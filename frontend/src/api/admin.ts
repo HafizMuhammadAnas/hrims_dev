@@ -1,0 +1,472 @@
+import { apiJsonHeaders, ensureCsrfCookie } from './client'
+import { ApiError, parseApiErrorResponse } from './apiError'
+
+async function throwIfNotOk(res: Response): Promise<void> {
+  if (!res.ok) throw new ApiError(await parseApiErrorResponse(res))
+}
+
+export type AdminRegion = { id: number; name: string; slug: string }
+export type AdminDistrict = { id: number; region_id: number; region_name: string | null; name: string; slug: string | null }
+export type AdminCatalogDepartment = {
+  id: number
+  region_ids: number[]
+  regions: Array<{ id: number; name: string; slug: string }>
+  code: string | null
+  name: string
+  type: string | null
+}
+export type AdminConvention = {
+  id: number
+  code: string
+  name: string
+  knowledge_icon: string | null
+  knowledge_adopted: string | null
+  knowledge_ratified: string | null
+  knowledge_articles: string | null
+  knowledge_implementation: string | null
+  description: string | null
+  sort_order: number
+  is_active: boolean
+}
+export type AdminConventionComponent = {
+  id: number
+  convention_id: number
+  parent_id: number | null
+  type: string
+  code: string
+  title: string
+  body: string | null
+  sort_order: number
+}
+export type AdminSdgNode = {
+  id: number
+  parent_id: number | null
+  node_type: string
+  code: string
+  title: string
+  knowledge_icon: string | null
+  summary: string | null
+  body: string | null
+  stat_1_value: string | null
+  stat_1_label: string | null
+  stat_2_value: string | null
+  stat_2_label: string | null
+  goal_number: number | null
+  sort_order: number
+}
+export type AdminUpr = {
+  id: number
+  session_label: string
+  code: string
+  title: string
+  body: string | null
+  sort_order: number
+}
+export type AdminKnowledgeCard = {
+  id: number
+  section: string
+  icon: string
+  title: string
+  summary: string | null
+  stat_1_value: string | null
+  stat_1_label: string | null
+  stat_2_value: string | null
+  stat_2_label: string | null
+  body: string | null
+  sort_order: number
+}
+
+export type AdminIssueCategory = {
+  id: number
+  name: string
+}
+
+export type AdminArticleRow = {
+  id: number
+  article_name: string
+}
+
+export type AdminIssueIndicator = {
+  id: number
+  indicator_text: string
+  disaggregation: string | null
+}
+
+export type AdminIssueArticleRow = {
+  id: number
+  article_name: string
+  relevant_paragraph: string | null
+}
+
+export type AdminIssueArticlePayload = {
+  article_id: number
+  relevant_paragraph?: string | null
+}
+
+export type AdminIssue = {
+  id: number
+  convention_id: number
+  category_id: number
+  issue_title: string
+  has_quantitative: boolean
+  has_qualitative: boolean
+  convention: { id: number; code: string; name: string } | null
+  category: { id: number; name: string } | null
+  articles: AdminIssueArticleRow[]
+  article_ids: number[]
+  indicators: AdminIssueIndicator[]
+}
+
+async function adminGet<T>(path: string): Promise<T> {
+  const res = await fetch(`/api/v1/admin${path}`, { credentials: 'include', headers: { Accept: 'application/json' } })
+  await throwIfNotOk(res)
+  return (await res.json()) as T
+}
+
+async function adminSend(method: string, path: string, body?: unknown): Promise<Response> {
+  await ensureCsrfCookie()
+  return fetch(`/api/v1/admin${path}`, {
+    method,
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+}
+
+export async function adminFetchRegionsPublic(): Promise<AdminRegion[]> {
+  const res = await fetch('/api/v1/regions', { credentials: 'include', headers: { Accept: 'application/json' } })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: AdminRegion[] }
+  return json.data
+}
+
+export async function adminCreateRegion(body: { name: string; slug: string }): Promise<AdminRegion> {
+  const res = await adminSend('POST', '/regions', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminRegion
+}
+
+export async function adminDeleteRegion(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/regions/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchDistricts(regionId?: number): Promise<AdminDistrict[]> {
+  const q = regionId != null ? `?region_id=${regionId}` : ''
+  const json = await adminGet<{ data: AdminDistrict[] }>(`/districts${q}`)
+  return json.data
+}
+
+export async function adminCreateDistrict(body: {
+  region_id: number
+  name: string
+  slug?: string | null
+}): Promise<AdminDistrict> {
+  const res = await adminSend('POST', '/districts', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminDistrict
+}
+
+export async function adminDeleteDistrict(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/districts/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchCatalogDepartments(): Promise<AdminCatalogDepartment[]> {
+  const json = await adminGet<{ data: AdminCatalogDepartment[] }>('/catalog/departments')
+  return json.data
+}
+
+export async function adminCreateDepartment(body: {
+  region_ids: number[]
+  code?: string | null
+  name: string
+  type?: string | null
+}): Promise<AdminCatalogDepartment> {
+  const res = await adminSend('POST', '/catalog/departments', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminCatalogDepartment
+}
+
+export async function adminUpdateDepartment(
+  id: number,
+  body: { region_ids?: number[]; code?: string | null; name?: string; type?: string | null },
+): Promise<AdminCatalogDepartment> {
+  const res = await adminSend('PATCH', `/catalog/departments/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminCatalogDepartment
+}
+
+export async function adminDeleteDepartment(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/catalog/departments/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchConventions(): Promise<AdminConvention[]> {
+  const json = await adminGet<{ data: AdminConvention[] }>('/conventions')
+  return json.data
+}
+
+export async function adminCreateConvention(body: {
+  code: string
+  name: string
+  description?: string | null
+  sort_order?: number
+}): Promise<AdminConvention> {
+  const res = await adminSend('POST', '/conventions', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminConvention
+}
+
+export async function adminDeleteConvention(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/conventions/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminUpdateConvention(
+  id: number,
+  body: Partial<{
+    code: string
+    name: string
+    knowledge_icon: string | null
+    knowledge_adopted: string | null
+    knowledge_ratified: string | null
+    knowledge_articles: string | null
+    knowledge_implementation: string | null
+    description: string | null
+    sort_order: number
+    is_active: boolean
+  }>,
+): Promise<AdminConvention> {
+  const res = await adminSend('PATCH', `/conventions/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminConvention
+}
+
+export async function adminFetchConventionComponents(conventionId: number): Promise<AdminConventionComponent[]> {
+  const json = await adminGet<{ data: AdminConventionComponent[] }>(`/conventions/${conventionId}/components`)
+  return json.data
+}
+
+export async function adminCreateConventionComponent(
+  conventionId: number,
+  body: { type: string; code: string; title: string; body?: string | null; parent_id?: number | null; sort_order?: number },
+): Promise<AdminConventionComponent> {
+  const res = await adminSend('POST', `/conventions/${conventionId}/components`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminConventionComponent
+}
+
+export async function adminDeleteConventionComponent(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/convention-components/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminUpdateConventionComponent(
+  id: number,
+  body: Partial<{
+    type: string
+    code: string
+    title: string
+    body: string | null
+    parent_id: number | null
+    sort_order: number
+  }>,
+): Promise<AdminConventionComponent> {
+  const res = await adminSend('PATCH', `/convention-components/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminConventionComponent
+}
+
+export async function adminFetchSdgNodes(): Promise<AdminSdgNode[]> {
+  const json = await adminGet<{ data: AdminSdgNode[] }>('/sdg-nodes')
+  return json.data
+}
+
+export async function adminCreateSdgNode(body: {
+  node_type: 'goal' | 'target' | 'indicator'
+  code: string
+  title: string
+  parent_id?: number | null
+  goal_number?: number | null
+  sort_order?: number
+}): Promise<AdminSdgNode> {
+  const res = await adminSend('POST', '/sdg-nodes', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminSdgNode
+}
+
+export async function adminDeleteSdgNode(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/sdg-nodes/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminUpdateSdgNode(
+  id: number,
+  body: Partial<{
+    parent_id: number | null
+    node_type: 'goal' | 'target' | 'indicator'
+    code: string
+    title: string
+    knowledge_icon: string | null
+    summary: string | null
+    body: string | null
+    stat_1_value: string | null
+    stat_1_label: string | null
+    stat_2_value: string | null
+    stat_2_label: string | null
+    goal_number: number | null
+    sort_order: number
+  }>,
+): Promise<AdminSdgNode> {
+  const res = await adminSend('PATCH', `/sdg-nodes/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminSdgNode
+}
+
+export async function adminFetchUpr(): Promise<AdminUpr[]> {
+  const json = await adminGet<{ data: AdminUpr[] }>('/upr-recommendations')
+  return json.data
+}
+
+export async function adminCreateUpr(body: {
+  session_label: string
+  code: string
+  title: string
+  body?: string | null
+  sort_order?: number
+}): Promise<AdminUpr> {
+  const res = await adminSend('POST', '/upr-recommendations', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUpr
+}
+
+export async function adminDeleteUpr(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/upr-recommendations/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminUpdateUpr(
+  id: number,
+  body: Partial<{
+    session_label: string
+    code: string
+    title: string
+    body: string | null
+    sort_order: number
+  }>,
+): Promise<AdminUpr> {
+  const res = await adminSend('PATCH', `/upr-recommendations/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUpr
+}
+
+export async function adminFetchKnowledgeCards(section: 'indicators' | 'upr'): Promise<AdminKnowledgeCard[]> {
+  const json = await adminGet<{ data: AdminKnowledgeCard[] }>(`/knowledge-cards?section=${section}`)
+  return json.data
+}
+
+export async function adminCreateKnowledgeCard(body: {
+  section: 'indicators' | 'upr'
+  icon?: string
+  title: string
+  summary?: string | null
+  stat_1_value?: string | null
+  stat_1_label?: string | null
+  stat_2_value?: string | null
+  stat_2_label?: string | null
+  body?: string | null
+  sort_order?: number
+}): Promise<AdminKnowledgeCard> {
+  const res = await adminSend('POST', '/knowledge-cards', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminKnowledgeCard
+}
+
+export async function adminUpdateKnowledgeCard(
+  id: number,
+  body: Partial<{
+    icon: string
+    title: string
+    summary: string | null
+    stat_1_value: string | null
+    stat_1_label: string | null
+    stat_2_value: string | null
+    stat_2_label: string | null
+    body: string | null
+    sort_order: number
+  }>,
+): Promise<AdminKnowledgeCard> {
+  const res = await adminSend('PATCH', `/knowledge-cards/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminKnowledgeCard
+}
+
+export async function adminDeleteKnowledgeCard(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/knowledge-cards/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchIssueCategories(): Promise<AdminIssueCategory[]> {
+  const json = await adminGet<{ data: AdminIssueCategory[] }>('/issue-categories')
+  return json.data
+}
+
+export async function adminCreateIssueCategory(body: { name: string }): Promise<AdminIssueCategory> {
+  const res = await adminSend('POST', '/issue-categories', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminIssueCategory
+}
+
+export async function adminFetchArticles(): Promise<AdminArticleRow[]> {
+  const json = await adminGet<{ data: AdminArticleRow[] }>('/articles')
+  return json.data
+}
+
+export async function adminCreateArticle(body: { article_name: string }): Promise<AdminArticleRow> {
+  const res = await adminSend('POST', '/articles', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminArticleRow
+}
+
+export async function adminDeleteArticle(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/articles/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchIssues(): Promise<AdminIssue[]> {
+  const json = await adminGet<{ data: AdminIssue[] }>('/issues')
+  return json.data
+}
+
+export async function adminFetchIssue(id: number): Promise<AdminIssue> {
+  const json = await adminGet<{ data: AdminIssue }>(`/issues/${id}`)
+  return json.data
+}
+
+export type AdminIssuePayload = {
+  convention_id: number
+  category_id: number
+  issue_title: string
+  has_quantitative: boolean
+  has_qualitative: boolean
+  articles: AdminIssueArticlePayload[]
+  indicators?: Array<{ indicator_text: string; disaggregation?: string | null }>
+}
+
+export async function adminCreateIssue(body: AdminIssuePayload): Promise<AdminIssue> {
+  const res = await adminSend('POST', '/issues', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminIssue
+}
+
+export async function adminUpdateIssue(id: number, body: Partial<AdminIssuePayload>): Promise<AdminIssue> {
+  const res = await adminSend('PATCH', `/issues/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminIssue
+}
+
+export async function adminDeleteIssue(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/issues/${id}`)
+  await throwIfNotOk(res)
+}

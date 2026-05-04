@@ -1,0 +1,49 @@
+/* Approved palette — aligned with hrims_old/index.html */
+:root {
+  --solid-brown: #8b7345;
+  --solid-brown-hover: #7a6238;
+  --solid-blue: #2e4fa3;
+  --solid-blue-hover: #26488a;
+  --solid-teal: #0f766e;
+  --solid-teal-hover: #0d6560;
+
+  --grad-brown: var(--solid-brown);
+  --grad-brown-hover: var(--solid-brown-hover);
+  --grad-blue: var(--solid-blue);
+  --grad-blue-hover: var(--solid-blue-hover);
+  --grad-teal: var(--solid-teal);
+  --grad-teal-hover: var(--solid-teal-hover);
+
+  --theme-brown-mid: #c4a574;
+  --theme-primary: #2e4fa3;
+  --theme-primary-dark: #26488a;
+  --theme-surface-blue: #e8eefb;
+  --theme-surface-brown: #f5ede0;
+  --theme-surface-teal: #e6faf7;
+
+  --txt: #212121;
+  --txt-lt: #757575;
+  --bdr: #e0e0e0;
+  --err: #ef4444;
+
+  --grad-chrome: var(--solid-blue);
+
+  --accent-teal-dark: #0f766e;
+  --nav-section-title-green: #355e48;
+  --nav-section-title-accent: #4a7b62;
+  --pk-green: var(--theme-primary);
+
+  --table-header-bg: #d4eaf7;
+  --table-header-text: #1a3a5c;
+  --table-header-border: rgba(46, 79, 163, 0.18);
+
+  /* Form fields — aligned with admin “Create user” style: soft radius, light border, hover ring */
+  --field-radius: 8px;
+  --field-border: #d8dde4;
+  --field-border-hover: #6b8dd6;
+  --field-bg: #ffffff;
+  --field-bg-soft: #f0f4f8;
+  --field-pad-y: 10px;
+  --field-pad-x: 12px;
+  --field-shadow-focus: 0 0 0 3px rgba(46, 79, 163, 0.14);
+}
