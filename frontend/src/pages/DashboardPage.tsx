@@ -51,8 +51,18 @@ function count(map: Record<string, number> | undefined, key: string): number {
 function statusBadgeClass(status: string): string {
   if (status === 'completed') return 'status-badge success'
   if (status === 'overdue') return 'status-badge danger'
-  if (status === 'in-progress') return 'status-badge warning'
+  if (status === 'in-progress') return 'status-badge in-progress'
   return 'status-badge pending'
+}
+
+function urgentRowChrome(status: string): { background: string; borderLeft: string } {
+  if (status === 'overdue') {
+    return { background: '#ffebee', borderLeft: '#f44336' }
+  }
+  if (status === 'in-progress') {
+    return { background: '#e8eefb', borderLeft: '#2e4fa3' }
+  }
+  return { background: '#fff8e1', borderLeft: '#e69a00' }
 }
 
 function formatStatus(s: string): string {
@@ -209,69 +219,28 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <div className="dashboard-shortcuts">
-            {variant === 'federal' && (
-              <>
-                <Link to="/federal-department-requests" className="btn btn-secondary btn-compact">
-                  Departmental requests
-                </Link>
-                <Link to="/requests" className="btn btn-secondary btn-compact">
-                  HR requests
-                </Link>
-                <Link to="/responses" className="btn btn-secondary btn-compact">
-                  Regional responses
-                </Link>
-                <Link to="/federal-groups" className="btn btn-secondary btn-compact">
-                  Federal groups
-                </Link>
-                <Link to="/federal-department-responses" className="btn btn-secondary btn-compact">
-                  Departmental responses
-                </Link>
-                <Link to="/analysis" className="btn btn-secondary btn-compact">
-                  Analysis
-                </Link>
-                {isSuperAdmin(user) && (
-                  <Link to="/admin/regions-districts" className="btn btn-secondary btn-compact">
-                    Super admin
+          {(variant === 'department' || variant === 'viewer' || variant === 'minimal') && (
+            <div className="dashboard-shortcuts">
+              {(variant === 'department' || variant === 'viewer') && (
+                <>
+                  <Link to="/department-tasks" className="btn btn-secondary btn-compact">
+                    Department tasks
                   </Link>
-                )}
-              </>
-            )}
-            {variant === 'regional' && (
-              <>
-                <Link to="/region-received" className="btn btn-secondary btn-compact">
-                  Received requests
-                </Link>
+                  <Link to="/requests" className="btn btn-secondary btn-compact">
+                    Linked HR requests
+                  </Link>
+                  <Link to="/department-history" className="btn btn-secondary btn-compact">
+                    Submission history
+                  </Link>
+                </>
+              )}
+              {variant === 'minimal' && (
                 <Link to="/requests" className="btn btn-secondary btn-compact">
                   HR requests
                 </Link>
-                <Link to="/responses" className="btn btn-secondary btn-compact">
-                  Responses
-                </Link>
-                <Link to="/analysis" className="btn btn-secondary btn-compact">
-                  Analysis
-                </Link>
-              </>
-            )}
-            {(variant === 'department' || variant === 'viewer') && (
-              <>
-                <Link to="/department-tasks" className="btn btn-secondary btn-compact">
-                  Department tasks
-                </Link>
-                <Link to="/requests" className="btn btn-secondary btn-compact">
-                  Linked HR requests
-                </Link>
-                <Link to="/department-history" className="btn btn-secondary btn-compact">
-                  Submission history
-                </Link>
-              </>
-            )}
-            {variant === 'minimal' && (
-              <Link to="/requests" className="btn btn-secondary btn-compact">
-                HR requests
-              </Link>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <div className="dashboard-kpi-grid">
             {variant === 'department' || variant === 'viewer' ? (
@@ -464,9 +433,7 @@ export function DashboardPage() {
               <div className="dashboard-panel-head">
                 <h3 className="dashboard-panel-title">
                   <Clock size={20} />
-                  {variant === 'federal' || variant === 'minimal'
-                    ? 'Deadlines & priority'
-                    : 'Priority items'}
+                  Requests
                 </h3>
                 <button
                   type="button"
@@ -479,19 +446,20 @@ export function DashboardPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {urgentList.length > 0 ? (
                   urgentList.map((r: UrgentRequestRow) => {
+                    const chrome = urgentRowChrome(r.status)
                     return (
                       <button
                         key={r.id}
                         type="button"
-                        onClick={() => navigate('/requests')}
+                        onClick={() => navigate(`/requests/${r.id}`)}
                         style={{
                           textAlign: 'left',
                           cursor: 'pointer',
                           padding: 12,
-                          background: r.status === 'overdue' ? '#ffebee' : '#fff8e1',
+                          background: chrome.background,
                           borderRadius: 8,
                           border: 'none',
-                          borderLeft: `4px solid ${r.status === 'overdue' ? '#f44336' : '#ffb300'}`,
+                          borderLeft: `4px solid ${chrome.borderLeft}`,
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',

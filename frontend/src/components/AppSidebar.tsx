@@ -3,7 +3,6 @@ import {
   Activity,
   BarChart2,
   BookOpen,
-  Building2,
   ClipboardList,
   FileCheck,
   FileText,
@@ -97,7 +96,6 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-section-title">Super admin</div>
             <div className="nav-sub">
               <NavItem to="/admin/regions-districts" icon={MapPin} label="Regions & districts" onPick={onPick} />
-              <NavItem to="/admin/departments" icon={Building2} label="Departments" onPick={onPick} />
               <NavItem to="/admin/conventions" icon={Scale} label="Conventions & components" onPick={onPick} />
               <NavItem to="/admin/sdg-nodes" icon={Layers} label="SDG nodes" onPick={onPick} />
               <NavItem to="/admin/upr-recommendations" icon={ScrollText} label="UPR recommendations" onPick={onPick} />
@@ -134,10 +132,10 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-sub">
               <NavItem to="/region-received" icon={List} label="Received requests" onPick={onPick} />
               <NavItem to="/region-distribution" icon={ClipboardList} label="Request distribution" onPick={onPick} />
-              <NavItem to="/region-monitoring" icon={Activity} label="Department monitoring" onPick={onPick} />
+              <NavItem to="/region-monitoring" icon={Activity} label="Distributed requests" onPick={onPick} />
               <NavItem to="/region-compilation" icon={FileText} label="Response compilation" onPick={onPick} />
+              <NavItem to="/region-history" icon={History} label="Compiled and submitted" onPick={onPick} />
               <NavItem to="/regional-users-mgmt" icon={Users} label="User management" onPick={onPick} />
-              <NavItem to="/region-history" icon={History} label="Submission history" onPick={onPick} />
             </div>
           </>
         )}
@@ -156,7 +154,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
           <>
             <div className="nav-section-title">Read-only access</div>
             <div className="nav-sub">
-              {user.region?.slug === 'federal' ? (
+              {user.region?.slug === 'ict' || user.region?.slug === 'federal' ? (
                 <NavItem to="/federal-history" icon={History} label="History" onPick={onPick} />
               ) : (
                 <NavItem to="/region-history" icon={History} label="History" onPick={onPick} />

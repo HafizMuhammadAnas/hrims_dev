@@ -10,7 +10,7 @@ class Department extends Model
 {
     /** Allowed region slugs (matches regions seeded for the catalog). */
     public const REGION_SLUGS = [
-        'federal',
+        'ict',
         'punjab',
         'sindh',
         'balochistan',
@@ -43,6 +43,10 @@ class Department extends Model
 
     public function coversRegionSlug(string $slug): bool
     {
+        if ($slug === 'federal') {
+            $slug = 'ict';
+        }
+
         return $this->regions()->where('slug', $slug)->exists();
     }
 }

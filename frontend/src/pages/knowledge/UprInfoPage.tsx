@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchKnowledgeUprHighlights, type KnowledgeStatCard } from '../../api/knowledgeHub'
+import { KnowledgeHubIcon } from '../../components/KnowledgeHubIcon'
 
 export function UprInfoPage() {
   const [cards, setCards] = useState<KnowledgeStatCard[]>([])
@@ -33,7 +34,7 @@ export function UprInfoPage() {
         <div className="knowledge-grid">
           {cards.map((k) => (
             <div key={k.id} className="knowledge-card knowledge-card-static">
-              <div className="knowledge-card-icon">{k.icon}</div>
+              <KnowledgeHubIcon value={k.icon} fallback="📋" />
               <h3>{k.title}</h3>
               <p>{k.summary ?? '—'}</p>
               {k.body?.trim() ? (

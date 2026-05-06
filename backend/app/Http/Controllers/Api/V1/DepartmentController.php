@@ -24,7 +24,7 @@ class DepartmentController extends Controller
         }
 
         if ($user->hasRole('federal_admin')) {
-            $query->whereHas('regions', fn ($q) => $q->where('slug', 'federal'));
+            $query->whereHas('regions', fn ($q) => $q->where('slug', 'ict'));
         } elseif ($user->hasRole('regional_admin')) {
             if ($user->region_id === null) {
                 return response()->json(['message' => 'Forbidden'], 403);

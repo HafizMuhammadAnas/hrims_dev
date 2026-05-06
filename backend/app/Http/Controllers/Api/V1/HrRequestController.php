@@ -11,17 +11,46 @@ use App\Models\HrRequestAttachment;
 use App\Models\HrRequestIndicatorResponse;
 use App\Models\Issue;
 use App\Models\IssueIndicator;
+use App\Models\Region;
 use App\Support\HrimsAccess;
+use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class HrRequestController extends Controller
 {
+    /**
+     * Conventions available when creating/editing HR requests (all catalog rows).
+     * Unlike the knowledge hub list, this is not limited to `is_active` so regional/federal
+     * workflows can reference every convention that may have mapped issues.
+     */
+    public function formConventions(Request $request): JsonResponse
+    {
+        if (! HrimsAccess::canManageHrRequests($request->user())) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $q = Convention::query();
+        if (Schema::hasColumn('conventions', 'sort_order')) {
+            $q->orderBy('sort_order');
+        }
+        $rows = $q->orderBy('name')->get(['id', 'code', 'name']);
+
+        return response()->json([
+            'data' => $rows->map(fn (Convention $c) => [
+                'id' => $c->id,
+                'code' => $c->code,
+                'name' => $c->name,
+            ]),
+        ]);
+    }
+
     public function formIssues(Request $request): JsonResponse
     {
         if (! HrimsAccess::canManageHrRequests($request->user())) {
@@ -50,7 +79,7 @@ class HrRequestController extends Controller
         }
 
         $rows = Department::query()
-            ->whereHas('regions', fn ($q) => $q->where('slug', 'federal'))
+            ->whereHas('regions', fn ($q) => $q->where('slug', 'ict'))
             ->orderBy('name')
             ->get(['id', 'code', 'name']);
 
@@ -127,6 +156,7 @@ class HrRequestController extends Controller
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
         }
+        $previousStatus = $model->status;
 
         $regionIds = HrimsAccess::scopedRegionIds($request->user());
         if ($regionIds !== null && ! $this->requestTouchesAllowedRegions($model, $regionIds)) {
@@ -202,6 +232,13 @@ class HrRequestController extends Controller
             }
 
             if (array_key_exists('department_ids', $data)) {
+                $deptIds = array_values(array_unique(array_map('intval', $data['department_ids'])));
+                if ($deptIds !== []) {
+                    $effectiveRegionIds = array_key_exists('region_ids', $data)
+                        ? $data['region_ids']
+                        : $model->regions()->pluck('id')->all();
+                    $this->assertIctRegionAmongRequestRegions($effectiveRegionIds);
+                }
                 $this->validateFederalDepartments($data['department_ids']);
                 $model->departments()->sync($data['department_ids']);
             }
@@ -225,6 +262,8 @@ class HrRequestController extends Controller
             'attachments',
             'indicatorResponses',
         ]);
+
+        app(NotificationService::class)->notifyHrRequestUpdated($model, $request->user(), $previousStatus);
 
         return new HrRequestResource($model);
     }
@@ -334,7 +373,10 @@ class HrRequestController extends Controller
             $row->save();
         }
 
-        return new HrRequestResource($row->load(['region', 'regions', 'convention', 'issue', 'departments']));
+        $row = $row->load(['region', 'regions', 'convention', 'issue', 'departments']);
+        app(NotificationService::class)->notifyHrRequestCreated($row, $request->user());
+
+        return new HrRequestResource($row);
     }
 
     private function storeFromIssueForm(Request $request): HrRequestResource|JsonResponse
@@ -379,6 +421,7 @@ class HrRequestController extends Controller
 
         $departmentIds = array_values(array_unique(array_map('intval', $data['department_ids'] ?? [])));
         if ($departmentIds !== []) {
+            $this->assertIctRegionAmongRequestRegions($regionIds);
             $this->validateFederalDepartments($departmentIds);
         }
 
@@ -437,6 +480,8 @@ class HrRequestController extends Controller
                 'indicatorResponses',
             ]);
         });
+
+        app(NotificationService::class)->notifyHrRequestCreated($row, $request->user());
 
         return new HrRequestResource($row);
     }
@@ -497,18 +542,31 @@ class HrRequestController extends Controller
                     'indicator_responses' => ['One or more indicators are not part of this issue.'],
                 ]);
             }
+            $indicatorRow = IssueIndicator::query()
+                ->where('issue_id', $issue->id)
+                ->whereKey($iid)
+                ->first();
+            if (! $indicatorRow) {
+                throw ValidationException::withMessages([
+                    'indicator_responses' => ['One or more indicators are not part of this issue.'],
+                ]);
+            }
+            $flags = $issue->effectiveIndicatorFlags($indicatorRow);
+            $allowsQ = $flags['has_quantitative'];
+            $allowsL = $flags['has_qualitative'];
+
             $qv = $r['quantitative_value'] ?? null;
             $hasQv = $qv !== null && $qv !== '';
-            if ($hasQv && ! $issue->has_quantitative) {
+            if ($hasQv && ! $allowsQ) {
                 throw ValidationException::withMessages([
-                    'indicator_responses' => ['Quantitative values are not enabled for this issue.'],
+                    'indicator_responses' => ['Quantitative values are not enabled for this indicator.'],
                 ]);
             }
             $qt = $r['qualitative_text'] ?? null;
             $hasQt = $qt !== null && $qt !== '';
-            if ($hasQt && ! $issue->has_qualitative) {
+            if ($hasQt && ! $allowsL) {
                 throw ValidationException::withMessages([
-                    'indicator_responses' => ['Qualitative text is not enabled for this issue.'],
+                    'indicator_responses' => ['Qualitative text is not enabled for this indicator.'],
                 ]);
             }
             HrRequestIndicatorResponse::query()->create([
@@ -523,13 +581,30 @@ class HrRequestController extends Controller
     /**
      * @param  list<int>  $departmentIds
      */
+    /**
+     * @param  list<int|string>  $regionIds
+     */
+    private function assertIctRegionAmongRequestRegions(array $regionIds): void
+    {
+        $ictId = Region::query()->whereIn('slug', ['ict', 'federal'])->value('id');
+        if (! $ictId) {
+            return;
+        }
+        $ids = array_map('intval', $regionIds);
+        if (! in_array((int) $ictId, $ids, true)) {
+            throw ValidationException::withMessages([
+                'department_ids' => ['Include the ICT region when linking ICT / national-line departments.'],
+            ]);
+        }
+    }
+
     private function validateFederalDepartments(array $departmentIds): void
     {
         foreach ($departmentIds as $did) {
             $dept = Department::query()->find($did);
-            if (! $dept || ! $dept->coversRegionSlug('federal')) {
+            if (! $dept || ! $dept->coversRegionSlug('ict')) {
                 throw ValidationException::withMessages([
-                    'department_ids' => ['Departments must be federal-line departments.'],
+                    'department_ids' => ['Departments must be ICT / national-line departments.'],
                 ]);
             }
         }
@@ -591,6 +666,7 @@ class HrRequestController extends Controller
         return [
             'id' => $i->id,
             'issue_title' => $i->issue_title,
+            'description' => $i->description,
             'has_quantitative' => (bool) $i->has_quantitative,
             'has_qualitative' => (bool) $i->has_qualitative,
             'category' => $i->category
@@ -601,11 +677,17 @@ class HrRequestController extends Controller
                 'article_name' => $a->article_name,
                 'relevant_paragraph' => $a->pivot->relevant_paragraph ?? null,
             ])->values()->all(),
-            'indicators' => $i->indicators->map(fn (IssueIndicator $ind) => [
-                'id' => $ind->id,
-                'indicator_text' => $ind->indicator_text,
-                'disaggregation' => $ind->disaggregation,
-            ])->values()->all(),
+            'indicators' => $i->indicators->map(function (IssueIndicator $ind) use ($i) {
+                $flags = $i->effectiveIndicatorFlags($ind);
+
+                return [
+                    'id' => $ind->id,
+                    'indicator_text' => $ind->indicator_text,
+                    'disaggregation' => $ind->disaggregation,
+                    'has_quantitative' => $flags['has_quantitative'],
+                    'has_qualitative' => $flags['has_qualitative'],
+                ];
+            })->values()->all(),
         ];
     }
 }

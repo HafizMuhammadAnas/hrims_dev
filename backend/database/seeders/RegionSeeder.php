@@ -10,7 +10,7 @@ class RegionSeeder extends Seeder
     public function run(): void
     {
         $regions = [
-            ['name' => 'Federal', 'slug' => 'federal'],
+            ['name' => 'ICT', 'slug' => 'ict'],
             ['name' => 'Punjab', 'slug' => 'punjab'],
             ['name' => 'Sindh', 'slug' => 'sindh'],
             ['name' => 'Balochistan', 'slug' => 'balochistan'],

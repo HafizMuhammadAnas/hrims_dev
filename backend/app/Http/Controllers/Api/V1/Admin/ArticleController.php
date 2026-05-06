@@ -36,6 +36,21 @@ class ArticleController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, Article $article): JsonResponse
+    {
+        $data = $request->validate([
+            'article_name' => ['required', 'string', 'max:255'],
+        ]);
+        $article->forceFill($data)->save();
+
+        return response()->json([
+            'data' => [
+                'id' => $article->id,
+                'article_name' => $article->article_name,
+            ],
+        ]);
+    }
+
     public function destroy(Article $article): JsonResponse
     {
         if ($article->issues()->exists()) {

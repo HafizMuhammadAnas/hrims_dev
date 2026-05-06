@@ -4,14 +4,13 @@ import {
   createHrRequestFromIssueForm,
   fetchHrRequestFormFederalDepartments,
   fetchHrRequestFormIssues,
-  fetchKnowledgeConventions,
+  fetchHrRequestFormConventions,
   updateHrRequest,
   type FederalDepartmentOption,
   type HrRequestIndicatorResponseInput,
   type KnowledgeConventionRow,
 } from '../api/hrRequests'
 import type { RegionRow } from '../api/regions'
-import { useAuth } from '../auth/AuthContext'
 import { HR_REQUEST_STATUSES } from '../data/hrRequestFormLookups'
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
 import { Alert, FieldError } from './ui/Alert'
@@ -26,6 +25,21 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+/** ICT replaced the former “federal” region; accept legacy slug until data is migrated. */
+function isIctRegionSlug(slug: string | undefined): boolean {
+  return slug === 'ict' || slug === 'federal'
+}
+
+/** Matches Super Admin → Issues & mapping: `ICCPR — International Covenant on…`. */
+function conventionOptionLabel(c: { code?: string | null; name?: string | null }): string {
+  const code = (c.code ?? '').trim()
+  const name = (c.name ?? '').trim()
+  if (code && name) return `${code} — ${name}`
+  if (name) return name
+  if (code) return code
+  return 'Convention'
+}
+
 type IndicatorValues = Record<number, { quantitative: string; qualitative: string }>
 
 type IssueFormState = {
@@ -37,6 +51,8 @@ type IssueFormState = {
   date: string
   status: HrRequestStatus
   details: string
+  /** Indicators included in this request (subset of the issue’s indicators). */
+  selectedIndicatorIds: number[]
   indicatorValues: IndicatorValues
   attachmentFiles: File[]
 }
@@ -52,6 +68,7 @@ function emptyIssueForm(lockedRegionId: number | null): IssueFormState {
     date: todayIso(),
     status: 'pending',
     details: '',
+    selectedIndicatorIds: [],
     indicatorValues: {},
     attachmentFiles: [],
   }
@@ -76,6 +93,9 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
       qualitative: r.qualitative_text ?? '',
     }
   }
+  const selectedIndicatorIds = [
+    ...new Set((row.indicator_responses ?? []).map((r) => r.issue_indicator_id)),
+  ]
   return {
     title: row.title,
     convention_id: row.convention_id ?? '',
@@ -85,6 +105,7 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
     date: row.date,
     status: row.status,
     details: row.details ?? '',
+    selectedIndicatorIds,
     indicatorValues: ind,
     attachmentFiles: [],
   }
@@ -103,25 +124,45 @@ function initIndicatorValues(issue: HrRequestIssueDetail | null, prev: Indicator
   return next
 }
 
-function showQuantitative(issue: HrRequestIssueDetail): boolean {
+function hasExplicitIndicatorTypeFlags(ind: HrRequestIssueDetail['indicators'][number]): boolean {
+  return (
+    ind.has_quantitative === true ||
+    ind.has_quantitative === false ||
+    ind.has_qualitative === true ||
+    ind.has_qualitative === false
+  )
+}
+
+function indicatorAllowsQuantitative(
+  ind: HrRequestIssueDetail['indicators'][number],
+  issue: HrRequestIssueDetail,
+): boolean {
+  if (!hasExplicitIndicatorTypeFlags(ind)) return issue.has_quantitative
+  if (ind.has_quantitative || ind.has_qualitative) return Boolean(ind.has_quantitative)
   return issue.has_quantitative
 }
 
-function showQualitative(issue: HrRequestIssueDetail): boolean {
+function indicatorAllowsQualitative(
+  ind: HrRequestIssueDetail['indicators'][number],
+  issue: HrRequestIssueDetail,
+): boolean {
+  if (!hasExplicitIndicatorTypeFlags(ind)) return issue.has_qualitative
+  if (ind.has_quantitative || ind.has_qualitative) return Boolean(ind.has_qualitative)
   return issue.has_qualitative
 }
 
 function buildIndicatorPayload(
   issue: HrRequestIssueDetail,
   values: IndicatorValues,
+  selectedIds: number[],
 ): HrRequestIndicatorResponseInput[] {
+  const selected = new Set(selectedIds)
   const out: HrRequestIndicatorResponseInput[] = []
   for (const ind of issue.indicators) {
-    const v = values[ind.id]
-    if (!v) continue
+    if (!selected.has(ind.id)) continue
+    const v = values[ind.id] ?? { quantitative: '', qualitative: '' }
     const qRaw = v.quantitative.trim()
     const lRaw = v.qualitative.trim()
-    if (!qRaw && !lRaw) continue
     const entry: HrRequestIndicatorResponseInput = { issue_indicator_id: ind.id }
     if (qRaw !== '') {
       const n = Number(qRaw)
@@ -143,6 +184,8 @@ export type HrRequestModalProps = {
   lockedRegionId?: number | null
   onClose: () => void
   onSaved: () => void
+  /** Inline full-width layout (no overlay) for `/requests/:id` */
+  layout?: 'modal' | 'page'
 }
 
 export function HrRequestModal({
@@ -155,12 +198,8 @@ export function HrRequestModal({
   lockedRegionId = null,
   onClose,
   onSaved,
+  layout = 'modal',
 }: HrRequestModalProps) {
-  const { user } = useAuth()
-  const showFederalDepartments = Boolean(
-    user?.roles.some((r) => r.slug === 'federal_admin'),
-  )
-
   const assignableRegions = useMemo(() => {
     const base = regions.filter((r) => r.slug !== 'federal')
     if (lockedRegionId == null) return base
@@ -168,6 +207,14 @@ export function HrRequestModal({
     const mine = regions.find((r) => r.id === lockedRegionId)
     return mine ? [mine, ...base] : base
   }, [regions, lockedRegionId])
+
+  const ictRegionIdSet = useMemo(() => {
+    const s = new Set<number>()
+    for (const r of regions) {
+      if (isIctRegionSlug(r.slug)) s.add(r.id)
+    }
+    return s
+  }, [regions])
 
   const usesIssueFlow = mode === 'create' || Boolean(detail?.convention_id && detail?.issue_id)
 
@@ -192,7 +239,32 @@ export function HrRequestModal({
   const [formBanner, setFormBanner] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
+  /** Full list for the convention `<select>`, including `detail.convention` when the catalog fetch hasn’t merged yet (edit/view). */
+  const conventionChoices = useMemo((): KnowledgeConventionRow[] => {
+    const byId = new Map<number, KnowledgeConventionRow>()
+    for (const c of conventions) {
+      byId.set(c.id, c)
+    }
+    const conv = detail?.convention
+    if (conv && typeof conv.id === 'number' && !byId.has(conv.id)) {
+      byId.set(conv.id, { id: conv.id, code: conv.code, name: conv.name })
+    }
+    return Array.from(byId.values()).sort((a, b) =>
+      (a.code || a.name || '').localeCompare(b.code || b.name || '', undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }),
+    )
+  }, [conventions, detail?.convention])
+
   const readOnly = mode === 'view' || !canManage
+
+  const ictAmongSelected = useMemo(() => {
+    if (!issueForm) return false
+    return issueForm.region_ids.some((id) => ictRegionIdSet.has(id))
+  }, [issueForm?.region_ids, ictRegionIdSet])
+
+  const selectedRegionIdsKey = issueForm?.region_ids.join(',') ?? ''
 
   const loadIssues = useCallback(async (conventionId: number) => {
     setIssuesLoading(true)
@@ -250,18 +322,14 @@ export function HrRequestModal({
   }, [mode, detail, detailLoading, assignableRegions, lockedRegionId, loadIssues])
 
   useEffect(() => {
-    if (mode !== 'create' || !issueForm) return
+    if (mode !== 'create') return
     let cancelled = false
     setCatalogLoading(true)
     void (async () => {
       try {
-        const [convRows, deptRows] = await Promise.all([
-          fetchKnowledgeConventions(),
-          showFederalDepartments ? fetchHrRequestFormFederalDepartments() : Promise.resolve([]),
-        ])
+        const convRows = await fetchHrRequestFormConventions()
         if (!cancelled) {
           setConventions(convRows)
-          setFederalDepts(deptRows)
         }
       } catch {
         if (!cancelled) setFormBanner('Could not load form catalogs.')
@@ -272,13 +340,13 @@ export function HrRequestModal({
     return () => {
       cancelled = true
     }
-  }, [mode, issueForm, showFederalDepartments])
+  }, [mode])
 
   useEffect(() => {
     if (mode === 'create') return
     if (!detail?.convention_id) return
     let cancelled = false
-    void fetchKnowledgeConventions()
+    void fetchHrRequestFormConventions()
       .then((rows) => {
         if (!cancelled) setConventions(rows)
       })
@@ -289,18 +357,33 @@ export function HrRequestModal({
   }, [mode, detail?.id, detail?.convention_id])
 
   useEffect(() => {
-    if (mode === 'create' || !showFederalDepartments) return
-    if (!detail?.issue_id) return
+    if (readOnly || !issueForm) {
+      setFederalDepts([])
+      return
+    }
+    if (!ictAmongSelected) {
+      setFederalDepts([])
+      return
+    }
     let cancelled = false
     void fetchHrRequestFormFederalDepartments()
       .then((rows) => {
         if (!cancelled) setFederalDepts(rows)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) setFederalDepts([])
+      })
     return () => {
       cancelled = true
     }
-  }, [mode, detail?.id, detail?.issue_id, showFederalDepartments])
+  }, [readOnly, ictAmongSelected, selectedRegionIdsKey])
+
+  useEffect(() => {
+    if (!issueForm || readOnly) return
+    if (!ictAmongSelected && issueForm.department_ids.length > 0) {
+      setIssueForm((f) => (f ? { ...f, department_ids: [] } : f))
+    }
+  }, [ictAmongSelected, readOnly, issueForm?.department_ids.length])
 
   useEffect(() => {
     if (mode !== 'create' || !issueForm) return
@@ -338,6 +421,13 @@ export function HrRequestModal({
     if (issueForm.convention_id === '') fe.convention_id = 'Convention is required.'
     if (issueForm.issue_id === '') fe.issue_id = 'Issue is required.'
     if (!issueForm.date) fe.date = 'Due date is required.'
+    if (
+      selectedIssue &&
+      selectedIssue.indicators.length > 0 &&
+      issueForm.selectedIndicatorIds.length === 0
+    ) {
+      fe.indicator_ids = 'Select at least one indicator for this issue.'
+    }
     setFieldErrors(fe)
     if (Object.keys(fe).length > 0) {
       setFormBanner('Please correct the fields below.')
@@ -371,6 +461,7 @@ export function HrRequestModal({
 
     if (issueForm && usesIssueFlow) {
       if (!runIssueValidation() || !selectedIssue) return
+      const ictInPayload = issueForm.region_ids.some((id) => ictRegionIdSet.has(id))
       setSaving(true)
       try {
         if (mode === 'create') {
@@ -383,8 +474,12 @@ export function HrRequestModal({
             status: issueForm.status,
             details: issueForm.details.trim() || null,
             region_ids: issueForm.region_ids,
-            department_ids: showFederalDepartments ? issueForm.department_ids : [],
-            indicator_responses: buildIndicatorPayload(selectedIssue, issueForm.indicatorValues),
+            department_ids: ictInPayload ? issueForm.department_ids : [],
+            indicator_responses: buildIndicatorPayload(
+              selectedIssue,
+              issueForm.indicatorValues,
+              issueForm.selectedIndicatorIds,
+            ),
             attachments: issueForm.attachmentFiles,
           })
         } else if (mode === 'edit' && detail) {
@@ -394,11 +489,15 @@ export function HrRequestModal({
               issueForm.convention_id === '' ? undefined : issueForm.convention_id,
             issue_id: issueForm.issue_id === '' ? undefined : issueForm.issue_id,
             region_ids: issueForm.region_ids,
-            ...(showFederalDepartments ? { department_ids: issueForm.department_ids } : {}),
+            department_ids: ictInPayload ? issueForm.department_ids : [],
             date: issueForm.date,
             status: issueForm.status,
             details: issueForm.details.trim() || null,
-            indicator_responses: buildIndicatorPayload(selectedIssue, issueForm.indicatorValues),
+            indicator_responses: buildIndicatorPayload(
+              selectedIssue,
+              issueForm.indicatorValues,
+              issueForm.selectedIndicatorIds,
+            ),
           })
         }
         onSaved()
@@ -463,9 +562,11 @@ export function HrRequestModal({
   const requestIdHint =
     mode === 'create' ? 'Assigned automatically on save (REQ-YYYY-####).' : detail?.id ?? '—'
 
-  return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modal-card modal-card-wide" onClick={(e) => e.stopPropagation()}>
+  const card = (
+      <div
+        className={`modal-card modal-card-wide${layout === 'page' ? ' hr-request-modal--page' : ''}`}
+        onClick={layout === 'modal' ? (e) => e.stopPropagation() : undefined}
+      >
         <ModalHeader
           title={
             mode === 'create'
@@ -527,6 +628,7 @@ export function HrRequestModal({
                             ...f,
                             convention_id: v === '' ? '' : v,
                             issue_id: '',
+                            selectedIndicatorIds: [],
                             indicatorValues: {},
                           }
                         : f,
@@ -537,9 +639,9 @@ export function HrRequestModal({
                   aria-describedby={fieldErrors.convention_id ? 'hr-conv-err' : undefined}
                 >
                   <option value="">Select convention</option>
-                  {conventions.map((c) => (
+                  {conventionChoices.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {conventionOptionLabel(c)}
                     </option>
                   ))}
                 </select>
@@ -557,6 +659,7 @@ export function HrRequestModal({
                         ? {
                             ...f,
                             issue_id: v === '' ? '' : v,
+                            selectedIndicatorIds: [],
                           }
                         : f,
                     )
@@ -600,89 +703,99 @@ export function HrRequestModal({
                                 >
                                   {a.relevant_paragraph}
                                 </p>
-                              ) : (
-                                <p className="muted" style={{ margin: '4px 0 0' }}>
-                                  <em>No relevant paragraph recorded.</em>
-                                </p>
-                              )}
+                              ) : null}
                             </li>
                           ))}
                         </ul>
                       )}
                     </div>
                     <div>
-                      <strong>Indicators (linked to this issue)</strong>
+                      <strong>Indicators for this request</strong>
+                      <FieldError id="hr-ind-sel-err" message={fieldErrors.indicator_ids} />
                       {selectedIssue.indicators.length === 0 ? (
                         <p className="muted">—</p>
                       ) : (
-                        <ul className="mapping-indicators">
-                          {selectedIssue.indicators.map((ind) => (
-                            <li key={ind.id}>
-                              <div>{ind.indicator_text}</div>
-                              {ind.disaggregation && (
-                                <div className="muted small">Disaggregation: {ind.disaggregation}</div>
-                              )}
-                              {(showQuantitative(selectedIssue) || showQualitative(selectedIssue)) && (
-                                <div className="indicator-inputs">
-                                  {showQuantitative(selectedIssue) && (
-                                    <FormControl label="Quantitative" htmlFor={`hr-ind-q-${ind.id}`}>
-                                      <input
-                                        id={`hr-ind-q-${ind.id}`}
-                                        type="number"
-                                        step="any"
-                                        value={issueForm.indicatorValues[ind.id]?.quantitative ?? ''}
-                                        onChange={(e) =>
-                                          setIssueForm((f) =>
-                                            f
-                                              ? {
-                                                  ...f,
-                                                  indicatorValues: {
-                                                    ...f.indicatorValues,
-                                                    [ind.id]: {
-                                                      quantitative: e.target.value,
-                                                      qualitative:
-                                                        f.indicatorValues[ind.id]?.qualitative ?? '',
-                                                    },
-                                                  },
-                                                }
-                                              : f,
-                                          )
+                        <ul className="mapping-indicators" style={{ listStyle: 'none', paddingLeft: 0 }}>
+                          {selectedIssue.indicators.map((ind) => {
+                            const checked = issueForm.selectedIndicatorIds.includes(ind.id)
+                            const allowQ = indicatorAllowsQuantitative(ind, selectedIssue)
+                            const allowL = indicatorAllowsQualitative(ind, selectedIssue)
+                            const typeHint = [
+                              allowQ ? 'Quantitative' : null,
+                              allowL ? 'Qualitative' : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')
+                            return (
+                              <li key={ind.id} style={{ marginBottom: 12 }}>
+                                <label className="checkbox-label" style={{ alignItems: 'flex-start' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={readOnly}
+                                    onChange={(e) => {
+                                      const on = e.target.checked
+                                      setIssueForm((f) => {
+                                        if (!f) return f
+                                        const set = new Set(f.selectedIndicatorIds)
+                                        if (on) set.add(ind.id)
+                                        else set.delete(ind.id)
+                                        const nextVals = { ...f.indicatorValues }
+                                        if (!on) {
+                                          nextVals[ind.id] = { quantitative: '', qualitative: '' }
                                         }
-                                        disabled={readOnly}
-                                      />
-                                    </FormControl>
-                                  )}
-                                  {showQualitative(selectedIssue) && (
-                                    <FormControl label="Qualitative" htmlFor={`hr-ind-l-${ind.id}`}>
-                                      <input
-                                        id={`hr-ind-l-${ind.id}`}
-                                        type="text"
-                                        value={issueForm.indicatorValues[ind.id]?.qualitative ?? ''}
-                                        onChange={(e) =>
-                                          setIssueForm((f) =>
-                                            f
-                                              ? {
-                                                  ...f,
-                                                  indicatorValues: {
-                                                    ...f.indicatorValues,
-                                                    [ind.id]: {
-                                                      quantitative:
-                                                        f.indicatorValues[ind.id]?.quantitative ?? '',
-                                                      qualitative: e.target.value,
-                                                    },
-                                                  },
-                                                }
-                                              : f,
-                                          )
+                                        return {
+                                          ...f,
+                                          selectedIndicatorIds: [...set].sort((a, b) => a - b),
+                                          indicatorValues: nextVals,
                                         }
-                                        disabled={readOnly}
-                                      />
-                                    </FormControl>
-                                  )}
-                                </div>
-                              )}
-                            </li>
-                          ))}
+                                      })
+                                    }}
+                                  />
+                                  <span>
+                                    <span style={{ fontWeight: 600 }}>{ind.indicator_text}</span>
+                                    {typeHint ? (
+                                      <span className="muted small" style={{ marginLeft: 8 }}>
+                                        ({typeHint})
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </label>
+                                {ind.disaggregation && (
+                                  <div className="muted small" style={{ marginLeft: 28 }}>
+                                    Disaggregation: {ind.disaggregation}
+                                  </div>
+                                )}
+                                {checked &&
+                                  readOnly &&
+                                  (() => {
+                                    const resp = detail?.indicator_responses?.find(
+                                      (r) => r.issue_indicator_id === ind.id,
+                                    )
+                                    if (
+                                      !resp ||
+                                      (resp.quantitative_value == null &&
+                                        !(resp.qualitative_text && resp.qualitative_text.trim()))
+                                    ) {
+                                      return null
+                                    }
+                                    return (
+                                      <div className="muted small" style={{ marginLeft: 28, marginTop: 8 }}>
+                                        {resp.quantitative_value != null &&
+                                        !Number.isNaN(resp.quantitative_value) ? (
+                                          <div>Quantitative: {resp.quantitative_value}</div>
+                                        ) : null}
+                                        {resp.qualitative_text?.trim() ? (
+                                          <div style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>
+                                            Qualitative: {resp.qualitative_text}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    )
+                                  })()}
+                              </li>
+                            )
+                          })}
                         </ul>
                       )}
                     </div>
@@ -692,7 +805,7 @@ export function HrRequestModal({
 
               <FormField
                 label="Regions (optional)"
-                hint="Choose regions this request applies to. Your role may limit which regions you can select."
+                hint="Include ICT when this request applies at national level. ICT national-line departments can be linked after ICT is selected."
               >
                 <div className="checkbox-grid" role="group" aria-label="Regions (optional)">
                   {assignableRegions.map((r) => (
@@ -707,7 +820,12 @@ export function HrRequestModal({
                             const next = on
                               ? [...f.region_ids, r.id]
                               : f.region_ids.filter((x) => x !== r.id)
-                            return { ...f, region_ids: next }
+                            const ictStill = next.some((id) => ictRegionIdSet.has(id))
+                            return {
+                              ...f,
+                              region_ids: next,
+                              department_ids: ictStill ? f.department_ids : [],
+                            }
                           })
                         }
                         disabled={readOnly || lockedRegionId != null}
@@ -719,30 +837,43 @@ export function HrRequestModal({
                 <FieldError id="hr-regions-err" message={fieldErrors.region_ids} />
               </FormField>
 
-              {showFederalDepartments && federalDepts.length > 0 && (
+              {readOnly && (detail?.departments?.length ?? 0) > 0 && (
+                <FormField label="ICT departments">
+                  <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                    {detail!.departments!.map((d) => (
+                      <li key={d.id}>
+                        {d.name} ({d.code})
+                      </li>
+                    ))}
+                  </ul>
+                </FormField>
+              )}
+
+              {!readOnly && ictAmongSelected && federalDepts.length > 0 && (
                 <FormField
-                  label="Federal departments (optional)"
-                  hint="Link national-line departments when coordinating this request at federal level."
+                  label="ICT departments (optional)"
+                  hint="Select one or more national-line departments for this request."
                 >
-                  <div className="checkbox-grid" role="group" aria-label="Federal departments (optional)">
+                  <div className="checkbox-grid" role="group" aria-label="ICT departments (optional)">
                     {federalDepts.map((d) => (
                       <label key={d.id} className="checkbox-label">
                         <input
                           type="checkbox"
                           checked={issueForm.department_ids.includes(d.id)}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const on = e.target.checked
                             setIssueForm((f) => {
                               if (!f) return f
-                              const on = e.target.checked
                               const next = on
                                 ? [...f.department_ids, d.id]
                                 : f.department_ids.filter((x) => x !== d.id)
                               return { ...f, department_ids: next }
                             })
-                          }
-                          disabled={readOnly}
+                          }}
                         />
-                        {d.name}
+                        <span>
+                          {d.name} <span className="muted small">({d.code})</span>
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -972,6 +1103,15 @@ export function HrRequestModal({
         )}
 
       </div>
+  )
+
+  if (layout === 'page') {
+    return card
+  }
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+      {card}
     </div>
   )
 }

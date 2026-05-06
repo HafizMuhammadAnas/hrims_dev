@@ -35,4 +35,29 @@ class IssueCategoryController extends Controller
             ],
         ], 201);
     }
+
+    public function update(Request $request, IssueCategory $issue_category): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+        $issue_category->forceFill($data)->save();
+
+        return response()->json([
+            'data' => [
+                'id' => $issue_category->id,
+                'name' => $issue_category->name,
+            ],
+        ]);
+    }
+
+    public function destroy(IssueCategory $issue_category): JsonResponse
+    {
+        if ($issue_category->issues()->exists()) {
+            return response()->json(['message' => 'Category is used by one or more issues. Reassign or delete those issues first.'], 422);
+        }
+        $issue_category->delete();
+
+        return response()->json(['message' => 'Deleted']);
+    }
 }

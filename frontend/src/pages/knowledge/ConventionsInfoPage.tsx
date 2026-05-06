@@ -7,6 +7,7 @@ import {
   type KnowledgeConventionListItem,
 } from '../../api/knowledgeHub'
 import { isApiError } from '../../api/apiError'
+import { KnowledgeHubIcon } from '../../components/KnowledgeHubIcon'
 
 function ConventionDetail({
   data,
@@ -15,7 +16,6 @@ function ConventionDetail({
   data: KnowledgeConventionDetail
   onBack: () => void
 }) {
-  const icon = data.knowledge_icon?.trim() || '📜'
   const adopted = data.knowledge_adopted?.trim() || '—'
   const ratified = data.knowledge_ratified?.trim() || '—'
   const articles = data.knowledge_articles?.trim() || '—'
@@ -28,7 +28,7 @@ function ConventionDetail({
         All conventions
       </button>
       <div className="knowledge-hero">
-        <div className="knowledge-hero-icon">{icon}</div>
+        <KnowledgeHubIcon value={data.knowledge_icon} fallback="📜" variant="hero" />
         <div>
           <h2 className="knowledge-hero-title">{data.code}</h2>
           <p className="muted">{data.name}</p>
@@ -126,7 +126,7 @@ export function ConventionsInfoPage() {
               void openDetail(c.id)
             }}
           >
-            <div className="knowledge-card-icon">{c.knowledge_icon?.trim() || '📜'}</div>
+            <KnowledgeHubIcon value={c.knowledge_icon} fallback="📜" />
             <h3>{c.code}</h3>
             <p>{c.name}</p>
           </button>

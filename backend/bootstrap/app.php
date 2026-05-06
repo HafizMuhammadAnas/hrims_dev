@@ -27,7 +27,23 @@ return Application::configure(basePath: dirname(__DIR__))
 
                 return response()->json([
                     'message' => 'A database error occurred. Please try again or contact support.',
+                    ...(config('app.debug') ? [
+                        'debug' => $e->getMessage(),
+                    ] : []),
                 ], 500);
             }
+        });
+
+        // Temporary: turn APP_DEBUG=true on the server to see the real error for login failures.
+        $exceptions->render(function (\Throwable $e, Request $request) {
+            if (! config('app.debug') || ! $request->is('api/v1/auth/login') || $request->method() !== 'POST') {
+                return null;
+            }
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'exception' => $e::class,
+            ], 500);
         });
     })->create();

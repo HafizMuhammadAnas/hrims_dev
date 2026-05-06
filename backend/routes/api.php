@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\DepartmentTaskController;
 use App\Http\Controllers\Api\V1\FederalGroupController;
 use App\Http\Controllers\Api\V1\HrRequestController;
 use App\Http\Controllers\Api\V1\KnowledgeHubController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\RegionalResponseController;
 use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\UserController;
@@ -28,13 +29,17 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', fn () => ['status' => 'ok', 'app' => config('app.name')])->name('api.v1.health');
 
-    Route::post('/auth/login', [AuthController::class, 'login'])
-        ->middleware('throttle:5,1')
-        ->name('api.v1.auth.login');
+    // Throttle uses the default cache store; database cache without a `cache` table causes 500 here.
+    // Re-add e.g. ->middleware('throttle:5,1') after CACHE_STORE=file (or migrate cache table).
+    Route::post('/auth/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.v1.auth.reset-password');
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
         Route::get('/auth/me', [AuthController::class, 'me'])->name('api.v1.auth.me');
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('api.v1.notifications.index');
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('api.v1.notifications.read');
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('api.v1.notifications.read-all');
 
         Route::get('/regions', [RegionController::class, 'index'])->name('api.v1.regions.index');
         Route::get('/departments', [DepartmentController::class, 'index'])->name('api.v1.departments.index');
@@ -64,8 +69,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/compiled-records', [CompiledRecordController::class, 'store'])->name('api.v1.compiled-records.store');
         Route::get('/department-tasks', [DepartmentTaskController::class, 'index'])->name('api.v1.department-tasks.index');
         Route::post('/department-tasks', [DepartmentTaskController::class, 'store'])->name('api.v1.department-tasks.store');
+        Route::patch('/department-tasks/{departmentTask}', [DepartmentTaskController::class, 'updateReview'])->name('api.v1.department-tasks.update-review');
         Route::get('/violation-entries', [ViolationEntryController::class, 'index'])->name('api.v1.violation-entries.index');
 
+        Route::get('/hr-request-form/conventions', [HrRequestController::class, 'formConventions'])->name('api.v1.hr-request-form.conventions');
         Route::get('/hr-request-form/issues', [HrRequestController::class, 'formIssues'])->name('api.v1.hr-request-form.issues');
         Route::get('/hr-request-form/federal-departments', [HrRequestController::class, 'formFederalDepartments'])->name('api.v1.hr-request-form.federal-departments');
 
@@ -115,9 +122,12 @@ Route::prefix('v1')->group(function (): void {
 
             Route::get('/issue-categories', [AdminIssueCategoryController::class, 'index'])->name('api.v1.admin.issue-categories.index');
             Route::post('/issue-categories', [AdminIssueCategoryController::class, 'store'])->name('api.v1.admin.issue-categories.store');
+            Route::patch('/issue-categories/{issue_category}', [AdminIssueCategoryController::class, 'update'])->name('api.v1.admin.issue-categories.update');
+            Route::delete('/issue-categories/{issue_category}', [AdminIssueCategoryController::class, 'destroy'])->name('api.v1.admin.issue-categories.destroy');
 
             Route::get('/articles', [AdminArticleController::class, 'index'])->name('api.v1.admin.articles.index');
             Route::post('/articles', [AdminArticleController::class, 'store'])->name('api.v1.admin.articles.store');
+            Route::patch('/articles/{article}', [AdminArticleController::class, 'update'])->name('api.v1.admin.articles.update');
             Route::delete('/articles/{article}', [AdminArticleController::class, 'destroy'])->name('api.v1.admin.articles.destroy');
 
             Route::get('/issues', [AdminIssueController::class, 'index'])->name('api.v1.admin.issues.index');

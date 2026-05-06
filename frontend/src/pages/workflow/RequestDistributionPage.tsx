@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchHrRequests } from '../../api/hrRequests'
 import { fetchDepartmentTasks, type DepartmentTaskRow } from '../../api/lists'
 import { createDepartmentTask, fetchDepartments, type DepartmentRow } from '../../api/workflows'
@@ -15,6 +15,8 @@ type Props = {
 
 export function RequestDistributionPage({ title, nextPath }: Props) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const preselectReqId = searchParams.get('req')
   const [requests, setRequests] = useState<Awaited<ReturnType<typeof fetchHrRequests>>>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [departments, setDepartments] = useState<DepartmentRow[]>([])
@@ -42,10 +44,22 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
     return requests.filter((r) => !tasks.some((t) => t.req_id === r.id))
   }, [requests, tasks])
 
+  useEffect(() => {
+    if (!preselectReqId) return
+    if (!openRequests.some((r) => r.id === preselectReqId)) return
+    setSelectedReq(preselectReqId)
+  }, [preselectReqId, openRequests])
+
   const selectedRequestLabel = useMemo(
     () => openRequests.find((r) => r.id === selectedReq)?.title ?? '',
     [openRequests, selectedReq],
   )
+
+  const preselectUnavailable = useMemo(() => {
+    if (!preselectReqId || requests.length === 0) return false
+    if (openRequests.some((r) => r.id === preselectReqId)) return false
+    return requests.some((r) => r.id === preselectReqId)
+  }, [preselectReqId, requests, openRequests])
 
   async function assign() {
     if (!selectedReq) {
@@ -79,6 +93,12 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
       subtitle="Step 1: assign incoming requests to relevant departments with clear ownership."
     >
       {error && <p className="login-error">{error}</p>}
+      {preselectUnavailable && (
+        <p className="muted" style={{ marginTop: 12 }}>
+          Request <strong>{preselectReqId}</strong> is not in the undistributed list (it may already be assigned).
+          Choose another request below.
+        </p>
+      )}
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[

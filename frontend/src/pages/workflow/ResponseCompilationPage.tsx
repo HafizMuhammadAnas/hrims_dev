@@ -6,8 +6,14 @@ import { createRegionalResponse } from '../../api/workflows'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatsCards } from '../../components/ui/StatsCards'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
+import { countDepartmentTasksByWorkflow, workflowPresentation } from '../../lib/departmentTaskWorkflow'
 import type { HrRequestRow } from '../../types/hrRequest'
+
+function taskListSignature(tasks: DepartmentTaskRow[]): string {
+  return [...tasks.map((t) => t.id)].sort().join('\u001f')
+}
 
 type Props = {
   title: string
@@ -22,6 +28,8 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
   const [content, setContent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  /** Department task IDs to pull into the compilation draft (checkboxes). */
+  const [includedTaskIds, setIncludedTaskIds] = useState<string[]>([])
 
   useEffect(() => {
     void Promise.all([fetchHrRequests(), fetchDepartmentTasks()])
@@ -40,17 +48,43 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
     () => tasks.filter((t) => t.req_id === selectedReqId),
     [tasks, selectedReqId],
   )
+  const workflowCounts = useMemo(
+    () => (selectedReqId ? countDepartmentTasksByWorkflow(selectedTasks) : null),
+    [selectedReqId, selectedTasks],
+  )
+
+  const selectedTaskIdKey = useMemo(() => taskListSignature(selectedTasks), [selectedTasks])
+
+  useEffect(() => {
+    if (!selectedReqId) {
+      setIncludedTaskIds([])
+      return
+    }
+    setIncludedTaskIds(selectedTasks.map((t) => t.id))
+  }, [selectedReqId, selectedTaskIdKey])
+
+  const includedSet = useMemo(() => new Set(includedTaskIds), [includedTaskIds])
+
   const prefill = useMemo(() => {
-    if (!selectedTasks.length) return ''
-    return selectedTasks
-      .map(
-        (t) =>
+    const picked = selectedTasks.filter((t) => includedSet.has(t.id))
+    if (!picked.length) return ''
+    return picked
+      .map((t) => {
+        const wf = workflowPresentation(t)
+        return (
           `[${t.department_name ?? t.department_id}]` +
-          `\nStatus: ${t.status}` +
-          `\n${t.response_data ?? 'No response data yet.'}`,
-      )
+          `\nProgress: ${wf.label}` +
+          `\n${t.response_data ?? 'No response data yet.'}`
+        )
+      })
       .join('\n\n')
-  }, [selectedTasks])
+  }, [selectedTasks, includedSet])
+
+  function toggleTaskInclusion(taskId: string) {
+    setIncludedTaskIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId],
+    )
+  }
 
   async function submit() {
     if (!selectedReq) {
@@ -85,13 +119,24 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
     >
       {error && <p className="login-error">{error}</p>}
       <div style={{ marginTop: 16 }}>
-        <StatsCards
-          items={[
-            { label: 'Requests available', value: requests.length },
-            { label: 'Tasks linked to selection', value: selectedTasks.length },
-          ]}
-        />
+        <StatsCards items={[{ label: 'Requests available', value: requests.length }]} />
       </div>
+      {selectedReqId && workflowCounts && (
+        <div style={{ marginTop: 14 }}>
+          <p className="muted" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>
+            Distribution progress for <strong>{selectedReqId}</strong>
+          </p>
+          <StatsCards
+            items={[
+              { label: 'Departments distributed', value: selectedTasks.length },
+              { label: 'In process', value: workflowCounts.in_process },
+              { label: 'Responded', value: workflowCounts.responded },
+              { label: 'Revision', value: workflowCounts.revision },
+              { label: 'Accepted', value: workflowCounts.accepted },
+            ]}
+          />
+        </div>
+      )}
 
       <TableCard padded>
         <label className="muted">Select request ID</label>
@@ -109,14 +154,81 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
         </select>
 
         {selectedReq && (
-          <div style={{ marginBottom: 10 }}>
-            <p className="muted">
-              Linked department tasks: <strong>{selectedTasks.length}</strong>
-            </p>
-            {selectedTasks.length > 0 && !content && (
-              <Button variant="secondary" compact onClick={() => setContent(prefill)}>
-                Prefill from department task notes
-              </Button>
+          <div style={{ marginBottom: 14 }}>
+            {selectedTasks.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>
+                No departments have been assigned to this request yet. Use <strong>Request distribution</strong> first.
+              </p>
+            ) : (
+              <>
+                <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>
+                  <strong>{selectedTasks.length}</strong> department
+                  {selectedTasks.length === 1 ? '' : 's'} — breakdown above.{' '}
+                  <strong>{includedTaskIds.length}</strong> included in compilation draft.
+                </p>
+                <div
+                  className="compilation-dept-toolbar"
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginBottom: 10 }}
+                >
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => setIncludedTaskIds(selectedTasks.map((t) => t.id))}
+                  >
+                    Select all
+                  </button>
+                  <button type="button" className="link-button" onClick={() => setIncludedTaskIds([])}>
+                    Clear all
+                  </button>
+                </div>
+                <div className="compilation-dept-status-grid" style={{ marginBottom: 10 }}>
+                  {selectedTasks.map((t) => {
+                    const wf = workflowPresentation(t)
+                    const checked = includedSet.has(t.id)
+                    return (
+                      <label
+                        key={t.id}
+                        className="compilation-dept-status-row"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '8px 10px',
+                          border: '1px solid var(--field-border, #e1e7f5)',
+                          borderRadius: 8,
+                          marginBottom: 6,
+                          background: '#fafbfd',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleTaskInclusion(t.id)}
+                          aria-label={`Include ${t.department_name ?? t.department_id} in compilation`}
+                        />
+                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>
+                          {t.department_name ?? t.department_id}
+                        </span>
+                        <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
+                      </label>
+                    )
+                  })}
+                </div>
+                <Button
+                  variant="secondary"
+                  compact
+                  disabled={includedTaskIds.length === 0}
+                  onClick={() => setContent(prefill)}
+                >
+                  {content.trim() ? 'Replace draft with selected departments' : 'Prefill from selected departments'}
+                </Button>
+                {includedTaskIds.length === 0 && (
+                  <p className="muted" style={{ margin: '8px 0 0', fontSize: 12 }}>
+                    Select at least one department to build text from task notes.
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}

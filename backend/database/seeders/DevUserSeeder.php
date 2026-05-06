@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Department;
 use App\Models\RbacRole;
 use App\Models\Region;
 use App\Models\User;
@@ -17,7 +16,7 @@ class DevUserSeeder extends Seeder
      * - superadmin — Super administrator (catalog + create federal/regional admins)
      * - federal — Federal admin
      * - punjab_admin — Regional admin (Punjab)
-     * - punjab_edu — Department admin (if SEC-EDU department exists)
+     * Department logins are created by {@see DepartmentUsersSeeder} (username like punjab_sec_edu).
      */
     public function run(): void
     {
@@ -35,7 +34,7 @@ class DevUserSeeder extends Seeder
         $superRole = RbacRole::query()->where('slug', 'super_admin')->firstOrFail();
         $super->roles()->sync([$superRole->id]);
 
-        $federalRegion = Region::query()->where('slug', 'federal')->firstOrFail();
+        $federalRegion = Region::query()->where('slug', 'ict')->firstOrFail();
 
         $user = User::query()->updateOrCreate(
             ['username' => 'federal'],
@@ -66,22 +65,5 @@ class DevUserSeeder extends Seeder
         );
         $regionalRole = RbacRole::query()->where('slug', 'regional_admin')->firstOrFail();
         $regional->roles()->sync([$regionalRole->id]);
-
-        $eduDept = Department::query()->where('code', 'SEC-EDU')->first();
-        if ($eduDept) {
-            $deptUser = User::query()->updateOrCreate(
-                ['username' => 'punjab_edu'],
-                [
-                    'name' => 'Punjab Education (department)',
-                    'email' => 'punjab.edu@example.test',
-                    'password' => Hash::make('password'),
-                    'region_id' => $punjab->id,
-                    'department_id' => $eduDept->id,
-                    'is_active' => true,
-                ]
-            );
-            $deptRole = RbacRole::query()->where('slug', 'department_admin')->firstOrFail();
-            $deptUser->roles()->sync([$deptRole->id]);
-        }
     }
 }

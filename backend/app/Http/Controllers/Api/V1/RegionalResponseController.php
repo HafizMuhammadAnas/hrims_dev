@@ -7,6 +7,7 @@ use App\Models\HrRequest;
 use App\Models\RegionalResponse;
 use App\Models\User;
 use App\Support\HrimsAccess;
+use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -52,30 +53,57 @@ class RegionalResponseController extends Controller
         ]);
 
         $model->load(['region', 'hrRequest']);
+        app(NotificationService::class)->notifyRegionalResponseCreated($model, $request->user());
 
         return response()->json(['data' => $this->serialize($model)], 201);
     }
 
     public function update(Request $request, string $regionalResponse): JsonResponse
     {
-        if (! $request->user()->hasRole('federal_admin')) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
         $model = RegionalResponse::query()->with(['region', 'hrRequest'])->find($regionalResponse);
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        $data = $request->validate([
-            'review_status' => ['required', Rule::in(['pending', 'accepted', 'needs-modification', 'rejected'])],
-            'comments' => ['nullable', 'string'],
-        ]);
+        $user = $request->user();
 
-        $model->fill($data);
-        $model->save();
+        if ($user->hasRole('federal_admin')) {
+            $data = $request->validate([
+                'review_status' => ['required', Rule::in(['pending', 'accepted', 'needs-modification', 'rejected'])],
+                'comments' => ['nullable', 'string'],
+            ]);
 
-        return response()->json(['data' => $this->serialize($model->fresh(['region', 'hrRequest']))]);
+            $previousStatus = $model->review_status;
+            $model->fill($data);
+            $model->save();
+
+            app(NotificationService::class)->notifyRegionalResponseReviewed($model->fresh(['region', 'hrRequest']), $request->user(), $previousStatus);
+
+            return response()->json(['data' => $this->serialize($model->fresh(['region', 'hrRequest']))]);
+        }
+
+        if ($user->hasRole('regional_admin') && $user->region_id !== null) {
+            if ((int) $model->region_id !== (int) $user->region_id) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+            if ($model->review_status !== 'needs-modification') {
+                return response()->json(['message' => 'Only responses returned for modification can be updated.'], 422);
+            }
+
+            $data = $request->validate([
+                'title' => ['required', 'string', 'max:500'],
+                'content' => ['required', 'string'],
+            ]);
+
+            $model->title = $data['title'];
+            $model->content = $data['content'];
+            $model->review_status = 'pending';
+            $model->save();
+
+            return response()->json(['data' => $this->serialize($model->fresh(['region', 'hrRequest']))]);
+        }
+
+        return response()->json(['message' => 'Forbidden'], 403);
     }
 
     public function index(Request $request): JsonResponse

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import {
   adminCreateConvention,
@@ -8,6 +8,7 @@ import {
   adminCreateArticle,
   adminCreateIssue,
   adminCreateIssueCategory,
+  adminDeleteIssueCategory,
   adminCreateKnowledgeCard,
   adminCreateRegion,
   adminCreateSdgNode,
@@ -17,6 +18,7 @@ import {
   adminDeleteDepartment,
   adminDeleteDistrict,
   adminDeleteIssue,
+  adminDeleteArticle,
   adminDeleteKnowledgeCard,
   adminDeleteRegion,
   adminDeleteSdgNode,
@@ -35,9 +37,13 @@ import {
   adminFetchUpr,
   adminUpdateConvention,
   adminUpdateConventionComponent,
+  adminUpdateDistrict,
   adminUpdateDepartment,
   adminUpdateIssue,
+  adminUpdateIssueCategory,
+  adminUpdateArticle,
   adminUpdateKnowledgeCard,
+  adminUpdateRegion,
   adminUpdateSdgNode,
   adminUpdateUpr,
   type AdminArticleRow,
@@ -51,6 +57,7 @@ import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
+import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { TableCard } from '../components/ui/TableCard'
 import { FormControl } from '../components/ui/FormControl'
 import { FormField } from '../components/ui/FormField'
@@ -69,7 +76,6 @@ type Tab =
 
 const ADMIN_SECTION_TO_TAB: Record<string, Tab> = {
   'regions-districts': 'geography',
-  departments: 'departments',
   conventions: 'conventions',
   'sdg-nodes': 'sdg',
   'upr-recommendations': 'upr',
@@ -105,8 +111,7 @@ const TAB_PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
   },
   issues: {
     title: 'Issues & mappings',
-    subtitle:
-      'Define issues by convention and category. Each linked treaty article has its own relevant paragraph; then attach indicators (quantitative / qualitative) for reporting.',
+    subtitle: '',
   },
 }
 
@@ -132,6 +137,13 @@ export function SuperAdminConsolePage() {
   const [editingIssue, setEditingIssue] = useState<AdminIssue | null>(null)
 
   const [geoRegionId, setGeoRegionId] = useState<string>('')
+  const [editingRegionId, setEditingRegionId] = useState<number | null>(null)
+  const [editRegionName, setEditRegionName] = useState('')
+  const [editRegionSlug, setEditRegionSlug] = useState('')
+  const [editingDistrictId, setEditingDistrictId] = useState<number | null>(null)
+  const [editDistrictRegionId, setEditDistrictRegionId] = useState<number | ''>('')
+  const [editDistrictName, setEditDistrictName] = useState('')
+  const [editDistrictSlug, setEditDistrictSlug] = useState('')
 
   const [editingDeptId, setEditingDeptId] = useState<number | null>(null)
   const [editDeptRegionIds, setEditDeptRegionIds] = useState<number[]>([])
@@ -274,26 +286,78 @@ export function SuperAdminConsolePage() {
             <tbody>
               {regions.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.name}</td>
-                  <td>{r.slug}</td>
-                  <td>
-                    <Button
-                      variant="link"
-                      dangerLink
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            await adminDeleteRegion(r.id)
-                            setRegions(await adminFetchRegionsPublic())
-                          } catch (e: unknown) {
-                            setError(isApiError(e) ? e.message : 'Delete failed')
-                          }
-                        })()
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </td>
+                  {editingRegionId === r.id ? (
+                    <>
+                      <td>
+                        <input value={editRegionName} onChange={(e) => setEditRegionName(e.target.value)} />
+                      </td>
+                      <td>
+                        <input value={editRegionSlug} onChange={(e) => setEditRegionSlug(e.target.value)} />
+                      </td>
+                      <td>
+                        <Button
+                          variant="primary"
+                          compact
+                          disabled={!editRegionName.trim() || !editRegionSlug.trim()}
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await adminUpdateRegion(r.id, {
+                                  name: editRegionName.trim(),
+                                  slug: editRegionSlug.trim(),
+                                })
+                                setEditingRegionId(null)
+                                setRegions(await adminFetchRegionsPublic())
+                              } catch (e: unknown) {
+                                setError(isApiError(e) ? e.message : 'Update failed')
+                              }
+                            })()
+                          }}
+                        >
+                          Save
+                        </Button>{' '}
+                        <Button variant="link" compact onClick={() => setEditingRegionId(null)}>
+                          Cancel
+                        </Button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{r.name}</td>
+                      <td>{r.slug}</td>
+                      <td>
+                        <ActionMenu>
+                          <Button
+                            variant="link"
+                            compact
+                            onClick={() => {
+                              setEditingRegionId(r.id)
+                              setEditRegionName(r.name)
+                              setEditRegionSlug(r.slug)
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="link"
+                            dangerLink
+                            onClick={() => {
+                              void (async () => {
+                                try {
+                                  await adminDeleteRegion(r.id)
+                                  setRegions(await adminFetchRegionsPublic())
+                                } catch (e: unknown) {
+                                  setError(isApiError(e) ? e.message : 'Delete failed')
+                                }
+                              })()
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </ActionMenu>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -330,27 +394,93 @@ export function SuperAdminConsolePage() {
             <tbody>
               {districts.map((d) => (
                 <tr key={d.id}>
-                  <td>{d.region_name ?? d.region_id}</td>
-                  <td>{d.name}</td>
-                  <td>{d.slug ?? '—'}</td>
-                  <td>
-                    <Button
-                      variant="link"
-                      dangerLink
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            await adminDeleteDistrict(d.id)
-                            setDistricts(await adminFetchDistricts(geoRegionId ? Number(geoRegionId) : undefined))
-                          } catch (e: unknown) {
-                            setError(isApiError(e) ? e.message : 'Delete failed')
-                          }
-                        })()
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </td>
+                  {editingDistrictId === d.id ? (
+                    <>
+                      <td>
+                        <select
+                          value={editDistrictRegionId}
+                          onChange={(e) => setEditDistrictRegionId(e.target.value === '' ? '' : Number(e.target.value))}
+                        >
+                          <option value="">—</option>
+                          {regions.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <input value={editDistrictName} onChange={(e) => setEditDistrictName(e.target.value)} />
+                      </td>
+                      <td>
+                        <input value={editDistrictSlug} onChange={(e) => setEditDistrictSlug(e.target.value)} />
+                      </td>
+                      <td>
+                        <Button
+                          variant="primary"
+                          compact
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await adminUpdateDistrict(d.id, {
+                                  region_id: Number(editDistrictRegionId),
+                                  name: editDistrictName.trim(),
+                                  slug: editDistrictSlug.trim() || null,
+                                })
+                                setEditingDistrictId(null)
+                                setDistricts(await adminFetchDistricts(geoRegionId ? Number(geoRegionId) : undefined))
+                              } catch (e: unknown) {
+                                setError(isApiError(e) ? e.message : 'Update failed')
+                              }
+                            })()
+                          }}
+                        >
+                          Save
+                        </Button>{' '}
+                        <Button variant="link" compact onClick={() => setEditingDistrictId(null)}>
+                          Cancel
+                        </Button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{d.region_name ?? d.region_id}</td>
+                      <td>{d.name}</td>
+                      <td>{d.slug ?? '—'}</td>
+                      <td>
+                        <ActionMenu>
+                          <Button
+                            variant="link"
+                            compact
+                            onClick={() => {
+                              setEditingDistrictId(d.id)
+                              setEditDistrictRegionId(d.region_id)
+                              setEditDistrictName(d.name)
+                              setEditDistrictSlug(d.slug ?? '')
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="link"
+                            dangerLink
+                            onClick={() => {
+                              void (async () => {
+                                try {
+                                  await adminDeleteDistrict(d.id)
+                                  setDistricts(await adminFetchDistricts(geoRegionId ? Number(geoRegionId) : undefined))
+                                } catch (e: unknown) {
+                                  setError(isApiError(e) ? e.message : 'Delete failed')
+                                }
+                              })()
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </ActionMenu>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -447,35 +577,37 @@ export function SuperAdminConsolePage() {
                     <td>{d.name}</td>
                     <td>{d.type ?? '—'}</td>
                     <td>
-                      <Button
-                        variant="link"
-                        compact
-                        onClick={() => {
-                          setEditingDeptId(d.id)
-                          setEditDeptRegionIds(d.region_ids ?? [])
-                          setEditDeptCode(d.code ?? '')
-                          setEditDeptName(d.name)
-                          setEditDeptType(d.type ?? '')
-                        }}
-                      >
-                        Edit
-                      </Button>{' '}
-                      <Button
-                        variant="link"
-                        dangerLink
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await adminDeleteDepartment(d.id)
-                              setDepartments(await adminFetchCatalogDepartments())
-                            } catch (e: unknown) {
-                              setError(isApiError(e) ? e.message : 'Delete failed')
-                            }
-                          })()
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      <ActionMenu>
+                        <Button
+                          variant="link"
+                          compact
+                          onClick={() => {
+                            setEditingDeptId(d.id)
+                            setEditDeptRegionIds(d.region_ids ?? [])
+                            setEditDeptCode(d.code ?? '')
+                            setEditDeptName(d.name)
+                            setEditDeptType(d.type ?? '')
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="link"
+                          dangerLink
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await adminDeleteDepartment(d.id)
+                                setDepartments(await adminFetchCatalogDepartments())
+                              } catch (e: unknown) {
+                                setError(isApiError(e) ? e.message : 'Delete failed')
+                              }
+                            })()
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </ActionMenu>
                     </td>
                   </tr>
                 ),
@@ -591,44 +723,46 @@ export function SuperAdminConsolePage() {
                     <td>{c.code}</td>
                     <td>{c.name}</td>
                     <td>
-                      <Button
-                        variant="link"
-                        compact
-                        onClick={() => {
-                          setEditingConvId(c.id)
-                          setEditConvCode(c.code)
-                          setEditConvName(c.name)
-                          setEditConvIcon(c.knowledge_icon ?? '')
-                          setEditConvAdopted(c.knowledge_adopted ?? '')
-                          setEditConvRatified(c.knowledge_ratified ?? '')
-                          setEditConvArticles(c.knowledge_articles ?? '')
-                          setEditConvImpl(c.knowledge_implementation ?? '')
-                          setEditConvDesc(c.description ?? '')
-                          setEditConvSort(String(c.sort_order ?? 0))
-                        }}
-                      >
-                        Edit
-                      </Button>{' '}
-                      <Button variant="link" onClick={() => setSelConv(c.id)}>
-                        Components
-                      </Button>{' '}
-                      <Button
-                        variant="link"
-                        dangerLink
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await adminDeleteConvention(c.id)
-                              if (selConv === c.id) setSelConv('')
-                              setConventions(await adminFetchConventions())
-                            } catch (e: unknown) {
-                              setError(isApiError(e) ? e.message : 'Delete failed')
-                            }
-                          })()
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      <ActionMenu>
+                        <Button
+                          variant="link"
+                          compact
+                          onClick={() => {
+                            setEditingConvId(c.id)
+                            setEditConvCode(c.code)
+                            setEditConvName(c.name)
+                            setEditConvIcon(c.knowledge_icon ?? '')
+                            setEditConvAdopted(c.knowledge_adopted ?? '')
+                            setEditConvRatified(c.knowledge_ratified ?? '')
+                            setEditConvArticles(c.knowledge_articles ?? '')
+                            setEditConvImpl(c.knowledge_implementation ?? '')
+                            setEditConvDesc(c.description ?? '')
+                            setEditConvSort(String(c.sort_order ?? 0))
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button variant="link" onClick={() => setSelConv(c.id)}>
+                          Components
+                        </Button>
+                        <Button
+                          variant="link"
+                          dangerLink
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await adminDeleteConvention(c.id)
+                                if (selConv === c.id) setSelConv('')
+                                setConventions(await adminFetchConventions())
+                              } catch (e: unknown) {
+                                setError(isApiError(e) ? e.message : 'Delete failed')
+                              }
+                            })()
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </ActionMenu>
                     </td>
                   </tr>
                 ),
@@ -719,35 +853,37 @@ export function SuperAdminConsolePage() {
                         <td>{x.code}</td>
                         <td>{x.title}</td>
                         <td>
-                          <Button
-                            variant="link"
-                            compact
-                            onClick={() => {
-                              setEditingCompId(x.id)
-                              setEditCompType(x.type)
-                              setEditCompCode(x.code)
-                              setEditCompTitle(x.title)
-                              setEditCompBody(x.body ?? '')
-                            }}
-                          >
-                            Edit
-                          </Button>{' '}
-                          <Button
-                            variant="link"
-                            dangerLink
-                            onClick={() => {
-                              void (async () => {
-                                try {
-                                  await adminDeleteConventionComponent(x.id)
-                                  setConvComponents(await adminFetchConventionComponents(Number(selConv)))
-                                } catch (e: unknown) {
-                                  setError(isApiError(e) ? e.message : 'Delete failed')
-                                }
-                              })()
-                            }}
-                          >
-                            Delete
-                          </Button>
+                          <ActionMenu>
+                            <Button
+                              variant="link"
+                              compact
+                              onClick={() => {
+                                setEditingCompId(x.id)
+                                setEditCompType(x.type)
+                                setEditCompCode(x.code)
+                                setEditCompTitle(x.title)
+                                setEditCompBody(x.body ?? '')
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="link"
+                              dangerLink
+                              onClick={() => {
+                                void (async () => {
+                                  try {
+                                    await adminDeleteConventionComponent(x.id)
+                                    setConvComponents(await adminFetchConventionComponents(Number(selConv)))
+                                  } catch (e: unknown) {
+                                    setError(isApiError(e) ? e.message : 'Delete failed')
+                                  }
+                                })()
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </ActionMenu>
                         </td>
                       </tr>
                     ),
@@ -895,42 +1031,44 @@ export function SuperAdminConsolePage() {
                     <td>{n.code}</td>
                     <td>{n.title}</td>
                     <td>
-                      <Button
-                        variant="link"
-                        compact
-                        onClick={() => {
-                          setEditingSdgId(n.id)
-                          setEditSdgType(n.node_type)
-                          setEditSdgCode(n.code)
-                          setEditSdgTitle(n.title)
-                          setEditSdgGoalNum(n.goal_number != null ? String(n.goal_number) : '')
-                          setEditSdgIcon(n.knowledge_icon ?? '')
-                          setEditSdgSummary(n.summary ?? '')
-                          setEditSdgBody(n.body ?? '')
-                          setEditSdgS1v(n.stat_1_value ?? '')
-                          setEditSdgS1l(n.stat_1_label ?? '')
-                          setEditSdgS2v(n.stat_2_value ?? '')
-                          setEditSdgS2l(n.stat_2_label ?? '')
-                        }}
-                      >
-                        Edit
-                      </Button>{' '}
-                      <Button
-                        variant="link"
-                        dangerLink
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await adminDeleteSdgNode(n.id)
-                              setSdgNodes(await adminFetchSdgNodes())
-                            } catch (e: unknown) {
-                              setError(isApiError(e) ? e.message : 'Delete failed')
-                            }
-                          })()
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      <ActionMenu>
+                        <Button
+                          variant="link"
+                          compact
+                          onClick={() => {
+                            setEditingSdgId(n.id)
+                            setEditSdgType(n.node_type)
+                            setEditSdgCode(n.code)
+                            setEditSdgTitle(n.title)
+                            setEditSdgGoalNum(n.goal_number != null ? String(n.goal_number) : '')
+                            setEditSdgIcon(n.knowledge_icon ?? '')
+                            setEditSdgSummary(n.summary ?? '')
+                            setEditSdgBody(n.body ?? '')
+                            setEditSdgS1v(n.stat_1_value ?? '')
+                            setEditSdgS1l(n.stat_1_label ?? '')
+                            setEditSdgS2v(n.stat_2_value ?? '')
+                            setEditSdgS2l(n.stat_2_label ?? '')
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="link"
+                          dangerLink
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await adminDeleteSdgNode(n.id)
+                                setSdgNodes(await adminFetchSdgNodes())
+                              } catch (e: unknown) {
+                                setError(isApiError(e) ? e.message : 'Delete failed')
+                              }
+                            })()
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </ActionMenu>
                     </td>
                   </tr>
                 ),
@@ -1023,35 +1161,37 @@ export function SuperAdminConsolePage() {
                     <td>{u.code}</td>
                     <td>{u.title}</td>
                     <td>
-                      <Button
-                        variant="link"
-                        compact
-                        onClick={() => {
-                          setEditingUprId(u.id)
-                          setEditUprSession(u.session_label)
-                          setEditUprCode(u.code)
-                          setEditUprTitle(u.title)
-                          setEditUprBody(u.body ?? '')
-                        }}
-                      >
-                        Edit
-                      </Button>{' '}
-                      <Button
-                        variant="link"
-                        dangerLink
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await adminDeleteUpr(u.id)
-                              setUprRows(await adminFetchUpr())
-                            } catch (e: unknown) {
-                              setError(isApiError(e) ? e.message : 'Delete failed')
-                            }
-                          })()
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      <ActionMenu>
+                        <Button
+                          variant="link"
+                          compact
+                          onClick={() => {
+                            setEditingUprId(u.id)
+                            setEditUprSession(u.session_label)
+                            setEditUprCode(u.code)
+                            setEditUprTitle(u.title)
+                            setEditUprBody(u.body ?? '')
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="link"
+                          dangerLink
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await adminDeleteUpr(u.id)
+                                setUprRows(await adminFetchUpr())
+                              } catch (e: unknown) {
+                                setError(isApiError(e) ? e.message : 'Delete failed')
+                              }
+                            })()
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </ActionMenu>
                     </td>
                   </tr>
                 ),
@@ -1115,20 +1255,20 @@ export function SuperAdminConsolePage() {
 
       {tab === 'issues' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>Issues &amp; mapping</h3>
-          <p className="text-muted" style={{ fontSize: 14 }}>
-            For each issue, set whether numeric and/or text responses are required, then map articles with a relevant paragraph
-            and indicators per article.
-          </p>
-          <IssuesLookupBar
-            busy={busy}
-            setBusy={setBusy}
-            setError={setError}
-            onRefreshLookups={async () => {
-              setIssueFormCategories(await adminFetchIssueCategories())
-              setIssueFormArticles(await adminFetchArticles())
-            }}
-          />
+          <div className="issues-page-header-row">
+            <h3>Issues &amp; mapping</h3>
+            <IssuesLookupBar
+              categories={issueFormCategories}
+              articles={issueFormArticles}
+              busy={busy}
+              setBusy={setBusy}
+              setError={setError}
+              onRefreshLookups={async () => {
+                setIssueFormCategories(await adminFetchIssueCategories())
+                setIssueFormArticles(await adminFetchArticles())
+              }}
+            />
+          </div>
           <IssuesCreateForm
             conventions={issueFormConventions}
             categories={issueFormCategories}
@@ -1160,59 +1300,61 @@ export function SuperAdminConsolePage() {
           <table className="data-table" style={{ marginTop: 16 }}>
             <thead>
               <tr>
+                <th>Articles</th>
                 <th>Convention</th>
                 <th>Category</th>
-                <th>Issue title</th>
-                <th>Articles</th>
+                <th>Title</th>
                 <th>Indicators</th>
-                <th>Flags</th>
+                <th>Indicator data types</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {issues.map((i) => (
                 <tr key={i.id}>
+                  <td style={{ fontSize: 13 }}>{i.articles.map((a) => a.article_name).join(', ') || '—'}</td>
                   <td>{i.convention?.code ?? i.convention_id}</td>
                   <td>{i.category?.name ?? i.category_id}</td>
                   <td>{i.issue_title}</td>
-                  <td style={{ fontSize: 13 }}>{i.articles.map((a) => a.article_name).join(', ') || '—'}</td>
                   <td style={{ fontSize: 13 }}>{i.indicators.length}</td>
                   <td style={{ fontSize: 12 }} className="text-muted">
-                    Q:{i.has_quantitative ? '✓' : '—'} · L:{i.has_qualitative ? '✓' : '—'}
+                    Quantitative:{i.has_quantitative ? ' ✓' : ' —'} · Qualitative:{i.has_qualitative ? ' ✓' : ' —'}
                   </td>
                   <td>
-                    <Button
-                      variant="link"
-                      compact
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            setEditingIssue(await adminFetchIssue(i.id))
-                          } catch (e: unknown) {
-                            setError(isApiError(e) ? e.message : 'Load failed')
-                          }
-                        })()
-                      }}
-                    >
-                      Edit
-                    </Button>{' '}
-                    <Button
-                      variant="link"
-                      dangerLink
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            await adminDeleteIssue(i.id)
-                            setEditingIssue((cur) => (cur?.id === i.id ? null : cur))
-                            setIssues(await adminFetchIssues())
-                          } catch (e: unknown) {
-                            setError(isApiError(e) ? e.message : 'Delete failed')
-                          }
-                        })()
-                      }}
-                    >
-                      Delete
-                    </Button>
+                    <ActionMenu>
+                      <Button
+                        variant="link"
+                        compact
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              setEditingIssue(await adminFetchIssue(i.id))
+                            } catch (e: unknown) {
+                              setError(isApiError(e) ? e.message : 'Load failed')
+                            }
+                          })()
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="link"
+                        dangerLink
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              await adminDeleteIssue(i.id)
+                              setEditingIssue((cur) => (cur?.id === i.id ? null : cur))
+                              setIssues(await adminFetchIssues())
+                            } catch (e: unknown) {
+                              setError(isApiError(e) ? e.message : 'Delete failed')
+                            }
+                          })()
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </ActionMenu>
                   </td>
                 </tr>
               ))}
@@ -1221,6 +1363,15 @@ export function SuperAdminConsolePage() {
         </TableCard>
       )}
     </PageSection>
+  )
+}
+
+function ActionMenu({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <RowActionsMenu isOpen={open} onOpenChange={setOpen}>
+      {children}
+    </RowActionsMenu>
   )
 }
 
@@ -1892,39 +2043,41 @@ function KnowledgeCardSection({
                 <td>{k.title}</td>
                 <td style={{ maxWidth: 280, fontSize: 13 }}>{k.summary ?? '—'}</td>
                 <td>
-                  <Button
-                    variant="link"
-                    compact
-                    onClick={() => {
-                      setEditingCardId(k.id)
-                      setEditCardIcon(k.icon)
-                      setEditCardTitle(k.title)
-                      setEditCardSummary(k.summary ?? '')
-                      setEditCardS1v(k.stat_1_value ?? '')
-                      setEditCardS1l(k.stat_1_label ?? '')
-                      setEditCardS2v(k.stat_2_value ?? '')
-                      setEditCardS2l(k.stat_2_label ?? '')
-                      setEditCardBody(k.body ?? '')
-                    }}
-                  >
-                    Edit
-                  </Button>{' '}
-                  <Button
-                    variant="link"
-                    dangerLink
-                    onClick={() => {
-                      void (async () => {
-                        try {
-                          await adminDeleteKnowledgeCard(k.id)
-                          await onRefresh()
-                        } catch (e: unknown) {
-                          setError(isApiError(e) ? e.message : 'Delete failed')
-                        }
-                      })()
-                    }}
-                  >
-                    Delete
-                  </Button>
+                  <ActionMenu>
+                    <Button
+                      variant="link"
+                      compact
+                      onClick={() => {
+                        setEditingCardId(k.id)
+                        setEditCardIcon(k.icon)
+                        setEditCardTitle(k.title)
+                        setEditCardSummary(k.summary ?? '')
+                        setEditCardS1v(k.stat_1_value ?? '')
+                        setEditCardS1l(k.stat_1_label ?? '')
+                        setEditCardS2v(k.stat_2_value ?? '')
+                        setEditCardS2l(k.stat_2_label ?? '')
+                        setEditCardBody(k.body ?? '')
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="link"
+                      dangerLink
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            await adminDeleteKnowledgeCard(k.id)
+                            await onRefresh()
+                          } catch (e: unknown) {
+                            setError(isApiError(e) ? e.message : 'Delete failed')
+                          }
+                        })()
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </ActionMenu>
                 </td>
               </tr>
             ),
@@ -2034,104 +2187,490 @@ function KnowledgeCardAddForm({
 
 type IndicatorDraft = {
   indicator_text: string
-  disaggregation: string
+  collects_quantitative: boolean
+  collects_qualitative: boolean
 }
 
 function emptyIndicator(): IndicatorDraft {
   return {
     indicator_text: '',
-    disaggregation: '',
+    collects_quantitative: false,
+    collects_qualitative: true,
   }
 }
 
-type ArticleBlockDraft = {
-  article_id: number
-  relevant_paragraph: string
+function validateIndicatorDataTypes(rows: IndicatorDraft[]): string | null {
+  const filled = rows.filter((x) => x.indicator_text.trim())
+  for (const x of filled) {
+    if (!x.collects_quantitative && !x.collects_qualitative) {
+      return 'Each indicator must have Quantitative and/or Qualitative selected.'
+    }
+  }
+  return null
+}
+
+function ArticleMultiSelectDropdown({
+  articles,
+  selectedIds,
+  onChange,
+  disabled,
+}: {
+  articles: AdminArticleRow[]
+  selectedIds: number[]
+  onChange: (ids: number[]) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState('')
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  const sorted = useMemo(
+    () =>
+      [...articles].sort((a, b) =>
+        a.article_name.localeCompare(b.article_name, undefined, { numeric: true, sensitivity: 'base' }),
+      ),
+    [articles],
+  )
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return sorted
+    return sorted.filter((a) => a.article_name.toLowerCase().includes(q))
+  }, [sorted, filter])
+
+  useEffect(() => {
+    if (!open) {
+      setFilter('')
+      return
+    }
+    function onDoc(e: MouseEvent) {
+      if (!(e.target instanceof Node)) return
+      if (wrapRef.current?.contains(e.target)) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const toggle = (id: number) => {
+    const set = new Set(selectedIds)
+    if (set.has(id)) set.delete(id)
+    else set.add(id)
+    onChange([...set].sort((a, b) => a - b))
+  }
+
+  const summary =
+    selectedIds.length === 0
+      ? 'Select articles…'
+      : selectedIds.length === 1
+        ? sorted.find((a) => a.id === selectedIds[0])?.article_name ?? '1 selected'
+        : `${selectedIds.length} articles selected`
+
+  return (
+    <div className="article-multi-dropdown" ref={wrapRef}>
+      <button
+        type="button"
+        className="article-multi-dropdown__trigger"
+        disabled={disabled}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="article-multi-dropdown__trigger-text">{summary}</span>
+        <span className="article-multi-dropdown__chevron" aria-hidden />
+      </button>
+      {open && (
+        <div className="article-multi-dropdown__panel" role="listbox" aria-multiselectable>
+          <input
+            type="search"
+            className="article-multi-dropdown__filter"
+            placeholder="Filter articles…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            onMouseDown={(e) => e.stopPropagation()}
+          />
+          <div className="article-multi-dropdown__list">
+            {filtered.length === 0 ? (
+              <div className="article-multi-dropdown__empty">No articles match.</div>
+            ) : (
+              filtered.map((a) => (
+                <label key={a.id} className="article-multi-dropdown__item">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(a.id)}
+                    onChange={() => toggle(a.id)}
+                    disabled={disabled}
+                  />
+                  <span>{a.article_name}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function IssuesLookupBar({
+  categories,
+  articles,
   busy,
   setBusy,
   setError,
   onRefreshLookups,
 }: {
+  categories: AdminIssueCategory[]
+  articles: AdminArticleRow[]
   busy: boolean
   setBusy: (v: boolean) => void
   setError: (s: string | null) => void
   onRefreshLookups: () => Promise<void>
 }) {
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [showArticleModal, setShowArticleModal] = useState(false)
   const [newCategory, setNewCategory] = useState('')
   const [newArticle, setNewArticle] = useState('')
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null)
+  const [editCategoryName, setEditCategoryName] = useState('')
+  const [editingArticleId, setEditingArticleId] = useState<number | null>(null)
+  const [editArticleName, setEditArticleName] = useState('')
+
+  useEffect(() => {
+    if (!showCategoryModal) {
+      setEditingCategoryId(null)
+      setEditCategoryName('')
+    }
+  }, [showCategoryModal])
+
+  useEffect(() => {
+    if (!showArticleModal) {
+      setEditingArticleId(null)
+      setEditArticleName('')
+    }
+  }, [showArticleModal])
+
   return (
-    <div
-      style={{
-        marginBottom: 16,
-        padding: 12,
-        background: 'rgba(46, 79, 163, 0.06)',
-        borderRadius: 8,
-      }}
-    >
-      <FormGrid>
-        <FormRow twoCol>
-          <FormControl label="New category">
-            <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="e.g. Thematic" />
-          </FormControl>
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <Button
-              variant="primary"
-              compact
-              disabled={busy || !newCategory.trim()}
-              onClick={() => {
-                void (async () => {
-                  setBusy(true)
-                  setError(null)
-                  try {
-                    await adminCreateIssueCategory({ name: newCategory.trim() })
-                    setNewCategory('')
-                    await onRefreshLookups()
-                  } catch (e: unknown) {
-                    setError(isApiError(e) ? e.message : 'Save failed')
-                  } finally {
-                    setBusy(false)
-                  }
-                })()
-              }}
-            >
-              Add category
-            </Button>
+    <>
+      <div
+        style={{
+          marginBottom: 0,
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <Button variant="primary" compact onClick={() => setShowCategoryModal(true)}>
+          Category list
+        </Button>
+        <Button variant="primary" compact onClick={() => setShowArticleModal(true)}>
+          Article list
+        </Button>
+      </div>
+
+      {showCategoryModal && (
+        <div className="modal-overlay" onClick={() => setShowCategoryModal(false)}>
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ padding: 16, maxWidth: 560, width: '100%' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h4 style={{ margin: 0 }}>Category list</h4>
+              <Button variant="link" compact onClick={() => setShowCategoryModal(false)}>
+                Close
+              </Button>
+            </div>
+            <FormRow twoCol>
+              <FormControl label="New category">
+                <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="e.g. Thematic" />
+              </FormControl>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <Button
+                  variant="primary"
+                  compact
+                  disabled={busy || !newCategory.trim()}
+                  onClick={() => {
+                    void (async () => {
+                      setBusy(true)
+                      setError(null)
+                      try {
+                        await adminCreateIssueCategory({ name: newCategory.trim() })
+                        setNewCategory('')
+                        await onRefreshLookups()
+                      } catch (e: unknown) {
+                        setError(isApiError(e) ? e.message : 'Save failed')
+                      } finally {
+                        setBusy(false)
+                      }
+                    })()
+                  }}
+                >
+                  Add category
+                </Button>
+              </div>
+            </FormRow>
+            <div style={{ marginTop: 12, maxHeight: 280, overflow: 'auto', border: '1px solid var(--field-border)', borderRadius: 8 }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th style={{ width: 1 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="text-muted">
+                        No categories yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    categories.map((c) => (
+                      <tr key={c.id}>
+                        <td>{c.id}</td>
+                        <td>
+                          {editingCategoryId === c.id ? (
+                            <input
+                              value={editCategoryName}
+                              onChange={(e) => setEditCategoryName(e.target.value)}
+                              style={{ width: '100%', maxWidth: 280, boxSizing: 'border-box' }}
+                            />
+                          ) : (
+                            c.name
+                          )}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          {editingCategoryId === c.id ? (
+                            <>
+                              <Button
+                                variant="primary"
+                                compact
+                                disabled={busy || !editCategoryName.trim()}
+                                onClick={() => {
+                                  void (async () => {
+                                    setBusy(true)
+                                    setError(null)
+                                    try {
+                                      await adminUpdateIssueCategory(c.id, { name: editCategoryName.trim() })
+                                      setEditingCategoryId(null)
+                                      await onRefreshLookups()
+                                    } catch (e: unknown) {
+                                      setError(isApiError(e) ? e.message : 'Update failed')
+                                    } finally {
+                                      setBusy(false)
+                                    }
+                                  })()
+                                }}
+                              >
+                                Save
+                              </Button>{' '}
+                              <Button variant="link" compact onClick={() => setEditingCategoryId(null)}>
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                variant="link"
+                                compact
+                                disabled={busy}
+                                onClick={() => {
+                                  setEditingCategoryId(c.id)
+                                  setEditCategoryName(c.name)
+                                }}
+                              >
+                                Edit
+                              </Button>{' '}
+                              <Button
+                                variant="link"
+                                compact
+                                dangerLink
+                                disabled={busy}
+                                onClick={() => {
+                                  if (!window.confirm(`Delete category “${c.name}”?`)) return
+                                  void (async () => {
+                                    setBusy(true)
+                                    setError(null)
+                                    try {
+                                      await adminDeleteIssueCategory(c.id)
+                                      await onRefreshLookups()
+                                    } catch (e: unknown) {
+                                      setError(isApiError(e) ? e.message : 'Delete failed')
+                                    } finally {
+                                      setBusy(false)
+                                    }
+                                  })()
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </FormRow>
-        <FormRow twoCol>
-          <FormControl label="New article label">
-            <input value={newArticle} onChange={(e) => setNewArticle(e.target.value)} placeholder='e.g. "Article 16"' />
-          </FormControl>
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <Button
-              variant="primary"
-              compact
-              disabled={busy || !newArticle.trim()}
-              onClick={() => {
-                void (async () => {
-                  setBusy(true)
-                  setError(null)
-                  try {
-                    await adminCreateArticle({ article_name: newArticle.trim() })
-                    setNewArticle('')
-                    await onRefreshLookups()
-                  } catch (e: unknown) {
-                    setError(isApiError(e) ? e.message : 'Save failed')
-                  } finally {
-                    setBusy(false)
-                  }
-                })()
-              }}
-            >
-              Add article
-            </Button>
+        </div>
+      )}
+
+      {showArticleModal && (
+        <div className="modal-overlay" onClick={() => setShowArticleModal(false)}>
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ padding: 16, maxWidth: 560, width: '100%' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h4 style={{ margin: 0 }}>Article list</h4>
+              <Button variant="link" compact onClick={() => setShowArticleModal(false)}>
+                Close
+              </Button>
+            </div>
+            <FormRow twoCol>
+              <FormControl label="New article name">
+                <input value={newArticle} onChange={(e) => setNewArticle(e.target.value)} placeholder='e.g. "Article 16"' />
+              </FormControl>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <Button
+                  variant="primary"
+                  compact
+                  disabled={busy || !newArticle.trim()}
+                  onClick={() => {
+                    void (async () => {
+                      setBusy(true)
+                      setError(null)
+                      try {
+                        await adminCreateArticle({ article_name: newArticle.trim() })
+                        setNewArticle('')
+                        await onRefreshLookups()
+                      } catch (e: unknown) {
+                        setError(isApiError(e) ? e.message : 'Save failed')
+                      } finally {
+                        setBusy(false)
+                      }
+                    })()
+                  }}
+                >
+                  Add article
+                </Button>
+              </div>
+            </FormRow>
+            <div style={{ marginTop: 12, maxHeight: 280, overflow: 'auto', border: '1px solid var(--field-border)', borderRadius: 8 }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Article name</th>
+                    <th style={{ width: 1 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {articles.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="text-muted">
+                        No articles yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    articles.map((a) => (
+                      <tr key={a.id}>
+                        <td>{a.id}</td>
+                        <td>
+                          {editingArticleId === a.id ? (
+                            <input
+                              value={editArticleName}
+                              onChange={(e) => setEditArticleName(e.target.value)}
+                              style={{ width: '100%', maxWidth: 280, boxSizing: 'border-box' }}
+                            />
+                          ) : (
+                            a.article_name
+                          )}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          {editingArticleId === a.id ? (
+                            <>
+                              <Button
+                                variant="primary"
+                                compact
+                                disabled={busy || !editArticleName.trim()}
+                                onClick={() => {
+                                  void (async () => {
+                                    setBusy(true)
+                                    setError(null)
+                                    try {
+                                      await adminUpdateArticle(a.id, { article_name: editArticleName.trim() })
+                                      setEditingArticleId(null)
+                                      await onRefreshLookups()
+                                    } catch (e: unknown) {
+                                      setError(isApiError(e) ? e.message : 'Update failed')
+                                    } finally {
+                                      setBusy(false)
+                                    }
+                                  })()
+                                }}
+                              >
+                                Save
+                              </Button>{' '}
+                              <Button variant="link" compact onClick={() => setEditingArticleId(null)}>
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                variant="link"
+                                compact
+                                disabled={busy}
+                                onClick={() => {
+                                  setEditingArticleId(a.id)
+                                  setEditArticleName(a.article_name)
+                                }}
+                              >
+                                Edit
+                              </Button>{' '}
+                              <Button
+                                variant="link"
+                                compact
+                                dangerLink
+                                disabled={busy}
+                                onClick={() => {
+                                  if (!window.confirm(`Delete article “${a.article_name}”?`)) return
+                                  void (async () => {
+                                    setBusy(true)
+                                    setError(null)
+                                    try {
+                                      await adminDeleteArticle(a.id)
+                                      await onRefreshLookups()
+                                    } catch (e: unknown) {
+                                      setError(isApiError(e) ? e.message : 'Delete failed')
+                                    } finally {
+                                      setBusy(false)
+                                    }
+                                  })()
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </FormRow>
-      </FormGrid>
-    </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -2166,17 +2705,35 @@ function IssueIndicatorsEditor({
                 }}
               />
             </FormControl>
-            <FormControl label="Disaggregation">
-              <input
-                placeholder="Disaggregation (text or JSON)"
-                value={row.disaggregation}
-                disabled={disabled}
-                onChange={(e) => {
-                  const next = [...rows]
-                  next[idx] = { ...row, disaggregation: e.target.value }
-                  onChange(next)
-                }}
-              />
+            <FormControl label="Data type">
+              <div className="issue-indicator-type-checks">
+                <label className="checkbox-label issue-indicator-type-checks__item">
+                  <input
+                    type="checkbox"
+                    checked={row.collects_quantitative}
+                    disabled={disabled}
+                    onChange={(e) => {
+                      const next = [...rows]
+                      next[idx] = { ...row, collects_quantitative: e.target.checked }
+                      onChange(next)
+                    }}
+                  />
+                  Quantitative
+                </label>
+                <label className="checkbox-label issue-indicator-type-checks__item">
+                  <input
+                    type="checkbox"
+                    checked={row.collects_qualitative}
+                    disabled={disabled}
+                    onChange={(e) => {
+                      const next = [...rows]
+                      next[idx] = { ...row, collects_qualitative: e.target.checked }
+                      onChange(next)
+                    }}
+                  />
+                  Qualitative
+                </label>
+              </div>
             </FormControl>
           </FormRow>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -2189,65 +2746,6 @@ function IssueIndicatorsEditor({
       <Button variant="link" compact disabled={disabled} onClick={() => onChange([...rows, emptyIndicator()])}>
         + Add indicator
       </Button>
-    </div>
-  )
-}
-
-function IssueArticleBlocksPicker({
-  articles,
-  value,
-  onChange,
-  disabled,
-}: {
-  articles: AdminArticleRow[]
-  value: ArticleBlockDraft[]
-  onChange: (rows: ArticleBlockDraft[]) => void
-  disabled?: boolean
-}) {
-  const sorted = [...articles].sort((a, b) => a.article_name.localeCompare(b.article_name))
-  const toggle = (articleId: number) => {
-    const has = value.some((r) => r.article_id === articleId)
-    if (has) {
-      onChange(value.filter((r) => r.article_id !== articleId))
-    } else {
-      onChange(
-        [...value, { article_id: articleId, relevant_paragraph: '' }].sort((x, y) => x.article_id - y.article_id),
-      )
-    }
-  }
-  const setParagraph = (articleId: number, text: string) => {
-    onChange(
-      value.map((r) => (r.article_id === articleId ? { ...r, relevant_paragraph: text } : r)),
-    )
-  }
-  return (
-    <div className="issue-article-picker">
-      {sorted.map((a) => {
-        const row = value.find((r) => r.article_id === a.id)
-        const checked = Boolean(row)
-        return (
-          <div key={a.id} className="issue-article-picker__row">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: disabled ? 'default' : 'pointer' }}>
-              <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(a.id)} />
-              <strong>{a.article_name}</strong>
-            </label>
-            {checked && row && (
-              <div className="form-row" style={{ marginTop: 10 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 500 }}>
-                  Relevant paragraph (description for this article)
-                </label>
-                <textarea
-                  value={row.relevant_paragraph}
-                  disabled={disabled}
-                  onChange={(e) => setParagraph(a.id, e.target.value)}
-                  rows={3}
-                  placeholder="Treaty text / paragraph for this article within this issue"
-                />
-              </div>
-            )}
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -2269,19 +2767,29 @@ function IssuesCreateForm({
   setError: (s: string | null) => void
   onDone: () => Promise<void>
 }) {
+  const sortedArticles = [...articles].sort((a, b) =>
+    a.article_name.localeCompare(b.article_name, undefined, { numeric: true, sensitivity: 'base' }),
+  )
   const [conventionId, setConventionId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [issueTitle, setIssueTitle] = useState('')
-  const [hasQuantitative, setHasQuantitative] = useState(false)
-  const [hasQualitative, setHasQualitative] = useState(false)
-  const [articleLinks, setArticleLinks] = useState<ArticleBlockDraft[]>([])
+  const [issueDescription, setIssueDescription] = useState('')
+  const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>([])
   const [indicators, setIndicators] = useState<IndicatorDraft[]>([])
 
   return (
-    <div style={{ marginBottom: 24 }}>
-      <h4 style={{ margin: '0 0 8px' }}>Create issue</h4>
+    <div className="issues-create-form">
+      <h4 className="issues-create-form__title">Create issue</h4>
       <FormGrid>
-        <FormRow twoCol>
+        <div className="issues-form-top-grid">
+          <FormControl label="Articles">
+            <ArticleMultiSelectDropdown
+              articles={sortedArticles}
+              selectedIds={selectedArticleIds}
+              onChange={setSelectedArticleIds}
+              disabled={busy}
+            />
+          </FormControl>
           <FormControl label="Convention">
             <select value={conventionId} onChange={(e) => setConventionId(e.target.value)}>
               <option value="">—</option>
@@ -2302,62 +2810,68 @@ function IssuesCreateForm({
               ))}
             </select>
           </FormControl>
-        </FormRow>
-        <FormField label="Issue title">
-          <input placeholder="Issue title" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} />
-        </FormField>
+        </div>
         <FormRow twoCol>
-          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="checkbox" checked={hasQuantitative} disabled={busy} onChange={(e) => setHasQuantitative(e.target.checked)} />
-            Quantitative input (numeric) required for this issue
-          </label>
-          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="checkbox" checked={hasQualitative} disabled={busy} onChange={(e) => setHasQualitative(e.target.checked)} />
-            Qualitative input (text) required for this issue
-          </label>
+          <FormField label="Title">
+            <input placeholder="Title" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} />
+          </FormField>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" compact disabled={busy} onClick={() => setIndicators((rows) => [...rows, emptyIndicator()])}>
+              Add indicators
+            </Button>
+          </div>
         </FormRow>
+        <FormField label="Description">
+          <textarea
+            className="issues-description-field"
+            placeholder="Optional longer description for this issue…"
+            value={issueDescription}
+            onChange={(e) => setIssueDescription(e.target.value)}
+            disabled={busy}
+            rows={10}
+          />
+        </FormField>
       </FormGrid>
-      <strong style={{ fontSize: 13, display: 'block', marginTop: 12 }}>Articles (description only)</strong>
-      <p className="text-muted" style={{ fontSize: 13, margin: '4px 0 8px' }}>
-        Each selected article has only the relevant paragraph. Indicators belong to the issue below.
-      </p>
-      <IssueArticleBlocksPicker articles={articles} value={articleLinks} onChange={setArticleLinks} disabled={busy} />
       <strong style={{ fontSize: 13, display: 'block', marginTop: 16 }}>Indicators (linked to this issue)</strong>
       <IssueIndicatorsEditor rows={indicators} onChange={setIndicators} disabled={busy} />
       <Button
         variant="primary"
         compact
         style={{ marginTop: 12 }}
-        disabled={busy || !conventionId || !categoryId || !issueTitle.trim() || articleLinks.length === 0}
+        disabled={busy || !conventionId || !categoryId || !issueTitle.trim() || selectedArticleIds.length === 0}
         onClick={() => {
           void (async () => {
             setBusy(true)
             setError(null)
             try {
-              const indPayload = indicators
-                .filter((x) => x.indicator_text.trim())
-                .map((x) => ({
-                  indicator_text: x.indicator_text.trim(),
-                  disaggregation: x.disaggregation.trim() || null,
-                }))
+              const typeErr = validateIndicatorDataTypes(indicators)
+              if (typeErr) {
+                setError(typeErr)
+                return
+              }
+              const filled = indicators.filter((x) => x.indicator_text.trim())
+              const indPayload = filled.map((x) => ({
+                indicator_text: x.indicator_text.trim(),
+                has_quantitative: x.collects_quantitative,
+                has_qualitative: x.collects_qualitative,
+              }))
+              const hasQuantitative = filled.some((x) => x.collects_quantitative)
+              const hasQualitative = filled.some((x) => x.collects_qualitative)
               await adminCreateIssue({
                 convention_id: Number(conventionId),
                 category_id: Number(categoryId),
                 issue_title: issueTitle.trim(),
+                description: issueDescription.trim() || null,
                 has_quantitative: hasQuantitative,
                 has_qualitative: hasQualitative,
-                articles: articleLinks.map((r) => ({
-                  article_id: r.article_id,
-                  relevant_paragraph: r.relevant_paragraph.trim() || null,
-                })),
+                articles: selectedArticleIds.map((articleId) => ({ article_id: articleId })),
                 indicators: indPayload.length ? indPayload : undefined,
               })
               setConventionId('')
               setCategoryId('')
               setIssueTitle('')
-              setHasQuantitative(false)
-              setHasQualitative(false)
-              setArticleLinks([])
+              setIssueDescription('')
+              setSelectedArticleIds([])
               setIndicators([])
               await onDone()
             } catch (e: unknown) {
@@ -2395,22 +2909,23 @@ function IssuesEditPanel({
   onClose: () => void
   onSaved: () => Promise<void>
 }) {
+  const sortedArticles = [...articles].sort((a, b) =>
+    a.article_name.localeCompare(b.article_name, undefined, { numeric: true, sensitivity: 'base' }),
+  )
   const [conventionId, setConventionId] = useState(String(issue.convention_id))
   const [categoryId, setCategoryId] = useState(String(issue.category_id))
   const [issueTitle, setIssueTitle] = useState(issue.issue_title)
-  const [hasQuantitative, setHasQuantitative] = useState(issue.has_quantitative)
-  const [hasQualitative, setHasQualitative] = useState(issue.has_qualitative)
-  const [articleLinks, setArticleLinks] = useState<ArticleBlockDraft[]>(
-    issue.articles.map((a) => ({
-      article_id: a.id,
-      relevant_paragraph: a.relevant_paragraph ?? '',
-    })),
-  )
+  const [issueDescription, setIssueDescription] = useState(issue.description ?? '')
+  const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>(issue.article_ids)
   const [indicators, setIndicators] = useState<IndicatorDraft[]>(
-    issue.indicators.map((ind) => ({
-      indicator_text: ind.indicator_text,
-      disaggregation: ind.disaggregation ?? '',
-    })),
+    issue.indicators.map((ind) => {
+      const legacyRow = !ind.has_quantitative && !ind.has_qualitative
+      return {
+        indicator_text: ind.indicator_text,
+        collects_quantitative: legacyRow ? issue.has_quantitative : ind.has_quantitative,
+        collects_qualitative: legacyRow ? issue.has_qualitative : ind.has_qualitative,
+      }
+    }),
   )
 
   return (
@@ -2422,7 +2937,15 @@ function IssuesEditPanel({
         </Button>
       </div>
       <FormGrid>
-        <FormRow twoCol>
+        <div className="issues-form-top-grid">
+          <FormControl label="Articles">
+            <ArticleMultiSelectDropdown
+              articles={sortedArticles}
+              selectedIds={selectedArticleIds}
+              onChange={setSelectedArticleIds}
+              disabled={busy}
+            />
+          </FormControl>
           <FormControl label="Convention">
             <select value={conventionId} onChange={(e) => setConventionId(e.target.value)}>
               {conventions.map((c) => (
@@ -2441,64 +2964,61 @@ function IssuesEditPanel({
               ))}
             </select>
           </FormControl>
-        </FormRow>
-        <FormField label="Issue title">
-          <input placeholder="Issue title" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} />
-        </FormField>
+        </div>
         <FormRow twoCol>
-          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={hasQuantitative}
-              disabled={busy}
-              onChange={(e) => setHasQuantitative(e.target.checked)}
-            />
-            Quantitative input (numeric) required for this issue
-          </label>
-          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={hasQualitative}
-              disabled={busy}
-              onChange={(e) => setHasQualitative(e.target.checked)}
-            />
-            Qualitative input (text) required for this issue
-          </label>
+          <FormField label="Title">
+            <input placeholder="Title" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} />
+          </FormField>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" compact disabled={busy} onClick={() => setIndicators((rows) => [...rows, emptyIndicator()])}>
+              Add indicators
+            </Button>
+          </div>
         </FormRow>
+        <FormField label="Description">
+          <textarea
+            className="issues-description-field"
+            placeholder="Optional longer description for this issue…"
+            value={issueDescription}
+            onChange={(e) => setIssueDescription(e.target.value)}
+            disabled={busy}
+            rows={10}
+          />
+        </FormField>
       </FormGrid>
-      <strong style={{ fontSize: 13, display: 'block', marginTop: 12 }}>Articles (description only)</strong>
-      <p className="text-muted" style={{ fontSize: 13, margin: '4px 0 8px' }}>
-        Each selected article has only the relevant paragraph. Indicators belong to the issue below.
-      </p>
-      <IssueArticleBlocksPicker articles={articles} value={articleLinks} onChange={setArticleLinks} disabled={busy} />
       <strong style={{ fontSize: 13, display: 'block', marginTop: 16 }}>Indicators (linked to this issue)</strong>
       <IssueIndicatorsEditor rows={indicators} onChange={setIndicators} disabled={busy} />
       <Button
         variant="primary"
         compact
         style={{ marginTop: 12 }}
-        disabled={busy || !conventionId || !categoryId || !issueTitle.trim() || articleLinks.length === 0}
+        disabled={busy || !conventionId || !categoryId || !issueTitle.trim() || selectedArticleIds.length === 0}
         onClick={() => {
           void (async () => {
             setBusy(true)
             setError(null)
             try {
-              const indPayload = indicators
-                .filter((x) => x.indicator_text.trim())
-                .map((x) => ({
-                  indicator_text: x.indicator_text.trim(),
-                  disaggregation: x.disaggregation.trim() || null,
-                }))
+              const typeErr = validateIndicatorDataTypes(indicators)
+              if (typeErr) {
+                setError(typeErr)
+                return
+              }
+              const filled = indicators.filter((x) => x.indicator_text.trim())
+              const indPayload = filled.map((x) => ({
+                indicator_text: x.indicator_text.trim(),
+                has_quantitative: x.collects_quantitative,
+                has_qualitative: x.collects_qualitative,
+              }))
+              const hasQuantitative = filled.some((x) => x.collects_quantitative)
+              const hasQualitative = filled.some((x) => x.collects_qualitative)
               await adminUpdateIssue(issue.id, {
                 convention_id: Number(conventionId),
                 category_id: Number(categoryId),
                 issue_title: issueTitle.trim(),
+                description: issueDescription.trim() || null,
                 has_quantitative: hasQuantitative,
                 has_qualitative: hasQualitative,
-                articles: articleLinks.map((r) => ({
-                  article_id: r.article_id,
-                  relevant_paragraph: r.relevant_paragraph.trim() || null,
-                })),
+                articles: selectedArticleIds.map((articleId) => ({ article_id: articleId })),
                 indicators: indPayload,
               })
               await onSaved()

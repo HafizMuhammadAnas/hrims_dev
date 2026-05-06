@@ -13,13 +13,14 @@ import { FormRow } from '../components/ui/FormRow'
 import { ModalActions, ModalHeader } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
 import { PaginationBar } from '../components/ui/PaginationBar'
+import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { StatsCards } from '../components/ui/StatsCards'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
-import { isSuperAdmin } from '../lib/roles'
+import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
 import type { AuthUser } from '../types/auth'
 
 type RoleSlug = 'federal_admin' | 'regional_admin' | 'department_admin' | 'viewer'
@@ -69,17 +70,6 @@ export function UserManagementPage() {
     void load().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when super flag from auth
   }, [superUser])
-
-  useEffect(() => {
-    function onDocClick(event: MouseEvent) {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      if (target.closest('.row-actions-menu')) return
-      setOpenActionId(null)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [])
 
   async function submit() {
     if (!form.name || !form.username || !form.password) {
@@ -178,7 +168,10 @@ export function UserManagementPage() {
 
   const subtitle = superUser
     ? 'Create federal and regional administrators only. Define department records per region under Super admin → Departments; federal and regional admins assign department user accounts.'
-    : 'Federal admins add federal-line department accounts; regional admins add accounts for departments in their region only. Regional administrator accounts are created by a super administrator.'
+    : isRegionalAdmin(user)
+      ? undefined
+      : 'Federal admins add federal-line department accounts; regional admins add accounts for departments in their region only. Regional administrator accounts are created by a super administrator.'
+  const showRoleBreakdownChips = superUser || isFederalAdmin(user)
   const roleFilter = filters.role ?? ''
   const statusFilter = filters.status ?? ''
   const filteredRows = useMemo(() => {
@@ -223,7 +216,7 @@ export function UserManagementPage() {
           ]}
         />
       </div>
-      {roleBreakdown.length > 0 && (
+      {showRoleBreakdownChips && roleBreakdown.length > 0 && (
         <div className="chip-list" style={{ marginTop: 10 }}>
           {roleBreakdown.map(([role, count]) => (
             <StatusBadge key={role} tone="pending">
@@ -301,29 +294,21 @@ export function UserManagementPage() {
                 </td>
                 <td className="table-actions">
                   {Number(u.id) !== Number(user?.id) && !u.roles.some((r) => r.slug === 'super_admin') ? (
-                    <div className="row-actions-menu">
-                      <button
-                        type="button"
-                        className="row-actions-trigger"
-                        onClick={() => setOpenActionId((prev) => (prev === Number(u.id) ? null : Number(u.id)))}
+                    <RowActionsMenu
+                      isOpen={openActionId === Number(u.id)}
+                      onOpenChange={(open) => setOpenActionId(open ? Number(u.id) : null)}
+                    >
+                      <Button
+                        variant="link"
+                        dangerLink
+                        onClick={() => {
+                          void remove(Number(u.id))
+                          setOpenActionId(null)
+                        }}
                       >
-                        Action
-                      </button>
-                      {openActionId === Number(u.id) && (
-                        <div className="row-actions-list">
-                          <Button
-                            variant="link"
-                            dangerLink
-                            onClick={() => {
-                              void remove(Number(u.id))
-                              setOpenActionId(null)
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                        Delete
+                      </Button>
+                    </RowActionsMenu>
                   ) : null}
                 </td>
               </tr>

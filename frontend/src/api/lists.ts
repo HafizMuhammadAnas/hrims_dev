@@ -43,10 +43,13 @@ export async function fetchCompiledRecords(): Promise<CompiledRecordRow[]> {
 export type DepartmentTaskRow = {
   id: string
   req_id: string
+  region_id: number
   region_name: string | null
   department_id: string
   department_name: string | null
   status: string
+  regional_review_status?: string | null
+  regional_review_comments?: string | null
   assigned_date: string
   submission_date?: string | null
   response_data?: string | null

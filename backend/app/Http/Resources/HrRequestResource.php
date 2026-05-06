@@ -93,11 +93,17 @@ class HrRequestResource extends JsonResource
                 'article_name' => $a->article_name,
                 'relevant_paragraph' => $a->pivot->relevant_paragraph ?? null,
             ])->values()->all(),
-            'indicators' => $i->indicators->map(fn (IssueIndicator $ind) => [
-                'id' => $ind->id,
-                'indicator_text' => $ind->indicator_text,
-                'disaggregation' => $ind->disaggregation,
-            ])->values()->all(),
+            'indicators' => $i->indicators->map(function (IssueIndicator $ind) use ($i) {
+                $flags = $i->effectiveIndicatorFlags($ind);
+
+                return [
+                    'id' => $ind->id,
+                    'indicator_text' => $ind->indicator_text,
+                    'disaggregation' => $ind->disaggregation,
+                    'has_quantitative' => $flags['has_quantitative'],
+                    'has_qualitative' => $flags['has_qualitative'],
+                ];
+            })->values()->all(),
         ];
     }
 }

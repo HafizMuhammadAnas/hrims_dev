@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\RbacRole;
 use App\Models\Region;
 use App\Models\User;
+use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -28,7 +29,7 @@ class UserController extends Controller
         } elseif ($creator->hasRole('federal_admin')) {
             $rows = $query
                 ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
-                ->whereHas('department.regions', fn ($r) => $r->where('slug', 'federal'))
+                ->whereHas('department.regions', fn ($r) => $r->where('slug', 'ict'))
                 ->get();
         } else {
             if ($creator->region_id === null) {
@@ -81,7 +82,7 @@ class UserController extends Controller
 
         if ($creator->hasRole('super_admin')) {
             if ($data['role_slug'] === 'federal_admin') {
-                $data['region_id'] = Region::query()->where('slug', 'federal')->value('id');
+                $data['region_id'] = Region::query()->where('slug', 'ict')->value('id');
                 $data['department_id'] = null;
             } else {
                 if (empty($data['region_id'])) {
@@ -92,10 +93,10 @@ class UserController extends Controller
         } else {
             $department = Department::query()->with('regions')->findOrFail($data['department_id']);
             if ($creator->hasRole('federal_admin')) {
-                if (! $department->coversRegionSlug('federal')) {
-                    return response()->json(['message' => 'Choose a federal-line department for this user.'], 422);
+                if (! $department->coversRegionSlug('ict')) {
+                    return response()->json(['message' => 'Choose an ICT / national-line department for this user.'], 422);
                 }
-                $data['region_id'] = (int) Region::query()->where('slug', 'federal')->value('id');
+                $data['region_id'] = (int) Region::query()->where('slug', 'ict')->value('id');
             } elseif ($creator->hasRole('regional_admin')) {
                 if ($creator->region_id === null) {
                     return response()->json(['message' => 'Forbidden'], 403);
@@ -120,8 +121,16 @@ class UserController extends Controller
             'is_active' => $data['is_active'] ?? true,
         ]);
         $user->roles()->sync([$role->id]);
+        $user->load(['roles.permissions', 'region', 'department']);
+        app(NotificationService::class)->notifyUserManaged(
+            $user,
+            $creator,
+            'user.created',
+            'User created',
+            sprintf('%s created user %s.', $creator->name, $user->username)
+        );
 
-        return response()->json(['data' => $this->serialize($user->load(['roles.permissions', 'region', 'department']))], 201);
+        return response()->json(['data' => $this->serialize($user)], 201);
     }
 
     public function update(Request $request, int $user): JsonResponse
@@ -153,10 +162,21 @@ class UserController extends Controller
             $data['password'] = Hash::make($data['password']);
         }
 
+        $wasActive = (bool) $model->is_active;
         $model->fill($data);
         $model->save();
+        $model->load(['roles.permissions', 'region', 'department']);
+        app(NotificationService::class)->notifyUserManaged(
+            $model,
+            $request->user(),
+            ! $model->is_active && $wasActive ? 'user.deactivated' : 'user.updated',
+            ! $model->is_active && $wasActive ? 'User deactivated' : 'User updated',
+            ! $model->is_active && $wasActive
+                ? sprintf('%s deactivated user %s.', $request->user()->name, $model->username)
+                : sprintf('%s updated user %s.', $request->user()->name, $model->username)
+        );
 
-        return response()->json(['data' => $this->serialize($model->load(['roles.permissions', 'region', 'department']))]);
+        return response()->json(['data' => $this->serialize($model)]);
     }
 
     public function destroy(Request $request, int $user): JsonResponse
@@ -181,7 +201,7 @@ class UserController extends Controller
         if ($creator->hasRole('super_admin')) {
             // allowed (except super accounts, above)
         } elseif ($creator->hasRole('federal_admin')) {
-            if (! $model->department?->coversRegionSlug('federal')) {
+            if (! $model->department?->coversRegionSlug('ict')) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         } elseif ($creator->hasRole('regional_admin')) {
@@ -191,7 +211,16 @@ class UserController extends Controller
             }
         }
 
+        $username = $model->username;
         $model->delete();
+
+        app(NotificationService::class)->notifyUserManaged(
+            $model,
+            $creator,
+            'user.deleted',
+            'User deleted',
+            sprintf('%s deleted user %s.', $creator->name, $username)
+        );
 
         return response()->json(['message' => 'Deleted']);
     }

@@ -1,7 +1,8 @@
 import { type FormEvent, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
+import { PasswordField } from '../components/ui/PasswordField'
 
 export function LoginPage() {
   const { user, login, loading } = useAuth()
@@ -42,16 +43,13 @@ export function LoginPage() {
               required
             />
           </label>
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              required
-            />
-          </label>
+          <PasswordField
+            label="Password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            required
+          />
           {error && (
             <Alert variant="error" title="Sign-in failed" onDismiss={() => setError(null)}>
               {error}
@@ -60,12 +58,10 @@ export function LoginPage() {
           <button type="submit" className="btn btn-primary" disabled={submitting || loading}>
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
+          <Link className="btn btn-link login-reset-link" to="/reset-password">
+            Reset password
+          </Link>
         </form>
-        <p className="login-hint">
-          Dev seed (password <code>password</code> for all; run <code>php artisan migrate --seed</code>):{' '}
-          <code>superadmin</code> — catalog tools in the sidebar under Super admin (opens <code>/admin</code>);{' '}
-          <code>federal</code>; <code>punjab_admin</code>; <code>punjab_edu</code>.
-        </p>
       </div>
     </div>
   )

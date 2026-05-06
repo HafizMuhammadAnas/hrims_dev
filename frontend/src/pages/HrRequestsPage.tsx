@@ -14,6 +14,7 @@ import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { ModalActions, ModalHeader } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
 import { PaginationBar } from '../components/ui/PaginationBar'
+import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
@@ -94,17 +95,6 @@ export function HrRequestsPage() {
       cancelled = true
     }
   }, [modal])
-
-  useEffect(() => {
-    function onDocClick(event: MouseEvent) {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      if (target.closest('.row-actions-menu')) return
-      setOpenActionId(null)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [])
 
   const statusFilter = filters.status ?? ''
 
@@ -224,52 +214,44 @@ export function HrRequestsPage() {
                     <td>{r.date}</td>
                     <td>{r.status}</td>
                     <td className="table-actions">
-                      <div className="row-actions-menu">
-                        <button
-                          type="button"
-                          className="row-actions-trigger"
-                          onClick={() => setOpenActionId((prev) => (prev === r.id ? null : r.id))}
+                      <RowActionsMenu
+                        isOpen={openActionId === r.id}
+                        onOpenChange={(open) => setOpenActionId(open ? r.id : null)}
+                      >
+                        <Button
+                          variant="link"
+                          onClick={() => {
+                            setModal({ mode: 'view', id: r.id })
+                            setOpenActionId(null)
+                          }}
                         >
-                          Action
-                        </button>
-                        {openActionId === r.id && (
-                          <div className="row-actions-list">
-                          <Button
-                            variant="link"
-                            onClick={() => {
-                              setModal({ mode: 'view', id: r.id })
-                              setOpenActionId(null)
-                            }}
-                          >
-                            View
-                          </Button>
-                          {canManage && (
-                            <>
-                              <Button
-                                variant="link"
-                                onClick={() => {
-                                  setModal({ mode: 'edit', id: r.id })
-                                  setOpenActionId(null)
-                                }}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                variant="link"
-                                dangerLink
-                                onClick={() => {
-                                  setDeleteError(null)
-                                  setDeleteTarget(r)
-                                  setOpenActionId(null)
-                                }}
-                              >
-                                Delete
-                              </Button>
-                            </>
-                          )}
-                          </div>
+                          View
+                        </Button>
+                        {canManage && (
+                          <>
+                            <Button
+                              variant="link"
+                              onClick={() => {
+                                setModal({ mode: 'edit', id: r.id })
+                                setOpenActionId(null)
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="link"
+                              dangerLink
+                              onClick={() => {
+                                setDeleteError(null)
+                                setDeleteTarget(r)
+                                setOpenActionId(null)
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </>
                         )}
-                      </div>
+                      </RowActionsMenu>
                     </td>
                   </tr>
                 ))}
@@ -303,18 +285,20 @@ export function HrRequestsPage() {
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteTarget(null)}>
           <div className="modal-card modal-card-narrow" onClick={(e) => e.stopPropagation()}>
             <ModalHeader title="Delete request" onClose={() => setDeleteTarget(null)} />
-            <p>
-              Delete <strong>{deleteTarget.id}</strong> — {deleteTarget.title}? This cannot be undone.
-            </p>
-            {deleteError && <p className="login-error">{deleteError}</p>}
-            <ModalActions>
-              <Button variant="secondary" compact onClick={() => setDeleteTarget(null)}>
-                Cancel
-              </Button>
-              <Button variant="danger" compact onClick={() => void confirmDelete()} disabled={deleting}>
-                {deleting ? 'Deleting…' : 'Delete'}
-              </Button>
-            </ModalActions>
+            <div className="pad-modal">
+              <p style={{ margin: '0 0 12px', lineHeight: 1.5 }}>
+                Delete <strong>{deleteTarget.id}</strong> — {deleteTarget.title}? This cannot be undone.
+              </p>
+              {deleteError && <p className="login-error">{deleteError}</p>}
+              <ModalActions>
+                <Button variant="secondary" compact onClick={() => setDeleteTarget(null)}>
+                  Cancel
+                </Button>
+                <Button variant="danger" compact onClick={() => void confirmDelete()} disabled={deleting}>
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </Button>
+              </ModalActions>
+            </div>
           </div>
         </div>
       )}

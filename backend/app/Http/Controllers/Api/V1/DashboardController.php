@@ -39,7 +39,7 @@ class DashboardController extends Controller
                             ->whereDate('due_date', '<', Carbon::now()->toDateString());
                     });
             })
-            ->orderBy('due_date')
+            ->orderByDesc('updated_at')
             ->limit(5)
             ->with(['region:id,name'])
             ->get(['id', 'title', 'status', 'due_date', 'region_id'])

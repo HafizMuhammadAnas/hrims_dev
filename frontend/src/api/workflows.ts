@@ -43,6 +43,25 @@ export async function createDepartmentTask(
   return json.data
 }
 
+export async function updateDepartmentTaskReview(
+  taskId: string,
+  body: {
+    regional_review_status: 'accepted' | 'needs-modification'
+    regional_review_comments?: string | null
+  },
+): Promise<DepartmentTaskRow> {
+  await ensureCsrfCookie()
+  const res = await fetch(`/api/v1/department-tasks/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify(body),
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: DepartmentTaskRow }
+  return json.data
+}
+
 export async function createRegionalResponse(body: {
   hr_request_id: string
   title: string
@@ -72,6 +91,23 @@ export async function updateRegionalReview(
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify({ review_status, comments }),
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: RegionalResponseRow }
+  return json.data
+}
+
+/** Regional admin: resubmit compilation after federal marked needs-modification (sets review to pending). */
+export async function updateRegionalCompiledResponse(
+  id: string,
+  body: { title: string; content: string },
+): Promise<RegionalResponseRow> {
+  await ensureCsrfCookie()
+  const res = await fetch(`/api/v1/regional-responses/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify(body),
   })
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: RegionalResponseRow }

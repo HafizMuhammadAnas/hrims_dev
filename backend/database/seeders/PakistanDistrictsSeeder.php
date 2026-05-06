@@ -237,7 +237,7 @@ class PakistanDistrictsSeeder extends Seeder
                 'Sudhanoti',
             ],
 
-            'federal' => [],
+            'ict' => [],
         ];
     }
 }

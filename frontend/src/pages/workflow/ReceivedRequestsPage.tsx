@@ -11,6 +11,7 @@ import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
 import { ModalActions, ModalHeader } from '../../components/ui/ModalChrome'
 import { PageSection } from '../../components/ui/PageSection'
 import { PaginationBar } from '../../components/ui/PaginationBar'
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
@@ -26,7 +27,7 @@ type Props = {
   enableRequestCrud?: boolean
 }
 
-type RowStatus = 'Untouch' | 'Distributed' | 'In Process' | 'Response Delivered'
+type RowStatus = 'pending' | 'Distributed' | 'In Process' | 'Response Delivered'
 
 export function ReceivedRequestsPage({
   title,
@@ -83,17 +84,6 @@ export function ReceivedRequestsPage({
   }, [load])
 
   useEffect(() => {
-    function onDocClick(event: MouseEvent) {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      if (target.closest('.row-actions-menu')) return
-      setOpenActionId(null)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [])
-
-  useEffect(() => {
     if (!modal) {
       setDetail(null)
       setDetailLoading(false)
@@ -126,7 +116,7 @@ export function ReceivedRequestsPage({
     return scopedRows.map((r) => {
       const reqTasks = tasks.filter((t) => t.req_id === r.id)
       const reqResp = responses.find((x) => x.req_id === r.id)
-      let status: RowStatus = 'Untouch'
+      let status: RowStatus = 'pending'
       if (reqResp) {
         status = 'Response Delivered'
       } else if (reqTasks.length > 0) {
@@ -138,7 +128,7 @@ export function ReceivedRequestsPage({
 
   const statusCounts = useMemo(
     () => [
-      { label: 'Untouch', count: mapped.filter((x) => x._status === 'Untouch').length },
+      { label: 'pending', count: mapped.filter((x) => x._status === 'pending').length },
       { label: 'Distributed', count: mapped.filter((x) => x._status === 'Distributed').length },
       { label: 'In process', count: mapped.filter((x) => x._status === 'In Process').length },
       { label: 'Delivered', count: mapped.filter((x) => x._status === 'Response Delivered').length },
@@ -147,14 +137,23 @@ export function ReceivedRequestsPage({
   )
 
   function actionPath(status: RowStatus): string {
-    if (status === 'Untouch') return distributionPath
+    if (status === 'pending') return distributionPath
     if (status === 'Response Delivered') return historyPath
     return monitoringPath
   }
 
+  /** Regional flow: pending rows open distribution with ?req= so the request is pre-selected. */
+  function workflowNavigateUrl(status: RowStatus, requestId: string): string {
+    const path = actionPath(status)
+    if (status === 'pending' && distributionPath !== monitoringPath) {
+      return `${path}?req=${encodeURIComponent(requestId)}`
+    }
+    return path
+  }
+
   function actionLabel(status: RowStatus): string {
-    if (status === 'Response Delivered') return 'View history'
-    if (status === 'Untouch' && distributionPath !== monitoringPath) return 'Proceed'
+    if (status === 'Response Delivered') return 'Compiled and submitted'
+    if (status === 'pending' && distributionPath !== monitoringPath) return 'Distribute request'
     return 'View progress'
   }
 
@@ -211,7 +210,7 @@ export function ReceivedRequestsPage({
         />
         <select value={statusFilter} onChange={(e) => setFilter('status', e.target.value)} aria-label="Filter by status">
           <option value="">All statuses</option>
-          <option value="Untouch">Untouch</option>
+          <option value="pending">pending</option>
           <option value="Distributed">Distributed</option>
           <option value="In Process">In Process</option>
           <option value="Response Delivered">Response Delivered</option>
@@ -262,63 +261,55 @@ export function ReceivedRequestsPage({
                   </StatusBadge>
                 </td>
                 <td className="table-actions">
-                  <div className="row-actions-menu">
-                    <button
-                      type="button"
-                      className="row-actions-trigger"
-                      onClick={() => setOpenActionId((prev) => (prev === r.id ? null : r.id))}
-                    >
-                      Action
-                    </button>
-                    {openActionId === r.id && (
-                      <div className="row-actions-list">
-                        {enableRequestCrud && (
-                          <Button
-                            variant="link"
-                            onClick={() => {
-                              setModal({ mode: 'view', id: r.id })
-                              setOpenActionId(null)
-                            }}
-                          >
-                            View
-                          </Button>
-                        )}
-                        {enableRequestCrud && canManage && (
-                          <Button
-                            variant="link"
-                            onClick={() => {
-                              setModal({ mode: 'edit', id: r.id })
-                              setOpenActionId(null)
-                            }}
-                          >
-                            Edit
-                          </Button>
-                        )}
-                        {enableRequestCrud && canManage && (
-                          <Button
-                            variant="link"
-                            dangerLink
-                            onClick={() => {
-                              setDeleteError(null)
-                              setDeleteTarget(r)
-                              setOpenActionId(null)
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        )}
-                        <Button
-                          variant="link"
-                          onClick={() => {
-                            navigate(actionPath(r._status))
-                            setOpenActionId(null)
-                          }}
-                        >
-                          {actionLabel(r._status)}
-                        </Button>
-                      </div>
+                  <RowActionsMenu
+                    isOpen={openActionId === r.id}
+                    onOpenChange={(open) => setOpenActionId(open ? r.id : null)}
+                  >
+                    {enableRequestCrud && (
+                      <Button
+                        variant="link"
+                        onClick={() => {
+                          setModal({ mode: 'view', id: r.id })
+                          setOpenActionId(null)
+                        }}
+                      >
+                        View
+                      </Button>
                     )}
-                  </div>
+                    {enableRequestCrud && canManage && (
+                      <Button
+                        variant="link"
+                        onClick={() => {
+                          setModal({ mode: 'edit', id: r.id })
+                          setOpenActionId(null)
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    {enableRequestCrud && canManage && (
+                      <Button
+                        variant="link"
+                        dangerLink
+                        onClick={() => {
+                          setDeleteError(null)
+                          setDeleteTarget(r)
+                          setOpenActionId(null)
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                    <Button
+                      variant="link"
+                      onClick={() => {
+                        navigate(workflowNavigateUrl(r._status, r.id))
+                        setOpenActionId(null)
+                      }}
+                    >
+                      {actionLabel(r._status)}
+                    </Button>
+                  </RowActionsMenu>
                 </td>
               </tr>
             ))}
@@ -347,18 +338,20 @@ export function ReceivedRequestsPage({
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteTarget(null)}>
           <div className="modal-card modal-card-narrow" onClick={(e) => e.stopPropagation()}>
             <ModalHeader title="Delete request" onClose={() => setDeleteTarget(null)} />
-            <p>
-              Delete <strong>{deleteTarget.id}</strong> — {deleteTarget.title}? This cannot be undone.
-            </p>
-            {deleteError && <p className="login-error">{deleteError}</p>}
-            <ModalActions>
-              <Button variant="secondary" compact onClick={() => setDeleteTarget(null)}>
-                Cancel
-              </Button>
-              <Button variant="danger" compact onClick={() => void confirmDelete()} disabled={deleting}>
-                {deleting ? 'Deleting…' : 'Delete'}
-              </Button>
-            </ModalActions>
+            <div className="pad-modal">
+              <p style={{ margin: '0 0 12px', lineHeight: 1.5 }}>
+                Delete <strong>{deleteTarget.id}</strong> — {deleteTarget.title}? This cannot be undone.
+              </p>
+              {deleteError && <p className="login-error">{deleteError}</p>}
+              <ModalActions>
+                <Button variant="secondary" compact onClick={() => setDeleteTarget(null)}>
+                  Cancel
+                </Button>
+                <Button variant="danger" compact onClick={() => void confirmDelete()} disabled={deleting}>
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </Button>
+              </ModalActions>
+            </div>
           </div>
         </div>
       )}

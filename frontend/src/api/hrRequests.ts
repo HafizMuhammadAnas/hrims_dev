@@ -22,6 +22,17 @@ export async function fetchKnowledgeConventions(): Promise<KnowledgeConventionRo
   return json.data
 }
 
+/** Full convention catalog for HR request create/edit (not limited to knowledge-hub `is_active`). */
+export async function fetchHrRequestFormConventions(): Promise<KnowledgeConventionRow[]> {
+  const res = await fetch('/api/v1/hr-request-form/conventions', {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: KnowledgeConventionRow[] }
+  return json.data
+}
+
 export async function fetchHrRequestFormIssues(conventionId: number): Promise<HrRequestIssueDetail[]> {
   const q = new URLSearchParams({ convention_id: String(conventionId) })
   const res = await fetch(`/api/v1/hr-request-form/issues?${q}`, {

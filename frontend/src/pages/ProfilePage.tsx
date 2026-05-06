@@ -1,51 +1,177 @@
+import { Building2, Camera, Mail, MapPin, ShieldCheck, UserCircle, UserSquare2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { PageSection } from '../components/ui/PageSection'
 import { TableCard } from '../components/ui/TableCard'
+import { primaryRoleSlug } from '../lib/roles'
+
+const PROFILE_PHOTO_KEY = 'hrims_profile_photo'
 
 export function ProfilePage() {
   const { user } = useAuth()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
   if (!user) return null
+
+  const primaryRole = primaryRoleSlug(user)?.replace(/_/g, ' ') ?? 'user'
+
+  useEffect(() => {
+    const savedPhoto = window.localStorage.getItem(PROFILE_PHOTO_KEY)
+    if (savedPhoto) {
+      setPhotoDataUrl(savedPhoto)
+    }
+  }, [])
+
+  function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : null
+      if (!result) return
+      setPhotoDataUrl(result)
+      window.localStorage.setItem(PROFILE_PHOTO_KEY, result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function clearPhoto() {
+    setPhotoDataUrl(null)
+    window.localStorage.removeItem(PROFILE_PHOTO_KEY)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   return (
     <PageSection title="Profile" subtitle="Signed-in account and access summary.">
-      <TableCard className="profile-card">
-        <dl className="profile-dl">
-          <dt>Name</dt>
-          <dd>{user.name}</dd>
-          <dt>Username</dt>
-          <dd>{user.username}</dd>
-          <dt>Email</dt>
-          <dd>{user.email ?? '—'}</dd>
-          <dt>Status</dt>
-          <dd>{user.is_active ? 'Active' : 'Inactive'}</dd>
-          <dt>Region</dt>
-          <dd>{user.region ? `${user.region.name} (${user.region.slug})` : '—'}</dd>
-          <dt>Department</dt>
-          <dd>{user.department ? user.department.name : '—'}</dd>
-        </dl>
-      </TableCard>
+      <div className="profile-hero">
+        <div className="profile-hero-avatar">
+          {photoDataUrl ? (
+            <img src={photoDataUrl} alt={`${user.name} profile`} className="profile-hero-avatar-image" />
+          ) : (
+            <UserCircle size={44} />
+          )}
+        </div>
+        <div className="profile-hero-copy">
+          <h3>{user.name}</h3>
+          <p>@{user.username}</p>
+          <div className="profile-chip-list">
+            <span className="profile-chip">{primaryRole}</span>
+            <span className={`profile-chip ${user.is_active ? 'active' : 'inactive'}`}>
+              {user.is_active ? 'Active account' : 'Inactive account'}
+            </span>
+          </div>
+        </div>
+        <div className="profile-photo-actions">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="profile-photo-input"
+            onChange={handlePhotoChange}
+          />
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact profile-photo-btn"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Camera size={16} />
+            Upload photo
+          </button>
+          {photoDataUrl && (
+            <button type="button" className="link-button" onClick={clearPhoto}>
+              Remove photo
+            </button>
+          )}
+          <div className="profile-photo-help">Choose a profile photo from your device.</div>
+        </div>
+      </div>
 
-      <h3 className="profile-subhead">Roles &amp; permissions</h3>
-      <TableCard>
-        {user.roles.length === 0 ? (
-          <p className="muted pad-modal">No roles assigned.</p>
-        ) : (
-          <ul className="profile-role-list">
-            {user.roles.map((r) => (
-              <li key={r.slug}>
-                <strong>{r.name}</strong> <span className="muted">({r.slug})</span>
-                {r.permissions.length > 0 && (
-                  <ul>
-                    {r.permissions.map((p) => (
-                      <li key={p}>{p}</li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </TableCard>
+      <div className="profile-grid">
+        <TableCard className="profile-card">
+          <h3 className="profile-card-title">Account details</h3>
+          <div className="profile-info-list">
+            <div className="profile-info-row">
+              <span className="profile-info-icon">
+                <UserSquare2 size={18} />
+              </span>
+              <div>
+                <div className="profile-info-label">Username</div>
+                <div className="profile-info-value">@{user.username}</div>
+              </div>
+            </div>
+            <div className="profile-info-row">
+              <span className="profile-info-icon">
+                <Mail size={18} />
+              </span>
+              <div>
+                <div className="profile-info-label">Email</div>
+                <div className="profile-info-value">{user.email ?? 'No email added'}</div>
+              </div>
+            </div>
+            <div className="profile-info-row">
+              <span className="profile-info-icon">
+                <MapPin size={18} />
+              </span>
+              <div>
+                <div className="profile-info-label">Region</div>
+                <div className="profile-info-value">
+                  {user.region ? `${user.region.name} (${user.region.slug})` : 'Not assigned'}
+                </div>
+              </div>
+            </div>
+            <div className="profile-info-row">
+              <span className="profile-info-icon">
+                <Building2 size={18} />
+              </span>
+              <div>
+                <div className="profile-info-label">Department</div>
+                <div className="profile-info-value">{user.department?.name ?? 'Not assigned'}</div>
+              </div>
+            </div>
+          </div>
+        </TableCard>
+
+        <TableCard className="profile-card">
+          <h3 className="profile-card-title">Access summary</h3>
+          <div className="profile-info-list">
+            <div className="profile-info-row">
+              <span className="profile-info-icon">
+                <ShieldCheck size={18} />
+              </span>
+              <div>
+                <div className="profile-info-label">Primary role</div>
+                <div className="profile-info-value" style={{ textTransform: 'capitalize' }}>
+                  {primaryRole}
+                </div>
+              </div>
+            </div>
+            <div className="profile-info-row">
+              <span className="profile-info-icon">
+                <ShieldCheck size={18} />
+              </span>
+              <div>
+                <div className="profile-info-label">Assigned roles</div>
+                <div className="profile-info-value">{user.roles.length}</div>
+              </div>
+            </div>
+            <div className="profile-info-row">
+              <span className="profile-info-icon">
+                <ShieldCheck size={18} />
+              </span>
+              <div>
+                <div className="profile-info-label">Permissions</div>
+                <div className="profile-info-value">
+                  {user.roles.reduce((count, role) => count + role.permissions.length, 0)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </TableCard>
+      </div>
+
     </PageSection>
   )
 }

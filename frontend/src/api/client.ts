@@ -56,3 +56,21 @@ export async function apiMe(): Promise<Response> {
     headers: { Accept: 'application/json' },
   })
 }
+
+export async function apiResetPassword(
+  username: string,
+  password: string,
+  passwordConfirmation: string,
+): Promise<Response> {
+  await ensureCsrfCookie()
+  return fetch('/api/v1/auth/reset-password', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify({
+      username,
+      password,
+      password_confirmation: passwordConfirmation,
+    }),
+  })
+}

@@ -90,6 +90,8 @@ export type AdminIssueIndicator = {
   id: number
   indicator_text: string
   disaggregation: string | null
+  has_quantitative: boolean
+  has_qualitative: boolean
 }
 
 export type AdminIssueArticleRow = {
@@ -108,6 +110,7 @@ export type AdminIssue = {
   convention_id: number
   category_id: number
   issue_title: string
+  description: string | null
   has_quantitative: boolean
   has_qualitative: boolean
   convention: { id: number; code: string; name: string } | null
@@ -151,6 +154,15 @@ export async function adminDeleteRegion(id: number): Promise<void> {
   await throwIfNotOk(res)
 }
 
+export async function adminUpdateRegion(
+  id: number,
+  body: { name?: string; slug?: string },
+): Promise<AdminRegion> {
+  const res = await adminSend('PATCH', `/regions/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminRegion
+}
+
 export async function adminFetchDistricts(regionId?: number): Promise<AdminDistrict[]> {
   const q = regionId != null ? `?region_id=${regionId}` : ''
   const json = await adminGet<{ data: AdminDistrict[] }>(`/districts${q}`)
@@ -170,6 +182,15 @@ export async function adminCreateDistrict(body: {
 export async function adminDeleteDistrict(id: number): Promise<void> {
   const res = await adminSend('DELETE', `/districts/${id}`)
   await throwIfNotOk(res)
+}
+
+export async function adminUpdateDistrict(
+  id: number,
+  body: { region_id?: number; name?: string; slug?: string | null },
+): Promise<AdminDistrict> {
+  const res = await adminSend('PATCH', `/districts/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminDistrict
 }
 
 export async function adminFetchCatalogDepartments(): Promise<AdminCatalogDepartment[]> {
@@ -418,6 +439,17 @@ export async function adminCreateIssueCategory(body: { name: string }): Promise<
   return (await res.json()).data as AdminIssueCategory
 }
 
+export async function adminUpdateIssueCategory(id: number, body: { name: string }): Promise<AdminIssueCategory> {
+  const res = await adminSend('PATCH', `/issue-categories/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminIssueCategory
+}
+
+export async function adminDeleteIssueCategory(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/issue-categories/${id}`)
+  await throwIfNotOk(res)
+}
+
 export async function adminFetchArticles(): Promise<AdminArticleRow[]> {
   const json = await adminGet<{ data: AdminArticleRow[] }>('/articles')
   return json.data
@@ -425,6 +457,12 @@ export async function adminFetchArticles(): Promise<AdminArticleRow[]> {
 
 export async function adminCreateArticle(body: { article_name: string }): Promise<AdminArticleRow> {
   const res = await adminSend('POST', '/articles', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminArticleRow
+}
+
+export async function adminUpdateArticle(id: number, body: { article_name: string }): Promise<AdminArticleRow> {
+  const res = await adminSend('PATCH', `/articles/${id}`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminArticleRow
 }
@@ -448,10 +486,16 @@ export type AdminIssuePayload = {
   convention_id: number
   category_id: number
   issue_title: string
+  description?: string | null
   has_quantitative: boolean
   has_qualitative: boolean
   articles: AdminIssueArticlePayload[]
-  indicators?: Array<{ indicator_text: string; disaggregation?: string | null }>
+  indicators?: Array<{
+    indicator_text: string
+    disaggregation?: string | null
+    has_quantitative?: boolean
+    has_qualitative?: boolean
+  }>
 }
 
 export async function adminCreateIssue(body: AdminIssuePayload): Promise<AdminIssue> {

@@ -7,6 +7,7 @@ import { CompiledRecordsPage } from './pages/CompiledRecordsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DepartmentTasksPage } from './pages/DepartmentTasksPage'
 import { FederalGroupsPage } from './pages/FederalGroupsPage'
+import { HrRequestViewPage } from './pages/HrRequestViewPage'
 import { HrRequestsPage } from './pages/HrRequestsPage'
 import { AnalysisPage } from './pages/AnalysisPage'
 import { ConventionsInfoPage } from './pages/knowledge/ConventionsInfoPage'
@@ -15,6 +16,7 @@ import { SdgsInfoPage } from './pages/knowledge/SdgsInfoPage'
 import { UprInfoPage } from './pages/knowledge/UprInfoPage'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { RegionalResponsesPage } from './pages/RegionalResponsesPage'
 import { ReportGeneratorPage } from './pages/ReportGeneratorPage'
 import { SuperAdminConsolePage } from './pages/SuperAdminConsolePage'
@@ -34,9 +36,11 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<ProtectedLayout />}>
             <Route element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="requests/:id" element={<HrRequestViewPage />} />
               <Route path="requests" element={<HrRequestsPage />} />
               <Route path="federal-groups" element={<FederalGroupsPage />} />
               <Route path="responses" element={<RegionalResponsesPage />} />
@@ -89,7 +93,7 @@ function App() {
               />
               <Route
                 path="region-monitoring"
-                element={<DepartmentMonitoringPage title="Regional — department monitoring" />}
+                element={<DepartmentMonitoringPage title="Distributed requests" />}
               />
               <Route
                 path="region-compilation"
@@ -103,7 +107,7 @@ function App() {
               <Route path="regional-users-mgmt" element={<UserManagementPage />} />
               <Route
                 path="region-history"
-                element={<SubmissionHistoryPage title="Regional — submission history" />}
+                element={<SubmissionHistoryPage title="Regional — compiled and submitted" />}
               />
               <Route path="department-tasks" element={<DepartmentTasksPage />} />
               <Route

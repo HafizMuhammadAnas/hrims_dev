@@ -55,6 +55,40 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out']);
     }
 
+    /**
+     * Guest password reset without email: user sets a new password on this screen.
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'username' => ['required', 'string', 'exists:users,username'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'username.required' => __('Username is required.'),
+            'username.exists' => __('No account was found for that username.'),
+            'password.required' => __('Choose a new password.'),
+            'password.min' => __('Password must be at least 8 characters.'),
+            'password.confirmed' => __('Password confirmation does not match.'),
+        ]);
+
+        /** @var User $user */
+        $user = User::query()->where('username', $data['username'])->firstOrFail();
+
+        if (! $user->is_active) {
+            throw ValidationException::withMessages([
+                'username' => [__('Your account is inactive.')],
+            ]);
+        }
+
+        $user->forceFill([
+            'password' => $data['password'],
+        ])->save();
+
+        return response()->json([
+            'message' => __('Your password has been updated. You can sign in.'),
+        ]);
+    }
+
     public function me(Request $request): JsonResponse
     {
         /** @var User|null $user */

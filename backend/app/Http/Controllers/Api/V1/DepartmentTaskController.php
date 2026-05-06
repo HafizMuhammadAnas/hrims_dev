@@ -7,12 +7,37 @@ use App\Models\Department;
 use App\Models\DepartmentTask;
 use App\Models\HrRequest;
 use App\Support\HrimsAccess;
+use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class DepartmentTaskController extends Controller
 {
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeTask(DepartmentTask $t, bool $redact): array
+    {
+        $t->loadMissing(['region', 'department']);
+
+        return [
+            'id' => $t->id,
+            'req_id' => $t->hr_request_id,
+            'region_id' => $t->region_id,
+            'region_name' => $t->region?->name,
+            'department_id' => $t->department?->code ?? (string) $t->department_id,
+            'department_name' => $t->department?->name,
+            'status' => $t->status,
+            'regional_review_status' => $t->regional_review_status,
+            'regional_review_comments' => $t->regional_review_comments,
+            'assigned_date' => $t->assigned_date->format('Y-m-d'),
+            'submission_date' => $t->submission_date?->format('Y-m-d'),
+            'response_data' => $redact ? null : $t->response_data,
+            'attachment_url' => $redact ? null : $t->attachment_url,
+        ];
+    }
+
     public function store(Request $request): JsonResponse
     {
         if (! HrimsAccess::canManageHrRequests($request->user())) {
@@ -60,25 +85,51 @@ class DepartmentTaskController extends Controller
 
         if ($hrRequest->status === 'pending') {
             $hrRequest->update(['status' => 'in-progress']);
+            app(NotificationService::class)->notifyHrRequestUpdated($hrRequest->fresh(['regions', 'departments']), $request->user(), 'pending');
         }
 
         $task->load(['region', 'department']);
+        app(NotificationService::class)->notifyDepartmentTaskAssigned($task, $request->user());
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
 
         return response()->json([
-            'data' => [
-                'id' => $task->id,
-                'req_id' => $task->hr_request_id,
-                'region_name' => $task->region?->name,
-                'department_id' => $task->department?->code ?? (string) $task->department_id,
-                'department_name' => $task->department?->name,
-                'status' => $task->status,
-                'assigned_date' => $task->assigned_date->format('Y-m-d'),
-                'submission_date' => $task->submission_date?->format('Y-m-d'),
-                'response_data' => $redact ? null : $task->response_data,
-                'attachment_url' => $redact ? null : $task->attachment_url,
-            ],
+            'data' => $this->serializeTask($task, $redact),
         ], 201);
+    }
+
+    public function updateReview(Request $request, DepartmentTask $departmentTask): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('regional_admin') && ! $user->hasRole('federal_admin')) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if ($user->hasRole('regional_admin')) {
+            if ($user->region_id === null || (int) $user->region_id !== (int) $departmentTask->region_id) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+        }
+
+        $hasResponse = $departmentTask->submission_date !== null || $departmentTask->status === 'submitted';
+        if (! $hasResponse) {
+            return response()->json(['message' => 'This task has no departmental response yet.'], 422);
+        }
+
+        $data = $request->validate([
+            'regional_review_status' => ['required', 'in:accepted,needs-modification'],
+            'regional_review_comments' => ['nullable', 'string', 'max:20000'],
+        ]);
+
+        $departmentTask->update([
+            'regional_review_status' => $data['regional_review_status'],
+            'regional_review_comments' => $data['regional_review_comments'] ?? null,
+        ]);
+
+        $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
+
+        return response()->json([
+            'data' => $this->serializeTask($departmentTask->fresh(['region', 'department']), $redact),
+        ]);
     }
 
     public function index(Request $request): JsonResponse
@@ -106,18 +157,7 @@ class DepartmentTaskController extends Controller
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($user);
 
         return response()->json([
-            'data' => $rows->map(fn (DepartmentTask $t) => [
-                'id' => $t->id,
-                'req_id' => $t->hr_request_id,
-                'region_name' => $t->region?->name,
-                'department_id' => $t->department?->code ?? (string) $t->department_id,
-                'department_name' => $t->department?->name,
-                'status' => $t->status,
-                'assigned_date' => $t->assigned_date->format('Y-m-d'),
-                'submission_date' => $t->submission_date?->format('Y-m-d'),
-                'response_data' => $redact ? null : $t->response_data,
-                'attachment_url' => $redact ? null : $t->attachment_url,
-            ]),
+            'data' => $rows->map(fn (DepartmentTask $t) => $this->serializeTask($t, $redact)),
         ]);
     }
 }

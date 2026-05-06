@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchKnowledgeSdgGoals, type KnowledgeSdgGoal } from '../../api/knowledgeHub'
+import { KnowledgeHubIcon } from '../../components/KnowledgeHubIcon'
 
 export function SdgsInfoPage() {
   const [goals, setGoals] = useState<KnowledgeSdgGoal[]>([])
@@ -48,7 +49,6 @@ export function SdgsInfoPage() {
       <div className="knowledge-grid knowledge-grid-dense">
         {goals.map((g) => {
           const open = expandedId === g.id
-          const icon = g.knowledge_icon?.trim() || '🎯'
           const s1v = g.stat_1_value ?? '—'
           const s1l = g.stat_1_label ?? ''
           const s2v = g.stat_2_value ?? '—'
@@ -61,7 +61,7 @@ export function SdgsInfoPage() {
               style={{ textAlign: 'left' }}
               onClick={() => setExpandedId(open ? null : g.id)}
             >
-              <div className="knowledge-card-icon">{icon}</div>
+              <KnowledgeHubIcon value={g.knowledge_icon} fallback="🎯" />
               <h3>{g.title}</h3>
               <p>{g.summary ?? '—'}</p>
               <div className="knowledge-stat-pair">

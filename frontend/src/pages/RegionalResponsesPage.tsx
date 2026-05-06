@@ -8,6 +8,7 @@ import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { ModalActions, ModalHeader } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
 import { PaginationBar } from '../components/ui/PaginationBar'
+import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { SortColumnHeader } from '../components/ui/SortColumnHeader'
 import { StatsCards } from '../components/ui/StatsCards'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -54,17 +55,6 @@ export function RegionalResponsesPage() {
     void fetchRegionalResponses()
       .then(setRows)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed'))
-  }, [])
-
-  useEffect(() => {
-    function onDocClick(event: MouseEvent) {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      if (target.closest('.row-actions-menu')) return
-      setOpenActionId(null)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
 
   const federalIds = useMemo(
@@ -279,28 +269,20 @@ export function RegionalResponsesPage() {
                   </StatusBadge>
                 </td>
                 <td className="table-actions">
-                  <div className="row-actions-menu">
-                    <button
-                      type="button"
-                      className="row-actions-trigger"
-                      onClick={() => setOpenActionId((prev) => (prev === r.id ? null : r.id))}
+                  <RowActionsMenu
+                    isOpen={openActionId === r.id}
+                    onOpenChange={(open) => setOpenActionId(open ? r.id : null)}
+                  >
+                    <Button
+                      variant="link"
+                      onClick={() => {
+                        openView(r)
+                        setOpenActionId(null)
+                      }}
                     >
-                      Action
-                    </button>
-                    {openActionId === r.id && (
-                      <div className="row-actions-list">
-                        <Button
-                          variant="link"
-                          onClick={() => {
-                            openView(r)
-                            setOpenActionId(null)
-                          }}
-                        >
-                          View
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                      View
+                    </Button>
+                  </RowActionsMenu>
                 </td>
               </tr>
             ))}

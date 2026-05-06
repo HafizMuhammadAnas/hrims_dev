@@ -4,6 +4,9 @@ export type HrRequestIssueIndicator = {
   id: number
   indicator_text: string
   disaggregation: string | null
+  /** Effective flags (per-indicator mapping; omitted on older payloads falls back to issue). */
+  has_quantitative?: boolean
+  has_qualitative?: boolean
 }
 
 export type HrRequestIssueArticle = {
@@ -15,6 +18,7 @@ export type HrRequestIssueArticle = {
 export type HrRequestIssueDetail = {
   id: number
   issue_title: string
+  description?: string | null
   has_quantitative: boolean
   has_qualitative: boolean
   category: { id: number; name: string } | null

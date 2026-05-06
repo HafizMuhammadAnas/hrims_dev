@@ -49,6 +49,9 @@ class IssueController extends Controller
                 'convention_id' => $data['convention_id'],
                 'category_id' => $data['category_id'],
                 'issue_title' => $data['issue_title'],
+                'description' => isset($data['description']) && $data['description'] !== ''
+                    ? (string) $data['description']
+                    : null,
                 'has_quantitative' => (bool) ($data['has_quantitative'] ?? false),
                 'has_qualitative' => (bool) ($data['has_qualitative'] ?? false),
             ]);
@@ -75,9 +78,13 @@ class IssueController extends Controller
                 'convention_id',
                 'category_id',
                 'issue_title',
+                'description',
                 'has_quantitative',
                 'has_qualitative',
             ])->all();
+            if (array_key_exists('description', $scalar) && ($scalar['description'] === '' || $scalar['description'] === null)) {
+                $scalar['description'] = null;
+            }
             if ($scalar !== []) {
                 $issue->fill($scalar);
                 $issue->save();
@@ -118,6 +125,7 @@ class IssueController extends Controller
             'convention_id' => [$req, 'integer', 'exists:conventions,id'],
             'category_id' => [$req, 'integer', 'exists:issue_categories,id'],
             'issue_title' => [$req, 'string', 'max:500'],
+            'description' => ['nullable', 'string'],
             'has_quantitative' => [$partial ? 'sometimes' : 'required', 'boolean'],
             'has_qualitative' => [$partial ? 'sometimes' : 'required', 'boolean'],
             'articles' => [$partial ? 'sometimes' : 'required', 'array', 'min:1'],
@@ -126,6 +134,8 @@ class IssueController extends Controller
             'indicators' => ['sometimes', 'array'],
             'indicators.*.indicator_text' => ['required_with:indicators', 'string'],
             'indicators.*.disaggregation' => ['nullable', 'string'],
+            'indicators.*.has_quantitative' => ['sometimes', 'boolean'],
+            'indicators.*.has_qualitative' => ['sometimes', 'boolean'],
         ]);
     }
 
@@ -163,6 +173,8 @@ class IssueController extends Controller
                 'disaggregation' => isset($row['disaggregation']) && $row['disaggregation'] !== ''
                     ? (string) $row['disaggregation']
                     : null,
+                'has_quantitative' => (bool) ($row['has_quantitative'] ?? false),
+                'has_qualitative' => (bool) ($row['has_qualitative'] ?? false),
             ]);
         }
     }
@@ -189,6 +201,8 @@ class IssueController extends Controller
                 'id' => $ind->id,
                 'indicator_text' => $ind->indicator_text,
                 'disaggregation' => $ind->disaggregation,
+                'has_quantitative' => (bool) $ind->has_quantitative,
+                'has_qualitative' => (bool) $ind->has_qualitative,
             ])->values()->all();
         }
 
@@ -197,6 +211,7 @@ class IssueController extends Controller
             'convention_id' => $i->convention_id,
             'category_id' => $i->category_id,
             'issue_title' => $i->issue_title,
+            'description' => $i->description,
             'has_quantitative' => (bool) $i->has_quantitative,
             'has_qualitative' => (bool) $i->has_qualitative,
             'convention' => $i->relationLoaded('convention') && $i->convention

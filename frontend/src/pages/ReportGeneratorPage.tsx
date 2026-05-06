@@ -50,6 +50,7 @@ import {
   type ReportPreviewFilters,
 } from '../lib/reportPreviewData'
 import { Button } from '../components/ui/Button'
+import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { PageSection } from '../components/ui/PageSection'
 import { StatsCards } from '../components/ui/StatsCards'
 import { TableCard } from '../components/ui/TableCard'
@@ -290,30 +291,42 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
     <>
       {error && <p className="login-error">{error}</p>}
       <StatsCards items={summaryTiles.map((tile) => ({ label: tile.label, value: tile.value }))} />
-      <TableToolbar>
-        <select value={reportType} onChange={(e) => setReportType(e.target.value as ReportType)}>
+      <TableToolbar className="report-exports-toolbar">
+        <select
+          className="report-exports-toolbar__select"
+          value={reportType}
+          onChange={(e) => setReportType(e.target.value as ReportType)}
+          aria-label="Report type"
+        >
           <option value="summary">Executive summary</option>
           <option value="regional-responses">Regional responses report</option>
           <option value="compiled-records">Compiled records report</option>
           <option value="violations">Violation entries report</option>
         </select>
-        <Button variant="primary" compact onClick={exportCurrent}>
-          Download CSV
+        <Button variant="primary" compact onClick={exportCurrent} className="report-exports-download-btn">
+          <span className="report-exports-download-btn__inner">
+            <Download size={16} aria-hidden />
+            Download CSV
+          </span>
         </Button>
       </TableToolbar>
 
-      <TableCard>
+      <TableCard padded className="report-exports-table-card">
         {reportType === 'summary' && (
-          <div style={{ padding: 16 }}>
+          <div className="report-exports-summary-inner">
             <h3 className="report-exports__snapshot-title">Executive summary snapshot</h3>
-            <div className="summary-metric-grid">
-              {Object.entries(summary.byStatus).map(([k, v]) => (
-                <div className="summary-metric-card" key={k}>
-                  <div className="summary-metric-title">Requests ({k})</div>
-                  <div className="summary-metric-value">{v}</div>
-                </div>
-              ))}
-            </div>
+            {Object.keys(summary.byStatus).length === 0 ? (
+              <p className="muted report-exports-empty-hint">No request status breakdown in your current scope.</p>
+            ) : (
+              <div className="summary-metric-grid">
+                {Object.entries(summary.byStatus).map(([k, v]) => (
+                  <div className="summary-metric-card" key={k}>
+                    <div className="summary-metric-title">Requests ({k})</div>
+                    <div className="summary-metric-value">{v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {reportType === 'regional-responses' && (
@@ -339,6 +352,9 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
                   <td>{r.review_status}</td>
                 </tr>
               ))}
+              {responses.length === 0 && (
+                <EmptyStateRow colSpan={6} message="No regional responses in your scope for this export." />
+              )}
             </tbody>
           </table>
         )}
@@ -363,6 +379,9 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
                   <td>{c.status}</td>
                 </tr>
               ))}
+              {compiled.length === 0 && (
+                <EmptyStateRow colSpan={5} message="No compiled records in your scope for this export." />
+              )}
             </tbody>
           </table>
         )}
@@ -387,6 +406,9 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
                   <td>{v.monitoring_status}</td>
                 </tr>
               ))}
+              {violations.length === 0 && (
+                <EmptyStateRow colSpan={5} message="No violation entries in your scope for this export." />
+              )}
             </tbody>
           </table>
         )}
@@ -399,10 +421,6 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
       <div className="report-exports">
         <div className="report-exports__head">
           <h3>Operational dataset export</h3>
-          <p>
-            Download scoped CSV extracts from the same live HRIMS data shown in the report preview tab (respecting
-            your account permissions).
-          </p>
         </div>
         {body}
       </div>
@@ -410,10 +428,7 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
   }
 
   return (
-    <PageSection
-      title="Operational dataset export"
-      subtitle="Download scoped CSV extracts from live HRIMS data (unchanged from the previous report generator tools)."
-    >
+    <PageSection title="Operational dataset export">
       {body}
     </PageSection>
   )
@@ -531,8 +546,6 @@ export function ReportGeneratorPage() {
     <PageSection
       titleIcon={<BarChart2 size={26} color="var(--solid-blue)" aria-hidden />}
       title="Report generator"
-      subtitle="Build a scoped analytical preview and CSV exports from live HRIMS data (no sample or offline datasets)."
-      detail="Charts and narrative bullets are computed in the browser from the same API responses used elsewhere in the app. They respect your role-based visibility rules."
     >
       <div className="report-generator-page">
         {loadError && <p className="login-error">{loadError}</p>}
@@ -567,7 +580,9 @@ export function ReportGeneratorPage() {
         </div>
 
         {mainTab === 'exports' ? (
-          <OperationalExportsPanel embedded />
+          <div className="report-generator-exports-shell">
+            <OperationalExportsPanel embedded />
+          </div>
         ) : (
           <>
             <div className="report-generator__callout">

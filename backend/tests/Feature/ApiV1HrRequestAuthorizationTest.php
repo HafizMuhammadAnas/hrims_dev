@@ -119,7 +119,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
 
     public function test_federal_admin_can_update_request_in_any_region(): void
     {
-        $federal = Region::query()->where('slug', 'federal')->firstOrFail();
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
         $sindh = Region::query()->where('slug', 'sindh')->firstOrFail();
         $role = RbacRole::query()->where('slug', 'federal_admin')->firstOrFail();
         $user = User::factory()->create(['region_id' => $federal->id]);
@@ -198,8 +198,8 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(DepartmentCatalogSeeder::class);
 
-        $federal = Region::query()->where('slug', 'federal')->firstOrFail();
-        $fedDept = Department::query()->whereHas('regions', fn ($q) => $q->where('slug', 'federal'))->firstOrFail();
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
+        $fedDept = Department::query()->whereHas('regions', fn ($q) => $q->where('slug', 'ict'))->firstOrFail();
         $role = RbacRole::query()->where('slug', 'federal_admin')->firstOrFail();
         $user = User::factory()->create(['region_id' => $federal->id]);
         $user->roles()->attach($role);
@@ -221,8 +221,8 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(DepartmentCatalogSeeder::class);
 
-        $federal = Region::query()->where('slug', 'federal')->firstOrFail();
-        $dept = Department::query()->whereHas('regions', fn ($q) => $q->where('slug', 'federal'))->firstOrFail();
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
+        $dept = Department::query()->whereHas('regions', fn ($q) => $q->where('slug', 'ict'))->firstOrFail();
         $superRole = RbacRole::query()->where('slug', 'super_admin')->firstOrFail();
         $super = User::factory()->create(['region_id' => null, 'department_id' => null]);
         $super->roles()->attach($superRole);

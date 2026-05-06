@@ -17,6 +17,8 @@ class DepartmentTask extends Model
         'region_id',
         'department_id',
         'status',
+        'regional_review_status',
+        'regional_review_comments',
         'assigned_date',
         'submission_date',
         'response_data',

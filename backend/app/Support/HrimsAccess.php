@@ -114,11 +114,12 @@ final class HrimsAccess
     }
 
     /**
-     * Regional admins coordinate tasks but must not read department submission payloads.
+     * Whether to hide department submission text from the API. Regional admins need payloads
+     * to review distributed tasks (accept / request modification).
      */
     public static function redactDepartmentTaskPayloadFor(User $user): bool
     {
-        return $user->hasRole('regional_admin');
+        return false;
     }
 
     /**
