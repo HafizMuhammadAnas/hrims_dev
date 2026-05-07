@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { isApiError } from '../api/apiError'
 import { fetchRegions } from '../api/regions'
-import { createUser, deleteUser, fetchUsers } from '../api/users'
+import { createUser, deleteUser, fetchUsers, updateUser } from '../api/users'
 import { fetchDepartments } from '../api/workflows'
 import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
@@ -35,6 +35,7 @@ export function UserManagementPage() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingUser, setEditingUser] = useState<AuthUser | null>(null)
   const [openActionId, setOpenActionId] = useState<number | null>(null)
   const [form, setForm] = useState({
     name: '',
@@ -199,6 +200,48 @@ export function UserManagementPage() {
     () => derivePaginatedRows(filteredRows, page, pageSize),
     [filteredRows, page, pageSize],
   )
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    is_active: true,
+    password: '',
+  })
+
+  function openEditModal(target: AuthUser) {
+    setEditingUser(target)
+    setEditForm({
+      name: target.name,
+      email: target.email ?? '',
+      is_active: target.is_active,
+      password: '',
+    })
+    setOpenActionId(null)
+  }
+
+  async function submitEdit() {
+    if (!editingUser) return
+    if (!editForm.name.trim()) {
+      setError('Name is required.')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await updateUser(Number(editingUser.id), {
+        name: editForm.name.trim(),
+        email: editForm.email.trim() || null,
+        is_active: editForm.is_active,
+        ...(editForm.password.trim() ? { password: editForm.password.trim() } : {}),
+      })
+      setEditingUser(null)
+      await load()
+      notify.success('User updated.')
+    } catch (e) {
+      setError(isApiError(e) ? e.message : e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <PageSection title="User management" subtitle={subtitle}>
@@ -298,6 +341,14 @@ export function UserManagementPage() {
                       isOpen={openActionId === Number(u.id)}
                       onOpenChange={(open) => setOpenActionId(open ? Number(u.id) : null)}
                     >
+                      <Button
+                        variant="link"
+                        onClick={() => {
+                          openEditModal(u)
+                        }}
+                      >
+                        Edit
+                      </Button>
                       <Button
                         variant="link"
                         dangerLink
@@ -400,6 +451,57 @@ export function UserManagementPage() {
                 </Button>
                 <Button variant="primary" compact disabled={saving} onClick={() => void submit()}>
                   {saving ? 'Creating...' : 'Create user'}
+                </Button>
+              </ModalActions>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingUser && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setEditingUser(null)}>
+          <div className="modal-card modal-card-wide" onClick={(e) => e.stopPropagation()}>
+            <ModalHeader title={`Edit user — ${editingUser.username}`} onClose={() => setEditingUser(null)} />
+            <div className="modal-form">
+              <FormGrid>
+                <FormRow twoCol>
+                  <FormControl label="Name">
+                    <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
+                  </FormControl>
+                  <FormControl label="Email">
+                    <input
+                      value={editForm.email}
+                      onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="email@example.com"
+                    />
+                  </FormControl>
+                </FormRow>
+                <FormRow twoCol>
+                  <FormControl label="Temporary password (optional)">
+                    <input
+                      type="password"
+                      value={editForm.password}
+                      onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
+                      placeholder="Leave blank to keep existing password"
+                    />
+                  </FormControl>
+                  <FormControl label="Status">
+                    <select
+                      value={editForm.is_active ? 'active' : 'inactive'}
+                      onChange={(e) => setEditForm((f) => ({ ...f, is_active: e.target.value === 'active' }))}
+                    >
+                      <option value="active">active</option>
+                      <option value="inactive">inactive</option>
+                    </select>
+                  </FormControl>
+                </FormRow>
+              </FormGrid>
+              <ModalActions>
+                <Button variant="secondary" compact onClick={() => setEditingUser(null)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" compact disabled={saving} onClick={() => void submitEdit()}>
+                  {saving ? 'Saving...' : 'Save changes'}
                 </Button>
               </ModalActions>
             </div>

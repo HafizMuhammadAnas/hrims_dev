@@ -27,6 +27,53 @@ export async function fetchDepartments(): Promise<DepartmentRow[]> {
   return json.data
 }
 
+export async function createDepartment(body: {
+  code?: string | null
+  name: string
+  type?: string | null
+}): Promise<DepartmentRow> {
+  await ensureCsrfCookie()
+  const res = await fetch('/api/v1/departments', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify(body),
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: DepartmentRow }
+  return json.data
+}
+
+export async function updateDepartment(
+  id: number,
+  body: {
+    code?: string | null
+    name?: string
+    type?: string | null
+  },
+): Promise<DepartmentRow> {
+  await ensureCsrfCookie()
+  const res = await fetch(`/api/v1/departments/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify(body),
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: DepartmentRow }
+  return json.data
+}
+
+export async function deleteDepartment(id: number): Promise<void> {
+  await ensureCsrfCookie()
+  const res = await fetch(`/api/v1/departments/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+  })
+  await throwIfNotOk(res)
+}
+
 export async function createDepartmentTask(
   hr_request_id: string,
   department_id: number,

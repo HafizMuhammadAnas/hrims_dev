@@ -135,13 +135,31 @@ class UserController extends Controller
 
     public function update(Request $request, int $user): JsonResponse
     {
-        if (! $request->user()->hasRole('super_admin')) {
+        $creator = $request->user();
+        if (! $creator->hasRole('super_admin') && ! $creator->hasRole('federal_admin') && ! $creator->hasRole('regional_admin')) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
         $model = User::query()->find($user);
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
+        }
+        if ((int) $model->id === (int) $creator->id) {
+            return response()->json(['message' => 'You cannot edit your own account from this screen.'], 422);
+        }
+        if ($model->roles()->where('slug', 'super_admin')->exists()) {
+            return response()->json(['message' => 'Super administrator accounts cannot be edited here.'], 422);
+        }
+
+        if ($creator->hasRole('federal_admin')) {
+            if (! $model->department?->coversRegionSlug('ict')) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+        } elseif ($creator->hasRole('regional_admin')) {
+            $creatorSlug = Region::query()->whereKey($creator->region_id)->value('slug');
+            if (! $model->department?->coversRegionSlug((string) $creatorSlug)) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
         }
 
         $data = $request->validate([
@@ -168,12 +186,12 @@ class UserController extends Controller
         $model->load(['roles.permissions', 'region', 'department']);
         app(NotificationService::class)->notifyUserManaged(
             $model,
-            $request->user(),
+            $creator,
             ! $model->is_active && $wasActive ? 'user.deactivated' : 'user.updated',
             ! $model->is_active && $wasActive ? 'User deactivated' : 'User updated',
             ! $model->is_active && $wasActive
-                ? sprintf('%s deactivated user %s.', $request->user()->name, $model->username)
-                : sprintf('%s updated user %s.', $request->user()->name, $model->username)
+                ? sprintf('%s deactivated user %s.', $creator->name, $model->username)
+                : sprintf('%s updated user %s.', $creator->name, $model->username)
         );
 
         return response()->json(['data' => $this->serialize($model)]);

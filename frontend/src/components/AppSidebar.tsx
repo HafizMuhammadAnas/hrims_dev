@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
   BarChart2,
+  Building2,
   BookOpen,
   ClipboardList,
   FileCheck,
@@ -115,6 +116,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/compilation" icon={Layers} label="Compilation center" onPick={onPick} />
               <NavItem to="/compiled-records" icon={FileCheck} label="Compiled records" onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label="User management" onPick={onPick} />
+              <NavItem to="/federal-departments-mgmt" icon={Building2} label="Manage departments" onPick={onPick} />
             </div>
             <div className="nav-section-title">Federal department actions</div>
             <div className="nav-sub">
@@ -136,6 +138,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/region-compilation" icon={FileText} label="Response compilation" onPick={onPick} />
               <NavItem to="/region-history" icon={History} label="Compiled and submitted" onPick={onPick} />
               <NavItem to="/regional-users-mgmt" icon={Users} label="User management" onPick={onPick} />
+              <NavItem to="/regional-departments-mgmt" icon={Building2} label="Manage departments" onPick={onPick} />
             </div>
           </>
         )}

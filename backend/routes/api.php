@@ -43,6 +43,9 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/regions', [RegionController::class, 'index'])->name('api.v1.regions.index');
         Route::get('/departments', [DepartmentController::class, 'index'])->name('api.v1.departments.index');
+        Route::post('/departments', [DepartmentController::class, 'store'])->name('api.v1.departments.store');
+        Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('api.v1.departments.update');
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('api.v1.departments.destroy');
 
         Route::get('/knowledge/conventions', [KnowledgeHubController::class, 'conventions'])->name('api.v1.knowledge.conventions.index');
         Route::get('/knowledge/conventions/{convention}', [KnowledgeHubController::class, 'showConvention'])->name('api.v1.knowledge.conventions.show');

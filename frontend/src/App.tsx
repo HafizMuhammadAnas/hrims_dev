@@ -15,6 +15,7 @@ import { IndicatorsInfoPage } from './pages/knowledge/IndicatorsInfoPage'
 import { SdgsInfoPage } from './pages/knowledge/SdgsInfoPage'
 import { UprInfoPage } from './pages/knowledge/UprInfoPage'
 import { LoginPage } from './pages/LoginPage'
+import { ManageDepartmentsPage } from './pages/ManageDepartmentsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { RegionalResponsesPage } from './pages/RegionalResponsesPage'
@@ -47,6 +48,7 @@ function App() {
               <Route path="compilation" element={<FederalCompilationPage />} />
               <Route path="compiled-records" element={<CompiledRecordsPage />} />
               <Route path="federal-users-mgmt" element={<UserManagementPage />} />
+              <Route path="federal-departments-mgmt" element={<ManageDepartmentsPage />} />
               <Route
                 path="federal-department-requests"
                 element={
@@ -110,6 +112,7 @@ function App() {
                 element={<SubmissionHistoryPage title="Regional — compiled and submitted" />}
               />
               <Route path="department-tasks" element={<DepartmentTasksPage />} />
+              <Route path="regional-departments-mgmt" element={<ManageDepartmentsPage />} />
               <Route
                 path="department-history"
                 element={<SubmissionHistoryPage title="Department — submission history" />}
