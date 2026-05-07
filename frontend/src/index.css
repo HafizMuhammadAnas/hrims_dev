@@ -716,11 +716,59 @@ body {
   max-width: 960px;
 }
 
-/* Full-page request view (no overlay) */
+/* Full-page request view (no overlay) — do not inherit .modal-card max-height: 90vh (clips long forms). */
 .hr-request-modal--page {
   max-width: min(960px, 100%);
-  margin: 0 auto;
+  width: 100%;
+  max-height: none;
+  margin: 0 auto 24px;
+  box-sizing: border-box;
   box-shadow: 0 2px 12px rgba(46, 79, 163, 0.1);
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 12px;
+  background: #fff;
+  overflow: visible;
+}
+
+/* Single centered column: request card + action panels share width (no narrow-over-wide jump). */
+.hr-request-view-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: min(960px, 100%);
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+.hr-request-view-stack .hr-request-modal--page {
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+}
+
+.hr-request-view-panel {
+  background: #fff;
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(46, 79, 163, 0.1);
+  padding: 16px 20px 20px;
+  box-sizing: border-box;
+}
+
+.hr-request-view-panel .dashboard-panel-title {
+  font-size: 1.05rem;
+}
+
+.hr-request-view-footnote {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Full-page request: keep due date & status in one vertical column for calmer layout */
+.hr-request-modal--page .form-row.two-col {
+  grid-template-columns: 1fr;
 }
 
 .hr-request-ict-dept-multiselect {
@@ -1047,6 +1095,12 @@ body {
 .mapping-indicators {
   margin: 8px 0 0;
   padding-left: 1.1rem;
+}
+
+.mapping-article-list {
+  list-style: disc !important;
+  list-style-position: outside;
+  padding-left: 1.25rem;
 }
 
 .mapping-indicators li {

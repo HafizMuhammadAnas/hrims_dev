@@ -17,6 +17,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { TableToolbar } from '../../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
+import { isRegionalAdmin } from '../../lib/roles'
 import type { HrRequestRow } from '../../types/hrRequest'
 
 type Props = {
@@ -126,6 +127,8 @@ export function ReceivedRequestsPage({
     })
   }, [rows, tasks, responses])
 
+  const regionalMode = isRegionalAdmin(user)
+
   const statusCounts = useMemo(
     () => [
       { label: 'pending', count: mapped.filter((x) => x._status === 'pending').length },
@@ -137,7 +140,7 @@ export function ReceivedRequestsPage({
   )
 
   function actionPath(status: RowStatus): string {
-    if (status === 'pending') return distributionPath
+    if (status === 'pending') return regionalMode ? monitoringPath : distributionPath
     if (status === 'Response Delivered') return historyPath
     return monitoringPath
   }
@@ -153,8 +156,13 @@ export function ReceivedRequestsPage({
 
   function actionLabel(status: RowStatus): string {
     if (status === 'Response Delivered') return 'Compiled and submitted'
+    if (regionalMode) return 'Open request'
     if (status === 'pending' && distributionPath !== monitoringPath) return 'Distribute request'
     return 'View progress'
+  }
+
+  function regionalRequestViewUrl(requestId: string): string {
+    return `/requests/${encodeURIComponent(requestId)}?from=${encodeURIComponent('/region-received')}`
   }
 
   async function confirmDelete() {
@@ -303,6 +311,11 @@ export function ReceivedRequestsPage({
                     <Button
                       variant="link"
                       onClick={() => {
+                        if (regionalMode) {
+                          navigate(regionalRequestViewUrl(r.id))
+                          setOpenActionId(null)
+                          return
+                        }
                         navigate(workflowNavigateUrl(r._status, r.id))
                         setOpenActionId(null)
                       }}
@@ -355,6 +368,7 @@ export function ReceivedRequestsPage({
           </div>
         </div>
       )}
+
     </PageSection>
   )
 }

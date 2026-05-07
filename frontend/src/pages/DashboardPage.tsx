@@ -22,7 +22,12 @@ import {
   XAxis,
 } from 'recharts'
 import { fetchDashboardSummary } from '../api/dashboard'
-import type { DashboardSummary, MonthCountPoint, UrgentRequestRow } from '../api/dashboard'
+import type {
+  DashboardSummary,
+  MonthCountPoint,
+  UrgentDepartmentTaskRow,
+  UrgentRequestRow,
+} from '../api/dashboard'
 import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
 import {
@@ -59,13 +64,14 @@ function urgentRowChrome(status: string): { background: string; borderLeft: stri
   if (status === 'overdue') {
     return { background: '#ffebee', borderLeft: '#f44336' }
   }
-  if (status === 'in-progress') {
+  if (status === 'in-progress' || status === 'needs-revision') {
     return { background: '#e8eefb', borderLeft: '#2e4fa3' }
   }
   return { background: '#fff8e1', borderLeft: '#e69a00' }
 }
 
 function formatStatus(s: string): string {
+  if (s === 'needs-revision') return 'Needs revision'
   return s.replace(/-/g, ' ')
 }
 
@@ -182,6 +188,14 @@ export function DashboardPage() {
   }, [user, variant])
 
   const urgentList = summary?.urgent_requests ?? []
+  const urgentDeptTasks = summary?.urgent_department_tasks ?? []
+
+  const requestsPanelRows: (UrgentRequestRow | (UrgentDepartmentTaskRow & { task_id: string }))[] =
+    variant === 'department' || variant === 'viewer'
+      ? urgentDeptTasks.length > 0
+        ? urgentDeptTasks
+        : urgentList
+      : urgentList
 
   const pieTitle =
     variant === 'department' || variant === 'viewer'
@@ -219,26 +233,11 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {(variant === 'department' || variant === 'viewer' || variant === 'minimal') && (
+          {variant === 'minimal' && (
             <div className="dashboard-shortcuts">
-              {(variant === 'department' || variant === 'viewer') && (
-                <>
-                  <Link to="/department-tasks" className="btn btn-secondary btn-compact">
-                    Department tasks
-                  </Link>
-                  <Link to="/requests" className="btn btn-secondary btn-compact">
-                    Linked HR requests
-                  </Link>
-                  <Link to="/department-history" className="btn btn-secondary btn-compact">
-                    Submission history
-                  </Link>
-                </>
-              )}
-              {variant === 'minimal' && (
-                <Link to="/requests" className="btn btn-secondary btn-compact">
-                  HR requests
-                </Link>
-              )}
+              <Link to="/requests" className="btn btn-secondary btn-compact">
+                HR requests
+              </Link>
             </div>
           )}
 
@@ -444,14 +443,20 @@ export function DashboardPage() {
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {urgentList.length > 0 ? (
-                  urgentList.map((r: UrgentRequestRow) => {
+                {requestsPanelRows.length > 0 ? (
+                  requestsPanelRows.map((r) => {
                     const chrome = urgentRowChrome(r.status)
+                    const taskId = 'task_id' in r ? r.task_id : null
                     return (
                       <button
-                        key={r.id}
+                        key={taskId ? `${r.id}-${taskId}` : r.id}
                         type="button"
-                        onClick={() => navigate(`/requests/${r.id}`)}
+                        onClick={() => {
+                          const q = taskId
+                            ? `?task=${encodeURIComponent(taskId)}&from=${encodeURIComponent('/')}`
+                            : `?from=${encodeURIComponent('/')}`
+                          navigate(`/requests/${encodeURIComponent(r.id)}${q}`)
+                        }}
                         style={{
                           textAlign: 'left',
                           cursor: 'pointer',

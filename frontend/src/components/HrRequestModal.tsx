@@ -186,6 +186,8 @@ export type HrRequestModalProps = {
   onSaved: () => void
   /** Inline full-width layout (no overlay) for `/requests/:id` */
   layout?: 'modal' | 'page'
+  /** When `layout` is `page`, label for the read-only close/back button */
+  pageCloseLabel?: string
 }
 
 export function HrRequestModal({
@@ -199,6 +201,7 @@ export function HrRequestModal({
   onClose,
   onSaved,
   layout = 'modal',
+  pageCloseLabel,
 }: HrRequestModalProps) {
   const assignableRegions = useMemo(() => {
     const base = regions.filter((r) => r.slug !== 'federal')
@@ -258,6 +261,9 @@ export function HrRequestModal({
   }, [conventions, detail?.convention])
 
   const readOnly = mode === 'view' || !canManage
+  const hideRegionsInRegionalView = readOnly && lockedRegionId != null
+  const readOnlyCloseLabel =
+    layout === 'page' && pageCloseLabel ? pageCloseLabel : readOnly ? 'Close' : 'Cancel'
 
   const ictAmongSelected = useMemo(() => {
     if (!issueForm) return false
@@ -266,14 +272,16 @@ export function HrRequestModal({
 
   const selectedRegionIdsKey = issueForm?.region_ids.join(',') ?? ''
 
-  const loadIssues = useCallback(async (conventionId: number) => {
+  const loadIssues = useCallback(async (conventionId: number, fallback: HrRequestIssueDetail[] = []) => {
     setIssuesLoading(true)
     try {
       const rows = await fetchHrRequestFormIssues(conventionId)
       setIssues(rows)
     } catch {
-      setIssues([])
-      setFormBanner('Could not load issues for this convention.')
+      setIssues(fallback)
+      if (fallback.length === 0) {
+        setFormBanner('Could not load issues for this convention.')
+      }
     } finally {
       setIssuesLoading(false)
     }
@@ -300,7 +308,11 @@ export function HrRequestModal({
         }
         const cid = detail.convention?.id ?? detail.convention_id
         if (typeof cid === 'number') {
-          void loadIssues(cid)
+          const hasEmbeddedIssue = Boolean(detail.issue)
+          const skipIssuesFetch = mode === 'view' && hasEmbeddedIssue
+          if (!skipIssuesFetch) {
+            void loadIssues(cid, hasEmbeddedIssue && detail.issue ? [detail.issue] : [])
+          }
         }
       } else {
         setIssueForm(null)
@@ -409,10 +421,29 @@ export function HrRequestModal({
     )
   }, [issueForm?.issue_id, issues])
 
+  /** Options for Issue `<select>`; always include embedded `detail.issue` when it matches the saved id. */
+  const issueOptions = useMemo(() => {
+    const list = [...issues]
+    if (
+      detail?.issue &&
+      issueForm &&
+      issueForm.issue_id !== '' &&
+      issueForm.issue_id === detail.issue.id &&
+      !list.some((i) => i.id === detail.issue.id)
+    ) {
+      list.push(detail.issue)
+    }
+    return list
+  }, [issues, detail?.issue, issueForm?.issue_id])
+
   const selectedIssue = useMemo(() => {
     if (!issueForm || issueForm.issue_id === '') return null
-    return issues.find((i) => i.id === issueForm.issue_id) ?? null
-  }, [issueForm, issues])
+    return (
+      issues.find((i) => i.id === issueForm.issue_id) ??
+      (detail?.issue?.id === issueForm.issue_id ? detail.issue : null) ??
+      null
+    )
+  }, [issueForm, issues, detail?.issue])
 
   const selectedIctDepartmentsText = useMemo(() => {
     if (!issueForm || federalDepts.length === 0) return 'Select ICT departments'
@@ -421,6 +452,12 @@ export function HrRequestModal({
     if (picked.length <= 2) return picked.map((d) => d.name).join(', ')
     return `${picked.length} departments selected`
   }, [issueForm?.department_ids, federalDepts])
+
+  const selectedRegions = useMemo(() => {
+    if (!issueForm) return []
+    const byId = new Map(assignableRegions.map((r) => [r.id, r.name]))
+    return issueForm.region_ids.map((id) => byId.get(id) ?? `Region ${id}`)
+  }, [issueForm?.region_ids, assignableRegions])
 
   function runIssueValidation(): boolean {
     if (!issueForm) return false
@@ -672,14 +709,16 @@ export function HrRequestModal({
                         : f,
                     )
                   }}
-                  disabled={readOnly || issueForm.convention_id === '' || issuesLoading}
+                  disabled={
+                    readOnly || issueForm.convention_id === '' || (!readOnly && issuesLoading)
+                  }
                   aria-invalid={Boolean(fieldErrors.issue_id)}
                   aria-describedby={fieldErrors.issue_id ? 'hr-issue-err' : undefined}
                 >
                   <option value="">
                     {issueForm.convention_id === '' ? 'Select a convention first' : 'Select issue'}
                   </option>
-                  {issues.map((i) => (
+                  {issueOptions.map((i) => (
                     <option key={i.id} value={i.id}>
                       {i.issue_title}
                     </option>
@@ -687,6 +726,25 @@ export function HrRequestModal({
                 </select>
                 <FieldError id="hr-issue-err" message={fieldErrors.issue_id} />
               </FormField>
+
+              {readOnly && (
+                <FormField label="Request description" htmlFor="hr-details-summary">
+                  {issueForm.details?.trim() ? (
+                    <textarea
+                      id="hr-details-summary"
+                      rows={8}
+                      readOnly
+                      disabled
+                      value={issueForm.details}
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                    />
+                  ) : (
+                    <p className="muted" id="hr-details-summary" style={{ margin: 0 }}>
+                      No additional description was provided for this request.
+                    </p>
+                  )}
+                </FormField>
+              )}
 
               {selectedIssue && (
                 <FormRow className="mapping-preview">
@@ -700,10 +758,10 @@ export function HrRequestModal({
                       {selectedIssue.articles.length === 0 ? (
                         <p className="muted">—</p>
                       ) : (
-                        <ul className="mapping-indicators" style={{ listStyle: 'disc' }}>
+                        <ul className="mapping-indicators mapping-article-list">
                           {selectedIssue.articles.map((a) => (
                             <li key={a.id}>
-                              <strong>{a.article_name}</strong>
+                              {a.article_name}
                               {a.relevant_paragraph ? (
                                 <p
                                   className="muted"
@@ -811,39 +869,59 @@ export function HrRequestModal({
                 </FormRow>
               )}
 
-              <FormField
-                label="Regions (optional)"
-                hint="Include ICT when this request applies at national level. ICT national-line departments can be linked after ICT is selected."
-              >
-                <div className="checkbox-grid" role="group" aria-label="Regions (optional)">
-                  {assignableRegions.map((r) => (
-                    <label key={r.id} className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={issueForm.region_ids.includes(r.id)}
-                        onChange={(e) =>
-                          setIssueForm((f) => {
-                            if (!f) return f
-                            const on = e.target.checked
-                            const next = on
-                              ? [...f.region_ids, r.id]
-                              : f.region_ids.filter((x) => x !== r.id)
-                            const ictStill = next.some((id) => ictRegionIdSet.has(id))
-                            return {
-                              ...f,
-                              region_ids: next,
-                              department_ids: ictStill ? f.department_ids : [],
+              {!hideRegionsInRegionalView && (
+                <FormField
+                  label="Regions (optional)"
+                  hint={
+                    readOnly
+                      ? undefined
+                      : 'Include ICT when this request applies at national level. ICT national-line departments can be linked after ICT is selected.'
+                  }
+                >
+                  {readOnly ? (
+                    selectedRegions.length > 0 ? (
+                      <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                        {selectedRegions.map((name) => (
+                          <li key={name}>{name}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted" style={{ margin: 0 }}>
+                        —
+                      </p>
+                    )
+                  ) : (
+                    <div className="checkbox-grid" role="group" aria-label="Regions (optional)">
+                      {assignableRegions.map((r) => (
+                        <label key={r.id} className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={issueForm.region_ids.includes(r.id)}
+                            onChange={(e) =>
+                              setIssueForm((f) => {
+                                if (!f) return f
+                                const on = e.target.checked
+                                const next = on
+                                  ? [...f.region_ids, r.id]
+                                  : f.region_ids.filter((x) => x !== r.id)
+                                const ictStill = next.some((id) => ictRegionIdSet.has(id))
+                                return {
+                                  ...f,
+                                  region_ids: next,
+                                  department_ids: ictStill ? f.department_ids : [],
+                                }
+                              })
                             }
-                          })
-                        }
-                        disabled={readOnly || lockedRegionId != null}
-                      />
-                      {r.name}
-                    </label>
-                  ))}
-                </div>
-                <FieldError id="hr-regions-err" message={fieldErrors.region_ids} />
-              </FormField>
+                            disabled={readOnly || lockedRegionId != null}
+                          />
+                          {r.name}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <FieldError id="hr-regions-err" message={fieldErrors.region_ids} />
+                </FormField>
+              )}
 
               {readOnly && (detail?.departments?.length ?? 0) > 0 && (
                 <FormField label="ICT departments">
@@ -961,25 +1039,27 @@ export function HrRequestModal({
                 </FormField>
               )}
 
-              <FormField
-                label="Request notes"
-                htmlFor="hr-details"
-                hint="Optional context for reviewers. Treaty wording for each article is shown in the mapping block above."
-              >
-                <textarea
-                  id="hr-details"
-                  rows={4}
-                  value={issueForm.details}
-                  onChange={(e) =>
-                    setIssueForm((f) => (f ? { ...f, details: e.target.value } : f))
-                  }
-                  disabled={readOnly}
-                />
-              </FormField>
+              {!readOnly && (
+                <FormField
+                  label="Request notes"
+                  htmlFor="hr-details"
+                  hint="Optional context for reviewers. Treaty wording for each article is shown in the mapping block above."
+                >
+                  <textarea
+                    id="hr-details"
+                    rows={4}
+                    value={issueForm.details}
+                    onChange={(e) =>
+                      setIssueForm((f) => (f ? { ...f, details: e.target.value } : f))
+                    }
+                    disabled={readOnly}
+                  />
+                </FormField>
+              )}
             </FormGrid>
             <ModalActions>
               <Button variant="secondary" compact type="button" onClick={onClose}>
-                {readOnly ? 'Close' : 'Cancel'}
+                {readOnlyCloseLabel}
               </Button>
               {!readOnly && (
                 <Button variant="primary" compact type="submit" disabled={saving}>
@@ -1032,31 +1112,46 @@ export function HrRequestModal({
                 <FieldError id="hr-leg-conv-err" message={fieldErrors.conv} />
               </FormField>
               <FormField label="Region" htmlFor="hr-leg-region">
-                <select
-                  id="hr-leg-region"
-                  value={legacyForm.region_id === '' ? '' : String(legacyForm.region_id)}
-                  onChange={(e) =>
-                    setLegacyForm((f) =>
-                      f
-                        ? {
-                            ...f,
-                            region_id: e.target.value === '' ? '' : Number(e.target.value),
-                          }
-                        : f,
-                    )
-                  }
-                  disabled={readOnly || lockedRegionId != null}
-                  aria-invalid={Boolean(fieldErrors.region_id)}
-                  aria-describedby={fieldErrors.region_id ? 'hr-leg-region-err' : undefined}
-                >
-                  <option value="">Select region</option>
-                  {assignableRegions.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-                <FieldError id="hr-leg-region-err" message={fieldErrors.region_id} />
+                {hideRegionsInRegionalView && readOnly ? (
+                  <input
+                    id="hr-leg-region"
+                    value={
+                      legacyForm.region_id === ''
+                        ? '—'
+                        : assignableRegions.find((r) => r.id === legacyForm.region_id)?.name ?? '—'
+                    }
+                    readOnly
+                    disabled
+                  />
+                ) : (
+                  <>
+                    <select
+                      id="hr-leg-region"
+                      value={legacyForm.region_id === '' ? '' : String(legacyForm.region_id)}
+                      onChange={(e) =>
+                        setLegacyForm((f) =>
+                          f
+                            ? {
+                                ...f,
+                                region_id: e.target.value === '' ? '' : Number(e.target.value),
+                              }
+                            : f,
+                        )
+                      }
+                      disabled={readOnly || lockedRegionId != null}
+                      aria-invalid={Boolean(fieldErrors.region_id)}
+                      aria-describedby={fieldErrors.region_id ? 'hr-leg-region-err' : undefined}
+                    >
+                      <option value="">Select region</option>
+                      {assignableRegions.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError id="hr-leg-region-err" message={fieldErrors.region_id} />
+                  </>
+                )}
               </FormField>
               <FormRow twoCol>
                 <FormControl label="Due date" htmlFor="hr-leg-date">
@@ -1106,7 +1201,7 @@ export function HrRequestModal({
             </FormGrid>
             <ModalActions>
               <Button variant="secondary" compact type="button" onClick={onClose}>
-                {readOnly ? 'Close' : 'Cancel'}
+                {readOnlyCloseLabel}
               </Button>
               {!readOnly && (
                 <Button variant="primary" compact type="submit" disabled={saving}>

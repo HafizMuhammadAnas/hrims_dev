@@ -133,7 +133,6 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-section-title">Province actions</div>
             <div className="nav-sub">
               <NavItem to="/region-received" icon={List} label="Received requests" onPick={onPick} />
-              <NavItem to="/region-distribution" icon={ClipboardList} label="Request distribution" onPick={onPick} />
               <NavItem to="/region-monitoring" icon={Activity} label="Distributed requests" onPick={onPick} />
               <NavItem to="/region-compilation" icon={FileText} label="Response compilation" onPick={onPick} />
               <NavItem to="/region-history" icon={History} label="Compiled and submitted" onPick={onPick} />

@@ -1,4 +1,4 @@
-import { apiJsonHeaders, ensureCsrfCookie } from './client'
+import { apiJsonHeaders, apiMultipartHeaders, ensureCsrfCookie } from './client'
 import { ApiError, parseApiErrorResponse } from './apiError'
 import type { DepartmentTaskRow, RegionalResponseRow } from './lists'
 
@@ -72,6 +72,27 @@ export async function deleteDepartment(id: number): Promise<void> {
     headers: apiJsonHeaders(),
   })
   await throwIfNotOk(res)
+}
+
+export async function submitDepartmentTaskResponse(
+  taskId: string,
+  body: { response_data: string; attachment?: File | null },
+): Promise<DepartmentTaskRow> {
+  await ensureCsrfCookie()
+  const form = new FormData()
+  form.append('response_data', body.response_data)
+  if (body.attachment) {
+    form.append('attachment', body.attachment)
+  }
+  const res = await fetch(`/api/v1/department-tasks/${encodeURIComponent(taskId)}/submit-response`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiMultipartHeaders(),
+    body: form,
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: DepartmentTaskRow }
+  return json.data
 }
 
 export async function createDepartmentTask(

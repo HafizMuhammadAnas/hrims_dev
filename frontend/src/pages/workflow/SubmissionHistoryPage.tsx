@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../../api/lists'
 import { updateRegionalCompiledResponse } from '../../api/workflows'
 import { useAuth } from '../../auth/AuthContext'
@@ -8,8 +9,8 @@ import { ModalActions, ModalHeader } from '../../components/ui/ModalChrome'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
-import { workflowPresentation } from '../../lib/departmentTaskWorkflow'
-import { isRegionalAdmin } from '../../lib/roles'
+import { hasDepartmentResponse, workflowPresentation } from '../../lib/departmentTaskWorkflow'
+import { isDepartmentAdmin, isRegionalAdmin, isViewer } from '../../lib/roles'
 
 type Props = {
   title: string
@@ -91,7 +92,10 @@ function DepartmentSubmissionSections({
 
 export function SubmissionHistoryPage({ title }: Props) {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const regional = isRegionalAdmin(user)
+  const deptHistoryUser =
+    (isDepartmentAdmin(user) || isViewer(user)) && user?.department != null
   const [rows, setRows] = useState<RegionalResponseRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -102,20 +106,33 @@ export function SubmissionHistoryPage({ title }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  async function reload() {
-    const [respRows, taskRows] = await Promise.all([fetchRegionalResponses(), fetchDepartmentTasks()])
-    setRows(respRows.sort((a, b) => b.submission_date.localeCompare(a.submission_date)))
+  const reload = useCallback(async () => {
+    const taskRows = await fetchDepartmentTasks()
     setTasks(taskRows)
-  }
+    if (deptHistoryUser) {
+      setRows([])
+      return
+    }
+    const respRows = await fetchRegionalResponses()
+    setRows(respRows.sort((a, b) => b.submission_date.localeCompare(a.submission_date)))
+  }, [deptHistoryUser])
 
   useEffect(() => {
     void reload().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
-  }, [])
+  }, [reload])
 
   const tasksForDetail = useMemo(() => {
     if (!detail) return []
     return tasks.filter((t) => t.req_id === detail.req_id).sort(sortTasksByDept)
   }, [tasks, detail])
+
+  const submittedDeptTasks = useMemo(() => {
+    return tasks
+      .filter((t) => hasDepartmentResponse(t))
+      .sort((a, b) => (b.submission_date ?? '').localeCompare(a.submission_date ?? ''))
+  }, [tasks])
+
+  const fromHistory = encodeURIComponent('/department-history')
 
   function openView(r: RegionalResponseRow) {
     setDetailMode('view')
@@ -162,47 +179,110 @@ export function SubmissionHistoryPage({ title }: Props) {
   return (
     <PageSection
       title={title}
-      subtitle="Compiled responses with per-department submissions, federal review status, and resubmission after modification."
+      subtitle={
+        deptHistoryUser
+          ? 'Your submitted department tasks. Use View response to open the full request page with the HR request, regional administration, and your response.'
+          : 'Compiled responses with per-department submissions, federal review status, and resubmission after modification.'
+      }
     >
       {error && <p className="login-error">{error}</p>}
-      <TableCard>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Response ID</th>
-              <th>Request</th>
-              <th>Title</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th className="table-actions">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>{r.id}</td>
-                <td>{r.req_id}</td>
-                <td>{r.title}</td>
-                <td>{r.submission_date}</td>
-                <td>{r.review_status}</td>
-                <td className="table-actions">
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                    <Button variant="primary" compact onClick={() => openView(r)}>
-                      View
-                    </Button>
-                    {regional && r.review_status === 'needs-modification' && (
-                      <Button variant="secondary" compact onClick={() => openEdit(r)}>
-                        Edit
-                      </Button>
-                    )}
-                  </div>
-                </td>
+
+      {deptHistoryUser && (
+        <>
+          <h3 className="dashboard-panel-title" style={{ marginBottom: 12 }}>
+            Your department submissions
+          </h3>
+          <div style={{ marginBottom: 28 }}>
+          <TableCard>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Request</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th className="table-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submittedDeptTasks.map((t) => {
+                  const wf = workflowPresentation(t)
+                  return (
+                    <tr key={t.id}>
+                      <td>{t.id}</td>
+                      <td>{t.req_id}</td>
+                      <td>{t.submission_date ?? '—'}</td>
+                      <td>
+                        <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
+                      </td>
+                      <td className="table-actions">
+                        <Button
+                          variant="primary"
+                          compact
+                          onClick={() =>
+                            navigate(
+                              `/requests/${encodeURIComponent(t.req_id)}?task=${encodeURIComponent(t.id)}&from=${fromHistory}`,
+                            )
+                          }
+                        >
+                          View response
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {submittedDeptTasks.length === 0 && (
+                  <EmptyStateRow colSpan={5} message="No submitted tasks yet." />
+                )}
+              </tbody>
+            </table>
+          </TableCard>
+          </div>
+        </>
+      )}
+
+      {!deptHistoryUser && (
+        <TableCard>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Response ID</th>
+                <th>Request</th>
+                <th>Title</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th className="table-actions">Actions</th>
               </tr>
-            ))}
-            {rows.length === 0 && <EmptyStateRow colSpan={6} message="No history found." />}
-          </tbody>
-        </table>
-      </TableCard>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.id}</td>
+                  <td>{r.req_id}</td>
+                  <td>{r.title}</td>
+                  <td>{r.submission_date}</td>
+                  <td>{r.review_status}</td>
+                  <td className="table-actions">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                      <Button variant="primary" compact onClick={() => openView(r)}>
+                        View
+                      </Button>
+                      {regional && r.review_status === 'needs-modification' && (
+                        <Button variant="secondary" compact onClick={() => openEdit(r)}>
+                          Edit
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <EmptyStateRow colSpan={6} message="No history found." />
+              )}
+            </tbody>
+          </table>
+        </TableCard>
+      )}
 
       {detail && detailMode === 'view' && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={closeDetail}>

@@ -1,21 +1,33 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchDepartmentTasks, type DepartmentTaskRow } from '../api/lists'
+import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { PageSection } from '../components/ui/PageSection'
 import { TableCard } from '../components/ui/TableCard'
 
 export function DepartmentTasksPage() {
+  const navigate = useNavigate()
   const [rows, setRows] = useState<DepartmentTaskRow[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    void fetchDepartmentTasks()
+  function reload() {
+    return fetchDepartmentTasks()
       .then(setRows)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed'))
+  }
+
+  useEffect(() => {
+    void reload()
   }, [])
 
+  const fromParam = encodeURIComponent('/department-tasks')
+
   return (
-    <PageSection title="Department tasks">
+    <PageSection
+      title="Department tasks"
+      subtitle="Open a task to read the HR request and submit your department’s response when it is open for input."
+    >
       {error && <p className="login-error">{error}</p>}
       <TableCard>
         <table className="data-table">
@@ -27,6 +39,7 @@ export function DepartmentTasksPage() {
               <th>Department</th>
               <th>Status</th>
               <th>Assigned</th>
+              <th className="table-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -38,9 +51,22 @@ export function DepartmentTasksPage() {
                 <td>{t.department_name}</td>
                 <td>{t.status}</td>
                 <td>{t.assigned_date}</td>
+                <td className="table-actions">
+                  <Button
+                    variant="primary"
+                    compact
+                    onClick={() =>
+                      navigate(
+                        `/requests/${encodeURIComponent(t.req_id)}?task=${encodeURIComponent(t.id)}&from=${fromParam}`,
+                      )
+                    }
+                  >
+                    View & response
+                  </Button>
+                </td>
               </tr>
             ))}
-            {rows.length === 0 && <EmptyStateRow colSpan={6} message="No department tasks available." />}
+            {rows.length === 0 && <EmptyStateRow colSpan={7} message="No department tasks available." />}
           </tbody>
         </table>
       </TableCard>

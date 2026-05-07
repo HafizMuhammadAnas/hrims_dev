@@ -4,6 +4,12 @@ export function hasDepartmentResponse(t: DepartmentTaskRow): boolean {
   return Boolean(t.submission_date) || t.status === 'submitted'
 }
 
+/** Task is open for the department user to submit or resubmit after regional revision. */
+export function canDepartmentSubmitResponse(t: DepartmentTaskRow): boolean {
+  if (t.status === 'assigned') return true
+  return t.status === 'submitted' && t.regional_review_status === 'needs-modification'
+}
+
 /** Mutually exclusive buckets for a distributed department task. */
 export type DepartmentTaskWorkflowBucket = 'in_process' | 'responded' | 'revision' | 'accepted'
 

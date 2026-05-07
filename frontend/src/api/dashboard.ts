@@ -6,6 +6,16 @@ export interface UrgentRequestRow {
   region_name: string | null
 }
 
+/** Open department tasks needing action (assigned or regional revision). */
+export interface UrgentDepartmentTaskRow {
+  task_id: string
+  id: string
+  title: string
+  status: string
+  date: string | null
+  region_name: string | null
+}
+
 export interface MonthCountPoint {
   month: string
   label: string
@@ -22,6 +32,7 @@ export interface DashboardSummary {
   department_tasks_total?: number
   department_tasks_by_status?: Record<string, number>
   department_tasks_by_month?: MonthCountPoint[]
+  urgent_department_tasks?: UrgentDepartmentTaskRow[]
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
