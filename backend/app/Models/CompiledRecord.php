@@ -13,7 +13,7 @@ class CompiledRecord extends Model
 
     protected $fillable = [
         'id',
-        'federal_group_id',
+        'hr_request_id',
         'title',
         'region_names',
         'compilation_date',
@@ -33,8 +33,8 @@ class CompiledRecord extends Model
         ];
     }
 
-    public function federalGroup(): BelongsTo
+    public function hrRequest(): BelongsTo
     {
-        return $this->belongsTo(FederalGroup::class, 'federal_group_id');
+        return $this->belongsTo(HrRequest::class, 'hr_request_id');
     }
 }

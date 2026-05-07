@@ -24,7 +24,6 @@ class HrRequest extends Model
         'status',
         'details',
         'attachment_file_name',
-        'federal_group_id',
         'category_id',
         'subcategory_id',
         'indicator_id',
@@ -81,24 +80,14 @@ class HrRequest extends Model
         return $this->hasMany(HrRequestIndicatorResponse::class, 'hr_request_id', 'id');
     }
 
-    public function federalGroup(): BelongsTo
-    {
-        return $this->belongsTo(FederalGroup::class, 'federal_group_id');
-    }
-
-    public function federalGroups(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            FederalGroup::class,
-            'federal_group_hr_request',
-            'hr_request_id',
-            'federal_group_id'
-        );
-    }
-
     public function regionalResponses(): HasMany
     {
         return $this->hasMany(RegionalResponse::class, 'hr_request_id');
+    }
+
+    public function compiledRecords(): HasMany
+    {
+        return $this->hasMany(CompiledRecord::class, 'hr_request_id');
     }
 
     public function departmentTasks(): HasMany

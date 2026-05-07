@@ -49,7 +49,6 @@ export interface HrRequestRow {
   status: HrRequestStatus
   details?: string | null
   attachment_file_name?: string | null
-  federal_group_id?: string | null
   region_id?: number | null
   category_id?: string | null
   subcategory_id?: string | null

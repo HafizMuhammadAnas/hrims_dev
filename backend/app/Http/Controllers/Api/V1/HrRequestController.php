@@ -311,7 +311,6 @@ class HrRequestController extends Controller
             'status' => ['required', Rule::in(['pending', 'in-progress', 'completed', 'overdue'])],
             'details' => ['nullable', 'string'],
             'attachment_file_name' => ['nullable', 'string', 'max:255'],
-            'federal_group_id' => ['nullable', 'exists:federal_groups,id'],
             'recommendation_id' => ['nullable', 'string'],
             'sdg' => ['nullable', 'string'],
             'sdg_indicator' => ['nullable', 'string'],
@@ -326,7 +325,6 @@ class HrRequestController extends Controller
             'region_id.exists' => 'Select a valid region.',
             'date.required' => 'Due date is required.',
             'status.required' => 'Status is required.',
-            'federal_group_id.exists' => 'Select a valid federal group.',
         ]);
 
         if (! HrimsAccess::seesAllRegions($request->user())) {
@@ -350,7 +348,6 @@ class HrRequestController extends Controller
             'status' => $data['status'],
             'details' => $data['details'] ?? null,
             'attachment_file_name' => $data['attachment_file_name'] ?? null,
-            'federal_group_id' => $data['federal_group_id'] ?? null,
             'recommendation_id' => $data['recommendation_id'] ?? null,
             'sdg' => $data['sdg'] ?? null,
             'sdg_indicator' => $data['sdg_indicator'] ?? null,
@@ -361,10 +358,6 @@ class HrRequestController extends Controller
 
         if (! empty($data['region_id'])) {
             $row->regions()->sync([(int) $data['region_id']]);
-        }
-
-        if (! empty($data['federal_group_id'])) {
-            $row->federalGroups()->sync([$data['federal_group_id']]);
         }
 
         $conventionId = Convention::query()->where('code', $data['conv'])->value('id');

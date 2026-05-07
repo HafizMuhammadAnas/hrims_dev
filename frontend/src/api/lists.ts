@@ -3,6 +3,7 @@ import { ApiError, parseApiErrorResponse } from './apiError'
 async function getData<T>(path: string): Promise<T> {
   const res = await fetch(path, {
     credentials: 'include',
+    cache: 'no-store',
     headers: { Accept: 'application/json' },
   })
   if (!res.ok) throw new ApiError(await parseApiErrorResponse(res))
@@ -12,7 +13,6 @@ async function getData<T>(path: string): Promise<T> {
 export type RegionalResponseRow = {
   id: string
   req_id: string
-  federal_id: string | null
   region_name: string | null
   title: string
   submission_date: string
@@ -28,11 +28,15 @@ export async function fetchRegionalResponses(): Promise<RegionalResponseRow[]> {
 
 export type CompiledRecordRow = {
   id: string
-  federal_id: string | null
+  req_id: string | null
   title: string
   region_names: string[]
   compilation_date: string | null
   status: string
+  submitted_to?: string | null
+  submission_date?: string | null
+  attachment?: string | null
+  summary?: string | null
 }
 
 export async function fetchCompiledRecords(): Promise<CompiledRecordRow[]> {

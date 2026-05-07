@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchFederalGroups, type FederalGroupRow } from '../../api/federalGroups'
+import { Link } from 'react-router-dom'
+import { fetchHrRequests } from '../../api/hrRequests'
 import { createCompiledRecord, fetchCompilationPreview } from '../../api/workflows'
 import { fetchRegionalResponses, type RegionalResponseRow } from '../../api/lists'
+import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
+import type { HrRequestRow } from '../../types/hrRequest'
 
 function responseListSignature(rows: RegionalResponseRow[]): string {
   return [...rows.map((r) => r.id)].sort().join('\u001f')
@@ -23,45 +26,70 @@ function reviewStatusPresentation(status: string): {
 }
 
 export function FederalCompilationPage() {
-  const [groups, setGroups] = useState<FederalGroupRow[]>([])
+  const [requests, setRequests] = useState<HrRequestRow[]>([])
   const [responses, setResponses] = useState<RegionalResponseRow[]>([])
-  const [selectedGroupId, setSelectedGroupId] = useState('')
+  const [selectedReqId, setSelectedReqId] = useState('')
   const [preview, setPreview] = useState<{ region_names: string[]; response_count: number } | null>(null)
   const [summary, setSummary] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState<'draft' | 'submitted' | null>(null)
-  /** Regional response IDs included in summary prefill. */
   const [includedResponseIds, setIncludedResponseIds] = useState<string[]>([])
 
   useEffect(() => {
-    void Promise.all([fetchFederalGroups(), fetchRegionalResponses()])
-      .then(([groupRows, responseRows]) => {
-        setGroups(groupRows)
+    void Promise.all([fetchHrRequests(), fetchRegionalResponses()])
+      .then(([reqRows, responseRows]) => {
+        setError(null)
+        setRequests(reqRows)
         setResponses(responseRows)
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load federal groups'))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load compilation data'))
   }, [])
 
+  const reqIdsWithResponses = useMemo(() => {
+    const ids = [...new Set(responses.map((r) => r.req_id))]
+    ids.sort((a, b) => a.localeCompare(b))
+    return ids
+  }, [responses])
+
+  const requestsForSelect = useMemo(() => {
+    const allowed = new Set(reqIdsWithResponses)
+    return requests.filter((r) => allowed.has(r.id)).sort((a, b) => a.id.localeCompare(b.id))
+  }, [requests, reqIdsWithResponses])
+
   useEffect(() => {
-    if (!selectedGroupId) {
+    if (!selectedReqId) {
       setPreview(null)
       return
     }
-    void fetchCompilationPreview(selectedGroupId)
+    void fetchCompilationPreview(selectedReqId)
       .then(setPreview)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to preview'))
-  }, [selectedGroupId])
+  }, [selectedReqId])
 
-  const selected = useMemo(
-    () => groups.find((g) => g.id === selectedGroupId) ?? null,
-    [groups, selectedGroupId],
+  useEffect(() => {
+    if (!selectedReqId) return
+    const refresh = () => {
+      void fetchCompilationPreview(selectedReqId)
+        .then(setPreview)
+        .catch(() => {})
+    }
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [selectedReqId])
+
+  const selectedReq = useMemo(
+    () => requests.find((r) => r.id === selectedReqId) ?? null,
+    [requests, selectedReqId],
   )
+
   const selectedResponses = useMemo(
-    () => responses.filter((r) => r.federal_id === selectedGroupId),
-    [responses, selectedGroupId],
+    () => responses.filter((r) => r.req_id === selectedReqId).sort((a, b) => (a.region_name ?? '').localeCompare(b.region_name ?? '')),
+    [responses, selectedReqId],
   )
-  const selectedResponseKey = useMemo(() => responseListSignature(selectedResponses), [selectedResponses])
+
+  const viewResponseKey = useMemo(() => responseListSignature(selectedResponses), [selectedResponses])
   const includedSet = useMemo(() => new Set(includedResponseIds), [includedResponseIds])
+
   const responseCounts = useMemo(() => {
     const counts = { pending: 0, accepted: 0, needs_modification: 0, rejected: 0 }
     for (const r of selectedResponses) {
@@ -72,24 +100,34 @@ export function FederalCompilationPage() {
     }
     return counts
   }, [selectedResponses])
+
+  /** Backend preview (and saved compiled records) only include regions with accepted regional responses. */
+  const canPersistCompilation = Boolean(
+    selectedReqId && preview && preview.region_names.length > 0,
+  )
+
   const prefillSummary = useMemo(() => {
     const picked = selectedResponses.filter((r) => includedSet.has(r.id))
     if (!picked.length) return ''
     return picked
       .map((r) => {
         const status = reviewStatusPresentation(r.review_status)
-        return `[${r.region_name ?? 'Unknown region'}]` + `\nReview: ${status.label}` + `\n${r.content?.trim() || 'No response content.'}`
+        return (
+          `[${r.req_id}] [${r.region_name ?? 'Unknown region'}]` +
+          `\nReview: ${status.label}` +
+          `\n${r.content?.trim() || 'No response content.'}`
+        )
       })
       .join('\n\n')
   }, [selectedResponses, includedSet])
 
   useEffect(() => {
-    if (!selectedGroupId) {
+    if (!selectedReqId) {
       setIncludedResponseIds([])
       return
     }
     setIncludedResponseIds(selectedResponses.map((r) => r.id))
-  }, [selectedGroupId, selectedResponseKey])
+  }, [selectedReqId, viewResponseKey])
 
   function toggleResponseInclusion(responseId: string) {
     setIncludedResponseIds((prev) =>
@@ -98,23 +136,25 @@ export function FederalCompilationPage() {
   }
 
   async function save(status: 'draft' | 'submitted') {
-    if (!selected || !preview || preview.region_names.length === 0) {
-      setError('Pick a federal group with accepted regional responses first.')
+    if (!selectedReq || !preview || preview.region_names.length === 0) {
+      setError(
+        'Cannot save yet: open Regional responses, set at least one province’s review status to Accepted for this request, then try again (refresh the page if you already accepted).',
+      )
       return
     }
     setSaving(status)
     setError(null)
     try {
       await createCompiledRecord({
-        federal_group_id: selected.id,
-        title: `Compiled Report - ${selected.title}`,
+        hr_request_id: selectedReq.id,
+        title: `Compiled Report - ${selectedReq.title}`,
         region_names: preview.region_names,
         summary: summary || null,
         status,
         submitted_to: status === 'submitted' ? 'Ministry of Human Rights' : null,
       })
       setSummary('')
-      setSelectedGroupId('')
+      setSelectedReqId('')
       setPreview(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save')
@@ -126,30 +166,45 @@ export function FederalCompilationPage() {
   return (
     <PageSection
       title="Compilation center"
-      subtitle="Federal compilation of accepted regional responses into draft/submitted national records."
+      subtitle={
+        <>
+          National record: only <strong>accepted</strong> regional compilations count toward the preview below. Review and accept
+          each province’s submission in <Link to="/responses">Regional responses</Link>, then prefill from those responses here.
+          Saved records appear under <Link to="/compiled-records">Compiled records</Link>.
+        </>
+      }
     >
       {error && <p className="login-error">{error}</p>}
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'Federal groups', value: groups.length },
-            { label: 'Responses in group', value: selectedResponses.length },
-            { label: 'Accepted responses (selected)', value: preview?.response_count ?? 0 },
-            { label: 'Regions included', value: preview?.region_names.length ?? 0 },
+            { label: 'HR requests (with responses)', value: requestsForSelect.length },
+            { label: 'Regional responses (selected)', value: selectedResponses.length },
+            { label: 'Accepted (preview)', value: preview?.response_count ?? 0 },
+            { label: 'Regions in preview', value: preview?.region_names.length ?? 0 },
           ]}
         />
       </div>
       <TableCard padded>
-        <label className="muted">Federal group</label>
+        <label className="muted">HR request</label>
+        {requestsForSelect.length === 0 ? (
+          <p className="muted" style={{ margin: '8px 0 12px', fontSize: 13 }}>
+            No regional compilations are in the system yet for any request. Provinces submit from <Link to="/region-compilation">Response compilation</Link>, then return here to build the national record.
+          </p>
+        ) : null}
         <select
           style={{ width: '100%', marginTop: 6, marginBottom: 12 }}
-          value={selectedGroupId}
-          onChange={(e) => setSelectedGroupId(e.target.value)}
+          value={selectedReqId}
+          onChange={(e) => {
+            setError(null)
+            setSelectedReqId(e.target.value)
+          }}
+          disabled={requestsForSelect.length === 0}
         >
-          <option value="">-- choose --</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.id} — {g.title}
+          <option value="">-- choose request --</option>
+          {requestsForSelect.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.id} — {r.title}
             </option>
           ))}
         </select>
@@ -165,10 +220,24 @@ export function FederalCompilationPage() {
             )}
           </div>
         )}
-        {selectedGroupId && (
+        {selectedReqId &&
+          preview &&
+          !canPersistCompilation &&
+          selectedResponses.length > 0 &&
+          responseCounts.accepted === 0 && (
+            <Alert variant="warning" title="Accept a regional response first" className="compilation-gate-alert">
+              <p style={{ margin: 0 }}>
+                This request has regional compilations, but none are <strong>accepted</strong> yet. Draft and submitted
+                national records only include <strong>accepted</strong> provinces. Go to{' '}
+                <Link to="/responses">Regional responses</Link>, open each row, set review status to{' '}
+                <strong>accepted</strong>, and save—then return here (refresh if the preview still shows zero).
+              </p>
+            </Alert>
+          )}
+        {selectedReqId && (
           <div style={{ marginBottom: 14 }}>
             <p className="muted" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>
-              Response progress for <strong>{selectedGroupId}</strong>
+              Response progress for <strong>{selectedReqId}</strong>
             </p>
             <StatsCards
               items={[
@@ -180,17 +249,17 @@ export function FederalCompilationPage() {
             />
           </div>
         )}
-        {selectedGroupId && (
+        {selectedReqId && (
           <div style={{ marginBottom: 14 }}>
             {selectedResponses.length === 0 ? (
               <p className="muted" style={{ margin: 0 }}>
-                No regional responses are linked to this federal group yet.
+                No regional responses for this request yet.
               </p>
             ) : (
               <>
                 <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>
-                  <strong>{selectedResponses.length}</strong> regional responses —{' '}
-                  <strong>{includedResponseIds.length}</strong> included in draft prefill.
+                  <strong>{selectedResponses.length}</strong> regional response{selectedResponses.length === 1 ? '' : 's'} —{' '}
+                  <strong>{selectedResponses.filter((r) => includedSet.has(r.id)).length}</strong> included in draft prefill.
                 </p>
                 <div
                   className="compilation-dept-toolbar"
@@ -231,9 +300,12 @@ export function FederalCompilationPage() {
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleResponseInclusion(r.id)}
-                          aria-label={`Include ${r.region_name ?? 'region'} in federal compilation`}
+                          aria-label={`Include ${r.region_name ?? 'region'} in national compilation for ${r.req_id}`}
                         />
                         <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>
+                          <span className="muted small" style={{ display: 'block', fontWeight: 500 }}>
+                            {r.title?.trim() || r.req_id}
+                          </span>
                           {r.region_name ?? 'Unknown region'}
                         </span>
                         <StatusBadge tone={review.tone}>{review.label}</StatusBadge>
@@ -264,15 +336,30 @@ export function FederalCompilationPage() {
           style={{ width: '100%', marginTop: 6 }}
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          placeholder="Write a federal compilation summary..."
+          placeholder="Write a national compilation summary..."
         />
-        <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-          <Button variant="secondary" compact disabled={saving !== null} onClick={() => void save('draft')}>
+        <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+          <Button
+            variant="secondary"
+            compact
+            disabled={saving !== null || !canPersistCompilation}
+            onClick={() => void save('draft')}
+          >
             {saving === 'draft' ? 'Saving draft...' : 'Save draft'}
           </Button>
-          <Button variant="primary" compact disabled={saving !== null} onClick={() => void save('submitted')}>
+          <Button
+            variant="primary"
+            compact
+            disabled={saving !== null || !canPersistCompilation}
+            onClick={() => void save('submitted')}
+          >
             {saving === 'submitted' ? 'Submitting...' : 'Submit to ministry'}
           </Button>
+          {!canPersistCompilation && selectedReqId ? (
+            <span className="muted" style={{ fontSize: 12, flex: '1 1 200px' }}>
+              Save is available after at least one region is <strong>accepted</strong> for this request.
+            </span>
+          ) : null}
         </div>
       </TableCard>
     </PageSection>

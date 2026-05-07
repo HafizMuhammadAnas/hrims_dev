@@ -691,11 +691,13 @@ body {
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 1000;
   padding: 24px;
+  padding-top: max(24px, env(safe-area-inset-top, 0px));
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .modal-card {
@@ -716,8 +718,52 @@ body {
   max-width: 960px;
 }
 
-/* Full-page request view (no overlay) — do not inherit .modal-card max-height: 90vh (clips long forms). */
-.hr-request-modal--page {
+.compiled-record-modal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  padding: 10px 12px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--field-border, #e1e7f5);
+  background: linear-gradient(to bottom, #f4f7fc, #f0f3fa);
+  box-sizing: border-box;
+}
+
+.compiled-record-modal-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt);
+  text-decoration: none;
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+  background: rgba(255, 255, 255, 0.55);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.compiled-record-modal-tab:hover {
+  background: #fff;
+  color: #2e4fa3;
+  border-color: #c8d4ec;
+}
+
+.compiled-record-modal-tab--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Full-page request view (no overlay) — beat .modal-card max-height (incl. 92vh in mobile media query). */
+.modal-card.hr-request-modal--page {
   max-width: min(960px, 100%);
   width: 100%;
   max-height: none;
@@ -740,6 +786,30 @@ body {
   margin-left: auto;
   margin-right: auto;
   box-sizing: border-box;
+}
+
+/* Prevent flex parents from shrinking stacked panels (avoids clipped request card above panels). */
+.hr-request-view-stack > * {
+  flex-shrink: 0;
+}
+
+/* Read-only narrative: full text height (fixed-row textareas looked “cut off” above the next card). */
+.hr-request-readonly-prose {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--field-pad-y) var(--field-pad-x);
+  border-radius: var(--field-radius);
+  border: 1px solid var(--field-border);
+  background: #f3f4f6;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  color: var(--txt);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: none;
+  overflow: visible;
 }
 
 .hr-request-view-stack .hr-request-modal--page {
@@ -1183,6 +1253,110 @@ body {
 
 .modal-form > .app-alert {
   margin-bottom: 14px;
+}
+
+.regional-response-accept-panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--field-border, #e1e7f5);
+  background: var(--surface-muted, #f4f7fc);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+@media (min-width: 560px) {
+  .regional-response-accept-panel {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .regional-response-accept-panel .muted {
+    flex: 1;
+    min-width: 200px;
+  }
+}
+
+.regional-responses-full-modal.regional-responses-full-modal {
+  max-width: min(1040px, 100%);
+}
+
+.regional-responses-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.regional-request-region-card {
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: #fcfdff;
+}
+
+.regional-request-region-card--focus {
+  box-shadow: 0 0 0 2px rgba(46, 79, 163, 0.22);
+  background: #fff;
+}
+
+.regional-request-region-card__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.regional-request-region-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.regional-request-region-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.regional-request-region-card__pill {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(46, 79, 163, 0.12);
+  color: var(--txt);
+  font-weight: 600;
+}
+
+.regional-request-region-card__meta {
+  margin-bottom: 4px;
+}
+
+.regional-request-region-card__switch {
+  margin-top: 12px;
+}
+
+.regional-request-region-card__federal {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--field-border, #e1e7f5);
+}
+
+.regional-request-region-card__federal-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.dept-submissions-heading {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 650;
 }
 
 .form-grid {
@@ -2441,6 +2615,12 @@ body {
 
   .modal-card {
     max-height: 92vh;
+  }
+
+  /* Inline request page must stay uncapped; .modal-card rule above would otherwise clip long forms. */
+  .modal-card.hr-request-modal--page {
+    max-height: none;
+    overflow: visible;
   }
 
   .profile-hero {

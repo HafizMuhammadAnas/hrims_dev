@@ -20,7 +20,7 @@ class CompiledRecordController extends Controller
         }
 
         $data = $request->validate([
-            'federal_group_id' => ['required', 'string', 'exists:federal_groups,id'],
+            'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
             'title' => ['required', 'string', 'max:500'],
             'region_names' => ['required', 'array', 'min:1'],
             'region_names.*' => ['string', 'max:128'],
@@ -31,7 +31,7 @@ class CompiledRecordController extends Controller
 
         $row = CompiledRecord::query()->create([
             'id' => 'COMP-'.strtoupper(Str::random(10)),
-            'federal_group_id' => $data['federal_group_id'],
+            'hr_request_id' => $data['hr_request_id'],
             'title' => $data['title'],
             'region_names' => $data['region_names'],
             'compilation_date' => now()->toDateString(),
@@ -45,7 +45,7 @@ class CompiledRecordController extends Controller
         return response()->json([
             'data' => [
                 'id' => $row->id,
-                'federal_id' => $row->federal_group_id,
+                'req_id' => $row->hr_request_id,
                 'title' => $row->title,
                 'region_names' => $row->region_names,
                 'compilation_date' => $row->compilation_date?->format('Y-m-d'),
@@ -59,7 +59,7 @@ class CompiledRecordController extends Controller
     }
 
     /**
-     * Preview which region names would compile for a federal group (accepted responses only).
+     * Preview which region names would compile for an HR request (accepted regional responses only).
      */
     public function preview(Request $request): JsonResponse
     {
@@ -68,12 +68,12 @@ class CompiledRecordController extends Controller
         }
 
         $data = $request->validate([
-            'federal_group_id' => ['required', 'string', 'exists:federal_groups,id'],
+            'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
         ]);
 
         $responses = RegionalResponse::query()
             ->with('region')
-            ->where('federal_group_id', $data['federal_group_id'])
+            ->where('hr_request_id', $data['hr_request_id'])
             ->where('review_status', 'accepted')
             ->get();
 
@@ -105,7 +105,7 @@ class CompiledRecordController extends Controller
         return response()->json([
             'data' => $rows->map(fn (CompiledRecord $c) => [
                 'id' => $c->id,
-                'federal_id' => $c->federal_group_id,
+                'req_id' => $c->hr_request_id,
                 'title' => $c->title,
                 'region_names' => $c->region_names,
                 'compilation_date' => $c->compilation_date?->format('Y-m-d'),

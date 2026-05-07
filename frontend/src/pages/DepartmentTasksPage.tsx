@@ -4,7 +4,9 @@ import { fetchDepartmentTasks, type DepartmentTaskRow } from '../api/lists'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { PageSection } from '../components/ui/PageSection'
+import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableCard } from '../components/ui/TableCard'
+import { workflowPresentation } from '../lib/departmentTaskWorkflow'
 
 export function DepartmentTasksPage() {
   const navigate = useNavigate()
@@ -43,13 +45,17 @@ export function DepartmentTasksPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((t) => (
+            {rows.map((t) => {
+              const wf = workflowPresentation(t)
+              return (
               <tr key={t.id}>
                 <td>{t.id}</td>
                 <td>{t.req_id}</td>
                 <td>{t.region_name}</td>
                 <td>{t.department_name}</td>
-                <td>{t.status}</td>
+                <td>
+                  <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
+                </td>
                 <td>{t.assigned_date}</td>
                 <td className="table-actions">
                   <Button
@@ -65,7 +71,7 @@ export function DepartmentTasksPage() {
                   </Button>
                 </td>
               </tr>
-            ))}
+            )})}
             {rows.length === 0 && <EmptyStateRow colSpan={7} message="No department tasks available." />}
           </tbody>
         </table>

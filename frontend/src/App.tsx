@@ -6,7 +6,6 @@ import { ProtectedLayout } from './layouts/ProtectedLayout'
 import { CompiledRecordsPage } from './pages/CompiledRecordsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DepartmentTasksPage } from './pages/DepartmentTasksPage'
-import { FederalGroupsPage } from './pages/FederalGroupsPage'
 import { HrRequestViewPage } from './pages/HrRequestViewPage'
 import { HrRequestsPage } from './pages/HrRequestsPage'
 import { AnalysisPage } from './pages/AnalysisPage'
@@ -43,7 +42,6 @@ function App() {
               <Route index element={<DashboardPage />} />
               <Route path="requests/:id" element={<HrRequestViewPage />} />
               <Route path="requests" element={<HrRequestsPage />} />
-              <Route path="federal-groups" element={<FederalGroupsPage />} />
               <Route path="responses" element={<RegionalResponsesPage />} />
               <Route path="compilation" element={<FederalCompilationPage />} />
               <Route path="compiled-records" element={<CompiledRecordsPage />} />

@@ -146,7 +146,6 @@ export type HrRequestWriteBody = {
   status: HrRequestRow['status']
   details?: string | null
   attachment_file_name?: string | null
-  federal_group_id?: string | null
   recommendation_id?: string | null
   sdg?: string | null
   sdg_indicator?: string | null
@@ -163,7 +162,6 @@ export async function createHrRequest(body: HrRequestWriteBody & { id: string })
     headers: apiJsonHeaders(),
     body: JSON.stringify({
       ...body,
-      federal_group_id: body.federal_group_id || null,
       recommendation_id: body.recommendation_id || null,
       details: body.details ?? null,
       attachment_file_name: body.attachment_file_name || null,
@@ -190,7 +188,6 @@ export type HrRequestPatchBody = {
   status?: HrRequestRow['status']
   details?: string | null
   attachment_file_name?: string | null
-  federal_group_id?: string | null
   recommendation_id?: string | null
   sdg?: string | null
   sdg_indicator?: string | null

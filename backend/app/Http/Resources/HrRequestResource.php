@@ -26,7 +26,6 @@ class HrRequestResource extends JsonResource
             'status' => $this->status,
             'details' => $this->details,
             'attachment_file_name' => $this->attachment_file_name,
-            'federal_group_id' => $this->federal_group_id,
             'category_id' => $this->category_id,
             'subcategory_id' => $this->subcategory_id,
             'indicator_id' => $this->indicator_id,

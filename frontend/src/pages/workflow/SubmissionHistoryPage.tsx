@@ -9,6 +9,7 @@ import { ModalActions, ModalHeader } from '../../components/ui/ModalChrome'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
+import { DepartmentSubmissionsForRequest } from '../../components/DepartmentSubmissionsForRequest'
 import { hasDepartmentResponse, workflowPresentation } from '../../lib/departmentTaskWorkflow'
 import { isDepartmentAdmin, isRegionalAdmin, isViewer } from '../../lib/roles'
 
@@ -20,74 +21,6 @@ function sortTasksByDept(a: DepartmentTaskRow, b: DepartmentTaskRow): number {
   const an = (a.department_name ?? a.department_id).toLowerCase()
   const bn = (b.department_name ?? b.department_id).toLowerCase()
   return an.localeCompare(bn)
-}
-
-function DepartmentSubmissionSections({
-  tasksForDetail,
-  reqId,
-}: {
-  tasksForDetail: DepartmentTaskRow[]
-  reqId: string
-}) {
-  if (tasksForDetail.length === 0) {
-    return (
-      <p className="muted" style={{ margin: '12px 0' }}>
-        No distributed department tasks found for this request. Department submissions will appear here when tasks exist for{' '}
-        <strong>{reqId}</strong>.
-      </p>
-    )
-  }
-  return (
-    <div className="submission-history-dept-sections" style={{ marginTop: 16 }}>
-      <h4 style={{ margin: '0 0 10px', fontSize: 15 }}>Department submissions</h4>
-      {tasksForDetail.map((t) => {
-        const wf = workflowPresentation(t)
-        return (
-          <div
-            key={t.id}
-            style={{
-              marginBottom: 14,
-              padding: 12,
-              border: '1px solid var(--field-border, #e1e7f5)',
-              borderRadius: 10,
-              background: '#fafbfd',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-                flexWrap: 'wrap',
-              }}
-            >
-              <strong style={{ fontSize: 14 }}>{t.department_name ?? t.department_id}</strong>
-              <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
-            </div>
-            <p className="muted" style={{ margin: '8px 0 6px', fontSize: 12 }}>
-              Task {t.id}
-              {t.submission_date ? ` · Submitted ${t.submission_date}` : ''}
-            </p>
-            <textarea
-              readOnly
-              rows={6}
-              value={t.response_data?.trim() ? t.response_data : '—'}
-              style={{ width: '100%', boxSizing: 'border-box', marginTop: 4 }}
-            />
-            {t.attachment_url ? (
-              <p className="muted" style={{ margin: '8px 0 0', fontSize: 12 }}>
-                Attachment:{' '}
-                <a href={t.attachment_url} target="_blank" rel="noreferrer">
-                  {t.attachment_url}
-                </a>
-              </p>
-            ) : null}
-          </div>
-        )
-      })}
-    </div>
-  )
 }
 
 export function SubmissionHistoryPage({ title }: Props) {
@@ -314,7 +247,7 @@ export function SubmissionHistoryPage({ title }: Props) {
                 <textarea rows={3} readOnly value={detail.comments ?? '—'} />
               </div>
 
-              <DepartmentSubmissionSections tasksForDetail={tasksForDetail} reqId={detail.req_id} />
+              <DepartmentSubmissionsForRequest tasksForDetail={tasksForDetail} reqId={detail.req_id} />
 
               <div className="form-row" style={{ marginTop: 16 }}>
                 <label>Compiled regional response</label>
@@ -350,7 +283,7 @@ export function SubmissionHistoryPage({ title }: Props) {
               </p>
               {saveError && <p className="login-error">{saveError}</p>}
 
-              <DepartmentSubmissionSections tasksForDetail={tasksForDetail} reqId={detail.req_id} />
+              <DepartmentSubmissionsForRequest tasksForDetail={tasksForDetail} reqId={detail.req_id} />
 
               <div className="form-row" style={{ marginTop: 16 }}>
                 <label htmlFor="edit-compilation-title">Title</label>

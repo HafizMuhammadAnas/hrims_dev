@@ -10,6 +10,7 @@ use App\Support\HrimsAccess;
 use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class DepartmentTaskController extends Controller
@@ -95,6 +96,66 @@ class DepartmentTaskController extends Controller
         return response()->json([
             'data' => $this->serializeTask($task, $redact),
         ], 201);
+    }
+
+    public function submitResponse(Request $request, DepartmentTask $departmentTask): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('department_admin') && ! $user->hasRole('viewer')) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if ($user->department_id === null || (int) $user->department_id !== (int) $departmentTask->department_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if ($user->region_id !== null && (int) $user->region_id !== (int) $departmentTask->region_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $maySubmit =
+            $departmentTask->status === 'assigned'
+            || (
+                $departmentTask->status === 'submitted'
+                && $departmentTask->regional_review_status === 'needs-modification'
+            );
+        if (! $maySubmit) {
+            return response()->json(['message' => 'This task cannot accept a submission in its current state.'], 422);
+        }
+
+        $data = $request->validate([
+            'response_data' => ['nullable', 'string', 'max:200000'],
+            'attachment' => ['nullable', 'file', 'max:15360'],
+        ]);
+
+        $text = trim($data['response_data'] ?? '');
+        if ($text === '' && ! $request->hasFile('attachment')) {
+            return response()->json(['message' => 'Provide a written response and/or an attachment.'], 422);
+        }
+
+        $attachmentUrl = $departmentTask->attachment_url;
+        if ($request->hasFile('attachment')) {
+            $file = $request->file('attachment');
+            if ($file && $file->isValid()) {
+                $path = $file->store('department-tasks/'.$departmentTask->id, 'public');
+                $attachmentUrl = Storage::disk('public')->url($path);
+            }
+        }
+
+        $departmentTask->update([
+            'response_data' => $text !== '' ? $text : $departmentTask->response_data,
+            'attachment_url' => $attachmentUrl,
+            'submission_date' => now()->toDateString(),
+            'status' => 'submitted',
+            'regional_review_status' => null,
+            'regional_review_comments' => null,
+        ]);
+
+        $redact = HrimsAccess::redactDepartmentTaskPayloadFor($user);
+
+        return response()->json([
+            'data' => $this->serializeTask($departmentTask->fresh(['region', 'department']), $redact),
+        ]);
     }
 
     public function updateReview(Request $request, DepartmentTask $departmentTask): JsonResponse

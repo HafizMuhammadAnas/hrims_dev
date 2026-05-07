@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { fetchHrRequests } from '../../api/hrRequests'
 import { fetchDepartmentTasks, type DepartmentTaskRow } from '../../api/lists'
 import { createRegionalResponse } from '../../api/workflows'
@@ -101,7 +101,6 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
       await createRegionalResponse({
         hr_request_id: selectedReq.id,
         title: `${selectedReq.title} - consolidated response`,
-        federal_group_id: selectedReq.federal_group_id ?? null,
         content: content.trim(),
       })
       navigate(nextPath)
@@ -115,7 +114,12 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
   return (
     <PageSection
       title={title}
-      subtitle="Compile department inputs into one consolidated regional response."
+      subtitle={
+        <>
+          Compile department inputs into one regional submission for this request. After you submit, federal reviewers see it in{' '}
+          <Link to="/responses">Regional responses</Link> (national users) and may accept it or request changes.
+        </>
+      }
     >
       {error && <p className="login-error">{error}</p>}
       <div style={{ marginTop: 16 }}>

@@ -252,11 +252,10 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
     if (reportType === 'regional-responses') {
       downloadCsv(
         'regional-responses-report',
-        ['Response ID', 'Request ID', 'Federal ID', 'Region', 'Title', 'Submission Date', 'Review Status'],
+        ['Response ID', 'Request ID', 'Region', 'Title', 'Submission Date', 'Review Status'],
         responses.map((r) => [
           r.id,
           r.req_id,
-          r.federal_id ?? '',
           r.region_name ?? '',
           r.title,
           r.submission_date,
@@ -268,10 +267,10 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
     if (reportType === 'compiled-records') {
       downloadCsv(
         'compiled-records-report',
-        ['Compiled ID', 'Federal ID', 'Title', 'Regions', 'Status', 'Compilation Date'],
+        ['Compiled ID', 'HR request', 'Title', 'Regions', 'Status', 'Compilation Date'],
         compiled.map((c) => [
           c.id,
-          c.federal_id ?? '',
+          c.req_id ?? '',
           c.title,
           (c.region_names ?? []).join('; '),
           c.status,
@@ -363,7 +362,7 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Federal ID</th>
+                <th>HR request</th>
                 <th>Title</th>
                 <th>Regions</th>
                 <th>Status</th>
@@ -373,7 +372,7 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
               {compiled.map((c) => (
                 <tr key={c.id}>
                   <td>{c.id}</td>
-                  <td>{c.federal_id}</td>
+                  <td>{c.req_id ?? '—'}</td>
                   <td>{c.title}</td>
                   <td>{c.region_names?.join(', ')}</td>
                   <td>{c.status}</td>

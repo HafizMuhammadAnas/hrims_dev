@@ -27,7 +27,6 @@ class RegionalResponseController extends Controller
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
             'title' => ['required', 'string', 'max:500'],
             'content' => ['required', 'string'],
-            'federal_group_id' => ['nullable', 'string', 'exists:federal_groups,id'],
         ]);
 
         $hrRequest = HrRequest::query()->find($data['hr_request_id']);
@@ -43,7 +42,6 @@ class RegionalResponseController extends Controller
         $model = RegionalResponse::query()->create([
             'id' => 'RES-'.strtoupper(Str::random(10)),
             'hr_request_id' => $hrRequest->id,
-            'federal_group_id' => $data['federal_group_id'] ?? $hrRequest->federal_group_id,
             'region_id' => $hrRequest->region_id,
             'title' => $data['title'],
             'submission_date' => now()->toDateString(),
@@ -58,6 +56,44 @@ class RegionalResponseController extends Controller
         return response()->json(['data' => $this->serialize($model)], 201);
     }
 
+    /**
+     * Federal / super-admin review (POST so JSON body is not stripped by proxies).
+     */
+    public function review(Request $request, string $regionalResponse): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('super_admin') && ! $user->hasRole('federal_admin')) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $model = RegionalResponse::query()->with(['region', 'hrRequest'])->find($regionalResponse);
+        if (! $model) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $data = $request->validate([
+            'review_status' => ['required', Rule::in(['pending', 'accepted', 'needs-modification', 'rejected'])],
+            'comments' => ['nullable', 'string'],
+        ]);
+
+        $previousStatus = $model->review_status;
+        $model->review_status = $data['review_status'];
+        $model->comments = $data['comments'] ?? null;
+        if (! $model->save()) {
+            return response()->json(['message' => 'Could not save review.'], 500);
+        }
+
+        $model->refresh();
+        $model->load(['region', 'hrRequest']);
+
+        app(NotificationService::class)->notifyRegionalResponseReviewed($model, $request->user(), $previousStatus);
+
+        return response()
+            ->json(['data' => $this->serialize($model)])
+            ->header('Cache-Control', 'no-store, private');
+    }
+
+    /** Regional admin: resubmit compilation after federal requested changes. */
     public function update(Request $request, string $regionalResponse): JsonResponse
     {
         $model = RegionalResponse::query()->with(['region', 'hrRequest'])->find($regionalResponse);
@@ -66,21 +102,6 @@ class RegionalResponseController extends Controller
         }
 
         $user = $request->user();
-
-        if ($user->hasRole('federal_admin')) {
-            $data = $request->validate([
-                'review_status' => ['required', Rule::in(['pending', 'accepted', 'needs-modification', 'rejected'])],
-                'comments' => ['nullable', 'string'],
-            ]);
-
-            $previousStatus = $model->review_status;
-            $model->fill($data);
-            $model->save();
-
-            app(NotificationService::class)->notifyRegionalResponseReviewed($model->fresh(['region', 'hrRequest']), $request->user(), $previousStatus);
-
-            return response()->json(['data' => $this->serialize($model->fresh(['region', 'hrRequest']))]);
-        }
 
         if ($user->hasRole('regional_admin') && $user->region_id !== null) {
             if ((int) $model->region_id !== (int) $user->region_id) {
@@ -100,7 +121,9 @@ class RegionalResponseController extends Controller
             $model->review_status = 'pending';
             $model->save();
 
-            return response()->json(['data' => $this->serialize($model->fresh(['region', 'hrRequest']))]);
+            return response()
+                ->json(['data' => $this->serialize($model->fresh(['region', 'hrRequest']))])
+                ->header('Cache-Control', 'no-store, private');
         }
 
         return response()->json(['message' => 'Forbidden'], 403);
@@ -131,9 +154,11 @@ class RegionalResponseController extends Controller
 
         $rows = $query->orderByDesc('submission_date')->get();
 
-        return response()->json([
-            'data' => $rows->map(fn (RegionalResponse $r) => $this->serialize($r)),
-        ]);
+        return response()
+            ->json([
+                'data' => $rows->map(fn (RegionalResponse $r) => $this->serialize($r)),
+            ])
+            ->header('Cache-Control', 'no-store, private');
     }
 
     public function show(Request $request, string $regionalResponse): JsonResponse
@@ -178,7 +203,6 @@ class RegionalResponseController extends Controller
         return [
             'id' => $r->id,
             'req_id' => $r->hr_request_id,
-            'federal_id' => $r->federal_group_id,
             'region_name' => $r->region?->name,
             'title' => $r->title,
             'submission_date' => $r->submission_date->format('Y-m-d'),

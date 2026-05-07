@@ -20,7 +20,7 @@ import {
   hasDepartmentResponse,
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
-import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isSuperAdmin, isViewer } from '../lib/roles'
+import { isDepartmentAdmin, isRegionalAdmin, isViewer } from '../lib/roles'
 import type { HrRequestRow } from '../types/hrRequest'
 import type { RegionRow } from '../api/regions'
 
@@ -192,15 +192,8 @@ export function HrRequestViewPage() {
     hasDepartmentResponse(activeTask) &&
     !canDepartmentSubmitResponse(activeTask)
 
-  const showRegionalContextCard = Boolean(
-    detail &&
-      !detailLoading &&
-      (deptUser ||
-        regionalUser ||
-        regionalResponses.length > 0 ||
-        isFederalAdmin(user) ||
-        isSuperAdmin(user)),
-  )
+  /** Always show on full request page so HR request → regional context → dept response flow is consistent. */
+  const showRegionalContextCard = Boolean(detail && !detailLoading)
 
   const selectedAssignDepartmentsText = useMemo(() => {
     if (assignDeptIds.length === 0) return 'Select departments'

@@ -58,7 +58,7 @@ class User extends Authenticatable
 
     public function hasRole(string $slug): bool
     {
-        return $this->roles->contains('slug', $slug);
+        return $this->roles()->where('slug', $slug)->exists();
     }
 
     public function hasPermission(string $slug): bool

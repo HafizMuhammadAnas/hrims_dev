@@ -134,7 +134,6 @@ export async function createRegionalResponse(body: {
   hr_request_id: string
   title: string
   content: string
-  federal_group_id?: string | null
 }): Promise<RegionalResponseRow> {
   await ensureCsrfCookie()
   const res = await fetch('/api/v1/regional-responses', {
@@ -154,15 +153,22 @@ export async function updateRegionalReview(
   comments: string,
 ): Promise<RegionalResponseRow> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/regional-responses/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
+  const res = await fetch(`/api/v1/regional-responses/${encodeURIComponent(id)}/review`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify({ review_status, comments }),
   })
   await throwIfNotOk(res)
-  const json = (await res.json()) as { data: RegionalResponseRow }
-  return json.data
+  const raw: unknown = await res.json()
+  const row =
+    raw && typeof raw === 'object' && 'data' in raw
+      ? (raw as { data: RegionalResponseRow }).data
+      : null
+  if (!row || typeof row.review_status !== 'string' || !row.id) {
+    throw new Error('Unexpected response when saving review.')
+  }
+  return row
 }
 
 /** Regional admin: resubmit compilation after federal marked needs-modification (sets review to pending). */
@@ -172,7 +178,7 @@ export async function updateRegionalCompiledResponse(
 ): Promise<RegionalResponseRow> {
   await ensureCsrfCookie()
   const res = await fetch(`/api/v1/regional-responses/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
+    method: 'PUT',
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify(body),
@@ -187,10 +193,8 @@ export type CompilationPreview = {
   response_count: number
 }
 
-export async function fetchCompilationPreview(
-  federal_group_id: string,
-): Promise<CompilationPreview> {
-  const url = `/api/v1/compiled-records/preview?federal_group_id=${encodeURIComponent(federal_group_id)}`
+export async function fetchCompilationPreview(hr_request_id: string): Promise<CompilationPreview> {
+  const url = `/api/v1/compiled-records/preview?hr_request_id=${encodeURIComponent(hr_request_id)}`
   const res = await fetch(url, {
     credentials: 'include',
     headers: { Accept: 'application/json' },
@@ -201,7 +205,7 @@ export async function fetchCompilationPreview(
 }
 
 export async function createCompiledRecord(body: {
-  federal_group_id: string
+  hr_request_id: string
   title: string
   region_names: string[]
   summary?: string | null

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 type PageSectionProps = {
   title: string
-  subtitle?: string
+  subtitle?: ReactNode
   /** Optional second line under the subtitle (e.g. extra context). */
   detail?: ReactNode
   /** Optional icon or badge shown before the title (e.g. report generator). */

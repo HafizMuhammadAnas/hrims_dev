@@ -84,10 +84,38 @@ class DashboardController extends Controller
                     ->map(fn ($c) => (int) $c)
                     ->all();
                 $data['department_tasks_by_month'] = $this->monthlyCounts(clone $tq, 'assigned_date', 6);
+
+                $openForAction = DepartmentTask::query()
+                    ->where('department_id', $user->department_id)
+                    ->where(function ($q): void {
+                        $q->where('status', 'assigned')
+                            ->orWhere(function ($q2): void {
+                                $q2->where('status', 'submitted')
+                                    ->where('regional_review_status', 'needs-modification');
+                            });
+                    })
+                    ->orderByDesc('assigned_date')
+                    ->limit(5)
+                    ->with(['region', 'hrRequest:id,title,due_date,region_id'])
+                    ->get();
+
+                $data['urgent_department_tasks'] = $openForAction->map(function (DepartmentTask $t) {
+                    $status = $t->regional_review_status === 'needs-modification' ? 'needs-revision' : 'pending';
+
+                    return [
+                        'task_id' => $t->id,
+                        'id' => $t->hr_request_id,
+                        'title' => $t->hrRequest?->title ?? $t->hr_request_id,
+                        'status' => $status,
+                        'date' => $t->hrRequest?->due_date?->format('Y-m-d'),
+                        'region_name' => $t->region?->name,
+                    ];
+                })->values()->all();
             } else {
                 $data['department_tasks_total'] = 0;
                 $data['department_tasks_by_status'] = [];
                 $data['department_tasks_by_month'] = $this->emptyMonthSeries(6);
+                $data['urgent_department_tasks'] = [];
             }
         }
 

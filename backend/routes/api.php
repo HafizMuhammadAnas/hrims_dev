@@ -16,7 +16,6 @@ use App\Http\Controllers\Api\V1\CompiledRecordController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\DepartmentTaskController;
-use App\Http\Controllers\Api\V1\FederalGroupController;
 use App\Http\Controllers\Api\V1\HrRequestController;
 use App\Http\Controllers\Api\V1\KnowledgeHubController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -59,12 +58,12 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('api.v1.users.destroy');
         Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('api.v1.dashboard.summary');
 
-        Route::get('/federal-groups', [FederalGroupController::class, 'index'])->name('api.v1.federal-groups.index');
-        Route::get('/federal-groups/{federalGroup}', [FederalGroupController::class, 'show'])->name('api.v1.federal-groups.show');
-
         Route::get('/regional-responses', [RegionalResponseController::class, 'index'])->name('api.v1.regional-responses.index');
         Route::post('/regional-responses', [RegionalResponseController::class, 'store'])->name('api.v1.regional-responses.store');
+        /** POST body is reliably delivered everywhere (some stacks drop PUT/PATCH JSON bodies). */
+        Route::post('/regional-responses/{regionalResponse}/review', [RegionalResponseController::class, 'review'])->name('api.v1.regional-responses.review');
         Route::patch('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update'])->name('api.v1.regional-responses.update');
+        Route::put('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update']);
         Route::get('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'show'])->name('api.v1.regional-responses.show');
 
         Route::get('/compiled-records/preview', [CompiledRecordController::class, 'preview'])->name('api.v1.compiled-records.preview');
@@ -72,6 +71,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/compiled-records', [CompiledRecordController::class, 'store'])->name('api.v1.compiled-records.store');
         Route::get('/department-tasks', [DepartmentTaskController::class, 'index'])->name('api.v1.department-tasks.index');
         Route::post('/department-tasks', [DepartmentTaskController::class, 'store'])->name('api.v1.department-tasks.store');
+        Route::post('/department-tasks/{departmentTask}/submit-response', [DepartmentTaskController::class, 'submitResponse'])->name('api.v1.department-tasks.submit-response');
         Route::patch('/department-tasks/{departmentTask}', [DepartmentTaskController::class, 'updateReview'])->name('api.v1.department-tasks.update-review');
         Route::get('/violation-entries', [ViolationEntryController::class, 'index'])->name('api.v1.violation-entries.index');
 

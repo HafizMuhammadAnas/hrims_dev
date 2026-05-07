@@ -14,7 +14,6 @@ class RegionalResponse extends Model
     protected $fillable = [
         'id',
         'hr_request_id',
-        'federal_group_id',
         'region_id',
         'title',
         'submission_date',
@@ -33,11 +32,6 @@ class RegionalResponse extends Model
     public function hrRequest(): BelongsTo
     {
         return $this->belongsTo(HrRequest::class, 'hr_request_id');
-    }
-
-    public function federalGroup(): BelongsTo
-    {
-        return $this->belongsTo(FederalGroup::class, 'federal_group_id');
     }
 
     public function region(): BelongsTo

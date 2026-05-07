@@ -424,14 +424,15 @@ export function HrRequestModal({
   /** Options for Issue `<select>`; always include embedded `detail.issue` when it matches the saved id. */
   const issueOptions = useMemo(() => {
     const list = [...issues]
+    const embedded = detail?.issue
     if (
-      detail?.issue &&
+      embedded &&
       issueForm &&
       issueForm.issue_id !== '' &&
-      issueForm.issue_id === detail.issue.id &&
-      !list.some((i) => i.id === detail.issue.id)
+      issueForm.issue_id === embedded.id &&
+      !list.some((i) => i.id === embedded.id)
     ) {
-      list.push(detail.issue)
+      list.push(embedded)
     }
     return list
   }, [issues, detail?.issue, issueForm?.issue_id])
@@ -730,14 +731,15 @@ export function HrRequestModal({
               {readOnly && (
                 <FormField label="Request description" htmlFor="hr-details-summary">
                   {issueForm.details?.trim() ? (
-                    <textarea
+                    <div
                       id="hr-details-summary"
-                      rows={8}
-                      readOnly
-                      disabled
-                      value={issueForm.details}
-                      style={{ width: '100%', boxSizing: 'border-box' }}
-                    />
+                      className="hr-request-readonly-prose"
+                      tabIndex={0}
+                      role="region"
+                      aria-label="Request description"
+                    >
+                      {issueForm.details}
+                    </div>
                   ) : (
                     <p className="muted" id="hr-details-summary" style={{ margin: 0 }}>
                       No additional description was provided for this request.
@@ -1188,15 +1190,26 @@ export function HrRequestModal({
                 </FormControl>
               </FormRow>
               <FormField label="Details" htmlFor="hr-leg-details">
-                <textarea
-                  id="hr-leg-details"
-                  rows={4}
-                  value={legacyForm.details}
-                  onChange={(e) =>
-                    setLegacyForm((f) => (f ? { ...f, details: e.target.value } : f))
-                  }
-                  disabled={readOnly}
-                />
+                {readOnly ? (
+                  legacyForm.details?.trim() ? (
+                    <div id="hr-leg-details" className="hr-request-readonly-prose" tabIndex={0}>
+                      {legacyForm.details}
+                    </div>
+                  ) : (
+                    <p className="muted" id="hr-leg-details" style={{ margin: 0 }}>
+                      —
+                    </p>
+                  )
+                ) : (
+                  <textarea
+                    id="hr-leg-details"
+                    rows={4}
+                    value={legacyForm.details}
+                    onChange={(e) =>
+                      setLegacyForm((f) => (f ? { ...f, details: e.target.value } : f))
+                    }
+                  />
+                )}
               </FormField>
             </FormGrid>
             <ModalActions>
