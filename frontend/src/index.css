@@ -741,6 +741,41 @@ body {
   box-shadow: var(--field-shadow-focus);
 }
 
+.hr-request-ict-dept-dropdown {
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field-bg);
+}
+
+.hr-request-ict-dept-dropdown > summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  list-style: none;
+}
+
+.hr-request-ict-dept-dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.hr-request-ict-dept-dropdown > summary::after {
+  content: '▾';
+  float: right;
+  color: var(--text-muted);
+}
+
+.hr-request-ict-dept-dropdown[open] > summary::after {
+  content: '▴';
+}
+
+.hr-request-ict-dept-dropdown__menu {
+  border-top: 1px solid var(--field-border);
+  padding: 10px 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+}
+
 .mapping-preview fieldset {
   border: 1px solid var(--field-border);
   border-radius: var(--field-radius);

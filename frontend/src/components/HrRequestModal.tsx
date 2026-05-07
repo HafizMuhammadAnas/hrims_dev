@@ -414,6 +414,14 @@ export function HrRequestModal({
     return issues.find((i) => i.id === issueForm.issue_id) ?? null
   }, [issueForm, issues])
 
+  const selectedIctDepartmentsText = useMemo(() => {
+    if (!issueForm || federalDepts.length === 0) return 'Select ICT departments'
+    const picked = federalDepts.filter((d) => issueForm.department_ids.includes(d.id))
+    if (picked.length === 0) return 'Select ICT departments'
+    if (picked.length <= 2) return picked.map((d) => d.name).join(', ')
+    return `${picked.length} departments selected`
+  }, [issueForm?.department_ids, federalDepts])
+
   function runIssueValidation(): boolean {
     if (!issueForm) return false
     const fe: Record<string, string> = {}
@@ -854,29 +862,36 @@ export function HrRequestModal({
                   label="ICT departments (optional)"
                   hint="Select one or more national-line departments for this request."
                 >
-                  <div className="checkbox-grid" role="group" aria-label="ICT departments (optional)">
-                    {federalDepts.map((d) => (
-                      <label key={d.id} className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={issueForm.department_ids.includes(d.id)}
-                          onChange={(e) => {
-                            const on = e.target.checked
-                            setIssueForm((f) => {
-                              if (!f) return f
-                              const next = on
-                                ? [...f.department_ids, d.id]
-                                : f.department_ids.filter((x) => x !== d.id)
-                              return { ...f, department_ids: next }
-                            })
-                          }}
-                        />
-                        <span>
-                          {d.name} <span className="muted small">({d.code})</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                  <details className="hr-request-ict-dept-dropdown">
+                    <summary>{selectedIctDepartmentsText}</summary>
+                    <div
+                      className="hr-request-ict-dept-dropdown__menu"
+                      role="group"
+                      aria-label="ICT departments (optional)"
+                    >
+                      {federalDepts.map((d) => (
+                        <label key={d.id} className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={issueForm.department_ids.includes(d.id)}
+                            onChange={(e) => {
+                              const on = e.target.checked
+                              setIssueForm((f) => {
+                                if (!f) return f
+                                const next = on
+                                  ? [...f.department_ids, d.id]
+                                  : f.department_ids.filter((x) => x !== d.id)
+                                return { ...f, department_ids: next }
+                              })
+                            }}
+                          />
+                          <span>
+                            {d.name} <span className="muted small">({d.code})</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </details>
                 </FormField>
               )}
 
