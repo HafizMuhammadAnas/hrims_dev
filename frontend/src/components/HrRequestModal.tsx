@@ -711,6 +711,7 @@ export function HrRequestModal({
                   conventionLabel={conventionDisplayLabel}
                   issueTitle={selectedIssue.issue_title}
                   categoryName={selectedIssue.category?.name ?? '—'}
+                  issueDescription={selectedIssue.description ?? null}
                   description={issueForm.details}
                   regionalInstructionsOnly={departmentPortalRegionalNotes !== undefined}
                   regionalInstructionsText={

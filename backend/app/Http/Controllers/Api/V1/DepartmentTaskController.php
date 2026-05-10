@@ -47,7 +47,9 @@ class DepartmentTaskController extends Controller
     public function store(Request $request): JsonResponse
     {
         if (! HrimsAccess::canManageHrRequests($request->user())) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json([
+                'message' => 'Only federal or regional administrators can assign department tasks.',
+            ], 403);
         }
 
         $data = $request->validate([
@@ -63,7 +65,9 @@ class DepartmentTaskController extends Controller
 
         $regionIds = HrimsAccess::scopedRegionIds($request->user());
         if ($regionIds !== null && ! in_array((int) $hrRequest->region_id, $regionIds, true)) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json([
+                'message' => 'This HR request is not assigned to your region. Check the request’s primary region matches your account after import.',
+            ], 403);
         }
 
         $department = Department::query()->with('regions')->find($data['department_id']);
@@ -94,11 +98,25 @@ class DepartmentTaskController extends Controller
 
         if ($hrRequest->status === 'draft') {
             $hrRequest->update(['status' => 'active']);
-            app(NotificationService::class)->notifyHrRequestUpdated($hrRequest->fresh(['regions', 'departments']), $request->user(), 'draft');
+            try {
+                app(NotificationService::class)->notifyHrRequestUpdated(
+                    $hrRequest->fresh(['regions', 'departments']),
+                    $request->user(),
+                    'draft',
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         $task->load(['region', 'department']);
-        app(NotificationService::class)->notifyDepartmentTaskAssigned($task, $request->user());
+        try {
+            app(NotificationService::class)->notifyDepartmentTaskAssigned($task, $request->user());
+        } catch (\Throwable $e) {
+            // Task row is committed; do not fail assignment if notification persistence errors (see storage/logs).
+            report($e);
+        }
+
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
 
         return response()->json([

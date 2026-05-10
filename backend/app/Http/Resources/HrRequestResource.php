@@ -82,6 +82,7 @@ class HrRequestResource extends JsonResource
         return [
             'id' => $i->id,
             'issue_title' => $i->issue_title,
+            'description' => $i->description,
             'has_quantitative' => (bool) $i->has_quantitative,
             'has_qualitative' => (bool) $i->has_qualitative,
             'category' => $i->category

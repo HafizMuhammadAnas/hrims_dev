@@ -24,6 +24,8 @@ type Props = {
   conventionLabel: string
   issueTitle: string
   categoryName: string
+  /** Catalog issue narrative (Super Admin → Issues), distinct from per-request details below. */
+  issueDescription?: string | null
   /** Federal / HR request notes (not shown to department portal when regionalInstructionsOnly is set). */
   description: string
   /** When true, the prose block shows regional assignment instructions instead of federal request description. */
@@ -80,6 +82,7 @@ export function HrRequestViewTemplate({
   conventionLabel,
   issueTitle,
   categoryName,
+  issueDescription = null,
   description,
   regionalInstructionsOnly = false,
   regionalInstructionsText = null,
@@ -135,6 +138,21 @@ export function HrRequestViewTemplate({
           <div className="hr-request-view-template__grid2-full">
             <div className="hr-request-view-template__field-label">Category</div>
             <p className="hr-request-view-template__field-value">{categoryName}</p>
+          </div>
+          <div className="hr-request-view-template__grid2-full">
+            <div className="hr-request-view-template__field-label">Issue description</div>
+            {issueDescription?.trim() ? (
+              <p
+                className="hr-request-view-template__field-value"
+                style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}
+              >
+                {issueDescription.trim()}
+              </p>
+            ) : (
+              <p className="muted" style={{ margin: 0 }}>
+                —
+              </p>
+            )}
           </div>
         </div>
       </section>

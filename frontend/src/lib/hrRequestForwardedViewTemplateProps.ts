@@ -69,6 +69,7 @@ export function buildDepartmentForwardedViewTemplateProps(
   conventionLabel: string
   issueTitle: string
   categoryName: string
+  issueDescription: string | null
   description: string
   regionalInstructionsOnly: boolean
   regionalInstructionsText: string | null
@@ -109,6 +110,7 @@ export function buildDepartmentForwardedViewTemplateProps(
     conventionLabel,
     issueTitle: selectedIssue.issue_title,
     categoryName: selectedIssue.category?.name ?? '—',
+    issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,
     description: detail.details ?? '',
     regionalInstructionsOnly: true,
     regionalInstructionsText: task.assignment_instructions ?? null,
@@ -140,6 +142,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
   conventionLabel: string
   issueTitle: string
   categoryName: string
+  issueDescription: string | null
   description: string
   regionalInstructionsOnly: boolean
   regionalInstructionsText: string | null
@@ -178,6 +181,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
     conventionLabel,
     issueTitle: selectedIssue.issue_title,
     categoryName: selectedIssue.category?.name ?? '—',
+    issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,
     description: detail.details ?? '',
     regionalInstructionsOnly: false,
     regionalInstructionsText: null,
