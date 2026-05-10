@@ -46,7 +46,7 @@ class ApiV1NotificationsTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'date' => now()->addWeek()->format('Y-m-d'),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
 
         $response->assertCreated();
@@ -98,7 +98,7 @@ class ApiV1NotificationsTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'due_date' => now()->addDays(10),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
 
         $response = $this->actingAs($regionalAdmin)->postJson('/api/v1/department-tasks', [

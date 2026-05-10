@@ -31,12 +31,13 @@ class DashboardController extends Controller
 
         $total = (clone $query)->count();
 
+        $today = Carbon::now()->toDateString();
         $urgent = (clone $query)
-            ->where(function ($q): void {
-                $q->whereIn('status', ['pending', 'overdue'])
-                    ->orWhere(function ($q2): void {
-                        $q2->where('status', 'in-progress')
-                            ->whereDate('due_date', '<', Carbon::now()->toDateString());
+            ->where(function ($q) use ($today): void {
+                $q->where('status', 'draft')
+                    ->orWhere(function ($q2) use ($today): void {
+                        $q2->where('status', 'active')
+                            ->whereDate('due_date', '<', $today);
                     });
             })
             ->orderByDesc('updated_at')

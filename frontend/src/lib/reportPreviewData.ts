@@ -262,9 +262,11 @@ export function buildReportPreview(
       : '') +
     (notes.length ? notes.join(' ') : '')
 
-  const completed = f.dataSource === 'requests' ? fr.filter((r) => r.status === 'completed').length : 0
-  const overdue = f.dataSource === 'requests' ? fr.filter((r) => r.status === 'overdue').length : 0
-  const inProgress = f.dataSource === 'requests' ? fr.filter((r) => r.status === 'in-progress').length : 0
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const draftCount = f.dataSource === 'requests' ? fr.filter((r) => r.status === 'draft').length : 0
+  const activeCount = f.dataSource === 'requests' ? fr.filter((r) => r.status === 'active').length : 0
+  const pastDue =
+    f.dataSource === 'requests' ? fr.filter((r) => r.date && r.date < todayIso).length : 0
 
   let responseCoverage = 0
   if (f.dataSource === 'requests' && fr.length > 0) {
@@ -278,7 +280,7 @@ export function buildReportPreview(
   if (f.dataSource === 'requests') {
     insights.push({
       label: 'Volume',
-      text: `${fr.length} HR request(s) match the current filters. ${completed} completed, ${inProgress} in progress, ${overdue} overdue.`,
+      text: `${fr.length} HR request(s) match the current filters. ${draftCount} draft, ${activeCount} active.${pastDue > 0 ? ` ${pastDue} past due date.` : ''}`,
     })
     if (fr.length > 0) {
       insights.push({
@@ -325,14 +327,14 @@ export function buildReportPreview(
 
   let recommendation = ''
   if (f.dataSource === 'requests') {
-    if (overdue > 0) {
-      recommendation = `${overdue} request(s) in this scope are overdue — review ownership and deadlines in the Requests workspace.`
+    if (pastDue > 0) {
+      recommendation = `${pastDue} request(s) in this scope are past their due date — review ownership and deadlines in the Requests workspace.`
     } else if (fr.length > 0 && responseCoverage < 40) {
       recommendation = `Response coverage is ${responseCoverage}% — consider following up on provinces or sectors with no regional response yet.`
     } else if (fr.length === 0) {
       recommendation = 'No requests match these filters; widen the date range or clear filters to see data.'
     } else {
-      recommendation = 'No overdue items in this scope; keep monitoring in-progress work and submission timelines.'
+      recommendation = 'No past-due items in this scope; keep monitoring active work and submission timelines.'
     }
   } else if (f.dataSource === 'responses') {
     recommendation =

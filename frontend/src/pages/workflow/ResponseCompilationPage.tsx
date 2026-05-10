@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 import { fetchHrRequests } from '../../api/hrRequests'
-import { fetchDepartmentTasks, type DepartmentTaskRow } from '../../api/lists'
+import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow } from '../../api/lists'
 import { createRegionalResponse } from '../../api/workflows'
+import { DepartmentTaskResponseModal } from '../../components/DepartmentTaskResponseModal'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
+import { formatDepartmentResponseAsPlaintext } from '../../lib/departmentTaskResponseFormat'
 import { countDepartmentTasksByWorkflow, workflowPresentation } from '../../lib/departmentTaskWorkflow'
+import { isRegionalAdmin } from '../../lib/roles'
 import type { HrRequestRow } from '../../types/hrRequest'
 
 function taskListSignature(tasks: DepartmentTaskRow[]): string {
@@ -22,23 +26,44 @@ type Props = {
 
 export function ResponseCompilationPage({ title, nextPath }: Props) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [requests, setRequests] = useState<HrRequestRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
+  /** For regional admins: request IDs that already have a regional compilation (API is scoped to their region). */
+  const [compiledReqIds, setCompiledReqIds] = useState<Set<string>>(() => new Set())
   const [selectedReqId, setSelectedReqId] = useState('')
   const [content, setContent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   /** Department task IDs to pull into the compilation draft (checkboxes). */
   const [includedTaskIds, setIncludedTaskIds] = useState<string[]>([])
+  const [viewingTask, setViewingTask] = useState<DepartmentTaskRow | null>(null)
 
   useEffect(() => {
-    void Promise.all([fetchHrRequests(), fetchDepartmentTasks()])
-      .then(([reqs, taskRows]) => {
+    void Promise.all([fetchHrRequests(), fetchDepartmentTasks(), fetchRegionalResponses()])
+      .then(([reqs, taskRows, regionalRows]) => {
         setRequests(reqs)
         setTasks(taskRows)
+        if (isRegionalAdmin(user) && user?.region != null) {
+          setCompiledReqIds(new Set(regionalRows.map((r) => r.req_id)))
+        } else {
+          setCompiledReqIds(new Set())
+        }
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
-  }, [])
+  }, [user?.id, user?.region?.id])
+
+  const requestsForCompilationSelect = useMemo(
+    () => requests.filter((r) => !compiledReqIds.has(r.id)),
+    [requests, compiledReqIds],
+  )
+
+  useEffect(() => {
+    if (selectedReqId && compiledReqIds.has(selectedReqId)) {
+      setSelectedReqId('')
+      setContent('')
+    }
+  }, [selectedReqId, compiledReqIds])
 
   const selectedReq = useMemo(
     () => requests.find((r) => r.id === selectedReqId) ?? null,
@@ -74,7 +99,7 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
         return (
           `[${t.department_name ?? t.department_id}]` +
           `\nProgress: ${wf.label}` +
-          `\n${t.response_data ?? 'No response data yet.'}`
+          `\n${formatDepartmentResponseAsPlaintext(t.response_data, t.attachment_url)}`
         )
       })
       .join('\n\n')
@@ -123,7 +148,17 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
     >
       {error && <p className="login-error">{error}</p>}
       <div style={{ marginTop: 16 }}>
-        <StatsCards items={[{ label: 'Requests available', value: requests.length }]} />
+        <StatsCards
+          items={[
+            {
+              label: isRegionalAdmin(user) ? 'Open for compilation' : 'HR requests (list)',
+              value: isRegionalAdmin(user) ? requestsForCompilationSelect.length : requests.length,
+            },
+            ...(isRegionalAdmin(user) && compiledReqIds.size > 0
+              ? [{ label: 'Already compiled (this region)', value: compiledReqIds.size }]
+              : []),
+          ]}
+        />
       </div>
       {selectedReqId && workflowCounts && (
         <div style={{ marginTop: 14 }}>
@@ -133,10 +168,10 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
           <StatsCards
             items={[
               { label: 'Departments distributed', value: selectedTasks.length },
-              { label: 'In process', value: workflowCounts.in_process },
-              { label: 'Responded', value: workflowCounts.responded },
-              { label: 'Revision', value: workflowCounts.revision },
-              { label: 'Accepted', value: workflowCounts.accepted },
+              { label: 'Pending submission', value: workflowCounts.in_process },
+              { label: 'Pending regional review', value: workflowCounts.responded },
+              { label: 'Resubmission requested', value: workflowCounts.revision },
+              { label: 'Accepted by region', value: workflowCounts.accepted },
             ]}
           />
         </div>
@@ -150,12 +185,18 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
           onChange={(e) => setSelectedReqId(e.target.value)}
         >
           <option value="">-- choose --</option>
-          {requests.map((r) => (
+          {requestsForCompilationSelect.map((r) => (
             <option key={r.id} value={r.id}>
               {r.id} — {r.title}
             </option>
           ))}
         </select>
+        {isRegionalAdmin(user) && requests.length > 0 && requestsForCompilationSelect.length === 0 ? (
+          <p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>
+            Every listed request already has a regional compilation from your province. Manage or review it under{' '}
+            <Link to="/responses">Regional responses</Link> or <Link to="/region-history">submission history</Link>.
+          </p>
+        ) : null}
 
         {selectedReq && (
           <div style={{ marginBottom: 14 }}>
@@ -190,32 +231,35 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
                     const wf = workflowPresentation(t)
                     const checked = includedSet.has(t.id)
                     return (
-                      <label
-                        key={t.id}
-                        className="compilation-dept-status-row"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          padding: '8px 10px',
-                          border: '1px solid var(--field-border, #e1e7f5)',
-                          borderRadius: 8,
-                          marginBottom: 6,
-                          background: '#fafbfd',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleTaskInclusion(t.id)}
-                          aria-label={`Include ${t.department_name ?? t.department_id} in compilation`}
-                        />
-                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>
-                          {t.department_name ?? t.department_id}
-                        </span>
-                        <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
-                      </label>
+                      <div key={t.id} className="compilation-dept-status-row">
+                        <label className="compilation-dept-status-row__check">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleTaskInclusion(t.id)}
+                            aria-label={`Include ${t.department_name ?? t.department_id} in compilation`}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="compilation-dept-status-row__body"
+                          onClick={() => setViewingTask(t)}
+                          title="Open department submission"
+                        >
+                          <span className="compilation-dept-status-row__label">
+                            {t.region_name ? (
+                              <>
+                                <span className="compilation-dept-status-row__region">{t.region_name}</span>
+                                <span className="compilation-dept-status-row__sep">—</span>
+                              </>
+                            ) : null}
+                            <span className="compilation-dept-status-row__dept">
+                              {t.department_name ?? t.department_id}
+                            </span>
+                          </span>
+                          <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
+                        </button>
+                      </div>
                     )
                   })}
                 </div>
@@ -251,6 +295,8 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
           </Button>
         </div>
       </TableCard>
+
+      <DepartmentTaskResponseModal task={viewingTask} onClose={() => setViewingTask(null)} />
     </PageSection>
   )
 }

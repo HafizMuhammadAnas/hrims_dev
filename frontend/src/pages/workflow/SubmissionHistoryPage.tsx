@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../../api/lists'
 import { updateRegionalCompiledResponse } from '../../api/workflows'
 import { useAuth } from '../../auth/AuthContext'
+import { DepartmentSubmissionsForRequest } from '../../components/DepartmentSubmissionsForRequest'
 import { Button } from '../../components/ui/Button'
 import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
-import { ModalActions, ModalHeader } from '../../components/ui/ModalChrome'
+import { ModalActions } from '../../components/ui/ModalChrome'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
-import { DepartmentSubmissionsForRequest } from '../../components/DepartmentSubmissionsForRequest'
+import { RegionalResponsePreviewModal } from '../../components/RegionalResponsePreviewModal'
 import { hasDepartmentResponse, workflowPresentation } from '../../lib/departmentTaskWorkflow'
 import { isDepartmentAdmin, isRegionalAdmin, isViewer } from '../../lib/roles'
 
@@ -184,7 +185,7 @@ export function SubmissionHistoryPage({ title }: Props) {
                 <th>Title</th>
                 <th>Date</th>
                 <th>Status</th>
-                <th className="table-actions">Actions</th>
+                <th className="table-actions">Compilation</th>
               </tr>
             </thead>
             <tbody>
@@ -198,7 +199,7 @@ export function SubmissionHistoryPage({ title }: Props) {
                   <td className="table-actions">
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                       <Button variant="primary" compact onClick={() => openView(r)}>
-                        View
+                        View compilation
                       </Button>
                       {regional && r.review_status === 'needs-modification' && (
                         <Button variant="secondary" compact onClick={() => openEdit(r)}>
@@ -218,91 +219,78 @@ export function SubmissionHistoryPage({ title }: Props) {
       )}
 
       {detail && detailMode === 'view' && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={closeDetail}>
-          <div className="modal-card modal-card-wide" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader title="Response detail" onClose={closeDetail} />
-            <div className="modal-form">
-              <div className="form-row">
-                <label>Response ID</label>
-                <input value={detail.id} readOnly />
-              </div>
-              <div className="form-row">
-                <label>Request</label>
-                <input value={detail.req_id} readOnly />
-              </div>
-              <div className="form-row">
-                <label>Title</label>
-                <input value={detail.title} readOnly />
-              </div>
-              <div className="form-row">
-                <label>Submitted</label>
-                <input value={detail.submission_date} readOnly />
-              </div>
-              <div className="form-row">
-                <label>Review status</label>
-                <input value={detail.review_status} readOnly />
-              </div>
-              <div className="form-row">
-                <label>Federal feedback</label>
-                <textarea rows={3} readOnly value={detail.comments ?? '—'} />
-              </div>
-
-              <DepartmentSubmissionsForRequest tasksForDetail={tasksForDetail} reqId={detail.req_id} />
-
-              <div className="form-row" style={{ marginTop: 16 }}>
-                <label>Compiled regional response</label>
-                <textarea
-                  rows={10}
-                  readOnly
-                  value={detail.content?.trim() ? detail.content : '—'}
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
-              </div>
-              <ModalActions>
-                {regional && detail.review_status === 'needs-modification' && (
-                  <Button variant="primary" compact onClick={() => openEdit(detail)}>
-                    Edit compilation
-                  </Button>
-                )}
-                <Button variant="secondary" compact onClick={closeDetail}>
-                  Close
-                </Button>
-              </ModalActions>
-            </div>
-          </div>
-        </div>
+        <RegionalResponsePreviewModal
+          row={detail}
+          tasksForDetail={tasksForDetail}
+          onClose={closeDetail}
+          introText="Consolidated submission for federal review. Department inputs and your compiled narrative are below."
+          footerExtra={
+            regional && detail.review_status === 'needs-modification' ? (
+              <Button variant="primary" compact onClick={() => openEdit(detail)}>
+                Edit compilation
+              </Button>
+            ) : null
+          }
+        />
       )}
 
       {detail && detailMode === 'edit' && regional && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={closeDetail}>
-          <div className="modal-card modal-card-wide" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader title="Edit compilation (federal requested changes)" onClose={closeDetail} />
-            <div className="modal-form">
-              <p className="muted" style={{ marginTop: 0 }}>
-                Update the consolidated response and resubmit for federal review. Status will return to <strong>pending</strong>.
+          <div
+            className="modal-card modal-card-wide regional-response-detail-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head dept-task-response-modal__head">
+              <div>
+                <h3>Edit compilation</h3>
+                <p className="dept-task-response-modal__head-meta muted small">
+                  Federal requested changes · Response <strong>{detail.id}</strong> · Request{' '}
+                  <strong>{detail.req_id}</strong>
+                </p>
+              </div>
+              <button type="button" className="modal-close" onClick={closeDetail} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <div className="modal-form regional-response-detail-modal__form">
+              <p className="muted small" style={{ marginTop: 0 }}>
+                Update the consolidated narrative and save. Review status will return to <strong>pending</strong>.
               </p>
               {saveError && <p className="login-error">{saveError}</p>}
 
-              <DepartmentSubmissionsForRequest tasksForDetail={tasksForDetail} reqId={detail.req_id} />
+              <div className="dept-task-response-modal__panel regional-response-detail-modal__panel">
+                <section className="hr-request-view-template__card regional-response-detail-modal__section">
+                  <h2 className="hr-request-view-template__section-title">Reference — department submissions</h2>
+                  <DepartmentSubmissionsForRequest
+                    tasksForDetail={tasksForDetail}
+                    reqId={detail.req_id}
+                    filterByRegionName={detail.region_name ?? undefined}
+                    omitHeading
+                  />
+                </section>
 
-              <div className="form-row" style={{ marginTop: 16 }}>
-                <label htmlFor="edit-compilation-title">Title</label>
-                <input
-                  id="edit-compilation-title"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div className="form-row">
-                <label htmlFor="edit-compilation-content">Compiled regional response</label>
-                <textarea
-                  id="edit-compilation-content"
-                  rows={12}
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
+                <section className="hr-request-view-template__card regional-response-detail-modal__section">
+                  <h2 className="hr-request-view-template__section-title">Your compilation</h2>
+                  <div className="form-row">
+                    <label htmlFor="edit-compilation-title">Title</label>
+                    <input
+                      id="edit-compilation-title"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div className="form-row">
+                    <label htmlFor="edit-compilation-content">Compiled regional response</label>
+                    <textarea
+                      id="edit-compilation-content"
+                      rows={12}
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </section>
               </div>
               <ModalActions>
                 <Button variant="secondary" compact disabled={saving} onClick={closeDetail}>

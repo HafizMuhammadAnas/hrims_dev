@@ -1,4 +1,5 @@
 import type { DepartmentTaskRow } from '../api/lists'
+import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
 import { StatusBadge } from './ui/StatusBadge'
 import { workflowPresentation } from '../lib/departmentTaskWorkflow'
 
@@ -7,9 +8,16 @@ type Props = {
   reqId: string
   /** Only show tasks whose region matches (federal consolidated view per province). */
   filterByRegionName?: string | null
+  /** When the parent already provides a section title (e.g. modal card). */
+  omitHeading?: boolean
 }
 
-export function DepartmentSubmissionsForRequest({ tasksForDetail, reqId, filterByRegionName }: Props) {
+export function DepartmentSubmissionsForRequest({
+  tasksForDetail,
+  reqId,
+  filterByRegionName,
+  omitHeading = false,
+}: Props) {
   const scoped = (() => {
     if (filterByRegionName === undefined) {
       return tasksForDetail
@@ -35,16 +43,18 @@ export function DepartmentSubmissionsForRequest({ tasksForDetail, reqId, filterB
     )
   }
   return (
-    <div className="submission-history-dept-sections" style={{ marginTop: 12 }}>
-      <h4 className="dept-submissions-heading">
-        Department submissions
-        {filterByRegionName !== undefined ? (
-          <>
-            {' '}
-            — <strong>{filterByRegionName?.trim() || '—'}</strong>
-          </>
-        ) : null}
-      </h4>
+    <div className="submission-history-dept-sections" style={{ marginTop: omitHeading ? 0 : 12 }}>
+      {!omitHeading ? (
+        <h4 className="dept-submissions-heading">
+          Department submissions
+          {filterByRegionName !== undefined ? (
+            <>
+              {' '}
+              — <strong>{filterByRegionName?.trim() || '—'}</strong>
+            </>
+          ) : null}
+        </h4>
+      ) : null}
       {scoped.map((t) => {
         const wf = workflowPresentation(t)
         return (
@@ -79,20 +89,9 @@ export function DepartmentSubmissionsForRequest({ tasksForDetail, reqId, filterB
             <label className="muted small" style={{ display: 'block', marginBottom: 4 }}>
               Department response
             </label>
-            <textarea
-              readOnly
-              rows={6}
-              value={t.response_data?.trim() ? t.response_data : '—'}
-              style={{ width: '100%', boxSizing: 'border-box', marginTop: 4 }}
-            />
-            {t.attachment_url ? (
-              <p className="muted" style={{ margin: '8px 0 0', fontSize: 12 }}>
-                Attachment:{' '}
-                <a href={t.attachment_url} target="_blank" rel="noreferrer">
-                  {t.attachment_url}
-                </a>
-              </p>
-            ) : null}
+            <div style={{ marginTop: 4 }}>
+              <DepartmentResponseDisplay responseData={t.response_data} attachmentUrl={t.attachment_url} />
+            </div>
           </div>
         )
       })}

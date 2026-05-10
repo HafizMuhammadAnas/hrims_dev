@@ -74,15 +74,38 @@ export async function deleteDepartment(id: number): Promise<void> {
   await throwIfNotOk(res)
 }
 
+export type SubmitDepartmentTaskBody =
+  | { mode: 'legacy'; response_data: string; attachment?: File | null }
+  | {
+      mode: 'indicators'
+      indicator_bundles: string
+      quantFiles?: Record<number, File | null | undefined>
+      qualFiles?: Record<number, File | null | undefined>
+    }
+
 export async function submitDepartmentTaskResponse(
   taskId: string,
-  body: { response_data: string; attachment?: File | null },
+  body: SubmitDepartmentTaskBody,
 ): Promise<DepartmentTaskRow> {
   await ensureCsrfCookie()
   const form = new FormData()
-  form.append('response_data', body.response_data)
-  if (body.attachment) {
-    form.append('attachment', body.attachment)
+  if (body.mode === 'legacy') {
+    form.append('response_data', body.response_data)
+    if (body.attachment) {
+      form.append('attachment', body.attachment)
+    }
+  } else {
+    form.append('indicator_bundles', body.indicator_bundles)
+    for (const [id, file] of Object.entries(body.quantFiles ?? {})) {
+      if (file) {
+        form.append(`quant_file[${id}]`, file)
+      }
+    }
+    for (const [id, file] of Object.entries(body.qualFiles ?? {})) {
+      if (file) {
+        form.append(`qual_file[${id}]`, file)
+      }
+    }
   }
   const res = await fetch(`/api/v1/department-tasks/${encodeURIComponent(taskId)}/submit-response`, {
     method: 'POST',
@@ -98,13 +121,17 @@ export async function submitDepartmentTaskResponse(
 export async function createDepartmentTask(
   hr_request_id: string,
   department_id: number,
+  options?: { assignment_instructions?: string | null },
 ): Promise<DepartmentTaskRow> {
   await ensureCsrfCookie()
+  const body: Record<string, unknown> = { hr_request_id, department_id }
+  const notes = options?.assignment_instructions?.trim()
+  if (notes) body.assignment_instructions = notes
   const res = await fetch('/api/v1/department-tasks', {
     method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
-    body: JSON.stringify({ hr_request_id, department_id }),
+    body: JSON.stringify(body),
   })
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: DepartmentTaskRow }

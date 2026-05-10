@@ -38,14 +38,12 @@ import {
   isViewer,
 } from '../lib/roles'
 
-const HR_STATUS_ORDER = ['pending', 'in-progress', 'completed', 'overdue'] as const
+const HR_STATUS_ORDER = ['draft', 'active'] as const
 const HR_PIE_LABELS: Record<(typeof HR_STATUS_ORDER)[number], string> = {
-  pending: 'Pending',
-  'in-progress': 'In progress',
-  completed: 'Completed',
-  overdue: 'Overdue',
+  draft: 'Draft',
+  active: 'Active',
 }
-const HR_PIE_COLORS = ['#c4a574', '#5b8def', '#2e4fa3', '#f44336']
+const HR_PIE_COLORS = ['#c4a574', '#2e4fa3']
 
 const TASK_PIE_COLORS = ['#5b8def', '#2e4fa3', '#0f766e', '#c4a574', '#f44336', '#9333ea']
 
@@ -54,17 +52,16 @@ function count(map: Record<string, number> | undefined, key: string): number {
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === 'completed') return 'status-badge success'
-  if (status === 'overdue') return 'status-badge danger'
-  if (status === 'in-progress') return 'status-badge in-progress'
+  if (status === 'active') return 'status-badge success'
+  if (status === 'draft') return 'status-badge pending'
   return 'status-badge pending'
 }
 
 function urgentRowChrome(status: string): { background: string; borderLeft: string } {
-  if (status === 'overdue') {
-    return { background: '#ffebee', borderLeft: '#f44336' }
+  if (status === 'needs-revision') {
+    return { background: '#fff8e1', borderLeft: '#e69a00' }
   }
-  if (status === 'in-progress' || status === 'needs-revision') {
+  if (status === 'active') {
     return { background: '#e8eefb', borderLeft: '#2e4fa3' }
   }
   return { background: '#fff8e1', borderLeft: '#e69a00' }
@@ -125,10 +122,8 @@ export function DashboardPage() {
   }, [])
 
   const by = summary?.by_status ?? {}
-  const pending = count(by, 'pending')
-  const inProgress = count(by, 'in-progress')
-  const completed = count(by, 'completed')
-  const overdue = count(by, 'overdue')
+  const draft = count(by, 'draft')
+  const active = count(by, 'active')
 
   const review = summary?.regional_responses_by_review
   const respTotal = summary?.regional_responses_total ?? 0
@@ -143,7 +138,7 @@ export function DashboardPage() {
 
   const resolvedRatePct =
     summary && summary.hr_requests_total > 0
-      ? Math.round((completed / summary.hr_requests_total) * 100)
+      ? Math.round((active / summary.hr_requests_total) * 100)
       : 0
   const acceptedRatePct =
     respTotal > 0 ? Math.round((acceptedResp / respTotal) * 100) : null
@@ -189,6 +184,7 @@ export function DashboardPage() {
 
   const urgentList = summary?.urgent_requests ?? []
   const urgentDeptTasks = summary?.urgent_department_tasks ?? []
+  const urgentRequestCount = urgentList.length
 
   const requestsPanelRows: (UrgentRequestRow | (UrgentDepartmentTaskRow & { task_id: string }))[] =
     variant === 'department' || variant === 'viewer'
@@ -267,9 +263,9 @@ export function DashboardPage() {
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
                   <div className="dashboard-card-title">Linked request attention</div>
-                  <div className="dashboard-card-value">{pending + overdue}</div>
+                  <div className="dashboard-card-value">{draft}</div>
                   <div className="dashboard-card-subtitle">
-                    {pending} pending · {overdue} overdue (in your HR request scope)
+                    {draft} draft · {urgentRequestCount} in urgent queue (HR requests in your scope)
                   </div>
                 </div>
               </>
@@ -279,9 +275,9 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">In progress</div>
-                  <div className="dashboard-card-value">{inProgress}</div>
-                  <div className="dashboard-card-subtitle">HR requests currently in progress</div>
+                  <div className="dashboard-card-title">Active requests</div>
+                  <div className="dashboard-card-value">{active}</div>
+                  <div className="dashboard-card-subtitle">HR requests marked active (circulated)</div>
                 </div>
                 <div className="dashboard-card blue">
                   <div className="dashboard-card-icon">
@@ -298,9 +294,9 @@ export function DashboardPage() {
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
                   <div className="dashboard-card-title">Needs attention</div>
-                  <div className="dashboard-card-value">{pending + needsMod}</div>
+                  <div className="dashboard-card-value">{draft + needsMod}</div>
                   <div className="dashboard-card-subtitle">
-                    {pending} pending requests · {needsMod} responses need modification
+                    {draft} draft requests · {needsMod} responses need modification
                   </div>
                 </div>
               </>
@@ -310,26 +306,26 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">In progress</div>
-                  <div className="dashboard-card-value">{inProgress}</div>
-                  <div className="dashboard-card-subtitle">Requests currently in progress</div>
+                  <div className="dashboard-card-title">Active requests</div>
+                  <div className="dashboard-card-value">{active}</div>
+                  <div className="dashboard-card-subtitle">Requests marked active (circulated)</div>
                 </div>
                 <div className="dashboard-card blue">
                   <div className="dashboard-card-icon">
                     <TrendingUp size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Resolved rate</div>
+                  <div className="dashboard-card-title">Active share</div>
                   <div className="dashboard-card-value">{summary.hr_requests_total ? `${resolvedRatePct}%` : '—'}</div>
-                  <div className="dashboard-card-subtitle">Completed / total requests in scope</div>
+                  <div className="dashboard-card-subtitle">Active / total requests in scope</div>
                 </div>
                 <div className="dashboard-card teal">
                   <div className="dashboard-card-icon">
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Pending & overdue</div>
-                  <div className="dashboard-card-value">{pending + overdue}</div>
+                  <div className="dashboard-card-title">Urgent queue</div>
+                  <div className="dashboard-card-value">{urgentRequestCount}</div>
                   <div className="dashboard-card-subtitle">
-                    {pending} pending · {overdue} overdue
+                    {draft} draft total · draft or past-due active requests listed below
                     {variant === 'federal' && respTotal > 0 ? ` · ${pendingReview} responses awaiting review` : ''}
                   </div>
                 </div>
@@ -346,15 +342,15 @@ export function DashboardPage() {
             </div>
             <div className="stat-card" style={{ borderLeft: '4px solid #ffb300' }}>
               <div className="stat-card-value" style={{ color: '#ffb300' }}>
-                {pending}
+                {draft}
               </div>
-              <div className="stat-card-label">Pending</div>
+              <div className="stat-card-label">Draft</div>
             </div>
             <div className="stat-card" style={{ borderLeft: '4px solid #00bcd4' }}>
               <div className="stat-card-value" style={{ color: '#00bcd4' }}>
-                {inProgress}
+                {active}
               </div>
-              <div className="stat-card-label">In progress</div>
+              <div className="stat-card-label">Active</div>
             </div>
             {variant === 'regional' ? (
               <>
@@ -390,15 +386,9 @@ export function DashboardPage() {
               <>
                 <div className="stat-card" style={{ borderLeft: '4px solid #4caf50' }}>
                   <div className="stat-card-value" style={{ color: '#4caf50' }}>
-                    {completed}
+                    {urgentRequestCount}
                   </div>
-                  <div className="stat-card-label">Completed</div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #f44336' }}>
-                  <div className="stat-card-value" style={{ color: '#f44336' }}>
-                    {overdue}
-                  </div>
-                  <div className="stat-card-label">Overdue</div>
+                  <div className="stat-card-label">Urgent queue</div>
                 </div>
               </>
             )}

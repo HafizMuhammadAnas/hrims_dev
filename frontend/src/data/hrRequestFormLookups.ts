@@ -83,4 +83,9 @@ export const UPR_REQUEST_CYCLES: { title: string }[] = [
   { title: 'Cycle - 3' },
 ]
 
-export const HR_REQUEST_STATUSES = ['pending', 'in-progress', 'completed', 'overdue'] as const
+export const HR_REQUEST_STATUSES = ['draft', 'active'] as const
+
+export const HR_REQUEST_STATUS_LABELS: Record<(typeof HR_REQUEST_STATUSES)[number], string> = {
+  draft: 'Draft',
+  active: 'Active',
+}

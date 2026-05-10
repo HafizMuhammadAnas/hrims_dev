@@ -174,7 +174,7 @@ class HrRequestController extends Controller
             'department_ids' => ['sometimes', 'array'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
             'date' => ['sometimes', 'date'],
-            'status' => ['sometimes', Rule::in(['pending', 'in-progress', 'completed', 'overdue'])],
+            'status' => ['sometimes', Rule::in(['draft', 'active'])],
             'details' => ['sometimes', 'nullable', 'string'],
             'indicator_responses' => ['sometimes', 'array'],
             'indicator_responses.*.issue_indicator_id' => ['required', 'integer', 'exists:issue_indicators,id'],
@@ -184,7 +184,7 @@ class HrRequestController extends Controller
             'title.max' => 'Title may not exceed 500 characters.',
             'region_id.exists' => 'Select a valid region.',
             'date.date' => 'Due date must be a valid date.',
-            'status.in' => 'Status must be pending, in-progress, completed, or overdue.',
+            'status.in' => 'Status must be draft or active.',
         ]);
 
         if (! HrimsAccess::seesAllRegions($request->user())) {
@@ -308,7 +308,7 @@ class HrRequestController extends Controller
             'conv' => ['required', 'string', 'max:64'],
             'region_id' => ['nullable', 'exists:regions,id'],
             'date' => ['required', 'date'],
-            'status' => ['required', Rule::in(['pending', 'in-progress', 'completed', 'overdue'])],
+            'status' => ['required', Rule::in(['draft', 'active'])],
             'details' => ['nullable', 'string'],
             'attachment_file_name' => ['nullable', 'string', 'max:255'],
             'recommendation_id' => ['nullable', 'string'],
@@ -379,7 +379,7 @@ class HrRequestController extends Controller
             'convention_id' => ['required', 'integer', 'exists:conventions,id'],
             'issue_id' => ['required', 'integer', 'exists:issues,id'],
             'date' => ['required', 'date'],
-            'status' => ['required', Rule::in(['pending', 'in-progress', 'completed', 'overdue'])],
+            'status' => ['required', Rule::in(['draft', 'active'])],
             'details' => ['nullable', 'string'],
             'region_ids' => ['nullable', 'array'],
             'region_ids.*' => ['integer', 'exists:regions,id'],

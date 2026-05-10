@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { fetchHrRequests } from '../../api/hrRequests'
 import { createCompiledRecord, fetchCompilationPreview } from '../../api/workflows'
-import { fetchRegionalResponses, type RegionalResponseRow } from '../../api/lists'
+import {
+  fetchCompiledRecords,
+  fetchDepartmentTasks,
+  fetchRegionalResponses,
+  type CompiledRecordRow,
+  type DepartmentTaskRow,
+  type RegionalResponseRow,
+} from '../../api/lists'
+import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../../components/CompiledRecordsWorkflowNav'
+import { RegionalResponsePreviewModal } from '../../components/RegionalResponsePreviewModal'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
@@ -10,10 +19,6 @@ import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import type { HrRequestRow } from '../../types/hrRequest'
-
-function responseListSignature(rows: RegionalResponseRow[]): string {
-  return [...rows.map((r) => r.id)].sort().join('\u001f')
-}
 
 function reviewStatusPresentation(status: string): {
   label: string
@@ -25,25 +30,48 @@ function reviewStatusPresentation(status: string): {
   return { label: 'Pending', tone: 'pending' }
 }
 
+function sortTasksByDept(a: DepartmentTaskRow, b: DepartmentTaskRow): number {
+  const an = (a.department_name ?? a.department_id).toLowerCase()
+  const bn = (b.department_name ?? b.department_id).toLowerCase()
+  return an.localeCompare(bn)
+}
+
 export function FederalCompilationPage() {
+  const [searchParams] = useSearchParams()
   const [requests, setRequests] = useState<HrRequestRow[]>([])
   const [responses, setResponses] = useState<RegionalResponseRow[]>([])
+  const [deptTasks, setDeptTasks] = useState<DepartmentTaskRow[]>([])
+  const [viewingResponse, setViewingResponse] = useState<RegionalResponseRow | null>(null)
   const [selectedReqId, setSelectedReqId] = useState('')
   const [preview, setPreview] = useState<{ region_names: string[]; response_count: number } | null>(null)
   const [summary, setSummary] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState<'draft' | 'submitted' | null>(null)
-  const [includedResponseIds, setIncludedResponseIds] = useState<string[]>([])
+  const [compiledRecords, setCompiledRecords] = useState<CompiledRecordRow[]>([])
 
   useEffect(() => {
-    void Promise.all([fetchHrRequests(), fetchRegionalResponses()])
-      .then(([reqRows, responseRows]) => {
+    void Promise.all([
+      fetchHrRequests(),
+      fetchRegionalResponses(),
+      fetchDepartmentTasks(),
+      fetchCompiledRecords(),
+    ])
+      .then(([reqRows, responseRows, taskRows, compiledRows]) => {
         setError(null)
         setRequests(reqRows)
         setResponses(responseRows)
+        setDeptTasks(taskRows)
+        setCompiledRecords(compiledRows)
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load compilation data'))
   }, [])
+
+  useEffect(() => {
+    const from = searchParams.get('from') ?? ''
+    const req = searchParams.get('reqId')?.trim() ?? ''
+    if (!isFromCompiledRecordsPath(from) || !req) return
+    setSelectedReqId(req)
+  }, [searchParams])
 
   const reqIdsWithResponses = useMemo(() => {
     const ids = [...new Set(responses.map((r) => r.req_id))]
@@ -51,10 +79,29 @@ export function FederalCompilationPage() {
     return ids
   }, [responses])
 
+  /** Requests already submitted to the ministry from this center — hide from the picker. */
+  const reqIdsNationallySubmitted = useMemo(() => {
+    const s = new Set<string>()
+    for (const c of compiledRecords) {
+      if (c.status === 'submitted' && c.req_id) s.add(c.req_id)
+    }
+    return s
+  }, [compiledRecords])
+
   const requestsForSelect = useMemo(() => {
     const allowed = new Set(reqIdsWithResponses)
-    return requests.filter((r) => allowed.has(r.id)).sort((a, b) => a.id.localeCompare(b.id))
-  }, [requests, reqIdsWithResponses])
+    return requests
+      .filter((r) => allowed.has(r.id) && !reqIdsNationallySubmitted.has(r.id))
+      .sort((a, b) => a.id.localeCompare(b.id))
+  }, [requests, reqIdsWithResponses, reqIdsNationallySubmitted])
+
+  useEffect(() => {
+    if (selectedReqId && reqIdsNationallySubmitted.has(selectedReqId)) {
+      setSelectedReqId('')
+      setSummary('')
+      setPreview(null)
+    }
+  }, [selectedReqId, reqIdsNationallySubmitted])
 
   useEffect(() => {
     if (!selectedReqId) {
@@ -87,8 +134,10 @@ export function FederalCompilationPage() {
     [responses, selectedReqId],
   )
 
-  const viewResponseKey = useMemo(() => responseListSignature(selectedResponses), [selectedResponses])
-  const includedSet = useMemo(() => new Set(includedResponseIds), [includedResponseIds])
+  const tasksForViewingResponse = useMemo(() => {
+    if (!viewingResponse) return []
+    return deptTasks.filter((t) => t.req_id === viewingResponse.req_id).sort(sortTasksByDept)
+  }, [deptTasks, viewingResponse])
 
   const responseCounts = useMemo(() => {
     const counts = { pending: 0, accepted: 0, needs_modification: 0, rejected: 0 }
@@ -105,35 +154,6 @@ export function FederalCompilationPage() {
   const canPersistCompilation = Boolean(
     selectedReqId && preview && preview.region_names.length > 0,
   )
-
-  const prefillSummary = useMemo(() => {
-    const picked = selectedResponses.filter((r) => includedSet.has(r.id))
-    if (!picked.length) return ''
-    return picked
-      .map((r) => {
-        const status = reviewStatusPresentation(r.review_status)
-        return (
-          `[${r.req_id}] [${r.region_name ?? 'Unknown region'}]` +
-          `\nReview: ${status.label}` +
-          `\n${r.content?.trim() || 'No response content.'}`
-        )
-      })
-      .join('\n\n')
-  }, [selectedResponses, includedSet])
-
-  useEffect(() => {
-    if (!selectedReqId) {
-      setIncludedResponseIds([])
-      return
-    }
-    setIncludedResponseIds(selectedResponses.map((r) => r.id))
-  }, [selectedReqId, viewResponseKey])
-
-  function toggleResponseInclusion(responseId: string) {
-    setIncludedResponseIds((prev) =>
-      prev.includes(responseId) ? prev.filter((id) => id !== responseId) : [...prev, responseId],
-    )
-  }
 
   async function save(status: 'draft' | 'submitted') {
     if (!selectedReq || !preview || preview.region_names.length === 0) {
@@ -156,12 +176,15 @@ export function FederalCompilationPage() {
       setSummary('')
       setSelectedReqId('')
       setPreview(null)
+      void fetchCompiledRecords().then(setCompiledRecords).catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save')
     } finally {
       setSaving(null)
     }
   }
+
+  const fromCompiledRecords = isFromCompiledRecordsPath(searchParams.get('from'))
 
   return (
     <PageSection
@@ -170,10 +193,13 @@ export function FederalCompilationPage() {
         <>
           National record: only <strong>accepted</strong> regional compilations count toward the preview below. Review and accept
           each province’s submission in <Link to="/responses">Regional responses</Link>, then prefill from those responses here.
-          Saved records appear under <Link to="/compiled-records">Compiled records</Link>.
+          Saved records appear under <Link to="/compiled-records">Compilation records</Link>.
         </>
       }
     >
+      {fromCompiledRecords && selectedReqId ? (
+        <CompiledRecordsWorkflowNav reqId={selectedReqId} activeTab="compilation" />
+      ) : null}
       {error && <p className="login-error">{error}</p>}
       <div style={{ marginTop: 16 }}>
         <StatsCards
@@ -187,9 +213,16 @@ export function FederalCompilationPage() {
       </div>
       <TableCard padded>
         <label className="muted">HR request</label>
-        {requestsForSelect.length === 0 ? (
+        {requestsForSelect.length === 0 && reqIdsWithResponses.length === 0 ? (
           <p className="muted" style={{ margin: '8px 0 12px', fontSize: 13 }}>
-            No regional compilations are in the system yet for any request. Provinces submit from <Link to="/region-compilation">Response compilation</Link>, then return here to build the national record.
+            No regional compilations are in the system yet for any request. Provinces submit from{' '}
+            <Link to="/region-compilation">Response compilation</Link>, then return here to build the national record.
+          </p>
+        ) : null}
+        {requestsForSelect.length === 0 && reqIdsWithResponses.length > 0 ? (
+          <p className="muted" style={{ margin: '8px 0 12px', fontSize: 13 }}>
+            Every request with regional data has already been <strong>submitted to the ministry</strong> from this center.
+            Open <Link to="/compiled-records">Compilation records</Link> to review saved national records.
           </p>
         ) : null}
         <select
@@ -258,85 +291,46 @@ export function FederalCompilationPage() {
             ) : (
               <>
                 <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>
-                  <strong>{selectedResponses.length}</strong> regional response{selectedResponses.length === 1 ? '' : 's'} —{' '}
-                  <strong>{selectedResponses.filter((r) => includedSet.has(r.id)).length}</strong> included in draft prefill.
+                  <strong>{selectedResponses.length}</strong> regional response{selectedResponses.length === 1 ? '' : 's'} for
+                  this request. Open a row to read the provincial compilation; the ministry summary below is written only by
+                  federal staff (regional text is not copied in automatically).
                 </p>
-                <div
-                  className="compilation-dept-toolbar"
-                  style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginBottom: 10 }}
-                >
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => setIncludedResponseIds(selectedResponses.map((r) => r.id))}
-                  >
-                    Select all
-                  </button>
-                  <button type="button" className="link-button" onClick={() => setIncludedResponseIds([])}>
-                    Clear all
-                  </button>
-                </div>
                 <div className="compilation-dept-status-grid" style={{ marginBottom: 10 }}>
                   {selectedResponses.map((r) => {
                     const review = reviewStatusPresentation(r.review_status)
-                    const checked = includedSet.has(r.id)
                     return (
-                      <label
-                        key={r.id}
-                        className="compilation-dept-status-row"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          padding: '8px 10px',
-                          border: '1px solid var(--field-border, #e1e7f5)',
-                          borderRadius: 8,
-                          marginBottom: 6,
-                          background: '#fafbfd',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleResponseInclusion(r.id)}
-                          aria-label={`Include ${r.region_name ?? 'region'} in national compilation for ${r.req_id}`}
-                        />
-                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>
-                          <span className="muted small" style={{ display: 'block', fontWeight: 500 }}>
-                            {r.title?.trim() || r.req_id}
+                      <div key={r.id} className="compilation-dept-status-row">
+                        <button
+                          type="button"
+                          className="compilation-dept-status-row__body"
+                          onClick={() => setViewingResponse(r)}
+                          title="View provincial compilation"
+                        >
+                          <span className="compilation-dept-status-row__label compilation-dept-status-row__label--stacked">
+                            <span className="compilation-dept-status-row__title-sub muted small">
+                              {r.title?.trim() || r.req_id}
+                            </span>
+                            <span className="compilation-dept-status-row__dept">
+                              {r.region_name ?? 'Unknown region'}
+                            </span>
                           </span>
-                          {r.region_name ?? 'Unknown region'}
-                        </span>
-                        <StatusBadge tone={review.tone}>{review.label}</StatusBadge>
-                      </label>
+                          <StatusBadge tone={review.tone}>{review.label}</StatusBadge>
+                        </button>
+                      </div>
                     )
                   })}
                 </div>
-                <Button
-                  variant="secondary"
-                  compact
-                  disabled={includedResponseIds.length === 0}
-                  onClick={() => setSummary(prefillSummary)}
-                >
-                  {summary.trim() ? 'Replace summary from selected responses' : 'Prefill from selected responses'}
-                </Button>
-                {includedResponseIds.length === 0 && (
-                  <p className="muted" style={{ margin: '8px 0 0', fontSize: 12 }}>
-                    Select at least one response to build summary text.
-                  </p>
-                )}
               </>
             )}
           </div>
         )}
-        <label className="muted">Compilation summary</label>
+        <label className="muted">Federal summary for ministry</label>
         <textarea
           rows={8}
           style={{ width: '100%', marginTop: 6 }}
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          placeholder="Write a national compilation summary..."
+          placeholder="Write the federal administrator’s summary for ministry submission. Provincial narratives are not filled in here automatically—use each regional row above for source material."
         />
         <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
           <Button
@@ -362,6 +356,13 @@ export function FederalCompilationPage() {
           ) : null}
         </div>
       </TableCard>
+
+      <RegionalResponsePreviewModal
+        row={viewingResponse}
+        tasksForDetail={tasksForViewingResponse}
+        onClose={() => setViewingResponse(null)}
+        introText="Provincial consolidated response received for national compilation. Department submissions below are limited to this region."
+      />
     </PageSection>
   )
 }

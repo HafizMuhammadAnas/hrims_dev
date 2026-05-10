@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../api/lists'
 import { updateRegionalReview } from '../api/workflows'
 import { useAuth } from '../auth/AuthContext'
+import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../components/CompiledRecordsWorkflowNav'
 import { DepartmentSubmissionsForRequest } from '../components/DepartmentSubmissionsForRequest'
 import { Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
-import { ModalActions, ModalHeader } from '../components/ui/ModalChrome'
+import { ModalActions } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { SortColumnHeader } from '../components/ui/SortColumnHeader'
@@ -37,8 +38,16 @@ function federalReviewTone(
   return 'pending'
 }
 
+function formatReviewStatusLabel(status: string): string {
+  if (status === 'needs-modification') return 'Needs modification'
+  const s = status.replace(/-/g, ' ')
+  if (!s) return status
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 export function RegionalResponsesPage() {
   const { user } = useAuth()
+  const location = useLocation()
   const notify = useNotify()
   const federal = isFederalAdmin(user)
   const superUser = isSuperAdmin(user)
@@ -52,7 +61,6 @@ export function RegionalResponsesPage() {
     initialSortDir: 'desc',
   })
   const [viewing, setViewing] = useState<RegionalResponseRow | null>(null)
-  const [reviewStatus, setReviewStatus] = useState<ReviewStatus>('pending')
   const [reviewComments, setReviewComments] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -95,6 +103,10 @@ export function RegionalResponsesPage() {
 
   const statusFilter = filters.status ?? ''
   const reqIdFilter = filters.reqId ?? ''
+
+  const fromWorkflow = searchParams.get('from') ?? ''
+  const workflowReqId = (reqIdFromUrl || reqIdFilter).trim()
+  const showCompiledWorkflowNav = isFromCompiledRecordsPath(fromWorkflow) && Boolean(workflowReqId)
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -148,12 +160,8 @@ export function RegionalResponsesPage() {
   )
 
   function openView(row: RegionalResponseRow) {
+    setError(null)
     setViewing(row)
-    setReviewStatus(
-      REVIEW_STATUSES.includes(row.review_status as ReviewStatus)
-        ? (row.review_status as ReviewStatus)
-        : 'pending',
-    )
     setReviewComments(row.comments ?? '')
   }
 
@@ -180,12 +188,24 @@ export function RegionalResponsesPage() {
     }
   }
 
-  async function saveReview() {
-    await persistReview(reviewStatus, reviewComments)
-  }
-
   async function acceptResponse() {
     await persistReview('accepted', reviewComments)
+  }
+
+  async function requestModification() {
+    if (!reviewComments.trim()) {
+      setError('Add feedback for the region when requesting modification.')
+      return
+    }
+    await persistReview('needs-modification', reviewComments)
+  }
+
+  async function rejectResponse() {
+    if (!reviewComments.trim()) {
+      setError('Add a short note to the region when rejecting.')
+      return
+    }
+    await persistReview('rejected', reviewComments)
   }
 
   function exportCsv() {
@@ -215,6 +235,9 @@ export function RegionalResponsesPage() {
         </>
       }
     >
+      {showCompiledWorkflowNav ? (
+        <CompiledRecordsWorkflowNav reqId={workflowReqId} activeTab="responses" />
+      ) : null}
       {error && (
         <Alert variant="error" title="Action required" onDismiss={() => setError(null)}>
           {error}
@@ -327,28 +350,40 @@ export function RegionalResponsesPage() {
       {viewing && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setViewing(null)}>
           <div
-            className="modal-card modal-card-wide regional-responses-full-modal"
+            className="modal-card modal-card-wide regional-responses-full-modal regional-response-detail-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <ModalHeader
-              title={`HR request ${viewing.req_id}`}
-              onClose={() => setViewing(null)}
-            />
-            <div className="modal-form">
-              <p className="muted" style={{ marginTop: 0 }}>
-                Consolidated regional compilations and underlying department submissions for this request.
-                Federal review applies to one region at a time (highlighted below).
+            <div className="modal-head dept-task-response-modal__head">
+              <div>
+                <h3>Regional responses</h3>
+                <p className="dept-task-response-modal__head-meta muted small">
+                  Request <strong>{viewing.req_id}</strong> ·{' '}
+                  <strong>{allResponsesForRequest.length}</strong> provincial compilation
+                  {allResponsesForRequest.length === 1 ? '' : 's'}
+                  <br />
+                  <span className="muted">The highlighted card is the one you opened. Switch region below if needed.</span>
+                </p>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setViewing(null)} aria-label="Close">
+                ×
+              </button>
+            </div>
+
+            <div className="modal-form regional-response-detail-modal__form">
+              <p className="muted small regional-response-detail-modal__intro" style={{ marginTop: 0 }}>
+                Each card is one province&apos;s consolidated submission and underlying department inputs. Use the actions at
+                the bottom of the highlighted card to record federal review — no separate status menu.
               </p>
-              <p style={{ margin: '0 0 16px' }}>
+              <p style={{ margin: '0 0 12px' }}>
                 <Link
                   className="btn btn-secondary btn-compact"
-                  to={`/requests/${encodeURIComponent(viewing.req_id)}?from=${encodeURIComponent('/responses')}`}
+                  to={`/requests/${encodeURIComponent(viewing.req_id)}?from=${encodeURIComponent(location.pathname)}`}
                 >
-                  Open full HR request record
+                  Open full HR request
                 </Link>
               </p>
 
-              <div className="regional-responses-stacked">
+              <div className="dept-task-response-modal__panel regional-response-detail-modal__panel regional-responses-stacked">
                 {allResponsesForRequest.map((resp) => {
                   const isFocus = resp.id === viewing.id
                   return (
@@ -363,50 +398,89 @@ export function RegionalResponsesPage() {
                         </h3>
                         <div className="regional-request-region-card__badges">
                           <StatusBadge tone={federalReviewTone(resp.review_status)}>
-                            Federal: {resp.review_status.replace('-', ' ')}
+                            {formatReviewStatusLabel(resp.review_status)}
                           </StatusBadge>
                           {isFocus ? (
-                            <span className="regional-request-region-card__pill">Federal review target</span>
+                            <span className="regional-request-region-card__pill">Review target</span>
                           ) : null}
                         </div>
                       </div>
 
-                      <div className="form-grid regional-request-region-card__meta">
-                        <div className="form-row">
-                          <label>Response ID</label>
-                          <input value={resp.id} readOnly disabled />
-                        </div>
-                        <div className="form-row">
-                          <label>Title</label>
-                          <input value={resp.title} readOnly disabled />
-                        </div>
-                        <div className="form-row">
-                          <label>Submitted</label>
-                          <input value={resp.submission_date} readOnly disabled />
-                        </div>
-                        {resp.comments ? (
-                          <div className="form-row">
-                            <label>Existing federal feedback (read-only)</label>
-                            <textarea readOnly rows={2} value={resp.comments} />
+                      <section
+                        className="hr-request-view-template__card regional-response-detail-modal__section"
+                        style={{ marginBottom: 14 }}
+                      >
+                        <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
+                          Overview
+                        </h2>
+                        <div className="regional-response-detail-modal__grid">
+                          <div>
+                            <div className="hr-request-view-template__field-label">Response ID</div>
+                            <p className="regional-response-detail-modal__value">{resp.id}</p>
                           </div>
-                        ) : null}
-                      </div>
+                          <div>
+                            <div className="hr-request-view-template__field-label">Submitted</div>
+                            <p className="regional-response-detail-modal__value">{resp.submission_date}</p>
+                          </div>
+                          <div className="regional-response-detail-modal__grid-full">
+                            <div className="hr-request-view-template__field-label">Compilation title</div>
+                            <p className="regional-response-detail-modal__value">{resp.title || '—'}</p>
+                          </div>
+                          <div>
+                            <div className="hr-request-view-template__field-label">Federal review</div>
+                            <p className="regional-response-detail-modal__value" style={{ marginBottom: 0 }}>
+                              <StatusBadge tone={federalReviewTone(resp.review_status)}>
+                                {formatReviewStatusLabel(resp.review_status)}
+                              </StatusBadge>
+                            </p>
+                          </div>
+                        </div>
+                      </section>
 
-                      <DepartmentSubmissionsForRequest
-                        tasksForDetail={tasksForViewing}
-                        reqId={viewing.req_id}
-                        filterByRegionName={resp.region_name}
-                      />
+                      {resp.comments?.trim() ? (
+                        <section
+                          className="hr-request-view-template__card regional-response-detail-modal__section"
+                          style={{ marginBottom: 14 }}
+                          aria-labelledby={`fed-prev-${resp.id}`}
+                        >
+                          <h2 id={`fed-prev-${resp.id}`} className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
+                            Federal feedback on record
+                          </h2>
+                          <div className="regional-response-detail-modal__feedback">{resp.comments.trim()}</div>
+                        </section>
+                      ) : null}
 
-                      <div className="form-row" style={{ marginTop: 12 }}>
-                        <label>Compiled regional response</label>
-                        <textarea
-                          readOnly
-                          rows={10}
-                          value={resp.content?.trim() ? resp.content : '—'}
-                          style={{ width: '100%', boxSizing: 'border-box' }}
+                      <section
+                        className="hr-request-view-template__card regional-response-detail-modal__section"
+                        style={{ marginBottom: 14 }}
+                      >
+                        <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
+                          Department submissions
+                        </h2>
+                        <DepartmentSubmissionsForRequest
+                          tasksForDetail={tasksForViewing}
+                          reqId={viewing.req_id}
+                          filterByRegionName={resp.region_name}
+                          omitHeading
                         />
-                      </div>
+                      </section>
+
+                      <section className="hr-request-view-template__card regional-response-detail-modal__section">
+                        <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
+                          Compiled regional response
+                        </h2>
+                        <div className="hr-request-view-template__prose-box">
+                          {resp.content?.trim() ? (
+                            <p className="hr-request-view-template__prose" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                              {resp.content.trim()}
+                            </p>
+                          ) : (
+                            <p className="muted" style={{ margin: 0 }}>
+                              —
+                            </p>
+                          )}
+                        </div>
+                      </section>
 
                       {!isFocus && canReviewFederal && (
                         <div className="regional-request-region-card__switch">
@@ -418,52 +492,61 @@ export function RegionalResponsesPage() {
 
                       {isFocus && canReviewFederal && (
                         <div className="regional-request-region-card__federal">
-                          <h4 className="regional-request-region-card__federal-title">Federal review (this region)</h4>
-                          <div className="form-grid">
-                            <div className="form-row">
-                              <label>Review status</label>
-                              <select
-                                value={reviewStatus}
-                                onChange={(e) => setReviewStatus(e.target.value as ReviewStatus)}
-                              >
-                                {REVIEW_STATUSES.map((s) => (
-                                  <option key={s} value={s}>
-                                    {s}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="form-row">
-                              <label>Federal feedback</label>
-                              <textarea
-                                rows={4}
-                                value={reviewComments}
-                                onChange={(e) => setReviewComments(e.target.value)}
-                                placeholder="Comments to the region (e.g. modification instructions)…"
-                              />
-                            </div>
-                          </div>
-                          {viewing.review_status !== 'accepted' && (
-                            <div className="regional-response-accept-panel">
-                              <Button
-                                variant="primary"
-                                compact
-                                type="button"
-                                disabled={saving}
-                                onClick={() => void acceptResponse()}
-                              >
-                                {saving ? 'Saving…' : 'Accept response'}
-                              </Button>
-                              <p className="muted small" style={{ margin: 0 }}>
-                                Accept records this regional compilation as approved for national compilation.
-                              </p>
-                            </div>
-                          )}
-                          {viewing.review_status === 'accepted' && (
-                            <p className="muted small" style={{ marginTop: 12 }}>
-                              Already <strong>accepted</strong>. Change the status above and use <strong>Save review</strong> if
-                              needed.
+                          <h4 className="hr-request-view-template__section-title" style={{ fontSize: 14, marginBottom: 12 }}>
+                            Federal review — {resp.region_name ?? 'this region'}
+                          </h4>
+                          {resp.review_status === 'accepted' ? (
+                            <p className="muted small" style={{ margin: 0 }}>
+                              This response is <strong>accepted</strong> and is eligible for national compilation. Further
+                              federal actions are not available unless the record is changed elsewhere in the workflow.
                             </p>
+                          ) : (
+                            <>
+                              <div className="form-row">
+                                <label htmlFor="regional-fed-review-comments">Feedback to the region</label>
+                                <textarea
+                                  id="regional-fed-review-comments"
+                                  rows={5}
+                                  value={reviewComments}
+                                  onChange={(e) => setReviewComments(e.target.value)}
+                                  placeholder="Use this box for acceptance notes, modification instructions, or rejection reasons. Request modification and rejection require text here."
+                                  style={{ width: '100%', boxSizing: 'border-box' }}
+                                />
+                              </div>
+                              <div className="regional-response-federal-actions">
+                                <Button
+                                  variant="primary"
+                                  compact
+                                  type="button"
+                                  disabled={saving}
+                                  onClick={() => void acceptResponse()}
+                                >
+                                  {saving ? 'Saving…' : 'Accept response'}
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  compact
+                                  type="button"
+                                  disabled={saving}
+                                  onClick={() => void requestModification()}
+                                >
+                                  {saving ? 'Saving…' : 'Request modification'}
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  compact
+                                  type="button"
+                                  disabled={saving}
+                                  onClick={() => void rejectResponse()}
+                                >
+                                  {saving ? 'Saving…' : 'Reject'}
+                                </Button>
+                              </div>
+                              <p className="muted small" style={{ margin: '12px 0 0' }}>
+                                <strong>Accept</strong> approves this province for national compilation. <strong>Request
+                                modification</strong> and <strong>Reject</strong> require feedback in the box above.
+                              </p>
+                            </>
                           )}
                         </div>
                       )}
@@ -476,11 +559,6 @@ export function RegionalResponsesPage() {
                 <Button variant="secondary" compact onClick={() => setViewing(null)}>
                   Close
                 </Button>
-                {canReviewFederal && (
-                  <Button variant="primary" compact disabled={saving} onClick={() => void saveReview()}>
-                    {saving ? 'Saving...' : 'Save review'}
-                  </Button>
-                )}
               </ModalActions>
             </div>
           </div>

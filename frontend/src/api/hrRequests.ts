@@ -1,9 +1,14 @@
 import { apiJsonHeaders, apiMultipartHeaders, ensureCsrfCookie } from './client'
 import { ApiError, parseApiErrorResponse } from './apiError'
 import type { HrRequestIssueDetail, HrRequestRow } from '../types/hrRequest'
+import { coerceHrRequestStatus } from '../types/hrRequest'
 
 async function throwIfNotOk(res: Response): Promise<void> {
   if (!res.ok) throw new ApiError(await parseApiErrorResponse(res))
+}
+
+function withCoercedStatus(row: HrRequestRow): HrRequestRow {
+  return { ...row, status: coerceHrRequestStatus(row.status) }
 }
 
 export type KnowledgeConventionRow = {
@@ -67,7 +72,7 @@ export async function fetchHrRequests(): Promise<HrRequestRow[]> {
   })
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: HrRequestRow[] }
-  return json.data
+  return json.data.map(withCoercedStatus)
 }
 
 export async function fetchHrRequest(id: string): Promise<HrRequestRow> {
@@ -77,7 +82,7 @@ export async function fetchHrRequest(id: string): Promise<HrRequestRow> {
   })
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: HrRequestRow }
-  return json.data
+  return withCoercedStatus(json.data)
 }
 
 export type HrRequestIndicatorResponseInput = {
@@ -133,7 +138,7 @@ export async function createHrRequestFromIssueForm(
   })
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: HrRequestRow }
-  return json.data
+  return withCoercedStatus(json.data)
 }
 
 /** @deprecated Legacy JSON create (tests / old clients). Prefer `createHrRequestFromIssueForm`. */
@@ -173,7 +178,7 @@ export async function createHrRequest(body: HrRequestWriteBody & { id: string })
   })
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: HrRequestRow }
-  return json.data
+  return withCoercedStatus(json.data)
 }
 
 export type HrRequestPatchBody = {
@@ -206,7 +211,7 @@ export async function updateHrRequest(id: string, body: HrRequestPatchBody): Pro
   })
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: HrRequestRow }
-  return json.data
+  return withCoercedStatus(json.data)
 }
 
 export async function deleteHrRequest(id: string): Promise<void> {

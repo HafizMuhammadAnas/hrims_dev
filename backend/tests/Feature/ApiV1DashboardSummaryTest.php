@@ -41,7 +41,7 @@ class ApiV1DashboardSummaryTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'due_date' => now()->subDay()->toDateString(),
-            'status' => 'pending',
+            'status' => 'draft',
             'details' => null,
         ]);
 

@@ -1,11 +1,21 @@
 @import './styles/theme.css';
 
+/* Reserve space for the vertical scrollbar so width doesn’t jump when modals lock scroll. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
   background: #f5f5f5;
   color: var(--txt);
+}
+
+/* When any modal is open, keep the shell from scrolling behind it (avoids “broken” double-scroll / layout shift). */
+body:has(.modal-overlay) {
+  overflow: hidden;
 }
 
 .muted {
@@ -535,6 +545,25 @@ body {
 .table-card-padded {
   padding: 16px;
 }
+
+/* Light card body: default secondary is white-label for dark chrome; primary is full-width for forms. */
+.table-card .btn.btn-secondary {
+  background: #fff;
+  color: var(--solid-blue);
+  border: 1px solid #cfd9f3;
+  width: auto;
+}
+
+.table-card .btn.btn-secondary:hover:not(:disabled) {
+  background: #f5f9ff;
+  border-color: #b8ccff;
+  color: var(--solid-blue-hover);
+}
+
+.table-card .btn.btn-primary {
+  width: auto;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -693,7 +722,8 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  z-index: 1000;
+  /* Above sticky header (1000) and sidebar (900); below notifications (1100) and toasts (1200). */
+  z-index: 1090;
   padding: 24px;
   padding-top: max(24px, env(safe-area-inset-top, 0px));
   box-sizing: border-box;
@@ -762,6 +792,340 @@ body {
   background: rgba(255, 255, 255, 0.35);
 }
 
+button.compiled-record-modal-tab {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.compiled-record-modal-tab--active {
+  background: #fff;
+  color: #2e4fa3;
+  border-color: #c8d4ec;
+  box-shadow: 0 -1px 0 #fff;
+}
+
+/* Same tab strip as compilation-record modal, embedded on full pages when drilling in from that list. */
+.compiled-records-page-workflow-nav {
+  margin: 0 0 16px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.compiled-record-region-block {
+  margin-bottom: 18px;
+}
+
+.compiled-record-region-block:last-child {
+  margin-bottom: 0;
+}
+
+.compiled-record-region-block__title {
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.compiled-record-region-block__responses-label {
+  margin-top: 8px;
+  margin-bottom: 2px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.compiled-record-regional-response-list {
+  margin: 4px 0 0;
+  padding-left: 1.25rem;
+  list-style-type: disc;
+}
+
+.compiled-record-regional-response-list li {
+  margin-bottom: 10px;
+}
+
+.compiled-record-regional-response-list__text {
+  white-space: pre-wrap;
+}
+
+.compiled-record-dept-bullet__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--txt-muted, #5a6b8a);
+  margin-bottom: 4px;
+}
+
+.compiled-record-federal-summary-field {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  font: inherit;
+  line-height: 1.45;
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 8px;
+  background: var(--field-bg, #fafbfd);
+  color: var(--txt);
+  resize: vertical;
+  min-height: 120px;
+}
+
+.compiled-record-federal-summary-field:read-only {
+  cursor: default;
+}
+
+/* Regional compilation: department row — checkbox vs open submission */
+.compilation-dept-status-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 6px;
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 8px;
+  background: #fafbfd;
+  overflow: hidden;
+}
+
+.compilation-dept-status-row__check {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-right: 1px solid var(--field-border, #e1e7f5);
+  background: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.compilation-dept-status-row__body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  min-width: 0;
+  color: inherit;
+}
+
+.compilation-dept-status-row__body:hover {
+  background: rgba(232, 238, 251, 0.5);
+}
+
+.compilation-dept-status-row__body:focus-visible {
+  outline: 2px solid #2e4fa3;
+  outline-offset: -2px;
+}
+
+.compilation-dept-status-row__label {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.compilation-dept-status-row__label--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.compilation-dept-status-row__title-sub {
+  display: block;
+  font-weight: 500;
+  line-height: 1.35;
+  max-width: 100%;
+}
+
+.compilation-dept-status-row__region {
+  color: var(--txt-lt, #5a6b8a);
+  font-weight: 600;
+}
+
+.compilation-dept-status-row__sep {
+  color: var(--txt-lt, #5a6b8a);
+  font-weight: 500;
+}
+
+.compilation-dept-status-row__dept {
+  font-weight: 600;
+  color: var(--txt, #1a2233);
+}
+
+/* Department submission inspector (monitoring + compilation) */
+.dept-task-response-modal__head {
+  align-items: flex-start;
+}
+
+.dept-task-response-modal__head h3 {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.dept-task-response-modal__head-meta {
+  margin: 0;
+  line-height: 1.5;
+  max-width: 720px;
+}
+
+.dept-task-response-modal__tabs {
+  padding-top: 8px;
+}
+
+.dept-task-response-modal__body {
+  padding-top: 12px;
+}
+
+.dept-task-response-modal__panel {
+  max-height: min(58vh, 560px);
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-bottom: 4px;
+}
+
+.dept-task-response-modal__block-label {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: var(--txt, #1a2233);
+}
+
+.dept-task-response-modal__response-block {
+  margin-bottom: 8px;
+}
+
+/* Same card layout as department portal — nested in scroll panel */
+.dept-task-response-modal__request-template .hr-request-view-template {
+  padding-bottom: 4px;
+}
+
+/* Regional compilation detail (submission history) — align with dept submission modal */
+.regional-response-detail-modal__form {
+  padding-top: 12px;
+}
+
+.regional-response-detail-modal__intro {
+  line-height: 1.5;
+}
+
+.regional-response-detail-modal__section {
+  margin-bottom: 16px;
+}
+
+.regional-response-detail-modal__section:last-child {
+  margin-bottom: 6px;
+}
+
+.regional-response-detail-modal__grid {
+  display: grid;
+  gap: 14px 24px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 560px) {
+  .regional-response-detail-modal__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.regional-response-detail-modal__grid-full {
+  grid-column: 1 / -1;
+}
+
+.regional-response-federal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.regional-response-detail-modal__value {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--txt, #1a2233);
+}
+
+.regional-response-detail-modal__feedback {
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--theme-surface-blue, #e8eefb);
+  border: 1px solid #c8d4ec;
+}
+
+/* Embedded federal request template inside regional compilation preview */
+.regional-preview-embedded-request {
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 8px 8px 2px;
+  margin: 0 -4px 0 0;
+  border-radius: 10px;
+  border: 1px solid var(--field-border, #e1e7f5);
+  background: var(--field-bg-soft, #f0f4f8);
+  box-sizing: border-box;
+}
+
+.regional-preview-embedded-request .hr-request-view-template {
+  padding-top: 4px;
+}
+
+.dept-response-attachment-btn {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 2px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2e4fa3;
+  background: linear-gradient(to bottom, #f0f4fd, #e8eefb);
+  border: 1px solid #c8d4ec;
+  border-radius: 8px;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.dept-response-attachment-btn:hover {
+  background: #fff;
+  border-color: #2e4fa3;
+  color: #243f8a;
+}
+
+.dept-response-attachment-btn__action {
+  font-weight: 700;
+}
+
+.dept-response-attachment-btn__name {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--txt-lt, #5a6b8a);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Full-page request view (no overlay) — beat .modal-card max-height (incl. 92vh in mobile media query). */
 .modal-card.hr-request-modal--page {
   max-width: min(960px, 100%);
@@ -810,6 +1174,228 @@ body {
   word-break: break-word;
   max-height: none;
   overflow: visible;
+}
+
+/* HR request read-only view (card template) */
+.hr-request-view-template {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 4px 8px;
+}
+
+.hr-request-view-template__hero {
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  box-sizing: border-box;
+}
+
+.hr-request-view-template__hero-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hr-request-view-template__kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--txt-lt);
+  margin-bottom: 4px;
+}
+
+.hr-request-view-template__req-id {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--txt);
+  line-height: 1.2;
+}
+
+.hr-request-view-template__title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 14px 0 16px;
+  line-height: 1.25;
+  color: var(--txt);
+}
+
+.hr-request-view-template__meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  font-size: 14px;
+  color: var(--txt);
+}
+
+.hr-request-view-template__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hr-request-view-template__meta-icon {
+  flex-shrink: 0;
+  color: var(--txt-lt);
+}
+
+.hr-request-view-template__card {
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  padding: 18px 20px 20px;
+  box-sizing: border-box;
+}
+
+.hr-request-view-template__section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--txt-lt);
+  margin: 0 0 14px;
+}
+
+.hr-request-view-template__grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+}
+
+@media (max-width: 640px) {
+  .hr-request-view-template__grid2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hr-request-view-template__grid2-full {
+  grid-column: 1 / -1;
+}
+
+.hr-request-view-template__field-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--txt-lt);
+  margin-bottom: 6px;
+}
+
+.hr-request-view-template__field-value {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--txt);
+}
+
+.hr-request-view-template__prose-box {
+  background: var(--field-bg-soft);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  padding: 14px 16px;
+  box-sizing: border-box;
+}
+
+.hr-request-view-template__prose {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--txt);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.hr-request-view-template__article-pills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hr-request-view-template__article-pill {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--theme-primary);
+  color: var(--theme-primary);
+  font-size: 13px;
+  font-weight: 500;
+  background: rgba(46, 79, 163, 0.06);
+}
+
+.hr-request-view-template__indicators-box {
+  background: var(--field-bg-soft);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  padding: 14px 16px;
+  box-sizing: border-box;
+}
+
+.hr-request-view-template__indicator-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hr-request-view-template__indicator-item + .hr-request-view-template__indicator-item {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--field-border);
+}
+
+.hr-request-view-template__indicator-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.hr-request-view-template__check {
+  flex-shrink: 0;
+  color: var(--solid-teal);
+  margin-top: 2px;
+}
+
+.hr-request-view-template__indicator-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.hr-request-view-template__indicator-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.hr-request-view-template__indicator-text {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--txt);
+  line-height: 1.35;
+}
+
+.hr-request-view-template__type-pill {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #c2410c;
+  color: #c2410c;
+  background: rgba(194, 65, 12, 0.06);
+}
+
+.hr-request-view-template__federal-values {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--field-border);
 }
 
 .hr-request-view-stack .hr-request-modal--page {
@@ -1493,6 +2079,23 @@ body {
   background: var(--theme-surface-brown);
   color: var(--txt);
   border: 1px solid var(--bdr);
+}
+
+/*
+ * Default .btn-secondary is for dark header/chrome (white label text). Modal bodies are light —
+ * without this, secondary actions (e.g. “Request modification”) are effectively invisible.
+ */
+.modal-card .btn.btn-secondary {
+  background: #fff;
+  color: var(--solid-blue);
+  border: 1px solid #cfd9f3;
+  width: auto;
+}
+
+.modal-card .btn.btn-secondary:hover:not(:disabled) {
+  background: #f5f9ff;
+  border-color: #b8ccff;
+  color: var(--solid-blue-hover);
 }
 
 /* Knowledge hub */
@@ -2212,6 +2815,35 @@ body {
 .review-responses-toolbar__export {
   margin-left: auto;
   flex-shrink: 0;
+}
+
+.compiled-records-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.compiled-records-toolbar input[type='search'] {
+  flex: 1 1 280px;
+  min-width: 240px;
+  max-width: 420px;
+}
+
+.compiled-records-toolbar select {
+  flex: 0 0 180px;
+  width: 180px;
+  min-width: 160px;
+  max-width: 200px;
+}
+
+.compiled-records-toolbar .btn.btn-secondary {
+  background: #fff;
+  color: var(--solid-blue);
+  border-color: #cfd9f3;
+}
+
+.compiled-records-toolbar .btn.btn-secondary:hover:not(:disabled) {
+  background: #f5f9ff;
+  border-color: #b8ccff;
 }
 
 .user-management-toolbar {

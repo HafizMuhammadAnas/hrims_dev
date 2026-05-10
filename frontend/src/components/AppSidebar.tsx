@@ -111,10 +111,10 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
           <>
             <div className="nav-section-title">Federal actions</div>
             <div className="nav-sub">
-              <NavItem to="/requests" icon={Send} label="Regional requests" onPick={onPick} />
+              <NavItem to="/requests" icon={Send} label="Request management" onPick={onPick} />
               <NavItem to="/responses" icon={Inbox} label="Regional responses" onPick={onPick} />
               <NavItem to="/compilation" icon={Layers} label="Compilation center" onPick={onPick} />
-              <NavItem to="/compiled-records" icon={FileCheck} label="Compiled records" onPick={onPick} />
+              <NavItem to="/compiled-records" icon={FileCheck} label="Compilation records" onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label="User management" onPick={onPick} />
               <NavItem to="/federal-departments-mgmt" icon={Building2} label="Manage departments" onPick={onPick} />
             </div>

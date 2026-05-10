@@ -44,7 +44,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'date' => now()->format('Y-m-d'),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
 
         $response->assertForbidden();
@@ -64,7 +64,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $sindh->id,
             'date' => now()->format('Y-m-d'),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
 
         $response->assertForbidden();
@@ -83,7 +83,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'date' => now()->format('Y-m-d'),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
 
         $response->assertCreated();
@@ -107,7 +107,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $sindh->id,
             'due_date' => now(),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
 
         $response = $this->actingAs($user)->patchJson('/api/v1/hr-requests/REQ-TEST-SINDH', [
@@ -131,7 +131,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $sindh->id,
             'due_date' => now(),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
 
         $response = $this->actingAs($user)->patchJson('/api/v1/hr-requests/REQ-TEST-FED-PATCH', [
@@ -165,7 +165,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'due_date' => now(),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
         HrRequest::query()->create([
             'id' => 'REQ-DEPT-B',
@@ -173,7 +173,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'due_date' => now(),
-            'status' => 'pending',
+            'status' => 'draft',
         ]);
 
         DepartmentTask::query()->create([

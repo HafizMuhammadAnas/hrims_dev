@@ -55,10 +55,8 @@ const PASTEL_TABLE_ONGOING = '#9A7340'
 const PASTEL_TABLE_ACCOMPLISHED = '#559A72'
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: '#E0A55C',
-  'in-progress': '#6B96C8',
-  completed: '#6BB89A',
-  overdue: '#D97D90',
+  draft: '#E0A55C',
+  active: '#6BB89A',
 }
 
 type DraftFilters = {
@@ -370,8 +368,8 @@ export function AnalysisPage() {
         const total = list.length
         const respCount = list.filter((r) => hasResp.has(r.id)).length
         const compliance = total ? Math.min(100, Math.round((respCount / total) * 100)) : 0
-        const ongoing = list.filter((x) => x.status === 'pending' || x.status === 'in-progress').length
-        const accomplished = list.filter((x) => x.status === 'completed').length
+        const ongoing = list.filter((x) => x.status === 'draft').length
+        const accomplished = list.filter((x) => x.status === 'active').length
         return { name, records: total, compliance, ongoing, accomplished }
       })
       .sort((a, b) => b.records - a.records)
@@ -427,10 +425,8 @@ export function AnalysisPage() {
                 onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))}
               >
                 <option value="All">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="in-progress">In progress</option>
-                <option value="completed">Completed</option>
-                <option value="overdue">Overdue</option>
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
               </select>
             </div>
             <div className="analysis-field">
@@ -735,8 +731,8 @@ export function AnalysisPage() {
                     <th>Convention</th>
                     <th>Total records</th>
                     <th>Response coverage</th>
-                    <th>Active (pending / in progress)</th>
-                    <th>Completed</th>
+                    <th>Draft</th>
+                    <th>Active</th>
                   </tr>
                 </thead>
                 <tbody>

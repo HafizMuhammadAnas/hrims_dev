@@ -11,16 +11,20 @@ import { fetchRegions } from '../api/regions'
 import { createDepartmentTask, fetchDepartments, submitDepartmentTaskResponse, type DepartmentRow } from '../api/workflows'
 import { useAuth } from '../auth/AuthContext'
 import { canManageHrRequests, hrRequestLockedRegionId } from '../auth/rbac'
+import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../components/CompiledRecordsWorkflowNav'
+import { DepartmentResponseDisplay } from '../components/DepartmentResponseDisplay'
 import { HrRequestModal } from '../components/HrRequestModal'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { parseDepartmentTaskResponseData } from '../lib/departmentTaskResponseFormat'
 import {
   canDepartmentSubmitResponse,
   hasDepartmentResponse,
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
 import { isDepartmentAdmin, isRegionalAdmin, isViewer } from '../lib/roles'
+import { indicatorsScopedToRequest } from '../lib/hrRequestIndicatorScope'
 import type { HrRequestRow } from '../types/hrRequest'
 import type { RegionRow } from '../api/regions'
 
@@ -29,7 +33,20 @@ function pageBackLabel(from: string): string {
   if (from.includes('region-received')) return 'Back to received requests'
   if (from.includes('department-tasks')) return 'Back to assigned tasks'
   if (from.includes('department-history')) return 'Back to submission history'
+  if (from.includes('compiled-records')) return 'Back to compilation records'
   return 'Back to requests list'
+}
+
+type DeptIndicatorDraft = {
+  value: string
+  comment: string
+  qualText: string
+  quantFile: File | null
+  qualFile: File | null
+}
+
+function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
+  return { value: '', comment: '', qualText: '', quantFile: null, qualFile: null }
 }
 
 export function HrRequestViewPage() {
@@ -56,11 +73,13 @@ export function HrRequestViewPage() {
   const [departments, setDepartments] = useState<DepartmentRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [assignDeptIds, setAssignDeptIds] = useState<number[]>([])
+  const [assignRegionalNotes, setAssignRegionalNotes] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
 
   const [responseText, setResponseText] = useState('')
   const [responseFile, setResponseFile] = useState<File | null>(null)
+  const [indicatorDrafts, setIndicatorDrafts] = useState<Record<number, DeptIndicatorDraft>>({})
   const [submittingResponse, setSubmittingResponse] = useState(false)
   const [submitResponseError, setSubmitResponseError] = useState<string | null>(null)
 
@@ -159,17 +178,72 @@ export function HrRequestViewPage() {
     return tasks.find((t) => t.id === taskIdFromUrl && t.req_id === detail.id) ?? null
   }, [detail, taskIdFromUrl, tasks])
 
+  const deptIndicatorsForForm = useMemo(() => indicatorsScopedToRequest(detail), [detail])
+
+  const deptResponseDisplayScopeIds = useMemo(() => {
+    if (!detail || (detail.indicator_responses?.length ?? 0) === 0) return undefined
+    return indicatorsScopedToRequest(detail).map((i) => i.id)
+  }, [detail])
+
   useEffect(() => {
     if (!activeTask) {
       setResponseText('')
       setResponseFile(null)
+      setIndicatorDrafts({})
       setSubmitResponseError(null)
       return
     }
-    setResponseText(activeTask.response_data?.trim() ? activeTask.response_data : '')
     setResponseFile(null)
     setSubmitResponseError(null)
-  }, [activeTask?.id, activeTask?.response_data])
+    const collecting = indicatorsScopedToRequest(detail)
+    if (collecting.length > 0) {
+      setResponseText('')
+      const parsed = parseDepartmentTaskResponseData(
+        activeTask.response_data,
+        activeTask.attachment_url,
+      )
+      const next: Record<number, DeptIndicatorDraft> = {}
+      for (const ind of collecting) {
+        let value = ''
+        let comment = ''
+        let qualText = ''
+        if (parsed.kind === 'structured') {
+          const b = parsed.payload.by_indicator[String(ind.id)]
+          if (b?.quantitative && b.quantitative.value != null && !Number.isNaN(b.quantitative.value)) {
+            value = String(b.quantitative.value)
+          }
+          if (b?.quantitative?.comment) comment = b.quantitative.comment
+          if (b?.qualitative?.text) qualText = b.qualitative.text
+        }
+        next[ind.id] = { ...emptyDeptIndicatorDraft(), value, comment, qualText }
+      }
+      setIndicatorDrafts(next)
+      return
+    }
+    setIndicatorDrafts({})
+    setResponseText(activeTask.response_data?.trim() ? activeTask.response_data : '')
+  }, [activeTask?.id, activeTask?.response_data, activeTask?.attachment_url, detail])
+
+  const indicatorFormReady = useMemo(() => {
+    if (deptIndicatorsForForm.length === 0 || !activeTask) return true
+    const parsed = parseDepartmentTaskResponseData(activeTask.response_data, activeTask.attachment_url)
+    for (const ind of deptIndicatorsForForm) {
+      const d = indicatorDrafts[ind.id]
+      if (!d) return false
+      if (ind.has_quantitative) {
+        const v = d.value.trim()
+        if (!v || !Number.isFinite(Number(v))) return false
+      }
+      if (ind.has_qualitative) {
+        const prevQualUrl =
+          parsed.kind === 'structured'
+            ? parsed.payload.by_indicator[String(ind.id)]?.qualitative?.attachment_url?.trim()
+            : ''
+        if (!d.qualText.trim() && !d.qualFile && !prevQualUrl) return false
+      }
+    }
+    return true
+  }, [deptIndicatorsForForm, indicatorDrafts, activeTask])
 
   const showRegionalAssign =
     regionalUser &&
@@ -192,8 +266,9 @@ export function HrRequestViewPage() {
     hasDepartmentResponse(activeTask) &&
     !canDepartmentSubmitResponse(activeTask)
 
-  /** Always show on full request page so HR request → regional context → dept response flow is consistent. */
-  const showRegionalContextCard = Boolean(detail && !detailLoading)
+  const showRegionalContextCard = Boolean(
+    detail && !detailLoading && !from.includes('region-received') && !deptUser,
+  )
 
   const selectedAssignDepartmentsText = useMemo(() => {
     if (assignDeptIds.length === 0) return 'Select departments'
@@ -212,10 +287,14 @@ export function HrRequestViewPage() {
     setAssigning(true)
     setAssignError(null)
     try {
+      const notes = assignRegionalNotes.trim() || null
       for (const departmentId of assignDeptIds) {
-        await createDepartmentTask(detail.id, departmentId)
+        await createDepartmentTask(detail.id, departmentId, {
+          assignment_instructions: notes,
+        })
       }
       setAssignDeptIds([])
+      setAssignRegionalNotes('')
       await reloadTasksAndDepartments()
     } catch (e: unknown) {
       setAssignError(e instanceof Error ? e.message : 'Assignment failed')
@@ -226,18 +305,58 @@ export function HrRequestViewPage() {
 
   async function submitResponse() {
     if (!activeTask) return
-    const trimmed = responseText.trim()
-    if (!trimmed && !responseFile) {
-      setSubmitResponseError('Enter a response and/or attach a file.')
-      return
-    }
     setSubmittingResponse(true)
     setSubmitResponseError(null)
     try {
-      await submitDepartmentTaskResponse(activeTask.id, {
-        response_data: trimmed,
-        attachment: responseFile,
-      })
+      if (deptIndicatorsForForm.length > 0) {
+        if (!indicatorFormReady) {
+          setSubmitResponseError(
+            'Complete each indicator: a number where required, and qualitative text and/or an attachment where required.',
+          )
+          return
+        }
+        const by_indicator: Record<
+          string,
+          {
+            indicator_label: string
+            quantitative?: { value: string; comment: string }
+            qualitative?: { text: string }
+          }
+        > = {}
+        const quantFiles: Record<number, File> = {}
+        const qualFiles: Record<number, File> = {}
+        for (const ind of deptIndicatorsForForm) {
+          const d = indicatorDrafts[ind.id]
+          if (!d) continue
+          const entry: (typeof by_indicator)[string] = { indicator_label: ind.indicator_text }
+          if (ind.has_quantitative) {
+            entry.quantitative = { value: d.value.trim(), comment: d.comment.trim() }
+            if (d.quantFile) quantFiles[ind.id] = d.quantFile
+          }
+          if (ind.has_qualitative) {
+            entry.qualitative = { text: d.qualText.trim() }
+            if (d.qualFile) qualFiles[ind.id] = d.qualFile
+          }
+          by_indicator[String(ind.id)] = entry
+        }
+        await submitDepartmentTaskResponse(activeTask.id, {
+          mode: 'indicators',
+          indicator_bundles: JSON.stringify({ by_indicator }),
+          quantFiles,
+          qualFiles,
+        })
+      } else {
+        const trimmed = responseText.trim()
+        if (!trimmed && !responseFile) {
+          setSubmitResponseError('Enter a response and/or attach a file.')
+          return
+        }
+        await submitDepartmentTaskResponse(activeTask.id, {
+          mode: 'legacy',
+          response_data: trimmed,
+          attachment: responseFile,
+        })
+      }
       await reloadTasksAndDepartments()
     } catch (e: unknown) {
       setSubmitResponseError(e instanceof Error ? e.message : 'Submission failed')
@@ -251,12 +370,17 @@ export function HrRequestViewPage() {
   const pageSubtitle = regionalUser
     ? 'Read the request below. Regional admins can assign departments from this same page when distribution is still open.'
     : deptUser
-      ? 'Review the HR request, regional context, then your department response when a task is open.'
+      ? 'Review the request and your regional assignment instructions, then complete your department response when a task is open.'
       : 'View HR request details. Use the button below to return to the previous page.'
+
+  const showCompiledWorkflowNav = isFromCompiledRecordsPath(from) && Boolean(id)
 
   return (
     <PageSection title="Request" subtitle={pageSubtitle}>
       <div className="hr-request-view-stack">
+        {showCompiledWorkflowNav && id ? (
+          <CompiledRecordsWorkflowNav reqId={id} activeTab="request" />
+        ) : null}
         <HrRequestModal
           layout="page"
           mode="view"
@@ -269,6 +393,9 @@ export function HrRequestViewPage() {
           pageCloseLabel={backLabel}
           onClose={() => navigate(from)}
           onSaved={() => navigate(from)}
+          departmentPortalRegionalNotes={
+            deptUser ? (activeTask?.assignment_instructions ?? null) : undefined
+          }
         />
 
         {showRegionalContextCard && (
@@ -337,34 +464,163 @@ export function HrRequestViewPage() {
             <h3 className="dashboard-panel-title" style={{ marginTop: 0, marginBottom: 12 }}>
               Your response — task {activeTask.id}
             </h3>
-            <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-              Provide narrative input and optionally attach a file (up to 15 MB). This will mark the task as submitted.
-            </p>
-            <div className="form-row">
-              <label htmlFor="dept-task-response">Response</label>
-              <textarea
-                id="dept-task-response"
-                rows={8}
-                value={responseText}
-                onChange={(e) => setResponseText(e.target.value)}
-                placeholder="Describe your department’s response to this request…"
-                style={{ width: '100%', boxSizing: 'border-box' }}
-              />
-            </div>
-            <div className="form-row">
-              <label htmlFor="dept-task-file">Attachment (optional)</label>
-              <input
-                id="dept-task-file"
-                type="file"
-                onChange={(e) => setResponseFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
+            {deptIndicatorsForForm.length > 0 ? (
+              <>
+                <p className="muted" style={{ marginTop: 0, marginBottom: 16 }}>
+                  Submit values for each indicator in this request. Attachments are optional unless you rely on a file
+                  instead of qualitative text (up to 15 MB per file).
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {deptIndicatorsForForm.map((ind) => {
+                    const d = indicatorDrafts[ind.id] ?? emptyDeptIndicatorDraft()
+                    return (
+                      <div
+                        key={ind.id}
+                        style={{
+                          padding: 14,
+                          border: '1px solid var(--field-border, #e1e7f5)',
+                          borderRadius: 10,
+                          background: 'var(--field-bg, #fafbfd)',
+                        }}
+                      >
+                        <strong style={{ fontSize: 14, display: 'block', marginBottom: 10 }}>
+                          {ind.indicator_text}
+                        </strong>
+                        {ind.disaggregation?.trim() ? (
+                          <p className="muted small" style={{ margin: '0 0 12px' }}>
+                            {ind.disaggregation}
+                          </p>
+                        ) : null}
+                        {ind.has_quantitative ? (
+                          <div style={{ marginBottom: ind.has_qualitative ? 14 : 0 }}>
+                            <div className="muted small" style={{ marginBottom: 8 }}>
+                              Quantitative
+                            </div>
+                            <div className="form-row" style={{ marginBottom: 8 }}>
+                              <label htmlFor={`dept-ind-${ind.id}-num`}>Number</label>
+                              <input
+                                id={`dept-ind-${ind.id}-num`}
+                                type="text"
+                                inputMode="decimal"
+                                value={d.value}
+                                onChange={(e) =>
+                                  setIndicatorDrafts((prev) => ({
+                                    ...prev,
+                                    [ind.id]: { ...d, value: e.target.value },
+                                  }))
+                                }
+                                style={{ width: '100%', boxSizing: 'border-box' }}
+                              />
+                            </div>
+                            <div className="form-row" style={{ marginBottom: 8 }}>
+                              <label htmlFor={`dept-ind-${ind.id}-comment`}>Comment (optional)</label>
+                              <textarea
+                                id={`dept-ind-${ind.id}-comment`}
+                                rows={2}
+                                value={d.comment}
+                                onChange={(e) =>
+                                  setIndicatorDrafts((prev) => ({
+                                    ...prev,
+                                    [ind.id]: { ...d, comment: e.target.value },
+                                  }))
+                                }
+                                style={{ width: '100%', boxSizing: 'border-box' }}
+                              />
+                            </div>
+                            <div className="form-row">
+                              <label htmlFor={`dept-ind-${ind.id}-qfile`}>Attach file (optional)</label>
+                              <input
+                                id={`dept-ind-${ind.id}-qfile`}
+                                type="file"
+                                onChange={(e) =>
+                                  setIndicatorDrafts((prev) => ({
+                                    ...prev,
+                                    [ind.id]: { ...d, quantFile: e.target.files?.[0] ?? null },
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                        {ind.has_qualitative ? (
+                          <div>
+                            <div className="muted small" style={{ marginBottom: 8 }}>
+                              Qualitative
+                            </div>
+                            <div className="form-row" style={{ marginBottom: 8 }}>
+                              <label htmlFor={`dept-ind-${ind.id}-qual`}>Response</label>
+                              <textarea
+                                id={`dept-ind-${ind.id}-qual`}
+                                rows={5}
+                                value={d.qualText}
+                                onChange={(e) =>
+                                  setIndicatorDrafts((prev) => ({
+                                    ...prev,
+                                    [ind.id]: { ...d, qualText: e.target.value },
+                                  }))
+                                }
+                                placeholder="Narrative response for this indicator…"
+                                style={{ width: '100%', boxSizing: 'border-box' }}
+                              />
+                            </div>
+                            <div className="form-row">
+                              <label htmlFor={`dept-ind-${ind.id}-lfile`}>Attach file (optional)</label>
+                              <input
+                                id={`dept-ind-${ind.id}-lfile`}
+                                type="file"
+                                onChange={(e) =>
+                                  setIndicatorDrafts((prev) => ({
+                                    ...prev,
+                                    [ind.id]: { ...d, qualFile: e.target.files?.[0] ?? null },
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
+                  Provide narrative input and optionally attach a file (up to 15 MB). This will mark the task as
+                  submitted.
+                </p>
+                <div className="form-row">
+                  <label htmlFor="dept-task-response">Response</label>
+                  <textarea
+                    id="dept-task-response"
+                    rows={8}
+                    value={responseText}
+                    onChange={(e) => setResponseText(e.target.value)}
+                    placeholder="Describe your department’s response to this request…"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div className="form-row">
+                  <label htmlFor="dept-task-file">Attachment (optional)</label>
+                  <input
+                    id="dept-task-file"
+                    type="file"
+                    onChange={(e) => setResponseFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+              </>
+            )}
             {submitResponseError && <p className="login-error">{submitResponseError}</p>}
             <div style={{ marginTop: 16 }}>
               <Button
                 variant="primary"
                 compact
-                disabled={submittingResponse || (!responseText.trim() && !responseFile)}
+                disabled={
+                  submittingResponse ||
+                  (deptIndicatorsForForm.length > 0
+                    ? !indicatorFormReady
+                    : !responseText.trim() && !responseFile)
+                }
                 onClick={() => void submitResponse()}
               >
                 {submittingResponse ? 'Submitting…' : 'Submit response'}
@@ -394,20 +650,11 @@ export function HrRequestViewPage() {
             <label className="muted small" style={{ display: 'block', marginBottom: 6 }}>
               Response
             </label>
-            <textarea
-              readOnly
-              rows={8}
-              value={activeTask.response_data?.trim() ? activeTask.response_data : '—'}
-              style={{ width: '100%', boxSizing: 'border-box' }}
+            <DepartmentResponseDisplay
+              responseData={activeTask.response_data}
+              attachmentUrl={activeTask.attachment_url}
+              onlyIndicatorIds={deptResponseDisplayScopeIds}
             />
-            {activeTask.attachment_url ? (
-              <p className="muted small" style={{ marginTop: 12 }}>
-                Attachment:{' '}
-                <a href={activeTask.attachment_url} target="_blank" rel="noreferrer">
-                  {activeTask.attachment_url}
-                </a>
-              </p>
-            ) : null}
             <p className="muted small" style={{ marginTop: 16 }}>
               <Link to="/department-history">Open submission history</Link>
             </p>
@@ -463,6 +710,17 @@ export function HrRequestViewPage() {
                 ))}
               </div>
             </details>
+            <div className="form-row" style={{ marginTop: 14 }}>
+              <label htmlFor="reg-assign-instructions">Comments or instructions for departments (optional)</label>
+              <textarea
+                id="reg-assign-instructions"
+                rows={4}
+                value={assignRegionalNotes}
+                onChange={(e) => setAssignRegionalNotes(e.target.value)}
+                placeholder="e.g. Prioritize disaggregated figures by district; deadline for draft input is Friday."
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
             {assignError && <p className="login-error" style={{ marginTop: 12 }}>{assignError}</p>}
             <div style={{ marginTop: 16 }}>
               <Button
@@ -493,6 +751,12 @@ export function HrRequestViewPage() {
               before assigning tasks.
             </p>
           )}
+
+        <div className="hr-request-view-footback" style={{ marginTop: 20 }}>
+          <Button variant="secondary" compact type="button" onClick={() => navigate(from)}>
+            {backLabel}
+          </Button>
+        </div>
       </div>
     </PageSection>
   )

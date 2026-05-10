@@ -1,4 +1,13 @@
-export type HrRequestStatus = 'pending' | 'in-progress' | 'completed' | 'overdue'
+/** Publication lifecycle for an HR request (not department/regional workflow). */
+export type HrRequestStatus = 'draft' | 'active'
+
+/** Map legacy API values after deploy before migration runs, or old cached rows. */
+export function coerceHrRequestStatus(raw: string | undefined | null): HrRequestStatus {
+  const s = (raw ?? '').trim()
+  if (s === 'active' || s === 'draft') return s
+  if (s === 'completed' || s === 'in-progress') return 'active'
+  return 'draft'
+}
 
 export type HrRequestIssueIndicator = {
   id: number

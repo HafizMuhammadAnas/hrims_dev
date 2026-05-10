@@ -154,11 +154,13 @@ export function ReceivedRequestsPage({
     return path
   }
 
+  /** Primary link in the row menu — must match the navigate target in the click handler. */
   function actionLabel(status: RowStatus): string {
-    if (status === 'Response Delivered') return 'Compiled and submitted'
-    if (regionalMode) return 'Open request'
-    if (status === 'pending' && distributionPath !== monitoringPath) return 'Distribute request'
-    return 'View progress'
+    if (regionalMode) return 'View HR request'
+    if (status === 'Response Delivered') return 'View response history'
+    if (status === 'pending' && distributionPath !== monitoringPath) return 'Distribute to departments'
+    if (status === 'pending') return 'Open department workspace'
+    return 'View department tasks'
   }
 
   function regionalRequestViewUrl(requestId: string): string {
@@ -243,7 +245,7 @@ export function ReceivedRequestsPage({
               <th>Convention</th>
               <th>Date</th>
               <th>Status</th>
-              <th>Action</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -272,6 +274,7 @@ export function ReceivedRequestsPage({
                   <RowActionsMenu
                     isOpen={openActionId === r.id}
                     onOpenChange={(open) => setOpenActionId(open ? r.id : null)}
+                    triggerLabel="Actions"
                   >
                     {enableRequestCrud && (
                       <Button

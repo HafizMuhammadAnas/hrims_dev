@@ -17,6 +17,7 @@ import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
+import { HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import type { HrRequestRow } from '../types/hrRequest'
 
@@ -101,9 +102,6 @@ export function HrRequestsPage() {
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
     return rows.filter((r) => {
-      const federalDepartmentLinked = (r.departments?.length ?? 0) > 0
-      const isFederalUser = Boolean(user?.roles.some((role) => role.slug === 'federal_admin'))
-      if (isFederalUser && federalDepartmentLinked) return false
       if (statusFilter && r.status !== statusFilter) return false
       if (!q) return true
       const regionBlob =
@@ -115,7 +113,7 @@ export function HrRequestsPage() {
         regionBlob.toLowerCase().includes(q)
       )
     })
-  }, [rows, search, statusFilter, user])
+  }, [rows, search, statusFilter])
 
   const { pageRows } = useMemo(
     () => derivePaginatedRows(filteredRows, table.page, table.pageSize),
@@ -162,10 +160,8 @@ export function HrRequestsPage() {
           aria-label="Filter by status"
         >
           <option value="">All statuses</option>
-          <option value="pending">pending</option>
-          <option value="in-progress">in-progress</option>
-          <option value="completed">completed</option>
-          <option value="overdue">overdue</option>
+          <option value="draft">Draft</option>
+          <option value="active">Active</option>
         </select>
         <Button
           variant="secondary"
@@ -212,7 +208,7 @@ export function HrRequestsPage() {
                         : (r.region_name ?? '—')}
                     </td>
                     <td>{r.date}</td>
-                    <td>{r.status}</td>
+                    <td>{HR_REQUEST_STATUS_LABELS[r.status] ?? r.status}</td>
                     <td className="table-actions">
                       <RowActionsMenu
                         isOpen={openActionId === r.id}

@@ -55,6 +55,7 @@ export type DepartmentTaskRow = {
   regional_review_status?: string | null
   regional_review_comments?: string | null
   assigned_date: string
+  assignment_instructions?: string | null
   submission_date?: string | null
   response_data?: string | null
   attachment_url?: string | null

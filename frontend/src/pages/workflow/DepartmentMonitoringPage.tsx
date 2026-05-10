@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchDepartmentTasks, type DepartmentTaskRow } from '../../api/lists'
 import { updateDepartmentTaskReview } from '../../api/workflows'
 import { useAuth } from '../../auth/AuthContext'
+import { DepartmentTaskResponseModal } from '../../components/DepartmentTaskResponseModal'
 import { Button } from '../../components/ui/Button'
 import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
-import { ModalActions, ModalHeader } from '../../components/ui/ModalChrome'
 import { PageSection } from '../../components/ui/PageSection'
 import { PaginationBar } from '../../components/ui/PaginationBar'
 import { StatsCards } from '../../components/ui/StatsCards'
@@ -12,7 +12,10 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { TableToolbar } from '../../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
-import { hasDepartmentResponse, workflowPresentation } from '../../lib/departmentTaskWorkflow'
+import {
+  countDepartmentTasksByWorkflow,
+  workflowPresentation,
+} from '../../lib/departmentTaskWorkflow'
 import { isFederalAdmin, isRegionalAdmin } from '../../lib/roles'
 import type { AuthUser } from '../../types/auth'
 
@@ -68,11 +71,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
     [filtered, page, pageSize],
   )
 
-  const inProcessCount = filtered.filter((r) => !hasDepartmentResponse(r)).length
-  const revisionCount = filtered.filter((r) => r.regional_review_status === 'needs-modification').length
-  const respondedCount = filtered.filter(
-    (r) => hasDepartmentResponse(r) && r.regional_review_status !== 'needs-modification',
-  ).length
+  const workflowCounts = useMemo(() => countDepartmentTasksByWorkflow(filtered), [filtered])
 
   function openView(row: DepartmentTaskRow) {
     setViewing(row)
@@ -104,8 +103,6 @@ export function DepartmentMonitoringPage({ title }: Props) {
     }
   }
 
-  const showReviewForm = viewing && userMayReviewTask(user, viewing) && hasDepartmentResponse(viewing)
-
   return (
     <PageSection
       title={title}
@@ -115,9 +112,10 @@ export function DepartmentMonitoringPage({ title }: Props) {
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'In process', value: inProcessCount },
-            { label: 'Responded', value: respondedCount },
-            { label: 'Revision', value: revisionCount },
+            { label: 'Pending submission', value: workflowCounts.in_process },
+            { label: 'Pending regional review', value: workflowCounts.responded },
+            { label: 'Resubmission requested', value: workflowCounts.revision },
+            { label: 'Accepted by region', value: workflowCounts.accepted },
           ]}
         />
       </div>
@@ -157,10 +155,10 @@ export function DepartmentMonitoringPage({ title }: Props) {
               <th>Task ID</th>
               <th>Request</th>
               <th>Department</th>
-              <th>Progress</th>
+              <th>Workflow</th>
               <th>Assigned</th>
               <th>Submitted</th>
-              <th className="table-actions">Actions</th>
+              <th className="table-actions">Task details</th>
             </tr>
           </thead>
           <tbody>
@@ -178,7 +176,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
                   <td>{t.submission_date ?? '—'}</td>
                   <td className="table-actions">
                     <Button variant="primary" compact onClick={() => openView(t)}>
-                      View
+                      Open task
                     </Button>
                   </td>
                 </tr>
@@ -190,86 +188,26 @@ export function DepartmentMonitoringPage({ title }: Props) {
       </TableCard>
       <PaginationBar page={page} pageSize={pageSize} totalItems={filtered.length} onPageChange={setPage} />
 
-      {viewing && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setViewing(null)}>
-          <div className="modal-card modal-card-wide" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader title="Department response" onClose={() => setViewing(null)} />
-            <div className="modal-form">
-              <p className="muted" style={{ marginTop: 0 }}>
-                Task <strong>{viewing.id}</strong> · Request <strong>{viewing.req_id}</strong> ·{' '}
-                {viewing.department_name ?? viewing.department_id}
-              </p>
-              <div className="form-row">
-                <label>Submission</label>
-                {hasDepartmentResponse(viewing) ? (
-                  <>
-                    <textarea
-                      rows={10}
-                      readOnly
-                      value={viewing.response_data?.trim() ? viewing.response_data : '—'}
-                      style={{ width: '100%', boxSizing: 'border-box' }}
-                    />
-                    {viewing.attachment_url ? (
-                      <p className="muted" style={{ marginTop: 8 }}>
-                        Attachment:{' '}
-                        <a href={viewing.attachment_url} target="_blank" rel="noreferrer">
-                          {viewing.attachment_url}
-                        </a>
-                      </p>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="muted">The department has not submitted a response yet.</p>
-                )}
-              </div>
-
-              {showReviewForm ? (
-                <>
-                  <div className="form-row">
-                    <label htmlFor="dept-review-comments">Notes to department (required for modification)</label>
-                    <textarea
-                      id="dept-review-comments"
-                      rows={4}
-                      value={reviewComments}
-                      onChange={(e) => setReviewComments(e.target.value)}
-                      placeholder="e.g. Please add disaggregated data for female respondents."
-                      style={{ width: '100%', boxSizing: 'border-box' }}
-                    />
-                  </div>
-                  {reviewError && <p className="login-error">{reviewError}</p>}
-                  <ModalActions>
-                    <Button variant="secondary" compact disabled={savingReview} onClick={() => setViewing(null)}>
-                      Close
-                    </Button>
-                    <Button
-                      variant="primary"
-                      compact
-                      disabled={savingReview}
-                      onClick={() => void submitReview('accepted')}
-                    >
-                      {savingReview ? 'Saving…' : 'Accept'}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      compact
-                      disabled={savingReview}
-                      onClick={() => void submitReview('needs-modification')}
-                    >
-                      Request modification
-                    </Button>
-                  </ModalActions>
-                </>
-              ) : (
-                <ModalActions>
-                  <Button variant="secondary" compact onClick={() => setViewing(null)}>
-                    Close
-                  </Button>
-                </ModalActions>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <DepartmentTaskResponseModal
+        task={viewing}
+        onClose={() => {
+          setViewing(null)
+          setReviewComments('')
+          setReviewError(null)
+        }}
+        review={
+          viewing && userMayReviewTask(user, viewing)
+            ? {
+                comments: reviewComments,
+                onCommentsChange: setReviewComments,
+                onAccept: () => void submitReview('accepted'),
+                onRequestModification: () => void submitReview('needs-modification'),
+                saving: savingReview,
+                error: reviewError,
+              }
+            : undefined
+        }
+      />
     </PageSection>
   )
 }

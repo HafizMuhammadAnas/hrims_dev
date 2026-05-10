@@ -11,8 +11,11 @@ import {
   type KnowledgeConventionRow,
 } from '../api/hrRequests'
 import type { RegionRow } from '../api/regions'
-import { HR_REQUEST_STATUSES } from '../data/hrRequestFormLookups'
+import { useAuth } from '../auth/AuthContext'
+import { isDepartmentAdmin, isViewer } from '../lib/roles'
+import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
+import { HrRequestViewTemplate } from './HrRequestViewTemplate'
 import { Alert, FieldError } from './ui/Alert'
 import { Button } from './ui/Button'
 import { FormControl } from './ui/FormControl'
@@ -66,7 +69,7 @@ function emptyIssueForm(lockedRegionId: number | null): IssueFormState {
     region_ids,
     department_ids: [],
     date: todayIso(),
-    status: 'pending',
+    status: 'draft',
     details: '',
     selectedIndicatorIds: [],
     indicatorValues: {},
@@ -188,6 +191,11 @@ export type HrRequestModalProps = {
   layout?: 'modal' | 'page'
   /** When `layout` is `page`, label for the read-only close/back button */
   pageCloseLabel?: string
+  /**
+   * Department portal: when set (including null), the view template shows regional assignment notes here
+   * instead of the federal request description. Omit for federal/regional admin viewers.
+   */
+  departmentPortalRegionalNotes?: string | null
 }
 
 export function HrRequestModal({
@@ -202,7 +210,15 @@ export function HrRequestModal({
   onSaved,
   layout = 'modal',
   pageCloseLabel,
+  departmentPortalRegionalNotes,
 }: HrRequestModalProps) {
+  const { user: authUser } = useAuth()
+  const portalDeptViewer = Boolean(
+    authUser &&
+      (isDepartmentAdmin(authUser) || isViewer(authUser)) &&
+      authUser.department != null,
+  )
+
   const assignableRegions = useMemo(() => {
     const base = regions.filter((r) => r.slug !== 'federal')
     if (lockedRegionId == null) return base
@@ -460,6 +476,46 @@ export function HrRequestModal({
     return issueForm.region_ids.map((id) => byId.get(id) ?? `Region ${id}`)
   }, [issueForm?.region_ids, assignableRegions])
 
+  /** In read-only view, only list indicators included on this request (federal selection). */
+  const indicatorsForMappingUi = useMemo(() => {
+    if (!selectedIssue) return []
+    if (readOnly) {
+      const picked = new Set(issueForm?.selectedIndicatorIds ?? [])
+      return selectedIssue.indicators.filter((ind) => picked.has(ind.id))
+    }
+    return selectedIssue.indicators
+  }, [selectedIssue, readOnly, issueForm?.selectedIndicatorIds])
+
+  const conventionDisplayLabel = useMemo(() => {
+    if (detail?.convention) return conventionOptionLabel(detail.convention)
+    if (issueForm?.convention_id !== '' && issueForm?.convention_id !== undefined) {
+      const c = conventions.find((x) => x.id === issueForm.convention_id)
+      if (c) return conventionOptionLabel(c)
+    }
+    return '—'
+  }, [detail?.convention, issueForm?.convention_id, conventions])
+
+  /** Regional / department portals: show only the viewer's region in the hero. */
+  const viewTemplateRegionNames = useMemo(() => {
+    if (lockedRegionId != null) {
+      const nm =
+        assignableRegions.find((r) => r.id === lockedRegionId)?.name ?? authUser?.region?.name ?? null
+      if (nm) return [nm]
+    }
+    if (portalDeptViewer && authUser?.region?.name) {
+      return [authUser.region.name]
+    }
+    return selectedRegions
+  }, [
+    lockedRegionId,
+    assignableRegions,
+    selectedRegions,
+    portalDeptViewer,
+    authUser?.region?.name,
+  ])
+
+  const viewTemplateShowAssigneeMeta = lockedRegionId == null && !portalDeptViewer
+
   function runIssueValidation(): boolean {
     if (!issueForm) return false
     const fe: Record<string, string> = {}
@@ -633,7 +689,67 @@ export function HrRequestModal({
           </div>
         )}
 
-        {!showLoading && !showMissing && issueForm && usesIssueFlow && (
+        {!showLoading && !showMissing && issueForm && usesIssueFlow && mode === 'view' && (
+          <>
+            <div className="modal-form hr-request-view-template-modal">
+              {formBanner && (
+                <Alert variant="error" onDismiss={() => setFormBanner(null)}>
+                  {formBanner}
+                </Alert>
+              )}
+              {(catalogLoading || issuesLoading) && (
+                <p className="muted">Loading reference data…</p>
+              )}
+              {selectedIssue ? (
+                <HrRequestViewTemplate
+                  requestId={detail?.id ?? requestIdHint}
+                  title={issueForm.title}
+                  status={issueForm.status}
+                  dueDate={issueForm.date}
+                  regionNames={viewTemplateRegionNames}
+                  showMetaAssigneeRow={viewTemplateShowAssigneeMeta}
+                  conventionLabel={conventionDisplayLabel}
+                  issueTitle={selectedIssue.issue_title}
+                  categoryName={selectedIssue.category?.name ?? '—'}
+                  description={issueForm.details}
+                  regionalInstructionsOnly={departmentPortalRegionalNotes !== undefined}
+                  regionalInstructionsText={
+                    departmentPortalRegionalNotes !== undefined ? departmentPortalRegionalNotes : null
+                  }
+                  articles={selectedIssue.articles}
+                  indicators={indicatorsForMappingUi.map((ind) => {
+                    const resp = detail?.indicator_responses?.find(
+                      (r) => r.issue_indicator_id === ind.id,
+                    )
+                    return {
+                      id: ind.id,
+                      indicator_text: ind.indicator_text,
+                      disaggregation: ind.disaggregation,
+                      hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
+                      hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
+                      quantitative_value: resp?.quantitative_value,
+                      qualitative_text: resp?.qualitative_text,
+                    }
+                  })}
+                  attachments={detail?.attachments}
+                />
+              ) : (
+                <Alert variant="error" title="Missing issue data">
+                  <span>Issue metadata could not be loaded for this request.</span>
+                </Alert>
+              )}
+            </div>
+            {!(layout === 'page' && mode === 'view') && (
+              <ModalActions>
+                <Button variant="secondary" compact type="button" onClick={onClose}>
+                  {readOnlyCloseLabel}
+                </Button>
+              </ModalActions>
+            )}
+          </>
+        )}
+
+        {!showLoading && !showMissing && issueForm && usesIssueFlow && mode !== 'view' && (
           <form className="modal-form" onSubmit={handleSubmit} noValidate>
             {formBanner && (
               <Alert variant="error" onDismiss={() => setFormBanner(null)}>
@@ -780,11 +896,11 @@ export function HrRequestModal({
                     <div>
                       <strong>Indicators for this request</strong>
                       <FieldError id="hr-ind-sel-err" message={fieldErrors.indicator_ids} />
-                      {selectedIssue.indicators.length === 0 ? (
+                      {indicatorsForMappingUi.length === 0 ? (
                         <p className="muted">—</p>
                       ) : (
                         <ul className="mapping-indicators" style={{ listStyle: 'none', paddingLeft: 0 }}>
-                          {selectedIssue.indicators.map((ind) => {
+                          {indicatorsForMappingUi.map((ind) => {
                             const checked = issueForm.selectedIndicatorIds.includes(ind.id)
                             const allowQ = indicatorAllowsQuantitative(ind, selectedIssue)
                             const allowL = indicatorAllowsQualitative(ind, selectedIssue)
@@ -990,7 +1106,7 @@ export function HrRequestModal({
                   />
                   <FieldError id="hr-date-err" message={fieldErrors.date} />
                 </FormControl>
-                <FormControl label="Status" htmlFor="hr-status">
+                <FormControl label="Request status" htmlFor="hr-status">
                   <select
                     id="hr-status"
                     value={issueForm.status}
@@ -1003,7 +1119,7 @@ export function HrRequestModal({
                   >
                     {HR_REQUEST_STATUSES.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {HR_REQUEST_STATUS_LABELS[s]}
                       </option>
                     ))}
                   </select>
@@ -1065,7 +1181,7 @@ export function HrRequestModal({
               </Button>
               {!readOnly && (
                 <Button variant="primary" compact type="submit" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save'}
+                  {saving ? 'Submitting…' : 'Submit'}
                 </Button>
               )}
             </ModalActions>
@@ -1170,7 +1286,7 @@ export function HrRequestModal({
                   />
                   <FieldError id="hr-leg-date-err" message={fieldErrors.date} />
                 </FormControl>
-                <FormControl label="Status" htmlFor="hr-leg-status">
+                <FormControl label="Request status" htmlFor="hr-leg-status">
                   <select
                     id="hr-leg-status"
                     value={legacyForm.status}
@@ -1183,7 +1299,7 @@ export function HrRequestModal({
                   >
                     {HR_REQUEST_STATUSES.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {HR_REQUEST_STATUS_LABELS[s]}
                       </option>
                     ))}
                   </select>
@@ -1212,16 +1328,18 @@ export function HrRequestModal({
                 )}
               </FormField>
             </FormGrid>
-            <ModalActions>
-              <Button variant="secondary" compact type="button" onClick={onClose}>
-                {readOnlyCloseLabel}
-              </Button>
-              {!readOnly && (
-                <Button variant="primary" compact type="submit" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save'}
+            {!(layout === 'page' && mode === 'view') && (
+              <ModalActions>
+                <Button variant="secondary" compact type="button" onClick={onClose}>
+                  {readOnlyCloseLabel}
                 </Button>
-              )}
-            </ModalActions>
+                {!readOnly && (
+                  <Button variant="primary" compact type="submit" disabled={saving}>
+                    {saving ? 'Submitting…' : 'Submit'}
+                  </Button>
+                )}
+              </ModalActions>
+            )}
           </form>
         )}
 
