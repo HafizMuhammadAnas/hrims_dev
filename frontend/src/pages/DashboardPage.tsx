@@ -219,7 +219,7 @@ export function DashboardPage() {
                 {welcomeTagline}
               </p>
             </div>
-            <div className="muted" style={{ fontSize: 14, textAlign: 'right' }}>
+            <div className="muted" style={{ textAlign: 'right' }}>
               {new Date().toLocaleDateString('en-GB', {
                 weekday: 'long',
                 year: 'numeric',
@@ -464,12 +464,15 @@ export function DashboardPage() {
                         }}
                       >
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{r.title}</div>
-                          <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                          <div className="font-semibold text-sm">{r.title}</div>
+                          <div className="muted small" style={{ marginTop: 2 }}>
                             {r.region_name ?? '—'} · Due {r.date || '—'}
                           </div>
                         </div>
-                        <span className={statusBadgeClass(r.status)} style={{ fontSize: 10, flexShrink: 0 }}>
+                        <span
+                          className={statusBadgeClass(r.status)}
+                          style={{ fontSize: 'var(--font-size-micro)', flexShrink: 0 }}
+                        >
                           {formatStatus(r.status)}
                         </span>
                       </button>
@@ -497,20 +500,10 @@ export function DashboardPage() {
               </div>
               <div className="dashboard-charts-row">
                 <div className="dashboard-chart-col">
-                  <h4
-                    style={{
-                      fontSize: 13,
-                      textAlign: 'center',
-                      margin: '0 0 8px',
-                      color: '#666',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {pieTitle}
-                  </h4>
-                  <div style={{ width: '100%', height: 220 }}>
+                  <h4 className="chart-caption">{pieTitle}</h4>
+                  <div style={{ width: '100%', height: 220, minWidth: 0 }}>
                     {piePrimary.length > 0 ? (
-                      <ResponsiveContainer>
+                      <ResponsiveContainer width="100%" height={220} minWidth={0}>
                         <PieChart>
                           <Pie
                             data={piePrimary}
@@ -544,22 +537,12 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <div className="dashboard-chart-col">
-                  <h4
-                    style={{
-                      fontSize: 13,
-                      textAlign: 'center',
-                      margin: '0 0 8px',
-                      color: '#666',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {trendTitle}
-                  </h4>
-                  <div style={{ width: '100%', height: 220 }}>
-                    <ResponsiveContainer>
+                  <h4 className="chart-caption">{trendTitle}</h4>
+                  <div style={{ width: '100%', height: 220, minWidth: 0 }}>
+                    <ResponsiveContainer width="100%" height={220} minWidth={0}>
                       <LineChart data={trendChartData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                         <Tooltip />
                         <Line
                           type="monotone"
@@ -578,9 +561,7 @@ export function DashboardPage() {
 
           <section>
             <div className="dashboard-panel-head" style={{ marginBottom: 12 }}>
-              <h3 className="dashboard-panel-title" style={{ fontSize: '1.15rem' }}>
-                Knowledge & frameworks
-              </h3>
+              <h3 className="dashboard-panel-title">Knowledge & frameworks</h3>
             </div>
             <div className="knowledge-grid">
               <button

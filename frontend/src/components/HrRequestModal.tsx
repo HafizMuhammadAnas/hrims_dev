@@ -2,10 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'reac
 import { isApiError } from '../api/apiError'
 import {
   createHrRequestFromIssueForm,
+  deleteHrRequestAttachment,
   fetchHrRequestFormFederalDepartments,
   fetchHrRequestFormIssues,
   fetchHrRequestFormConventions,
   updateHrRequest,
+  updateHrRequestFromIssueForm,
   type FederalDepartmentOption,
   type HrRequestIndicatorResponseInput,
   type KnowledgeConventionRow,
@@ -15,6 +17,7 @@ import { useAuth } from '../auth/AuthContext'
 import { isDepartmentAdmin, isViewer } from '../lib/roles'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
+import { PendingFileAttachmentListItem } from './PendingFileAttachmentRow'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
 import { Alert, FieldError } from './ui/Alert'
 import { Button } from './ui/Button'
@@ -187,6 +190,8 @@ export type HrRequestModalProps = {
   lockedRegionId?: number | null
   onClose: () => void
   onSaved: () => void
+  /** After deleting a saved attachment, parent should refetch `detail` (e.g. `fetchHrRequest` + `setDetail`). */
+  onDetailRefresh?: () => void | Promise<void>
   /** Inline full-width layout (no overlay) for `/requests/:id` */
   layout?: 'modal' | 'page'
   /** When `layout` is `page`, label for the read-only close/back button */
@@ -208,6 +213,7 @@ export function HrRequestModal({
   lockedRegionId = null,
   onClose,
   onSaved,
+  onDetailRefresh,
   layout = 'modal',
   pageCloseLabel,
   departmentPortalRegionalNotes,
@@ -257,6 +263,8 @@ export function HrRequestModal({
   const [saving, setSaving] = useState(false)
   const [formBanner, setFormBanner] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [removingAttachmentId, setRemovingAttachmentId] = useState<number | null>(null)
+  const [attachmentRemoveError, setAttachmentRemoveError] = useState<string | null>(null)
 
   /** Full list for the convention `<select>`, including `detail.convention` when the catalog fetch hasn’t merged yet (edit/view). */
   const conventionChoices = useMemo((): KnowledgeConventionRow[] => {
@@ -280,6 +288,23 @@ export function HrRequestModal({
   const hideRegionsInRegionalView = readOnly && lockedRegionId != null
   const readOnlyCloseLabel =
     layout === 'page' && pageCloseLabel ? pageCloseLabel : readOnly ? 'Close' : 'Cancel'
+
+  const removeSavedAttachment = useCallback(
+    async (attachmentId: number) => {
+      if (!detail?.id || readOnly || mode !== 'edit') return
+      setRemovingAttachmentId(attachmentId)
+      setAttachmentRemoveError(null)
+      try {
+        await deleteHrRequestAttachment(detail.id, attachmentId)
+        await onDetailRefresh?.()
+      } catch (e: unknown) {
+        setAttachmentRemoveError(isApiError(e) ? e.message : 'Could not remove file')
+      } finally {
+        setRemovingAttachmentId(null)
+      }
+    },
+    [detail?.id, readOnly, mode, onDetailRefresh],
+  )
 
   const ictAmongSelected = useMemo(() => {
     if (!issueForm) return false
@@ -306,6 +331,7 @@ export function HrRequestModal({
   useLayoutEffect(() => {
     setFormBanner(null)
     setFieldErrors({})
+    setAttachmentRemoveError(null)
     if (mode === 'create') {
       setLegacyForm(null)
       setIssueForm(emptyIssueForm(lockedRegionId))
@@ -585,11 +611,10 @@ export function HrRequestModal({
             attachments: issueForm.attachmentFiles,
           })
         } else if (mode === 'edit' && detail) {
-          await updateHrRequest(detail.id, {
+          await updateHrRequestFromIssueForm(detail.id, {
             title: issueForm.title.trim(),
-            convention_id:
-              issueForm.convention_id === '' ? undefined : issueForm.convention_id,
-            issue_id: issueForm.issue_id === '' ? undefined : issueForm.issue_id,
+            convention_id: issueForm.convention_id as number,
+            issue_id: issueForm.issue_id as number,
             region_ids: issueForm.region_ids,
             department_ids: ictInPayload ? issueForm.department_ids : [],
             date: issueForm.date,
@@ -600,6 +625,7 @@ export function HrRequestModal({
               issueForm.indicatorValues,
               issueForm.selectedIndicatorIds,
             ),
+            attachments: issueForm.attachmentFiles,
           })
         }
         onSaved()
@@ -1127,32 +1153,89 @@ export function HrRequestModal({
                 </FormControl>
               </FormRow>
 
-              {mode === 'create' && !readOnly && (
+              {(mode === 'create' || mode === 'edit') && !readOnly && (
                 <FormField
-                  label="Attachments"
+                  label={mode === 'edit' ? 'Add attachments' : 'Attachments'}
                   htmlFor="hr-files"
-                  hint="You can select multiple files (up to 15 MB each)."
+                  hint={
+                    mode === 'edit'
+                      ? 'Pick files in one or more batches (up to 15 MB each). New files are added on save; remove a row below to drop a file before saving.'
+                      : 'Pick files in one or more batches (up to 15 MB each). Remove a row below to drop a file before saving.'
+                  }
                 >
                   <input
                     id="hr-files"
                     type="file"
                     multiple
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const picked = Array.from(e.target.files ?? [])
+                      e.target.value = ''
+                      if (picked.length === 0) return
                       setIssueForm((f) =>
-                        f
-                          ? { ...f, attachmentFiles: Array.from(e.target.files ?? []) }
-                          : f,
+                        f ? { ...f, attachmentFiles: [...f.attachmentFiles, ...picked] } : f,
                       )
-                    }
+                    }}
                   />
+                  {issueForm.attachmentFiles.length > 0 && (
+                    <ul className="hr-request-attachments-list" style={{ marginTop: 12 }}>
+                      {issueForm.attachmentFiles.map((file, idx) => (
+                        <PendingFileAttachmentListItem
+                          key={`${file.name}-${file.size}-${file.lastModified}-${idx}`}
+                          file={file}
+                          onRemove={() =>
+                            setIssueForm((f) =>
+                              f
+                                ? {
+                                    ...f,
+                                    attachmentFiles: f.attachmentFiles.filter((_, i) => i !== idx),
+                                  }
+                                : f,
+                            )
+                          }
+                        />
+                      ))}
+                    </ul>
+                  )}
                 </FormField>
               )}
 
               {detail?.attachments && detail.attachments.length > 0 && (
                 <FormField label="Uploaded files">
-                  <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                  {attachmentRemoveError ? (
+                    <p className="login-error" style={{ marginTop: 0, marginBottom: 10 }}>
+                      {attachmentRemoveError}
+                    </p>
+                  ) : null}
+                  <ul className="hr-request-attachments-list">
                     {detail.attachments.map((a) => (
-                      <li key={a.id}>{a.original_name}</li>
+                      <li key={a.id} className="hr-request-attachments-list__item">
+                        <span className="hr-request-attachments-list__name">{a.original_name}</span>
+                        <span className="hr-request-attachments-list__actions">
+                          {a.url ? (
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-secondary btn-compact"
+                            >
+                              View
+                            </a>
+                          ) : (
+                            <span className="muted small">Preview not available</span>
+                          )}
+                          {!readOnly && mode === 'edit' ? (
+                            <Button
+                              type="button"
+                              variant="danger"
+                              compact
+                              disabled={removingAttachmentId === a.id}
+                              onClick={() => void removeSavedAttachment(a.id)}
+                            >
+                              {removingAttachmentId === a.id ? 'Removing…' : 'Remove'}
+                            </Button>
+                          ) : null}
+                        </span>
+                      </li>
                     ))}
                   </ul>
                 </FormField>

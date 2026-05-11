@@ -73,7 +73,7 @@ export function SdgsInfoPage() {
                 </span>
               </div>
               {open && g.body?.trim() ? (
-                <p className="text-muted" style={{ fontSize: 14, marginTop: 12, whiteSpace: 'pre-wrap' }}>
+                <p className="text-muted" style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>
                   {g.body.trim()}
                 </p>
               ) : null}

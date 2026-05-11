@@ -364,7 +364,7 @@ export function SuperAdminConsolePage() {
           </table>
 
           <h3 style={{ marginTop: 24 }}>Districts</h3>
-          <p className="text-muted" style={{ fontSize: 14 }}>
+          <p className="text-muted">
             Filter by region (optional), then add districts for that province.
           </p>
           <select value={geoRegionId} onChange={(e) => setGeoRegionId(e.target.value)} style={{ marginBottom: 12 }}>
@@ -558,7 +558,7 @@ export function SuperAdminConsolePage() {
                           </FormRow>
                         </FormGrid>
                       </div>
-                      <strong style={{ fontSize: 13 }}>Regions (one or more)</strong>
+                      <strong className="font-semibold text-compact">Regions (one or more)</strong>
                       <RegionCheckboxMulti
                         regions={regions}
                         selectedIds={editDeptRegionIds}
@@ -620,7 +620,7 @@ export function SuperAdminConsolePage() {
       {tab === 'conventions' && (
         <TableCard padded>
           <h3 style={{ marginTop: 0 }}>Conventions</h3>
-          <p className="text-muted" style={{ fontSize: 14 }}>
+          <p className="text-muted">
             Create the catalog entry, then use <strong>Edit</strong> to fill the knowledge-page fields (icon, treaty
             dates, narrative, and optional sort order). Those fields power the Conventions page in the knowledge hub.
           </p>
@@ -772,7 +772,7 @@ export function SuperAdminConsolePage() {
           {selConv !== '' && (
             <>
               <h3 style={{ marginTop: 24 }}>Components (convention #{selConv})</h3>
-              <p className="text-muted" style={{ fontSize: 14 }}>
+              <p className="text-muted">
                 Articles and other treaty parts: optional <strong>Body</strong> text appears on the public convention
                 detail page under each component.
               </p>
@@ -898,7 +898,7 @@ export function SuperAdminConsolePage() {
       {tab === 'sdg' && (
         <TableCard padded>
           <h3 style={{ marginTop: 0 }}>SDG reference nodes</h3>
-          <p className="text-muted" style={{ fontSize: 14 }}>
+          <p className="text-muted">
             For <strong>goal</strong> nodes, use <strong>Edit</strong> to set icon, short summary, longer body text, and
             stat labels for the SDGs knowledge page.
           </p>
@@ -1081,7 +1081,7 @@ export function SuperAdminConsolePage() {
       {tab === 'upr' && (
         <TableCard padded>
           <h3 style={{ marginTop: 0 }}>UPR recommendations</h3>
-          <p className="text-muted" style={{ fontSize: 14 }}>
+          <p className="text-muted">
             Use <strong>Edit</strong> to add narrative <strong>Body</strong> text shown with each recommendation where
             the app links to UPR content.
           </p>
@@ -1204,7 +1204,7 @@ export function SuperAdminConsolePage() {
       {tab === 'hub' && (
         <TableCard padded>
           <h3 style={{ marginTop: 0 }}>Knowledge hub — Indicators &amp; UPR tiles</h3>
-          <p className="text-muted" style={{ fontSize: 14 }}>
+          <p className="text-muted">
             These cards populate the <strong>Human rights indicators</strong> and <strong>UPR</strong> knowledge pages
             (summary tiles). Convention and SDG pages use the Conventions and SDG tabs above.
           </p>
@@ -1312,12 +1312,12 @@ export function SuperAdminConsolePage() {
             <tbody>
               {issues.map((i) => (
                 <tr key={i.id}>
-                  <td style={{ fontSize: 13 }}>{i.articles.map((a) => a.article_name).join(', ') || '—'}</td>
+                  <td className="text-compact">{i.articles.map((a) => a.article_name).join(', ') || '—'}</td>
                   <td>{i.convention?.code ?? i.convention_id}</td>
                   <td>{i.category?.name ?? i.category_id}</td>
                   <td>{i.issue_title}</td>
-                  <td style={{ fontSize: 13 }}>{i.indicators.length}</td>
-                  <td style={{ fontSize: 12 }} className="text-muted">
+                  <td className="text-compact">{i.indicators.length}</td>
+                  <td className="text-muted text-xs">
                     Quantitative:{i.has_quantitative ? ' ✓' : ' —'} · Qualitative:{i.has_qualitative ? ' ✓' : ' —'}
                   </td>
                   <td>
@@ -1620,7 +1620,7 @@ function DeptForm({
         </FormRow>
       </FormGrid>
       <div style={{ marginTop: 12 }}>
-        <strong style={{ fontSize: 13 }}>Regions (one or more)</strong>
+        <strong className="font-semibold text-compact">Regions (one or more)</strong>
         <RegionCheckboxMulti regions={regions} selectedIds={regionIds} onChange={setRegionIds} disabled={busy} />
       </div>
     </div>
@@ -2041,7 +2041,9 @@ function KnowledgeCardSection({
               <tr key={k.id}>
                 <td>{k.icon}</td>
                 <td>{k.title}</td>
-                <td style={{ maxWidth: 280, fontSize: 13 }}>{k.summary ?? '—'}</td>
+                <td className="text-compact" style={{ maxWidth: 280 }}>
+                  {k.summary ?? '—'}
+                </td>
                 <td>
                   <ActionMenu>
                     <Button
@@ -2686,7 +2688,7 @@ function IssueIndicatorsEditor({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {rows.length === 0 && (
-        <p className="text-muted" style={{ fontSize: 13, margin: 0 }}>
+        <p className="text-muted text-compact" style={{ margin: 0 }}>
           No indicators for this issue yet. Add one or leave empty.
         </p>
       )}
@@ -2832,7 +2834,9 @@ function IssuesCreateForm({
           />
         </FormField>
       </FormGrid>
-      <strong style={{ fontSize: 13, display: 'block', marginTop: 16 }}>Indicators (linked to this issue)</strong>
+      <strong className="font-semibold text-compact" style={{ display: 'block', marginTop: 16 }}>
+        Indicators (linked to this issue)
+      </strong>
       <IssueIndicatorsEditor rows={indicators} onChange={setIndicators} disabled={busy} />
       <Button
         variant="primary"
@@ -2986,7 +2990,9 @@ function IssuesEditPanel({
           />
         </FormField>
       </FormGrid>
-      <strong style={{ fontSize: 13, display: 'block', marginTop: 16 }}>Indicators (linked to this issue)</strong>
+      <strong className="font-semibold text-compact" style={{ display: 'block', marginTop: 16 }}>
+        Indicators (linked to this issue)
+      </strong>
       <IssueIndicatorsEditor rows={indicators} onChange={setIndicators} disabled={busy} />
       <Button
         variant="primary"

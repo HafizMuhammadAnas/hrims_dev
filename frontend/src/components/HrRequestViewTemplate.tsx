@@ -123,7 +123,7 @@ export function HrRequestViewTemplate({
       </header>
 
       <section className="hr-request-view-template__card" aria-labelledby="hr-vt-conv-issue">
-        <h2 id="hr-vt-conv-issue" className="hr-request-view-template__section-title">
+        <h2 id="hr-vt-conv-issue" className="card-section-heading">
           Convention &amp; issue
         </h2>
         <div className="hr-request-view-template__grid2">
@@ -158,7 +158,7 @@ export function HrRequestViewTemplate({
       </section>
 
       <section className="hr-request-view-template__card" aria-labelledby="hr-vt-art-ind">
-        <h2 id="hr-vt-art-ind" className="hr-request-view-template__section-title">
+        <h2 id="hr-vt-art-ind" className="card-section-heading">
           Articles &amp; indicators
         </h2>
         <div className="hr-request-view-template__field-label" style={{ marginBottom: 10 }}>
@@ -266,12 +266,26 @@ export function HrRequestViewTemplate({
 
       {attachments && attachments.length > 0 ? (
         <section className="hr-request-view-template__card" aria-labelledby="hr-vt-files">
-          <h2 id="hr-vt-files" className="hr-request-view-template__section-title">
+          <h2 id="hr-vt-files" className="card-section-heading">
             Uploaded files
           </h2>
-          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+          <ul className="hr-request-attachments-list">
             {attachments.map((a) => (
-              <li key={a.id}>{a.original_name}</li>
+              <li key={a.id} className="hr-request-attachments-list__item">
+                <span className="hr-request-attachments-list__name">{a.original_name}</span>
+                {a.url ? (
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-secondary btn-compact"
+                  >
+                    View
+                  </a>
+                ) : (
+                  <span className="muted small">Preview not available</span>
+                )}
+              </li>
             ))}
           </ul>
         </section>

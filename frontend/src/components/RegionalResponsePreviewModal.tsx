@@ -153,7 +153,7 @@ export function RegionalResponsePreviewModal({
                   className="hr-request-view-template__card regional-response-detail-modal__section"
                   aria-labelledby={`reg-preview-overview-${row.id}`}
                 >
-                  <h2 id={`reg-preview-overview-${row.id}`} className="hr-request-view-template__section-title">
+                  <h2 id={`reg-preview-overview-${row.id}`} className="card-section-heading">
                     Overview
                   </h2>
                   <div className="regional-response-detail-modal__grid">
@@ -177,7 +177,7 @@ export function RegionalResponsePreviewModal({
                     className="hr-request-view-template__card regional-response-detail-modal__section"
                     aria-labelledby={`reg-preview-feedback-${row.id}`}
                   >
-                    <h2 id={`reg-preview-feedback-${row.id}`} className="hr-request-view-template__section-title">
+                    <h2 id={`reg-preview-feedback-${row.id}`} className="card-section-heading">
                       Federal feedback
                     </h2>
                     <div className="regional-response-detail-modal__feedback">{row.comments.trim()}</div>
@@ -188,7 +188,7 @@ export function RegionalResponsePreviewModal({
                   className="hr-request-view-template__card regional-response-detail-modal__section"
                   aria-labelledby={`reg-preview-depts-${row.id}`}
                 >
-                  <h2 id={`reg-preview-depts-${row.id}`} className="hr-request-view-template__section-title">
+                  <h2 id={`reg-preview-depts-${row.id}`} className="card-section-heading">
                     Department submissions
                   </h2>
                   <DepartmentSubmissionsForRequest
@@ -203,7 +203,7 @@ export function RegionalResponsePreviewModal({
                   className="hr-request-view-template__card regional-response-detail-modal__section"
                   aria-labelledby={`reg-preview-body-${row.id}`}
                 >
-                  <h2 id={`reg-preview-body-${row.id}`} className="hr-request-view-template__section-title">
+                  <h2 id={`reg-preview-body-${row.id}`} className="card-section-heading">
                     Compiled regional response
                   </h2>
                   <div className="hr-request-view-template__prose-box">

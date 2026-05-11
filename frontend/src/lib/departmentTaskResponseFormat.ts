@@ -84,3 +84,62 @@ export function formatDepartmentResponseAsPlaintext(
   }
   return lines.join('\n').trim() || 'No response data yet.'
 }
+
+/** Plain text only (no attachment URLs) — for consolidated regional views where files are listed separately. */
+export function formatDepartmentResponseTextOnly(
+  responseData: string | null | undefined,
+  attachmentUrl?: string | null,
+): string {
+  const p = parseDepartmentTaskResponseData(responseData, attachmentUrl)
+  if (p.kind === 'legacy') {
+    return (p.text ?? '').trim() || '—'
+  }
+  const lines: string[] = []
+  const entries = Object.entries(p.payload.by_indicator).sort(([a], [b]) => Number(a) - Number(b))
+  for (const [id, bundle] of entries) {
+    const title = bundle.indicator_label?.trim() || `Indicator #${id}`
+    lines.push(`— ${title} —`)
+    if (bundle.quantitative) {
+      const q = bundle.quantitative
+      lines.push(`  Quantitative: ${q.value}`)
+      if (q.comment) lines.push(`  Comment: ${q.comment}`)
+    }
+    if (bundle.qualitative) {
+      const l = bundle.qualitative
+      if (l.text) lines.push(`  Qualitative: ${l.text}`)
+    }
+    lines.push('')
+  }
+  return lines.join('\n').trim() || '—'
+}
+
+/** All attachment URLs from a department task (legacy single file + structured per-indicator files). */
+export function collectAttachmentUrlsFromDepartmentTask(
+  responseData: string | null | undefined,
+  attachmentUrl?: string | null,
+): string[] {
+  const p = parseDepartmentTaskResponseData(responseData, attachmentUrl)
+  if (p.kind === 'legacy') {
+    return p.attachmentUrl ? [p.attachmentUrl] : []
+  }
+  const out: string[] = []
+  for (const bundle of Object.values(p.payload.by_indicator)) {
+    const q = bundle.quantitative?.attachment_url?.trim()
+    if (q) out.push(q)
+    const l = bundle.qualitative?.attachment_url?.trim()
+    if (l) out.push(l)
+  }
+  return out
+}
+
+export function dedupeUrls(urls: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const u of urls) {
+    const t = u.trim()
+    if (!t || seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+  }
+  return out
+}

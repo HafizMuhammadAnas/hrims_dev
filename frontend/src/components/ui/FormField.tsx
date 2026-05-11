@@ -14,7 +14,7 @@ export function FormField({ label, htmlFor, hint, children }: FormFieldProps) {
     <div className="form-row">
       <label htmlFor={htmlFor}>{label}</label>
       {hint ? (
-        <p className="muted" style={{ fontSize: 12, margin: '0 0 6px', lineHeight: 1.35 }}>
+        <p className="text-hint" style={{ margin: '0 0 6px' }}>
           {hint}
         </p>
       ) : null}

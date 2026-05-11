@@ -410,9 +410,7 @@ export function RegionalResponsesPage() {
                         className="hr-request-view-template__card regional-response-detail-modal__section"
                         style={{ marginBottom: 14 }}
                       >
-                        <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
-                          Overview
-                        </h2>
+                        <h2 className="card-section-heading">Overview</h2>
                         <div className="regional-response-detail-modal__grid">
                           <div>
                             <div className="hr-request-view-template__field-label">Response ID</div>
@@ -443,7 +441,7 @@ export function RegionalResponsesPage() {
                           style={{ marginBottom: 14 }}
                           aria-labelledby={`fed-prev-${resp.id}`}
                         >
-                          <h2 id={`fed-prev-${resp.id}`} className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
+                          <h2 id={`fed-prev-${resp.id}`} className="card-section-heading">
                             Federal feedback on record
                           </h2>
                           <div className="regional-response-detail-modal__feedback">{resp.comments.trim()}</div>
@@ -454,9 +452,7 @@ export function RegionalResponsesPage() {
                         className="hr-request-view-template__card regional-response-detail-modal__section"
                         style={{ marginBottom: 14 }}
                       >
-                        <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
-                          Department submissions
-                        </h2>
+                        <h2 className="card-section-heading">Department submissions</h2>
                         <DepartmentSubmissionsForRequest
                           tasksForDetail={tasksForViewing}
                           reqId={viewing.req_id}
@@ -466,9 +462,7 @@ export function RegionalResponsesPage() {
                       </section>
 
                       <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                        <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
-                          Compiled regional response
-                        </h2>
+                        <h2 className="card-section-heading">Compiled regional response</h2>
                         <div className="hr-request-view-template__prose-box">
                           {resp.content?.trim() ? (
                             <p className="hr-request-view-template__prose" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
@@ -492,7 +486,7 @@ export function RegionalResponsesPage() {
 
                       {isFocus && canReviewFederal && (
                         <div className="regional-request-region-card__federal">
-                          <h4 className="hr-request-view-template__section-title" style={{ fontSize: 14, marginBottom: 12 }}>
+                          <h4 className="card-section-heading">
                             Federal review — {resp.region_name ?? 'this region'}
                           </h4>
                           {resp.review_status === 'accepted' ? (

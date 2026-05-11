@@ -13,6 +13,7 @@ import { ConventionsInfoPage } from './pages/knowledge/ConventionsInfoPage'
 import { IndicatorsInfoPage } from './pages/knowledge/IndicatorsInfoPage'
 import { SdgsInfoPage } from './pages/knowledge/SdgsInfoPage'
 import { UprInfoPage } from './pages/knowledge/UprInfoPage'
+import { UprRequestsPage } from './pages/UprRequestsPage'
 import { LoginPage } from './pages/LoginPage'
 import { ManageDepartmentsPage } from './pages/ManageDepartmentsPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -42,6 +43,7 @@ function App() {
               <Route index element={<DashboardPage />} />
               <Route path="requests/:id" element={<HrRequestViewPage />} />
               <Route path="requests" element={<HrRequestsPage />} />
+              <Route path="federal-upr-requests" element={<UprRequestsPage />} />
               <Route path="responses" element={<RegionalResponsesPage />} />
               <Route path="compilation" element={<FederalCompilationPage />} />
               <Route path="compiled-records" element={<CompiledRecordsPage />} />

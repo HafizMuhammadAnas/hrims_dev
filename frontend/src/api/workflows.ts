@@ -1,6 +1,6 @@
 import { apiJsonHeaders, apiMultipartHeaders, ensureCsrfCookie } from './client'
 import { ApiError, parseApiErrorResponse } from './apiError'
-import type { DepartmentTaskRow, RegionalResponseRow } from './lists'
+import type { CompiledRecordRow, DepartmentTaskRow, RegionalResponseRow } from './lists'
 
 async function throwIfNotOk(res: Response): Promise<void> {
   if (!res.ok) throw new ApiError(await parseApiErrorResponse(res))
@@ -75,12 +75,22 @@ export async function deleteDepartment(id: number): Promise<void> {
 }
 
 export type SubmitDepartmentTaskBody =
-  | { mode: 'legacy'; response_data: string; attachment?: File | null }
+  | {
+      mode: 'legacy'
+      response_data: string
+      attachment?: File | null
+      /** When true, drop the previously stored attachment (no new file). */
+      removeAttachment?: boolean
+    }
   | {
       mode: 'indicators'
       indicator_bundles: string
       quantFiles?: Record<number, File | null | undefined>
       qualFiles?: Record<number, File | null | undefined>
+      /** Indicator IDs whose saved quantitative attachment should be removed (resubmit). */
+      stripQuantIndicatorIds?: number[]
+      /** Indicator IDs whose saved qualitative attachment should be removed (resubmit). */
+      stripQualIndicatorIds?: number[]
     }
 
 export async function submitDepartmentTaskResponse(
@@ -94,6 +104,9 @@ export async function submitDepartmentTaskResponse(
     if (body.attachment) {
       form.append('attachment', body.attachment)
     }
+    if (body.removeAttachment) {
+      form.append('remove_attachment', '1')
+    }
   } else {
     form.append('indicator_bundles', body.indicator_bundles)
     for (const [id, file] of Object.entries(body.quantFiles ?? {})) {
@@ -105,6 +118,12 @@ export async function submitDepartmentTaskResponse(
       if (file) {
         form.append(`qual_file[${id}]`, file)
       }
+    }
+    for (const id of body.stripQuantIndicatorIds ?? []) {
+      form.append('strip_quant[]', String(id))
+    }
+    for (const id of body.stripQualIndicatorIds ?? []) {
+      form.append('strip_qual[]', String(id))
     }
   }
   const res = await fetch(`/api/v1/department-tasks/${encodeURIComponent(taskId)}/submit-response`, {
@@ -248,4 +267,25 @@ export async function createCompiledRecord(body: {
   })
   await throwIfNotOk(res)
   return (await res.json()) as { data: unknown }
+}
+
+export type CompiledRecordPatchBody = {
+  status?: 'draft' | 'submitted'
+  summary?: string | null
+  title?: string
+  submitted_to?: string | null
+}
+
+/** Finalize a draft national compilation or update draft fields (federal / super admin). */
+export async function updateCompiledRecord(id: string, body: CompiledRecordPatchBody): Promise<CompiledRecordRow> {
+  await ensureCsrfCookie()
+  const res = await fetch(`/api/v1/compiled-records/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify(body),
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: CompiledRecordRow }
+  return json.data
 }

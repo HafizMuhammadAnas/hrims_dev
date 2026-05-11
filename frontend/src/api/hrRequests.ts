@@ -214,6 +214,49 @@ export async function updateHrRequest(id: string, body: HrRequestPatchBody): Pro
   return withCoercedStatus(json.data)
 }
 
+/** Same fields as create, but PATCH — uses multipart so new attachments can be uploaded while editing. */
+export type HrRequestUpdateFromIssueFormInput = Omit<HrRequestCreateFromIssueFormInput, 'attachments'> & {
+  attachments?: File[]
+}
+
+export async function updateHrRequestFromIssueForm(
+  id: string,
+  input: HrRequestUpdateFromIssueFormInput,
+): Promise<HrRequestRow> {
+  await ensureCsrfCookie()
+  const fd = new FormData()
+  fd.append('title', input.title)
+  fd.append('convention_id', String(input.convention_id))
+  fd.append('issue_id', String(input.issue_id))
+  fd.append('date', input.date)
+  fd.append('status', input.status)
+  if (input.details != null && input.details !== '') {
+    fd.append('details', input.details)
+  }
+  for (const rid of input.region_ids) {
+    fd.append('region_ids[]', String(rid))
+  }
+  for (const did of input.department_ids) {
+    fd.append('department_ids[]', String(did))
+  }
+  if (input.indicator_responses.length > 0) {
+    fd.append('indicator_responses', JSON.stringify(input.indicator_responses))
+  }
+  for (const file of input.attachments ?? []) {
+    fd.append('attachments[]', file)
+  }
+
+  const res = await fetch(`/api/v1/hr-requests/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: apiMultipartHeaders(),
+    body: fd,
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: HrRequestRow }
+  return withCoercedStatus(json.data)
+}
+
 export async function deleteHrRequest(id: string): Promise<void> {
   await ensureCsrfCookie()
   const res = await fetch(`/api/v1/hr-requests/${encodeURIComponent(id)}`, {
@@ -221,5 +264,18 @@ export async function deleteHrRequest(id: string): Promise<void> {
     credentials: 'include',
     headers: apiJsonHeaders(),
   })
+  await throwIfNotOk(res)
+}
+
+export async function deleteHrRequestAttachment(hrRequestId: string, attachmentId: number): Promise<void> {
+  await ensureCsrfCookie()
+  const res = await fetch(
+    `/api/v1/hr-requests/${encodeURIComponent(hrRequestId)}/attachments/${encodeURIComponent(String(attachmentId))}`,
+    {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: apiJsonHeaders(),
+    },
+  )
   await throwIfNotOk(res)
 }

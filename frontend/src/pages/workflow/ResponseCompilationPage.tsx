@@ -162,7 +162,7 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
       </div>
       {selectedReqId && workflowCounts && (
         <div style={{ marginTop: 14 }}>
-          <p className="muted" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>
+          <p className="muted font-semibold text-compact" style={{ margin: '0 0 8px' }}>
             Distribution progress for <strong>{selectedReqId}</strong>
           </p>
           <StatsCards
@@ -192,7 +192,7 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
           ))}
         </select>
         {isRegionalAdmin(user) && requests.length > 0 && requestsForCompilationSelect.length === 0 ? (
-          <p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>
+          <p className="muted text-compact" style={{ margin: '0 0 12px' }}>
             Every listed request already has a regional compilation from your province. Manage or review it under{' '}
             <Link to="/responses">Regional responses</Link> or <Link to="/region-history">submission history</Link>.
           </p>
@@ -206,7 +206,7 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
               </p>
             ) : (
               <>
-                <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>
+                <p className="muted text-compact" style={{ margin: '0 0 8px' }}>
                   <strong>{selectedTasks.length}</strong> department
                   {selectedTasks.length === 1 ? '' : 's'} — breakdown above.{' '}
                   <strong>{includedTaskIds.length}</strong> included in compilation draft.
@@ -272,7 +272,7 @@ export function ResponseCompilationPage({ title, nextPath }: Props) {
                   {content.trim() ? 'Replace draft with selected departments' : 'Prefill from selected departments'}
                 </Button>
                 {includedTaskIds.length === 0 && (
-                  <p className="muted" style={{ margin: '8px 0 0', fontSize: 12 }}>
+                  <p className="muted small" style={{ margin: '8px 0 0' }}>
                     Select at least one department to build text from task notes.
                   </p>
                 )}

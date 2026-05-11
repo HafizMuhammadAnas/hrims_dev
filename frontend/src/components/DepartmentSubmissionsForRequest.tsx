@@ -78,10 +78,10 @@ export function DepartmentSubmissionsForRequest({
                 flexWrap: 'wrap',
               }}
             >
-              <strong style={{ fontSize: 14 }}>{t.department_name ?? t.department_id}</strong>
+              <strong className="text-sm font-semibold">{t.department_name ?? t.department_id}</strong>
               <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
             </div>
-            <p className="muted" style={{ margin: '8px 0 6px', fontSize: 12 }}>
+            <p className="muted small" style={{ margin: '8px 0 6px' }}>
               Task {t.id}
               {t.region_name ? ` · ${t.region_name}` : ''}
               {t.submission_date ? ` · Submitted ${t.submission_date}` : ''}

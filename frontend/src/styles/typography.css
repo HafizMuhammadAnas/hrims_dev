@@ -1,0 +1,184 @@
+/* Global type — single family + scale; import after theme.css */
+
+html {
+  font-size: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  font-weight: var(--font-weight-normal);
+}
+
+h1,
+.type-h1 {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 0.45em;
+  color: var(--txt);
+}
+
+h2,
+.type-h2 {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-snug);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 0.4em;
+  color: var(--txt);
+}
+
+h3,
+.type-h3 {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-snug);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 0.35em;
+  color: var(--txt);
+}
+
+h4,
+.type-h4 {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-snug);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 0.35em;
+  color: var(--txt);
+}
+
+h5 {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-snug);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 0.3em;
+  color: var(--txt);
+}
+
+h6 {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 0.35em;
+  color: var(--txt-lt);
+}
+
+p {
+  margin: 0 0 1em;
+  font-size: inherit;
+  line-height: var(--line-height-normal);
+}
+
+p:last-child {
+  margin-bottom: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+small {
+  font-size: var(--font-size-sm);
+}
+
+/* Secondary / de-emphasized copy */
+.muted {
+  color: var(--txt-lt);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.text-muted {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.text-xs {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+}
+
+/** Form / inline helper under labels */
+.text-hint {
+  color: var(--txt-lt);
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+}
+
+.text-compact {
+  font-size: var(--font-size-compact);
+  line-height: var(--line-height-normal);
+}
+
+.text-sm {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.text-base {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+}
+
+.font-medium {
+  font-weight: var(--font-weight-medium);
+}
+
+.font-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+
+.font-bold {
+  font-weight: var(--font-weight-bold);
+}
+
+.type-section-kicker {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--txt-lt);
+}
+
+/** Card / modal subsection title (sentence case, not the uppercase kicker). */
+.card-section-heading {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--txt);
+  margin: 0 0 12px;
+}
+
+.muted.small {
+  font-size: var(--font-size-xs);
+}
+
+.chart-caption {
+  font-size: var(--font-size-compact);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  text-align: center;
+  margin: 0 0 8px;
+  color: var(--txt-lt);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

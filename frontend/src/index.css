@@ -1,4 +1,5 @@
 @import './styles/theme.css';
+@import './styles/typography.css';
 
 /* Reserve space for the vertical scrollbar so width doesn’t jump when modals lock scroll. */
 html {
@@ -7,8 +8,6 @@ html {
 
 body {
   margin: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
   background: #f5f5f5;
   color: var(--txt);
 }
@@ -16,11 +15,6 @@ body {
 /* When any modal is open, keep the shell from scrolling behind it (avoids “broken” double-scroll / layout shift). */
 body:has(.modal-overlay) {
   overflow: hidden;
-}
-
-.muted {
-  color: var(--txt-lt);
-  font-size: 14px;
 }
 
 .login-page {
@@ -43,20 +37,21 @@ body:has(.modal-overlay) {
 .login-card h1 {
   margin: 0 0 0.25rem;
   color: var(--theme-primary);
-  font-size: 1.75rem;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
 }
 
 .login-sub {
   margin: 0 0 1.5rem;
   color: var(--txt-lt);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .login-form label {
   display: block;
   margin-bottom: 1rem;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   color: var(--txt);
 }
 
@@ -68,7 +63,7 @@ body:has(.modal-overlay) {
   border: 1px solid var(--field-border);
   border-radius: var(--field-radius);
   background: var(--field-bg);
-  font-size: 15px;
+  font-size: var(--font-size-base);
   box-sizing: border-box;
   transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
 }
@@ -121,7 +116,7 @@ body:has(.modal-overlay) {
 
 .login-error {
   color: var(--err);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   margin: 0 0 0.75rem;
 }
 
@@ -133,8 +128,8 @@ body:has(.modal-overlay) {
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid transparent;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
@@ -144,9 +139,9 @@ body:has(.modal-overlay) {
 }
 
 .app-alert__title {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   margin-bottom: 4px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .app-alert__content {
@@ -158,7 +153,7 @@ body:has(.modal-overlay) {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 20px;
+  font-size: var(--font-size-lg);
   line-height: 1;
   padding: 0 4px;
   color: inherit;
@@ -196,7 +191,7 @@ body:has(.modal-overlay) {
 
 .field-error {
   color: var(--err);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   margin: 6px 0 0;
   font-weight: 500;
 }
@@ -238,7 +233,7 @@ body:has(.modal-overlay) {
 
 .login-hint {
   margin-top: 1rem;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--txt-lt);
 }
 
@@ -252,7 +247,7 @@ body:has(.modal-overlay) {
   border: none;
   border-radius: 8px;
   padding: 10px 18px;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   cursor: pointer;
   font-weight: 600;
 }
@@ -278,7 +273,7 @@ body:has(.modal-overlay) {
   margin-top: 10px;
   padding: 0;
   text-align: center;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--solid-blue);
   background: transparent;
   text-decoration: none;
@@ -327,7 +322,7 @@ body:has(.modal-overlay) {
 
 .header-content h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
 }
 
@@ -335,7 +330,7 @@ body:has(.modal-overlay) {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .header-account-meta {
@@ -344,12 +339,12 @@ body:has(.modal-overlay) {
 }
 
 .header-account-name {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
 .header-account-subtitle {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   opacity: 0.82;
 }
 
@@ -371,7 +366,7 @@ body:has(.modal-overlay) {
   border-radius: 999px;
   background: #d32f2f;
   color: #fff;
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -424,14 +419,14 @@ body:has(.modal-overlay) {
 }
 
 .notification-item-title {
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 700;
   color: var(--txt);
 }
 
 .notification-item-message {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.45;
   color: var(--txt-lt);
 }
@@ -440,7 +435,7 @@ body:has(.modal-overlay) {
   padding: 16px;
   text-align: center;
   color: var(--txt-lt);
-  font-size: 13px;
+  font-size: var(--font-size-compact);
 }
 
 /* Sidebar — hrims_old */
@@ -468,7 +463,7 @@ body:has(.modal-overlay) {
   width: 100%;
   text-align: left;
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   line-height: 1.35;
   font-weight: 400;
 }
@@ -498,7 +493,7 @@ body:has(.modal-overlay) {
   padding: 15px 30px;
   color: var(--nav-section-title-green);
   font-weight: 700;
-  font-size: 16px;
+  font-size: var(--font-size-base);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   border-top: 1px solid var(--bdr);
@@ -567,7 +562,7 @@ body:has(.modal-overlay) {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 .data-table th {
   background: var(--table-header-bg, #d4eaf7);
@@ -606,7 +601,7 @@ body:has(.modal-overlay) {
   color: #fff;
   border: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .back-btn:hover {
@@ -701,7 +696,7 @@ body:has(.modal-overlay) {
   color: var(--solid-blue);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   padding: 0;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -764,7 +759,7 @@ body:has(.modal-overlay) {
   align-items: center;
   justify-content: center;
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 600;
   color: var(--txt);
   text-decoration: none;
@@ -794,7 +789,7 @@ body:has(.modal-overlay) {
 
 button.compiled-record-modal-tab {
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 600;
   margin: 0;
 }
@@ -823,36 +818,40 @@ button.compiled-record-modal-tab {
 
 .compiled-record-region-block__title {
   margin-bottom: 4px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
 }
 
 .compiled-record-region-block__responses-label {
   margin-top: 8px;
-  margin-bottom: 2px;
-  font-size: 12px;
+  margin-bottom: 6px;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
-.compiled-record-regional-response-list {
-  margin: 4px 0 0;
-  padding-left: 1.25rem;
-  list-style-type: disc;
-}
-
-.compiled-record-regional-response-list li {
-  margin-bottom: 10px;
-}
-
-.compiled-record-regional-response-list__text {
+.compiled-record-region-block__response-body {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
   white-space: pre-wrap;
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 8px;
+  background: var(--field-bg, #fafbfd);
+  color: var(--txt);
 }
 
-.compiled-record-dept-bullet__name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--txt-muted, #5a6b8a);
-  margin-bottom: 4px;
+.compiled-record-all-attachments {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compiled-record-all-attachments li {
+  margin: 0;
 }
 
 .compiled-record-federal-summary-field {
@@ -927,7 +926,7 @@ button.compiled-record-modal-tab {
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px 8px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 600;
   min-width: 0;
 }
@@ -968,7 +967,7 @@ button.compiled-record-modal-tab {
 
 .dept-task-response-modal__head h3 {
   margin: 0 0 4px;
-  font-size: 1.2rem;
+  font-size: var(--font-size-xl);
   letter-spacing: -0.02em;
 }
 
@@ -995,7 +994,7 @@ button.compiled-record-modal-tab {
 
 .dept-task-response-modal__block-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   margin-bottom: 8px;
   color: var(--txt, #1a2233);
 }
@@ -1052,14 +1051,15 @@ button.compiled-record-modal-tab {
 
 .regional-response-detail-modal__value {
   margin: 6px 0 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   line-height: 1.45;
   color: var(--txt, #1a2233);
 }
 
 .regional-response-detail-modal__feedback {
-  font-size: 14px;
-  line-height: 1.55;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
   white-space: pre-wrap;
   margin: 0;
   padding: 12px 14px;
@@ -1092,7 +1092,7 @@ button.compiled-record-modal-tab {
   gap: 6px 10px;
   margin-top: 2px;
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 600;
   color: #2e4fa3;
   background: linear-gradient(to bottom, #f0f4fd, #e8eefb);
@@ -1118,7 +1118,7 @@ button.compiled-record-modal-tab {
 
 .dept-response-attachment-btn__name {
   font-weight: 500;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--txt-lt, #5a6b8a);
   max-width: 280px;
   overflow: hidden;
@@ -1166,7 +1166,7 @@ button.compiled-record-modal-tab {
   border-radius: var(--field-radius);
   border: 1px solid var(--field-border);
   background: #f3f4f6;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-family: inherit;
   line-height: 1.5;
   color: var(--txt);
@@ -1176,8 +1176,15 @@ button.compiled-record-modal-tab {
   overflow: visible;
 }
 
+textarea.hr-request-readonly-prose {
+  display: block;
+  resize: vertical;
+  min-height: 6rem;
+}
+
 /* HR request read-only view (card template) */
 .hr-request-view-template {
+  font-family: var(--font-sans);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1201,8 +1208,8 @@ button.compiled-record-modal-tab {
 }
 
 .hr-request-view-template__kicker {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--txt-lt);
@@ -1210,18 +1217,18 @@ button.compiled-record-modal-tab {
 }
 
 .hr-request-view-template__req-id {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.65rem;
-  font-weight: 700;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
   color: var(--txt);
-  line-height: 1.2;
+  line-height: var(--line-height-tight);
 }
 
 .hr-request-view-template__title {
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
   margin: 14px 0 16px;
-  line-height: 1.25;
+  line-height: var(--line-height-snug);
   color: var(--txt);
 }
 
@@ -1229,7 +1236,7 @@ button.compiled-record-modal-tab {
   display: flex;
   flex-wrap: wrap;
   gap: 18px 28px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--txt);
 }
 
@@ -1252,13 +1259,39 @@ button.compiled-record-modal-tab {
   box-sizing: border-box;
 }
 
-.hr-request-view-template__section-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--txt-lt);
-  margin: 0 0 14px;
+.hr-request-attachments-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hr-request-attachments-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.hr-request-attachments-list__name {
+  font-size: var(--font-size-sm);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.hr-request-attachments-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .hr-request-view-template__grid2 {
@@ -1278,8 +1311,9 @@ button.compiled-record-modal-tab {
 }
 
 .hr-request-view-template__field-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--txt-lt);
@@ -1288,7 +1322,7 @@ button.compiled-record-modal-tab {
 
 .hr-request-view-template__field-value {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   line-height: 1.45;
   color: var(--txt);
 }
@@ -1303,7 +1337,7 @@ button.compiled-record-modal-tab {
 
 .hr-request-view-template__prose {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   line-height: 1.55;
   color: var(--txt);
   white-space: pre-wrap;
@@ -1325,7 +1359,7 @@ button.compiled-record-modal-tab {
   border-radius: 999px;
   border: 1px solid var(--theme-primary);
   color: var(--theme-primary);
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 500;
   background: rgba(46, 79, 163, 0.06);
 }
@@ -1376,13 +1410,13 @@ button.compiled-record-modal-tab {
 
 .hr-request-view-template__indicator-text {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--txt);
   line-height: 1.35;
 }
 
 .hr-request-view-template__type-pill {
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: 600;
   text-transform: capitalize;
   padding: 3px 10px;
@@ -1414,7 +1448,7 @@ button.compiled-record-modal-tab {
 }
 
 .hr-request-view-panel .dashboard-panel-title {
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
 }
 
 .hr-request-view-footnote {
@@ -1436,7 +1470,7 @@ button.compiled-record-modal-tab {
   border: 1px solid var(--field-border);
   border-radius: var(--field-radius);
   background: var(--field-bg);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .hr-request-ict-dept-multiselect:focus {
@@ -1540,7 +1574,7 @@ button.compiled-record-modal-tab {
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1557,7 +1591,7 @@ button.compiled-record-modal-tab {
   padding: 10px 12px;
   margin: 0;
   font: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   resize: vertical;
   border: 1px solid var(--field-border);
@@ -1592,7 +1626,7 @@ button.compiled-record-modal-tab {
 
 .issues-create-form__title {
   margin: 0 0 12px;
-  font-size: 1rem;
+  font-size: var(--font-size-base);
   font-weight: 600;
 }
 
@@ -1624,7 +1658,7 @@ button.compiled-record-modal-tab {
   padding: 8px 12px;
   box-sizing: border-box;
   font: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--txt);
   background: var(--field-bg);
   border: 1px solid var(--field-border);
@@ -1690,7 +1724,7 @@ button.compiled-record-modal-tab {
   border: none;
   border-bottom: 1px solid var(--field-border);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   background: var(--field-bg);
 }
 
@@ -1712,7 +1746,7 @@ button.compiled-record-modal-tab {
   padding: 8px 12px;
   margin: 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--txt);
 }
 
@@ -1726,7 +1760,7 @@ button.compiled-record-modal-tab {
 
 .article-multi-dropdown__empty {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   color: var(--txt-lt);
 }
 
@@ -1778,7 +1812,7 @@ button.compiled-record-modal-tab {
 
 .indicator-inputs > div > label {
   display: block;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 600;
   margin-bottom: 4px;
   color: var(--txt);
@@ -1811,14 +1845,14 @@ button.compiled-record-modal-tab {
 
 .modal-head h3 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--font-size-md);
   color: var(--txt);
 }
 
 .modal-close {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: var(--font-size-xl);
   line-height: 1;
   cursor: pointer;
   color: var(--txt-lt);
@@ -1899,7 +1933,7 @@ button.compiled-record-modal-tab {
 
 .regional-request-region-card__title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
   font-weight: 650;
 }
 
@@ -1911,7 +1945,7 @@ button.compiled-record-modal-tab {
 }
 
 .regional-request-region-card__pill {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   padding: 4px 10px;
   border-radius: 999px;
   background: rgba(46, 79, 163, 0.12);
@@ -1935,13 +1969,13 @@ button.compiled-record-modal-tab {
 
 .regional-request-region-card__federal-title {
   margin: 0 0 12px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-weight: 650;
 }
 
 .dept-submissions-heading {
   margin: 0 0 10px;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   font-weight: 650;
 }
 
@@ -1953,7 +1987,7 @@ button.compiled-record-modal-tab {
 
 .form-row label {
   display: block;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 500;
   margin-bottom: 6px;
   color: var(--txt);
@@ -1974,7 +2008,7 @@ button.compiled-record-modal-tab {
   border-radius: var(--field-radius);
   border: 1px solid var(--field-border);
   background: var(--field-bg);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-family: inherit;
   color: var(--txt);
   line-height: 1.4;
@@ -2036,7 +2070,7 @@ button.compiled-record-modal-tab {
   border-radius: var(--field-radius);
   border: 1px solid var(--field-border);
   background: var(--field-bg);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
   transition: border-color 0.18s ease, background-color 0.18s ease;
 }
@@ -2137,23 +2171,21 @@ button.compiled-record-modal-tab {
 
 .knowledge-card h3 {
   margin: 10px 0 8px;
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
   color: var(--solid-blue);
 }
 
 .knowledge-card p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   color: var(--txt-lt);
   line-height: 1.45;
 }
 
 .knowledge-card-icon {
-  font-size: 2rem;
+  font-size: var(--font-size-3xl);
   line-height: 1;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-    'Segoe UI Symbol', 'Noto Color Emoji', emoji;
+  font-family: var(--font-sans);
 }
 
 .knowledge-card-icon img {
@@ -2167,7 +2199,7 @@ button.compiled-record-modal-tab {
   display: flex;
   gap: 16px;
   margin-top: 12px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   color: var(--txt);
 }
 
@@ -2183,11 +2215,9 @@ button.compiled-record-modal-tab {
 }
 
 .knowledge-hero-icon {
-  font-size: 3rem;
+  font-size: var(--font-size-mega);
   line-height: 1;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-    'Segoe UI Symbol', 'Noto Color Emoji', emoji;
+  font-family: var(--font-sans);
 }
 
 .knowledge-hero-icon img {
@@ -2203,7 +2233,7 @@ button.compiled-record-modal-tab {
 }
 
 .knowledge-meta {
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   color: var(--txt-lt);
   margin: 8px 0 0;
 }
@@ -2259,14 +2289,14 @@ button.compiled-record-modal-tab {
 
 .profile-hero-copy h3 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: var(--font-size-display);
   color: var(--txt);
 }
 
 .profile-hero-copy p {
   margin: 4px 0 0;
   color: var(--txt-lt);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .profile-photo-actions {
@@ -2298,7 +2328,7 @@ button.compiled-record-modal-tab {
 }
 
 .profile-photo-help {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--txt-lt);
 }
 
@@ -2317,7 +2347,7 @@ button.compiled-record-modal-tab {
   background: #ffffff;
   border: 1px solid #d6e2fb;
   color: var(--solid-blue);
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 600;
   text-transform: capitalize;
 }
@@ -2343,7 +2373,7 @@ button.compiled-record-modal-tab {
 
 .profile-card-title {
   margin: 0 0 16px;
-  font-size: 1.02rem;
+  font-size: var(--font-size-base);
   color: var(--solid-blue);
 }
 
@@ -2372,13 +2402,13 @@ button.compiled-record-modal-tab {
 }
 
 .profile-info-label {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--txt-lt);
   margin-bottom: 2px;
 }
 
 .profile-info-value {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--txt);
   font-weight: 600;
 }
@@ -2388,7 +2418,7 @@ button.compiled-record-modal-tab {
   grid-template-columns: 140px 1fr;
   gap: 8px 16px;
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .profile-dl dt {
@@ -2402,7 +2432,7 @@ button.compiled-record-modal-tab {
 
 .profile-subhead {
   margin-top: 28px;
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
 }
 
 .profile-role-list {
@@ -2414,7 +2444,7 @@ button.compiled-record-modal-tab {
 .profile-role-list ul {
   margin: 6px 0 0;
   padding-left: 20px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   color: var(--txt-lt);
 }
 
@@ -2472,7 +2502,7 @@ button.compiled-record-modal-tab {
   align-items: center;
   border-radius: 999px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   line-height: 1.2;
   border: 1px solid transparent;
@@ -2542,12 +2572,12 @@ button.compiled-record-modal-tab {
 
 .summary-metric-title {
   color: var(--txt-lt);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .summary-metric-value {
   color: var(--solid-blue);
-  font-size: 22px;
+  font-size: var(--font-size-display);
   font-weight: 800;
   margin-top: 4px;
 }
@@ -2574,8 +2604,8 @@ button.compiled-record-modal-tab {
 
 .page-header-detail {
   margin: 8px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
   max-width: 52rem;
 }
 
@@ -2595,7 +2625,7 @@ button.compiled-record-modal-tab {
 }
 
 .stat-card-value {
-  font-size: 1.5rem;
+  font-size: var(--font-size-xl);
   font-weight: 800;
   color: var(--solid-blue);
   line-height: 1.15;
@@ -2603,7 +2633,7 @@ button.compiled-record-modal-tab {
 
 .stat-card-label {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2643,21 +2673,21 @@ button.compiled-record-modal-tab {
 }
 
 .dashboard-card-title {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   opacity: 0.9;
   margin-bottom: 8px;
 }
 
 .dashboard-card-value {
-  font-size: 28px;
+  font-size: var(--font-size-2lg);
   font-weight: 700;
   margin-bottom: 4px;
   line-height: 1.15;
 }
 
 .dashboard-card-subtitle {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   opacity: 0.85;
   line-height: 1.35;
 }
@@ -2690,7 +2720,7 @@ button.compiled-record-modal-tab {
 
 .dashboard-welcome-banner h2 {
   margin: 0 0 6px;
-  font-size: 1.5rem;
+  font-size: var(--font-size-xl);
   color: var(--txt);
 }
 
@@ -2705,7 +2735,7 @@ button.compiled-record-modal-tab {
 
 .dashboard-panel-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--font-size-lg);
   color: var(--solid-blue);
   display: flex;
   align-items: center;
@@ -2720,8 +2750,8 @@ button.compiled-record-modal-tab {
 }
 
 .dashboard-chart-col {
-  flex: 1 1 200px;
-  min-width: 180px;
+  flex: 1 1 240px;
+  min-width: 0;
 }
 
 .dashboard-shortcuts {
@@ -2944,7 +2974,7 @@ button.compiled-record-modal-tab {
   border: 1px solid var(--bdr);
   border-radius: 8px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   color: var(--solid-blue);
   background: #fff;
@@ -3079,7 +3109,7 @@ button.compiled-record-modal-tab {
   padding: 18px;
   text-align: center;
   color: var(--txt-lt);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .chip-list {
@@ -3110,7 +3140,7 @@ button.compiled-record-modal-tab {
 }
 
 .checkbox-card-label {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 /* Final interaction polish */
@@ -3187,7 +3217,7 @@ button.compiled-record-modal-tab {
   }
 
   .header-content h1 {
-    font-size: 16px;
+    font-size: var(--font-size-base);
     line-height: 1.3;
   }
 
@@ -3282,7 +3312,7 @@ button.compiled-record-modal-tab {
 
   .nav-section-title {
     padding: 12px 18px 12px 15px;
-    font-size: 13px;
+    font-size: var(--font-size-compact);
   }
 }
 
@@ -3319,7 +3349,7 @@ button.compiled-record-modal-tab {
   border: none;
   cursor: pointer;
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   padding: 10px 18px;
   border-radius: 9px;
@@ -3363,7 +3393,7 @@ button.compiled-record-modal-tab {
   min-width: min(280px, 100%);
   max-width: 480px;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   border: 1px solid var(--field-border);
   border-radius: var(--field-radius);
   background: var(--field-bg);
@@ -3398,7 +3428,7 @@ button.compiled-record-modal-tab {
 
 .report-exports-empty-hint {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .report-generator__callout {
@@ -3409,7 +3439,7 @@ button.compiled-record-modal-tab {
   border-radius: 10px;
   background: var(--theme-surface-blue);
   border: 1px solid rgba(46, 79, 163, 0.15);
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   line-height: 1.5;
   color: var(--txt);
 }
@@ -3444,14 +3474,14 @@ button.compiled-record-modal-tab {
 
 .report-exports__head h3 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--font-size-md);
   font-weight: 700;
   color: var(--txt);
 }
 
 .report-exports__head p {
   margin: 6px 0 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--txt-lt);
   line-height: 1.45;
   max-width: 40rem;
@@ -3463,14 +3493,14 @@ button.compiled-record-modal-tab {
 
 .report-exports__snapshot-title {
   margin: 0 0 12px;
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
   font-weight: 700;
   color: var(--txt);
 }
 
 .report-generator__tagline {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   color: var(--txt-lt);
   font-style: italic;
 }
@@ -3500,7 +3530,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__card-title {
   margin: 0 0 1rem;
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
   font-weight: 700;
   color: #424242;
   display: flex;
@@ -3528,7 +3558,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__field label {
   display: block;
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: 700;
   text-transform: uppercase;
   color: var(--txt-lt);
@@ -3559,7 +3589,7 @@ button.compiled-record-modal-tab {
   border: 1px solid var(--field-border);
   border-radius: var(--field-radius);
   background: var(--field-bg);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-family: inherit;
   color: var(--txt);
 }
@@ -3597,7 +3627,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__section-label {
   display: block;
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -3612,7 +3642,7 @@ button.compiled-record-modal-tab {
   justify-content: center;
   gap: 6px;
   margin-bottom: 1.25rem;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   color: var(--txt-lt);
 }
@@ -3636,7 +3666,7 @@ button.compiled-record-modal-tab {
   border-radius: 999px;
   background: var(--theme-surface-blue);
   color: var(--solid-blue);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .report-generator__step-sep {
@@ -3689,7 +3719,7 @@ button.compiled-record-modal-tab {
   padding: 10px 12px;
   border: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   text-align: left;
   font-family: inherit;
@@ -3723,7 +3753,7 @@ button.compiled-record-modal-tab {
   padding: 8px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.35;
 }
 
@@ -3772,7 +3802,7 @@ button.compiled-record-modal-tab {
   justify-content: center;
   gap: 8px;
   padding: 12px 16px;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: #fff;
   background: var(--solid-blue);
@@ -3816,7 +3846,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__results-head h3 {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: var(--font-size-lg);
   font-weight: 700;
   color: var(--txt);
 }
@@ -3856,7 +3886,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__exec h4 {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   text-transform: uppercase;
   color: var(--solid-blue);
@@ -3864,14 +3894,14 @@ button.compiled-record-modal-tab {
 
 .report-generator__exec p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   line-height: 1.55;
   color: var(--txt);
 }
 
 .report-generator__insights h4 {
   margin: 1.25rem 0 12px;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -3889,14 +3919,14 @@ button.compiled-record-modal-tab {
 
 .report-generator__insight-card h5 {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 700;
   color: #6366f1;
 }
 
 .report-generator__insight-card p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   line-height: 1.5;
   color: #616161;
 }
@@ -3922,14 +3952,14 @@ button.compiled-record-modal-tab {
 
 .report-generator__recommend h4 {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   font-weight: 700;
   color: #14532d;
 }
 
 .report-generator__recommend p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   line-height: 1.5;
   color: #166534;
 }
@@ -3946,7 +3976,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__chart-panel h4 {
   margin: 0 0 1rem;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -3963,7 +3993,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__chart-caption {
   margin: 12px 0 0;
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   text-align: center;
   color: #9e9e9e;
 }
@@ -3986,7 +4016,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__empty h4 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--font-size-md);
   font-weight: 600;
   color: #757575;
 }
@@ -3994,7 +4024,7 @@ button.compiled-record-modal-tab {
 .report-generator__empty p {
   margin: 12px 0 0;
   max-width: 28rem;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   line-height: 1.5;
 }
 
@@ -4022,7 +4052,7 @@ button.compiled-record-modal-tab {
 
 .report-generator__loading-msg {
   margin-top: 8px;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: #6366f1;
 }
@@ -4071,7 +4101,7 @@ button.compiled-record-modal-tab {
 
 .analysis-filter-card__head h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
   font-weight: 700;
   color: #374151;
 }
@@ -4096,7 +4126,7 @@ button.compiled-record-modal-tab {
 
 .analysis-field label {
   display: block;
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: 700;
   text-transform: uppercase;
   color: var(--txt-lt);
@@ -4111,7 +4141,7 @@ button.compiled-record-modal-tab {
   border: 1px solid var(--field-border);
   border-radius: var(--field-radius);
   background: var(--field-bg);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-family: inherit;
   color: var(--txt);
 }
@@ -4159,7 +4189,7 @@ button.compiled-record-modal-tab {
   justify-content: center;
   gap: 8px;
   padding: 10px 18px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   font-family: inherit;
   border-radius: var(--field-radius);
@@ -4264,7 +4294,7 @@ button.compiled-record-modal-tab {
 
 .analysis-chart-card__head h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
   font-weight: 700;
   color: #424242;
 }
@@ -4306,7 +4336,7 @@ button.compiled-record-modal-tab {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: var(--txt-lt);
   text-align: center;
   padding: 1rem;
@@ -4346,7 +4376,7 @@ button.compiled-record-modal-tab {
 
 .analysis-metrics-table-wrap header h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--font-size-base);
   font-weight: 700;
   color: #424242;
 }
@@ -4359,14 +4389,14 @@ button.compiled-record-modal-tab {
 .analysis-metrics-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .analysis-metrics-table th {
   text-align: left;
   padding: 12px 16px;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--font-size-compact);
   background: var(--table-header-bg);
   color: var(--table-header-text);
   border-bottom: 1px solid var(--table-header-border);

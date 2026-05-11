@@ -112,6 +112,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-section-title">Federal actions</div>
             <div className="nav-sub">
               <NavItem to="/requests" icon={Send} label="Request management" onPick={onPick} />
+              <NavItem to="/federal-upr-requests" icon={ScrollText} label="UPR Requests" onPick={onPick} />
               <NavItem to="/responses" icon={Inbox} label="Regional responses" onPick={onPick} />
               <NavItem to="/compilation" icon={Layers} label="Compilation center" onPick={onPick} />
               <NavItem to="/compiled-records" icon={FileCheck} label="Compilation records" onPick={onPick} />

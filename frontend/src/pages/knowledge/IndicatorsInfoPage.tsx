@@ -39,7 +39,7 @@ export function IndicatorsInfoPage() {
               <h3>{k.title}</h3>
               <p>{k.summary ?? '—'}</p>
               {k.body?.trim() ? (
-                <p className="text-muted" style={{ fontSize: 14, marginTop: 8, whiteSpace: 'pre-wrap' }}>
+                <p className="text-muted" style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>
                   {k.body.trim()}
                 </p>
               ) : null}

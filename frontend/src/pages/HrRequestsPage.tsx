@@ -97,6 +97,13 @@ export function HrRequestsPage() {
     }
   }, [modal])
 
+  const refreshModalDetail = useCallback(async () => {
+    if (modal?.id) {
+      const row = await fetchHrRequest(modal.id)
+      setDetail(row)
+    }
+  }, [modal?.id])
+
   const statusFilter = filters.status ?? ''
 
   const filteredRows = useMemo(() => {
@@ -274,6 +281,7 @@ export function HrRequestsPage() {
           lockedRegionId={lockedRegionId}
           onClose={() => setModal(null)}
           onSaved={() => void reload()}
+          onDetailRefresh={refreshModalDetail}
         />
       )}
 

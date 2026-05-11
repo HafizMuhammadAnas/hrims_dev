@@ -260,7 +260,7 @@ export function SubmissionHistoryPage({ title }: Props) {
 
               <div className="dept-task-response-modal__panel regional-response-detail-modal__panel">
                 <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                  <h2 className="hr-request-view-template__section-title">Reference — department submissions</h2>
+                  <h2 className="card-section-heading">Reference — department submissions</h2>
                   <DepartmentSubmissionsForRequest
                     tasksForDetail={tasksForDetail}
                     reqId={detail.req_id}
@@ -270,7 +270,7 @@ export function SubmissionHistoryPage({ title }: Props) {
                 </section>
 
                 <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                  <h2 className="hr-request-view-template__section-title">Your compilation</h2>
+                  <h2 className="card-section-heading">Your compilation</h2>
                   <div className="form-row">
                     <label htmlFor="edit-compilation-title">Title</label>
                     <input

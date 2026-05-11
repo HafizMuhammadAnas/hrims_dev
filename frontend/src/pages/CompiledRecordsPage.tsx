@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { isApiError } from '../api/apiError'
 import { fetchCompiledRecords, fetchDepartmentTasks, type CompiledRecordRow, type DepartmentTaskRow } from '../api/lists'
-import { formatDepartmentResponseAsPlaintext } from '../lib/departmentTaskResponseFormat'
+import { updateCompiledRecord } from '../api/workflows'
+import { useAuth } from '../auth/AuthContext'
+import {
+  collectAttachmentUrlsFromDepartmentTask,
+  dedupeUrls,
+  formatDepartmentResponseTextOnly,
+} from '../lib/departmentTaskResponseFormat'
 import { hasDepartmentResponse } from '../lib/departmentTaskWorkflow'
 import { Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
@@ -14,7 +21,9 @@ import { StatsCards } from '../components/ui/StatsCards'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
+import { AttachmentViewLink } from '../components/DepartmentResponseDisplay'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { isFederalAdmin, isSuperAdmin } from '../lib/roles'
 
 type CompiledSortKey = 'id' | 'req_id' | 'title' | 'status' | 'compilation_date'
 
@@ -33,10 +42,14 @@ function formatCompiledStatusLabel(status: string): string {
 }
 
 export function CompiledRecordsPage() {
+  const { user } = useAuth()
   const location = useLocation()
+  const canFinalizeCompilation = isFederalAdmin(user) || isSuperAdmin(user)
   const [rows, setRows] = useState<CompiledRecordRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [detail, setDetail] = useState<CompiledRecordRow | null>(null)
+  const [compileFinalizeError, setCompileFinalizeError] = useState<string | null>(null)
+  const [compileFinalizing, setCompileFinalizing] = useState(false)
   const [detailDeptTasks, setDetailDeptTasks] = useState<DepartmentTaskRow[]>([])
   const [detailDeptLoading, setDetailDeptLoading] = useState(false)
   const [detailDeptError, setDetailDeptError] = useState<string | null>(null)
@@ -66,6 +79,10 @@ export function CompiledRecordsPage() {
       .then(setRows)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed'))
   }, [])
+
+  useEffect(() => {
+    setCompileFinalizeError(null)
+  }, [detail?.id])
 
   useEffect(() => {
     if (!detail?.req_id) {
@@ -104,9 +121,28 @@ export function CompiledRecordsPage() {
     return () => {
       cancelled = true
     }
-  }, [detail?.id, detail?.req_id])
+  }, [detail?.id, detail?.req_id, (detail?.region_names ?? []).join('\u0001')])
 
   const statusFilter = filters.status ?? ''
+
+  const finalizeDraftCompilation = useCallback(async () => {
+    if (!detail || detail.status !== 'draft' || !canFinalizeCompilation) return
+    setCompileFinalizing(true)
+    setCompileFinalizeError(null)
+    try {
+      const updated = await updateCompiledRecord(detail.id, { status: 'submitted' })
+      setDetail(updated)
+      try {
+        setRows(await fetchCompiledRecords())
+      } catch {
+        setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+      }
+    } catch (e: unknown) {
+      setCompileFinalizeError(isApiError(e) ? e.message : 'Could not submit this record.')
+    } finally {
+      setCompileFinalizing(false)
+    }
+  }, [detail, canFinalizeCompilation])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -154,6 +190,14 @@ export function CompiledRecordsPage() {
     ],
     [rows],
   )
+
+  const allDepartmentAttachmentUrls = useMemo(() => {
+    return dedupeUrls(
+      detailDeptTasks.flatMap((t) =>
+        collectAttachmentUrlsFromDepartmentTask(t.response_data, t.attachment_url),
+      ),
+    )
+  }, [detailDeptTasks])
 
   const fromPath = encodeURIComponent(location.pathname)
 
@@ -274,7 +318,15 @@ export function CompiledRecordsPage() {
       <PaginationBar page={page} pageSize={pageSize} totalItems={processed.length} onPageChange={setPage} />
 
       {detail && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDetail(null)}>
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            setCompileFinalizeError(null)
+            setDetail(null)
+          }}
+        >
           <div
             className="modal-card modal-card-wide regional-response-detail-modal"
             onClick={(e) => e.stopPropagation()}
@@ -296,7 +348,15 @@ export function CompiledRecordsPage() {
                   </StatusBadge>
                 </p>
               </div>
-              <button type="button" className="modal-close" onClick={() => setDetail(null)} aria-label="Close">
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => {
+                  setCompileFinalizeError(null)
+                  setDetail(null)
+                }}
+                aria-label="Close"
+              >
                 ×
               </button>
             </div>
@@ -308,9 +368,7 @@ export function CompiledRecordsPage() {
               </p>
 
               <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
-                  Record details
-                </h2>
+                <h2 className="card-section-heading">Record details</h2>
                 <div className="regional-response-detail-modal__grid">
                   <div>
                     <div className="hr-request-view-template__field-label">Record ID</div>
@@ -358,12 +416,10 @@ export function CompiledRecordsPage() {
               </section>
 
               <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
-                  Department responses by region
-                </h2>
+                <h2 className="card-section-heading">Department responses by region</h2>
                 <p className="muted small" style={{ margin: '0 0 12px' }}>
-                  Each province lists <strong>department</strong> submissions only. The regional admin’s consolidated
-                  compilation is not shown here.
+                  Text from department submissions only, grouped by province (no department names). The regional
+                  admin’s consolidated compilation is not shown here. Files are listed together below.
                 </p>
                 {detailDeptLoading ? <p className="muted">Loading department responses…</p> : null}
                 {detailDeptError ? <p className="login-error">{detailDeptError}</p> : null}
@@ -375,6 +431,13 @@ export function CompiledRecordsPage() {
                   ) : (
                     (detail.region_names ?? []).map((regionName) => {
                       const forRegion = detailDeptTasks.filter((t) => (t.region_name ?? '') === regionName)
+                      const mergedText = (() => {
+                        if (forRegion.length === 0) return ''
+                        const parts = forRegion
+                          .map((t) => formatDepartmentResponseTextOnly(t.response_data, t.attachment_url).trim())
+                          .filter((s) => s && s !== '—')
+                        return parts.length > 0 ? parts.join('\n\n') : ''
+                      })()
                       return (
                         <div key={regionName} className="compiled-record-region-block">
                           <div className="hr-request-view-template__field-label compiled-record-region-block__title">
@@ -387,21 +450,12 @@ export function CompiledRecordsPage() {
                             <p className="muted" style={{ margin: '4px 0 0' }}>
                               No department submissions on file for this region.
                             </p>
+                          ) : mergedText ? (
+                            <div className="compiled-record-region-block__response-body">{mergedText}</div>
                           ) : (
-                            <ul className="compiled-record-regional-response-list">
-                              {forRegion.map((t) => (
-                                <li key={t.id}>
-                                  <div className="compiled-record-dept-bullet">
-                                    <div className="compiled-record-dept-bullet__name">
-                                      {t.department_name?.trim() || t.department_id}
-                                    </div>
-                                    <div className="compiled-record-regional-response-list__text">
-                                      {formatDepartmentResponseAsPlaintext(t.response_data, t.attachment_url)}
-                                    </div>
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
+                            <p className="muted" style={{ margin: '4px 0 0' }}>
+                              —
+                            </p>
                           )}
                         </div>
                       )
@@ -411,9 +465,31 @@ export function CompiledRecordsPage() {
               </section>
 
               <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                <h2 className="hr-request-view-template__section-title" style={{ fontSize: 14 }}>
-                  Federal administrator summary (ministry)
-                </h2>
+                <h2 className="card-section-heading">Department attachments</h2>
+                <p className="muted small" style={{ margin: '0 0 12px' }}>
+                  All files submitted with department responses for this record’s regions. Use <strong>View attachment</strong>{' '}
+                  to open each file.
+                </p>
+                {detailDeptLoading ? <p className="muted">Loading…</p> : null}
+                {!detailDeptLoading && !detailDeptError ? (
+                  allDepartmentAttachmentUrls.length === 0 ? (
+                    <p className="muted" style={{ margin: 0 }}>
+                      No department attachments on file.
+                    </p>
+                  ) : (
+                    <ul className="compiled-record-all-attachments">
+                      {allDepartmentAttachmentUrls.map((url) => (
+                        <li key={url}>
+                          <AttachmentViewLink url={url} />
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                ) : null}
+              </section>
+
+              <section className="hr-request-view-template__card regional-response-detail-modal__section">
+                <h2 className="card-section-heading">Federal administrator summary (ministry)</h2>
                 <p className="muted small" style={{ margin: '0 0 8px' }}>
                   Only this field is saved as the national submission summary. It is written by the federal administrator and
                   is not assembled from regional compilations.
@@ -427,10 +503,50 @@ export function CompiledRecordsPage() {
                 />
               </section>
 
+              {detail.status === 'draft' && canFinalizeCompilation ? (
+                <p className="muted small" style={{ margin: '0 0 12px' }}>
+                  This national record is still a <strong>draft</strong>. When you are ready, submit it to the ministry
+                  to mark it as sent and lock further edits.
+                  {detail.req_id ? (
+                    <>
+                      {' '}
+                      You can also return to{' '}
+                      <Link
+                        to={`/compilation?from=${fromPath}&reqId=${encodeURIComponent(detail.req_id)}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Compilation center
+                      </Link>{' '}
+                      to build another version (that flow saves a new record when you use Save draft).
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
+              {compileFinalizeError ? <p className="login-error">{compileFinalizeError}</p> : null}
+
               <ModalActions>
-                <Button variant="secondary" compact type="button" onClick={() => setDetail(null)}>
+                <Button
+                  variant="secondary"
+                  compact
+                  type="button"
+                  onClick={() => {
+                    setCompileFinalizeError(null)
+                    setDetail(null)
+                  }}
+                >
                   Close
                 </Button>
+                {detail.status === 'draft' && canFinalizeCompilation ? (
+                  <Button
+                    variant="primary"
+                    compact
+                    type="button"
+                    disabled={compileFinalizing}
+                    onClick={() => void finalizeDraftCompilation()}
+                  >
+                    {compileFinalizing ? 'Submitting…' : 'Submit to ministry'}
+                  </Button>
+                ) : null}
               </ModalActions>
             </div>
           </div>

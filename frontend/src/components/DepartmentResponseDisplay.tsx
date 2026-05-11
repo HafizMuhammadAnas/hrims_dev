@@ -34,7 +34,13 @@ export function DepartmentResponseDisplay({ responseData, attachmentUrl, onlyInd
     const text = parsed.text?.trim() ? parsed.text : '—'
     return (
       <>
-        <textarea readOnly rows={8} value={text} style={{ width: '100%', boxSizing: 'border-box' }} />
+        <textarea
+          readOnly
+          rows={8}
+          value={text}
+          className="hr-request-readonly-prose"
+          style={{ width: '100%', boxSizing: 'border-box' }}
+        />
         {parsed.attachmentUrl ? (
           <div style={{ marginTop: 10 }}>
             <AttachmentViewLink url={parsed.attachmentUrl} />
@@ -67,13 +73,15 @@ export function DepartmentResponseDisplay({ responseData, attachmentUrl, onlyInd
               background: 'var(--field-bg, #fafbfd)',
             }}
           >
-            <strong style={{ fontSize: 14, display: 'block', marginBottom: 10 }}>{title}</strong>
+            <strong className="text-sm font-semibold" style={{ display: 'block', marginBottom: 10 }}>
+              {title}
+            </strong>
             {bundle.quantitative ? (
               <div style={{ marginBottom: bundle.qualitative ? 12 : 0 }}>
                 <div className="muted small" style={{ marginBottom: 6 }}>
                   Quantitative
                 </div>
-                <div style={{ fontSize: 14 }}>Number: {bundle.quantitative.value}</div>
+                <div className="text-sm">Number: {bundle.quantitative.value}</div>
                 {bundle.quantitative.comment ? (
                   <p className="muted small" style={{ margin: '6px 0 0' }}>
                     Comment: {bundle.quantitative.comment}
@@ -92,7 +100,9 @@ export function DepartmentResponseDisplay({ responseData, attachmentUrl, onlyInd
                   Qualitative
                 </div>
                 {bundle.qualitative.text ? (
-                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{bundle.qualitative.text}</p>
+                  <p className="text-sm" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                    {bundle.qualitative.text}
+                  </p>
                 ) : (
                   <p className="muted small" style={{ margin: 0 }}>
                     (No narrative text)

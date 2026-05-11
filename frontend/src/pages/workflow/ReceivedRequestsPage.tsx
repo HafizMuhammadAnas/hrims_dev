@@ -110,6 +110,13 @@ export function ReceivedRequestsPage({
     }
   }, [modal])
 
+  const refreshModalDetail = useCallback(async () => {
+    if (modal?.id) {
+      const row = await fetchHrRequest(modal.id)
+      setDetail(row)
+    }
+  }, [modal?.id])
+
   const mapped = useMemo(() => {
     const scopedRows = enableRequestCrud
       ? rows.filter((r) => (r.departments?.length ?? 0) > 0)
@@ -347,6 +354,7 @@ export function ReceivedRequestsPage({
           lockedRegionId={lockedRegionId}
           onClose={() => setModal(null)}
           onSaved={() => void load()}
+          onDetailRefresh={refreshModalDetail}
         />
       )}
 

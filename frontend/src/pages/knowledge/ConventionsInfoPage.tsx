@@ -48,7 +48,7 @@ function ConventionDetail({
         )}
         {data.components.length > 0 && (
           <div style={{ marginTop: 20 }}>
-            <h3 style={{ fontSize: '1.1rem' }}>Treaty structure</h3>
+            <h4>Treaty structure</h4>
             <ul style={{ margin: '12px 0 0', paddingLeft: '1.25rem' }}>
               {data.components.map((c) => (
                 <li key={c.id}>
@@ -57,7 +57,7 @@ function ConventionDetail({
                   </strong>
                   : {c.title}
                   {c.body?.trim() ? (
-                    <div className="text-muted" style={{ marginTop: 6, fontSize: 14, whiteSpace: 'pre-wrap' }}>
+                    <div className="text-muted" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>
                       {c.body.trim()}
                     </div>
                   ) : null}

@@ -40,6 +40,8 @@ export type HrRequestAttachmentRow = {
   original_name: string
   mime: string | null
   size: number | null
+  /** Public disk: `/storage/...`. Legacy local disk: authenticated API path. */
+  url?: string | null
 }
 
 export type HrRequestIndicatorResponseRow = {

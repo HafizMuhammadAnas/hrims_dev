@@ -592,7 +592,7 @@ export function AnalysisPage() {
               <BarChart data={categoryBarData} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" allowDecimals={false} />
-                <YAxis dataKey="name" type="category" width={108} tick={{ fontSize: 11 }} />
+                <YAxis dataKey="name" type="category" width={108} tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Bar dataKey="records" fill={PASTEL_BAR_CATEGORY} radius={[0, 4, 4, 0]} name="Records" />
               </BarChart>
@@ -609,7 +609,7 @@ export function AnalysisPage() {
               <BarChart data={sdgBarData} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" allowDecimals={false} />
-                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10 }} />
+                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Bar dataKey="records" fill={PASTEL_BAR_SDG} radius={[0, 4, 4, 0]} name="Records" />
               </BarChart>
@@ -705,7 +705,7 @@ export function AnalysisPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={sdgRadarData} cx="50%" cy="50%" outerRadius="70%">
                   <PolarGrid />
-                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
+                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12 }} />
                   <PolarRadiusAxis angle={30} domain={[0, sdgRadarData[0]?.fullMark ?? 10]} />
                   <Radar
                     name="Tagged requests"
@@ -758,7 +758,7 @@ export function AnalysisPage() {
                                 }}
                               />
                             </div>
-                            <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                            <span className="text-xs tabular-nums">
                               {row.compliance}%
                             </span>
                           </div>

@@ -14,6 +14,7 @@ import { canManageHrRequests, hrRequestLockedRegionId } from '../auth/rbac'
 import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../components/CompiledRecordsWorkflowNav'
 import { DepartmentResponseDisplay } from '../components/DepartmentResponseDisplay'
 import { HrRequestModal } from '../components/HrRequestModal'
+import { PendingFileAttachmentRow } from '../components/PendingFileAttachmentRow'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -43,10 +44,22 @@ type DeptIndicatorDraft = {
   qualText: string
   quantFile: File | null
   qualFile: File | null
+  /** Resubmit: drop previously saved quantitative attachment. */
+  clearSavedQuantAttachment: boolean
+  /** Resubmit: drop previously saved qualitative attachment. */
+  clearSavedQualAttachment: boolean
 }
 
 function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
-  return { value: '', comment: '', qualText: '', quantFile: null, qualFile: null }
+  return {
+    value: '',
+    comment: '',
+    qualText: '',
+    quantFile: null,
+    qualFile: null,
+    clearSavedQuantAttachment: false,
+    clearSavedQualAttachment: false,
+  }
 }
 
 export function HrRequestViewPage() {
@@ -79,9 +92,17 @@ export function HrRequestViewPage() {
 
   const [responseText, setResponseText] = useState('')
   const [responseFile, setResponseFile] = useState<File | null>(null)
+  /** Resubmit: remove stored legacy attachment without replacing it. */
+  const [legacyAttachmentClear, setLegacyAttachmentClear] = useState(false)
+  /** Bumps remount file inputs after clearing a chosen file (same file can be picked again). */
+  const [deptFileInputRev, setDeptFileInputRev] = useState<Record<string, number>>({})
   const [indicatorDrafts, setIndicatorDrafts] = useState<Record<number, DeptIndicatorDraft>>({})
   const [submittingResponse, setSubmittingResponse] = useState(false)
   const [submitResponseError, setSubmitResponseError] = useState<string | null>(null)
+
+  function bumpDeptFileInput(key: string) {
+    setDeptFileInputRev((r) => ({ ...r, [key]: (r[key] ?? 0) + 1 }))
+  }
 
   const reloadTasksAndDepartments = useCallback(async () => {
     const [deptRows, taskRows] = await Promise.all([fetchDepartments(), fetchDepartmentTasks()])
@@ -189,11 +210,15 @@ export function HrRequestViewPage() {
     if (!activeTask) {
       setResponseText('')
       setResponseFile(null)
+      setLegacyAttachmentClear(false)
+      setDeptFileInputRev({})
       setIndicatorDrafts({})
       setSubmitResponseError(null)
       return
     }
     setResponseFile(null)
+    setLegacyAttachmentClear(false)
+    setDeptFileInputRev({})
     setSubmitResponseError(null)
     const collecting = indicatorsScopedToRequest(detail)
     if (collecting.length > 0) {
@@ -224,9 +249,15 @@ export function HrRequestViewPage() {
     setResponseText(activeTask.response_data?.trim() ? activeTask.response_data : '')
   }, [activeTask?.id, activeTask?.response_data, activeTask?.attachment_url, detail])
 
+  const deptParsedTaskResponse = useMemo(() => {
+    if (!activeTask) return null
+    return parseDepartmentTaskResponseData(activeTask.response_data, activeTask.attachment_url)
+  }, [activeTask])
+
   const indicatorFormReady = useMemo(() => {
     if (deptIndicatorsForForm.length === 0 || !activeTask) return true
-    const parsed = parseDepartmentTaskResponseData(activeTask.response_data, activeTask.attachment_url)
+    const parsed = deptParsedTaskResponse
+    if (!parsed) return true
     for (const ind of deptIndicatorsForForm) {
       const d = indicatorDrafts[ind.id]
       if (!d) return false
@@ -239,11 +270,19 @@ export function HrRequestViewPage() {
           parsed.kind === 'structured'
             ? parsed.payload.by_indicator[String(ind.id)]?.qualitative?.attachment_url?.trim()
             : ''
-        if (!d.qualText.trim() && !d.qualFile && !prevQualUrl) return false
+        const effectiveQualUrl = d.clearSavedQualAttachment ? '' : prevQualUrl
+        if (!d.qualText.trim() && !d.qualFile && !effectiveQualUrl) return false
       }
     }
     return true
-  }, [deptIndicatorsForForm, indicatorDrafts, activeTask])
+  }, [deptIndicatorsForForm, indicatorDrafts, activeTask, deptParsedTaskResponse])
+
+  const deptLegacySubmitReady = useMemo(() => {
+    if (!activeTask) return false
+    const trimmed = responseText.trim()
+    const hadStored = Boolean(activeTask.attachment_url?.trim())
+    return Boolean(trimmed || responseFile || (hadStored && !legacyAttachmentClear))
+  }, [activeTask, responseText, responseFile, legacyAttachmentClear])
 
   const showRegionalAssign =
     regionalUser &&
@@ -325,6 +364,8 @@ export function HrRequestViewPage() {
         > = {}
         const quantFiles: Record<number, File> = {}
         const qualFiles: Record<number, File> = {}
+        const stripQuantIndicatorIds: number[] = []
+        const stripQualIndicatorIds: number[] = []
         for (const ind of deptIndicatorsForForm) {
           const d = indicatorDrafts[ind.id]
           if (!d) continue
@@ -332,10 +373,12 @@ export function HrRequestViewPage() {
           if (ind.has_quantitative) {
             entry.quantitative = { value: d.value.trim(), comment: d.comment.trim() }
             if (d.quantFile) quantFiles[ind.id] = d.quantFile
+            if (d.clearSavedQuantAttachment) stripQuantIndicatorIds.push(ind.id)
           }
           if (ind.has_qualitative) {
             entry.qualitative = { text: d.qualText.trim() }
             if (d.qualFile) qualFiles[ind.id] = d.qualFile
+            if (d.clearSavedQualAttachment) stripQualIndicatorIds.push(ind.id)
           }
           by_indicator[String(ind.id)] = entry
         }
@@ -344,17 +387,20 @@ export function HrRequestViewPage() {
           indicator_bundles: JSON.stringify({ by_indicator }),
           quantFiles,
           qualFiles,
+          stripQuantIndicatorIds,
+          stripQualIndicatorIds,
         })
       } else {
         const trimmed = responseText.trim()
-        if (!trimmed && !responseFile) {
+        if (!deptLegacySubmitReady) {
           setSubmitResponseError('Enter a response and/or attach a file.')
           return
         }
         await submitDepartmentTaskResponse(activeTask.id, {
           mode: 'legacy',
           response_data: trimmed,
-          attachment: responseFile,
+          attachment: responseFile ?? undefined,
+          removeAttachment: legacyAttachmentClear && !responseFile,
         })
       }
       await reloadTasksAndDepartments()
@@ -431,7 +477,7 @@ export function HrRequestViewPage() {
                         justifyContent: 'space-between',
                       }}
                     >
-                      <strong style={{ fontSize: 14 }}>{r.title}</strong>
+                      <strong className="text-sm font-semibold">{r.title}</strong>
                       <StatusBadge tone="default">{r.review_status}</StatusBadge>
                     </div>
                     <p className="muted small" style={{ margin: '8px 0 10px' }}>
@@ -473,6 +519,16 @@ export function HrRequestViewPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {deptIndicatorsForForm.map((ind) => {
                     const d = indicatorDrafts[ind.id] ?? emptyDeptIndicatorDraft()
+                    const prevQuantUrl =
+                      deptParsedTaskResponse?.kind === 'structured'
+                        ? deptParsedTaskResponse.payload.by_indicator[String(ind.id)]?.quantitative?.attachment_url?.trim() ??
+                          ''
+                        : ''
+                    const prevQualUrl =
+                      deptParsedTaskResponse?.kind === 'structured'
+                        ? deptParsedTaskResponse.payload.by_indicator[String(ind.id)]?.qualitative?.attachment_url?.trim() ??
+                          ''
+                        : ''
                     return (
                       <div
                         key={ind.id}
@@ -483,7 +539,7 @@ export function HrRequestViewPage() {
                           background: 'var(--field-bg, #fafbfd)',
                         }}
                       >
-                        <strong style={{ fontSize: 14, display: 'block', marginBottom: 10 }}>
+                        <strong className="text-sm font-semibold" style={{ display: 'block', marginBottom: 10 }}>
                           {ind.indicator_text}
                         </strong>
                         {ind.disaggregation?.trim() ? (
@@ -527,19 +583,76 @@ export function HrRequestViewPage() {
                                 style={{ width: '100%', boxSizing: 'border-box' }}
                               />
                             </div>
+                            {prevQuantUrl && !d.clearSavedQuantAttachment ? (
+                              <div className="form-row" style={{ marginBottom: 8 }}>
+                                <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
+                                  Saved quantitative file
+                                </span>
+                                <span className="hr-request-attachments-list__actions">
+                                  <a
+                                    href={prevQuantUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-secondary btn-compact"
+                                  >
+                                    View
+                                  </a>
+                                  <Button
+                                    type="button"
+                                    variant="danger"
+                                    compact
+                                    onClick={() =>
+                                      setIndicatorDrafts((prev) => ({
+                                        ...prev,
+                                        [ind.id]: {
+                                          ...(prev[ind.id] ?? emptyDeptIndicatorDraft()),
+                                          clearSavedQuantAttachment: true,
+                                        },
+                                      }))
+                                    }
+                                  >
+                                    Remove
+                                  </Button>
+                                </span>
+                              </div>
+                            ) : null}
+                            {d.clearSavedQuantAttachment && prevQuantUrl ? (
+                              <p className="muted small" style={{ margin: '0 0 8px' }}>
+                                Saved quantitative file will be removed when you submit.
+                              </p>
+                            ) : null}
                             <div className="form-row">
                               <label htmlFor={`dept-ind-${ind.id}-qfile`}>Attach file (optional)</label>
                               <input
                                 id={`dept-ind-${ind.id}-qfile`}
+                                key={`q-${ind.id}-${deptFileInputRev[`q-${ind.id}`] ?? 0}`}
                                 type="file"
-                                onChange={(e) =>
-                                  setIndicatorDrafts((prev) => ({
-                                    ...prev,
-                                    [ind.id]: { ...d, quantFile: e.target.files?.[0] ?? null },
-                                  }))
-                                }
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0] ?? null
+                                  e.target.value = ''
+                                  setIndicatorDrafts((prev) => {
+                                    const cur = prev[ind.id] ?? emptyDeptIndicatorDraft()
+                                    return {
+                                      ...prev,
+                                      [ind.id]: { ...cur, quantFile: f, clearSavedQuantAttachment: false },
+                                    }
+                                  })
+                                }}
                               />
                             </div>
+                            {d.quantFile ? (
+                              <PendingFileAttachmentRow
+                                file={d.quantFile}
+                                listStyle={{ marginTop: 8 }}
+                                onRemove={() => {
+                                  bumpDeptFileInput(`q-${ind.id}`)
+                                  setIndicatorDrafts((prev) => {
+                                    const cur = prev[ind.id] ?? emptyDeptIndicatorDraft()
+                                    return { ...prev, [ind.id]: { ...cur, quantFile: null } }
+                                  })
+                                }}
+                              />
+                            ) : null}
                           </div>
                         ) : null}
                         {ind.has_qualitative ? (
@@ -563,19 +676,76 @@ export function HrRequestViewPage() {
                                 style={{ width: '100%', boxSizing: 'border-box' }}
                               />
                             </div>
+                            {prevQualUrl && !d.clearSavedQualAttachment ? (
+                              <div className="form-row" style={{ marginBottom: 8 }}>
+                                <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
+                                  Saved qualitative file
+                                </span>
+                                <span className="hr-request-attachments-list__actions">
+                                  <a
+                                    href={prevQualUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-secondary btn-compact"
+                                  >
+                                    View
+                                  </a>
+                                  <Button
+                                    type="button"
+                                    variant="danger"
+                                    compact
+                                    onClick={() =>
+                                      setIndicatorDrafts((prev) => ({
+                                        ...prev,
+                                        [ind.id]: {
+                                          ...(prev[ind.id] ?? emptyDeptIndicatorDraft()),
+                                          clearSavedQualAttachment: true,
+                                        },
+                                      }))
+                                    }
+                                  >
+                                    Remove
+                                  </Button>
+                                </span>
+                              </div>
+                            ) : null}
+                            {d.clearSavedQualAttachment && prevQualUrl ? (
+                              <p className="muted small" style={{ margin: '0 0 8px' }}>
+                                Saved qualitative file will be removed when you submit.
+                              </p>
+                            ) : null}
                             <div className="form-row">
                               <label htmlFor={`dept-ind-${ind.id}-lfile`}>Attach file (optional)</label>
                               <input
                                 id={`dept-ind-${ind.id}-lfile`}
+                                key={`l-${ind.id}-${deptFileInputRev[`l-${ind.id}`] ?? 0}`}
                                 type="file"
-                                onChange={(e) =>
-                                  setIndicatorDrafts((prev) => ({
-                                    ...prev,
-                                    [ind.id]: { ...d, qualFile: e.target.files?.[0] ?? null },
-                                  }))
-                                }
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0] ?? null
+                                  e.target.value = ''
+                                  setIndicatorDrafts((prev) => {
+                                    const cur = prev[ind.id] ?? emptyDeptIndicatorDraft()
+                                    return {
+                                      ...prev,
+                                      [ind.id]: { ...cur, qualFile: f, clearSavedQualAttachment: false },
+                                    }
+                                  })
+                                }}
                               />
                             </div>
+                            {d.qualFile ? (
+                              <PendingFileAttachmentRow
+                                file={d.qualFile}
+                                listStyle={{ marginTop: 8 }}
+                                onRemove={() => {
+                                  bumpDeptFileInput(`l-${ind.id}`)
+                                  setIndicatorDrafts((prev) => {
+                                    const cur = prev[ind.id] ?? emptyDeptIndicatorDraft()
+                                    return { ...prev, [ind.id]: { ...cur, qualFile: null } }
+                                  })
+                                }}
+                              />
+                            ) : null}
                           </div>
                         ) : null}
                       </div>
@@ -600,14 +770,55 @@ export function HrRequestViewPage() {
                     style={{ width: '100%', boxSizing: 'border-box' }}
                   />
                 </div>
+                {activeTask.attachment_url?.trim() && !legacyAttachmentClear ? (
+                  <div className="form-row">
+                    <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
+                      Saved attachment
+                    </span>
+                    <span className="hr-request-attachments-list__actions">
+                      <a
+                        href={activeTask.attachment_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary btn-compact"
+                      >
+                        View
+                      </a>
+                      <Button type="button" variant="danger" compact onClick={() => setLegacyAttachmentClear(true)}>
+                        Remove
+                      </Button>
+                    </span>
+                  </div>
+                ) : null}
+                {legacyAttachmentClear && activeTask.attachment_url?.trim() ? (
+                  <p className="muted small" style={{ marginTop: 0, marginBottom: 10 }}>
+                    Attachment will be removed when you submit.
+                  </p>
+                ) : null}
                 <div className="form-row">
-                  <label htmlFor="dept-task-file">Attachment (optional)</label>
+                  <label htmlFor="dept-task-file">Add or replace attachment (optional)</label>
                   <input
                     id="dept-task-file"
+                    key={`legacy-${deptFileInputRev.legacy ?? 0}`}
                     type="file"
-                    onChange={(e) => setResponseFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null
+                      e.target.value = ''
+                      setResponseFile(f)
+                      setLegacyAttachmentClear(false)
+                    }}
                   />
                 </div>
+                {responseFile ? (
+                  <PendingFileAttachmentRow
+                    file={responseFile}
+                    listStyle={{ marginTop: 8 }}
+                    onRemove={() => {
+                      bumpDeptFileInput('legacy')
+                      setResponseFile(null)
+                    }}
+                  />
+                ) : null}
               </>
             )}
             {submitResponseError && <p className="login-error">{submitResponseError}</p>}
@@ -617,9 +828,7 @@ export function HrRequestViewPage() {
                 compact
                 disabled={
                   submittingResponse ||
-                  (deptIndicatorsForForm.length > 0
-                    ? !indicatorFormReady
-                    : !responseText.trim() && !responseFile)
+                  (deptIndicatorsForForm.length > 0 ? !indicatorFormReady : !deptLegacySubmitReady)
                 }
                 onClick={() => void submitResponse()}
               >

@@ -214,13 +214,13 @@ export function FederalCompilationPage() {
       <TableCard padded>
         <label className="muted">HR request</label>
         {requestsForSelect.length === 0 && reqIdsWithResponses.length === 0 ? (
-          <p className="muted" style={{ margin: '8px 0 12px', fontSize: 13 }}>
+          <p className="muted" style={{ margin: '8px 0 12px' }}>
             No regional compilations are in the system yet for any request. Provinces submit from{' '}
             <Link to="/region-compilation">Response compilation</Link>, then return here to build the national record.
           </p>
         ) : null}
         {requestsForSelect.length === 0 && reqIdsWithResponses.length > 0 ? (
-          <p className="muted" style={{ margin: '8px 0 12px', fontSize: 13 }}>
+          <p className="muted" style={{ margin: '8px 0 12px' }}>
             Every request with regional data has already been <strong>submitted to the ministry</strong> from this center.
             Open <Link to="/compiled-records">Compilation records</Link> to review saved national records.
           </p>
@@ -269,7 +269,7 @@ export function FederalCompilationPage() {
           )}
         {selectedReqId && (
           <div style={{ marginBottom: 14 }}>
-            <p className="muted" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>
+            <p className="muted font-semibold text-compact" style={{ margin: '0 0 8px' }}>
               Response progress for <strong>{selectedReqId}</strong>
             </p>
             <StatsCards
@@ -290,7 +290,7 @@ export function FederalCompilationPage() {
               </p>
             ) : (
               <>
-                <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>
+                <p className="muted text-compact" style={{ margin: '0 0 8px' }}>
                   <strong>{selectedResponses.length}</strong> regional response{selectedResponses.length === 1 ? '' : 's'} for
                   this request. Open a row to read the provincial compilation; the ministry summary below is written only by
                   federal staff (regional text is not copied in automatically).
@@ -350,7 +350,7 @@ export function FederalCompilationPage() {
             {saving === 'submitted' ? 'Submitting...' : 'Submit to ministry'}
           </Button>
           {!canPersistCompilation && selectedReqId ? (
-            <span className="muted" style={{ fontSize: 12, flex: '1 1 200px' }}>
+            <span className="muted small" style={{ flex: '1 1 200px' }}>
               Save is available after at least one region is <strong>accepted</strong> for this request.
             </span>
           ) : null}
