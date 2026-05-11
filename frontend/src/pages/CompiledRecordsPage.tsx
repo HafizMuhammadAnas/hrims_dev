@@ -416,11 +416,7 @@ export function CompiledRecordsPage() {
               </section>
 
               <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                <h2 className="card-section-heading">Department responses by region</h2>
-                <p className="muted small" style={{ margin: '0 0 12px' }}>
-                  Text from department submissions only, grouped by province (no department names). The regional
-                  admin’s consolidated compilation is not shown here. Files are listed together below.
-                </p>
+                <h2 className="card-section-heading">Region responses</h2>
                 {detailDeptLoading ? <p className="muted">Loading department responses…</p> : null}
                 {detailDeptError ? <p className="login-error">{detailDeptError}</p> : null}
                 {!detailDeptLoading && !detailDeptError ? (

@@ -2784,14 +2784,6 @@ function IssuesCreateForm({
       <h4 className="issues-create-form__title">Create issue</h4>
       <FormGrid>
         <div className="issues-form-top-grid">
-          <FormControl label="Articles">
-            <ArticleMultiSelectDropdown
-              articles={sortedArticles}
-              selectedIds={selectedArticleIds}
-              onChange={setSelectedArticleIds}
-              disabled={busy}
-            />
-          </FormControl>
           <FormControl label="Convention">
             <select value={conventionId} onChange={(e) => setConventionId(e.target.value)}>
               <option value="">—</option>
@@ -2801,6 +2793,14 @@ function IssuesCreateForm({
                 </option>
               ))}
             </select>
+          </FormControl>
+          <FormControl label="Articles">
+            <ArticleMultiSelectDropdown
+              articles={sortedArticles}
+              selectedIds={selectedArticleIds}
+              onChange={setSelectedArticleIds}
+              disabled={busy}
+            />
           </FormControl>
           <FormControl label="Category">
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
@@ -2942,14 +2942,6 @@ function IssuesEditPanel({
       </div>
       <FormGrid>
         <div className="issues-form-top-grid">
-          <FormControl label="Articles">
-            <ArticleMultiSelectDropdown
-              articles={sortedArticles}
-              selectedIds={selectedArticleIds}
-              onChange={setSelectedArticleIds}
-              disabled={busy}
-            />
-          </FormControl>
           <FormControl label="Convention">
             <select value={conventionId} onChange={(e) => setConventionId(e.target.value)}>
               {conventions.map((c) => (
@@ -2958,6 +2950,14 @@ function IssuesEditPanel({
                 </option>
               ))}
             </select>
+          </FormControl>
+          <FormControl label="Articles">
+            <ArticleMultiSelectDropdown
+              articles={sortedArticles}
+              selectedIds={selectedArticleIds}
+              onChange={setSelectedArticleIds}
+              disabled={busy}
+            />
           </FormControl>
           <FormControl label="Category">
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
