@@ -43,19 +43,54 @@ class CompiledRecordController extends Controller
         ]);
 
         return response()->json([
-            'data' => [
-                'id' => $row->id,
-                'req_id' => $row->hr_request_id,
-                'title' => $row->title,
-                'region_names' => $row->region_names,
-                'compilation_date' => $row->compilation_date?->format('Y-m-d'),
-                'submitted_to' => $row->submitted_to,
-                'submission_date' => $row->submission_date?->format('Y-m-d'),
-                'status' => $row->status,
-                'attachment' => $row->attachment,
-                'summary' => $row->summary,
-            ],
+            'data' => $this->serializeCompiledRecord($row),
         ], 201);
+    }
+
+    public function update(Request $request, string $compiledRecord): JsonResponse
+    {
+        if (! $request->user()->hasRole('super_admin') && ! $request->user()->hasRole('federal_admin')) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $model = CompiledRecord::query()->find($compiledRecord);
+        if (! $model) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if ($model->status === 'submitted') {
+            return response()->json(['message' => 'This record is already submitted and cannot be changed.'], 422);
+        }
+
+        $data = $request->validate([
+            'status' => ['sometimes', Rule::in(['draft', 'submitted'])],
+            'summary' => ['sometimes', 'nullable', 'string'],
+            'title' => ['sometimes', 'string', 'max:500'],
+            'submitted_to' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        if (array_key_exists('title', $data)) {
+            $model->title = $data['title'];
+        }
+        if (array_key_exists('summary', $data)) {
+            $model->summary = $data['summary'];
+        }
+
+        $nextStatus = $data['status'] ?? null;
+        if ($nextStatus === 'submitted') {
+            $model->status = 'submitted';
+            $model->submission_date = now()->toDateString();
+            $model->submitted_to = $data['submitted_to'] ?? $model->submitted_to ?? 'Ministry of Human Rights';
+            $model->attachment = 'compiled-report.pdf';
+        }
+
+        $model->save();
+
+        $model->refresh();
+
+        return response()->json([
+            'data' => $this->serializeCompiledRecord($model),
+        ]);
     }
 
     /**
@@ -103,18 +138,26 @@ class CompiledRecordController extends Controller
         $rows = $query->orderByDesc('compilation_date')->get();
 
         return response()->json([
-            'data' => $rows->map(fn (CompiledRecord $c) => [
-                'id' => $c->id,
-                'req_id' => $c->hr_request_id,
-                'title' => $c->title,
-                'region_names' => $c->region_names,
-                'compilation_date' => $c->compilation_date?->format('Y-m-d'),
-                'submitted_to' => $c->submitted_to,
-                'submission_date' => $c->submission_date?->format('Y-m-d'),
-                'status' => $c->status,
-                'attachment' => $c->attachment,
-                'summary' => $c->summary,
-            ]),
+            'data' => $rows->map(fn (CompiledRecord $c) => $this->serializeCompiledRecord($c)),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeCompiledRecord(CompiledRecord $c): array
+    {
+        return [
+            'id' => $c->id,
+            'req_id' => $c->hr_request_id,
+            'title' => $c->title,
+            'region_names' => $c->region_names,
+            'compilation_date' => $c->compilation_date?->format('Y-m-d'),
+            'submitted_to' => $c->submitted_to,
+            'submission_date' => $c->submission_date?->format('Y-m-d'),
+            'status' => $c->status,
+            'attachment' => $c->attachment,
+            'summary' => $c->summary,
+        ];
     }
 }

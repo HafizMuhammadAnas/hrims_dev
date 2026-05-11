@@ -3,10 +3,12 @@
 namespace App\Http\Resources;
 
 use App\Models\HrRequest;
+use App\Models\HrRequestAttachment;
 use App\Models\Issue;
 use App\Models\IssueIndicator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /** @mixin HrRequest */
 class HrRequestResource extends JsonResource
@@ -58,11 +60,12 @@ class HrRequestResource extends JsonResource
                 'name' => $this->convention->name,
             ] : null),
             'issue' => $this->whenLoaded('issue', fn () => $this->issue instanceof Issue ? $this->serializeIssue($this->issue) : null),
-            'attachments' => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn ($a) => [
+            'attachments' => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn (HrRequestAttachment $a) => [
                 'id' => $a->id,
                 'original_name' => $a->original_name,
                 'mime' => $a->mime,
                 'size' => $a->size,
+                'url' => $this->attachmentViewUrl($a),
             ])->values()->all()),
             'indicator_responses' => $this->whenLoaded('indicatorResponses', fn () => $this->indicatorResponses->map(fn ($r) => [
                 'issue_indicator_id' => $r->issue_indicator_id,
@@ -70,6 +73,24 @@ class HrRequestResource extends JsonResource
                 'qualitative_text' => $r->qualitative_text,
             ])->values()->all()),
         ];
+    }
+
+    /**
+     * Public files: `/storage/...` after `php artisan storage:link`. Legacy `local` disk: authenticated download URL.
+     */
+    private function attachmentViewUrl(HrRequestAttachment $a): ?string
+    {
+        if ($a->path === null || $a->path === '') {
+            return null;
+        }
+        if ($a->disk === 'public') {
+            return Storage::disk('public')->url($a->path);
+        }
+
+        return route('api.v1.hr-requests.attachments.file', [
+            'hrRequest' => $this->resource->getKey(),
+            'attachment' => $a->id,
+        ], false);
     }
 
     /**

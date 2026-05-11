@@ -69,6 +69,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/compiled-records/preview', [CompiledRecordController::class, 'preview'])->name('api.v1.compiled-records.preview');
         Route::get('/compiled-records', [CompiledRecordController::class, 'index'])->name('api.v1.compiled-records.index');
         Route::post('/compiled-records', [CompiledRecordController::class, 'store'])->name('api.v1.compiled-records.store');
+        Route::patch('/compiled-records/{compiledRecord}', [CompiledRecordController::class, 'update'])->name('api.v1.compiled-records.update');
         Route::get('/department-tasks', [DepartmentTaskController::class, 'index'])->name('api.v1.department-tasks.index');
         Route::post('/department-tasks', [DepartmentTaskController::class, 'store'])->name('api.v1.department-tasks.store');
         Route::post('/department-tasks/{departmentTask}/submit-response', [DepartmentTaskController::class, 'submitResponse'])->name('api.v1.department-tasks.submit-response');
@@ -78,6 +79,11 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/hr-request-form/conventions', [HrRequestController::class, 'formConventions'])->name('api.v1.hr-request-form.conventions');
         Route::get('/hr-request-form/issues', [HrRequestController::class, 'formIssues'])->name('api.v1.hr-request-form.issues');
         Route::get('/hr-request-form/federal-departments', [HrRequestController::class, 'formFederalDepartments'])->name('api.v1.hr-request-form.federal-departments');
+
+        Route::get('/hr-requests/{hrRequest}/attachments/{attachment}/file', [HrRequestController::class, 'downloadHrRequestAttachment'])
+            ->name('api.v1.hr-requests.attachments.file');
+        Route::delete('/hr-requests/{hrRequest}/attachments/{attachment}', [HrRequestController::class, 'destroyAttachment'])
+            ->name('api.v1.hr-requests.attachments.destroy');
 
         Route::apiResource('hr-requests', HrRequestController::class)->parameters([
             'hr-requests' => 'hrRequest',

@@ -133,6 +133,64 @@ class HrRequestController extends Controller
         return new HrRequestResource($model);
     }
 
+    /**
+     * Stream an HR request attachment for viewers who may open the file (images, PDFs, etc.).
+     * New uploads use the `public` disk and are also exposed via `url` on the resource; legacy rows use `local`.
+     */
+    public function downloadHrRequestAttachment(Request $request, string $hrRequest, HrRequestAttachment $attachment): JsonResponse|\Symfony\Component\HttpFoundation\Response
+    {
+        $model = HrRequest::query()->find($hrRequest);
+        if (! $model) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+        if ((string) $attachment->hr_request_id !== (string) $model->id) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+        if (! HrimsAccess::userMayViewHrRequest($request->user(), $model)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        if ($attachment->path === null || $attachment->path === '' || ! Storage::disk($attachment->disk)->exists($attachment->path)) {
+            return response()->json(['message' => 'File not found'], 404);
+        }
+
+        return Storage::disk($attachment->disk)->response(
+            $attachment->path,
+            $attachment->original_name,
+            [
+                'Content-Type' => $attachment->mime ?: 'application/octet-stream',
+                'Content-Disposition' => 'inline; filename="'.addcslashes($attachment->original_name, '"\\').'"',
+            ]
+        );
+    }
+
+    public function destroyAttachment(Request $request, string $hrRequest, HrRequestAttachment $attachment): JsonResponse
+    {
+        if (! HrimsAccess::canManageHrRequests($request->user())) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $model = HrRequest::query()->find($hrRequest);
+        if (! $model) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if ((string) $attachment->hr_request_id !== (string) $model->id) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $regionIds = HrimsAccess::scopedRegionIds($request->user());
+        if ($regionIds !== null && ! $this->requestTouchesAllowedRegions($model, $regionIds)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if ($attachment->path && Storage::disk($attachment->disk)->exists($attachment->path)) {
+            Storage::disk($attachment->disk)->delete($attachment->path);
+        }
+        $attachment->delete();
+
+        return response()->json(['message' => 'Attachment removed']);
+    }
+
     public function store(Request $request): HrRequestResource|JsonResponse
     {
         if (! HrimsAccess::canManageHrRequests($request->user())) {
@@ -176,10 +234,10 @@ class HrRequestController extends Controller
             'date' => ['sometimes', 'date'],
             'status' => ['sometimes', Rule::in(['draft', 'active'])],
             'details' => ['sometimes', 'nullable', 'string'],
-            'indicator_responses' => ['sometimes', 'array'],
-            'indicator_responses.*.issue_indicator_id' => ['required', 'integer', 'exists:issue_indicators,id'],
-            'indicator_responses.*.quantitative_value' => ['nullable', 'numeric'],
-            'indicator_responses.*.qualitative_text' => ['nullable', 'string'],
+            /** JSON array (multipart) or array (JSON body); decoded in controller. Omit to leave indicators unchanged. */
+            'indicator_responses' => ['sometimes', 'nullable'],
+            'attachments' => ['nullable'],
+            'attachments.*' => ['file', 'max:15360'],
         ], [
             'title.max' => 'Title may not exceed 500 characters.',
             'region_id.exists' => 'Select a valid region.',
@@ -189,6 +247,12 @@ class HrRequestController extends Controller
 
         if (! HrimsAccess::seesAllRegions($request->user())) {
             unset($data['region_id']);
+        }
+
+        if (array_key_exists('indicator_responses', $data) && $data['indicator_responses'] === null) {
+            unset($data['indicator_responses']);
+        } elseif (array_key_exists('indicator_responses', $data)) {
+            $data['indicator_responses'] = $this->decodeIndicatorResponses($data['indicator_responses']);
         }
 
         DB::transaction(function () use ($model, $data, $request) {
@@ -249,6 +313,23 @@ class HrRequestController extends Controller
                 $issue = Issue::query()->findOrFail($model->issue_id);
                 $this->syncIndicatorResponses($model, $issue, $data['indicator_responses']);
             }
+
+            if ($request->hasFile('attachments')) {
+                foreach ((array) $request->file('attachments') as $file) {
+                    if (! $file || ! $file->isValid()) {
+                        continue;
+                    }
+                    $path = $file->store('hr-requests/'.$model->id, 'public');
+                    HrRequestAttachment::query()->create([
+                        'hr_request_id' => $model->id,
+                        'disk' => 'public',
+                        'path' => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                        'mime' => $file->getClientMimeType(),
+                        'size' => $file->getSize(),
+                    ]);
+                }
+            }
         });
 
         $model->load([
@@ -285,8 +366,8 @@ class HrRequestController extends Controller
         }
 
         foreach ($model->attachments as $att) {
-            if ($att->disk === 'local' && $att->path && Storage::disk('local')->exists($att->path)) {
-                Storage::disk('local')->delete($att->path);
+            if ($att->path && Storage::disk($att->disk)->exists($att->path)) {
+                Storage::disk($att->disk)->delete($att->path);
             }
         }
 
@@ -449,10 +530,10 @@ class HrRequestController extends Controller
                     if (! $file || ! $file->isValid()) {
                         continue;
                     }
-                    $path = $file->store('hr-requests/'.$row->id, 'local');
+                    $path = $file->store('hr-requests/'.$row->id, 'public');
                     HrRequestAttachment::query()->create([
                         'hr_request_id' => $row->id,
-                        'disk' => 'local',
+                        'disk' => 'public',
                         'path' => $path,
                         'original_name' => $file->getClientOriginalName(),
                         'mime' => $file->getClientMimeType(),

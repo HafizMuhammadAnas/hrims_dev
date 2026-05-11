@@ -154,18 +154,25 @@ class NotificationService
             ->filter(fn (User $user) => $actor === null || (int) $user->id !== (int) $actor->id)
             ->unique('id')
             ->values()
-            ->map(fn (User $user) => [
-                'user_id' => $user->id,
-                'event_key' => $eventKey,
-                'title' => $title,
-                'message' => $message,
-                'entity_type' => $entityType,
-                'entity_id' => $entityId,
-                'route' => $route,
-                'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ])
+            ->map(function (User $user) use ($eventKey, $title, $message, $entityType, $entityId, $route, $meta): array {
+                $encoded = json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                if ($encoded === false) {
+                    $encoded = '{}';
+                }
+
+                return [
+                    'user_id' => $user->id,
+                    'event_key' => $eventKey,
+                    'title' => $title,
+                    'message' => $message,
+                    'entity_type' => $entityType,
+                    'entity_id' => $entityId,
+                    'route' => $route,
+                    'meta' => $encoded,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            })
             ->all();
 
         if ($rows !== []) {

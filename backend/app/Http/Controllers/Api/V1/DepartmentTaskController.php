@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 
 class DepartmentTaskController extends Controller
 {
@@ -86,15 +87,18 @@ class DepartmentTaskController extends Controller
         }
 
         $instructions = isset($data['assignment_instructions']) ? trim((string) $data['assignment_instructions']) : '';
-        $task = DepartmentTask::query()->create([
+        $payload = [
             'id' => 'TSK-'.strtoupper(Str::random(10)),
             'hr_request_id' => $hrRequest->id,
             'region_id' => $hrRequest->region_id,
             'department_id' => $data['department_id'],
             'status' => 'assigned',
             'assigned_date' => now()->toDateString(),
-            'assignment_instructions' => $instructions !== '' ? $instructions : null,
-        ]);
+        ];
+        if (Schema::hasColumn('department_tasks', 'assignment_instructions')) {
+            $payload['assignment_instructions'] = $instructions !== '' ? $instructions : null;
+        }
+        $task = DepartmentTask::query()->create($payload);
 
         if ($hrRequest->status === 'draft') {
             $hrRequest->update(['status' => 'active']);
@@ -140,6 +144,26 @@ class DepartmentTaskController extends Controller
         }
 
         return null;
+    }
+
+    private function deletePublicDiskFileByUrl(?string $url): void
+    {
+        if ($url === null || $url === '') {
+            return;
+        }
+        $path = parse_url($url, PHP_URL_PATH);
+        if (! is_string($path)) {
+            return;
+        }
+        $marker = '/storage/';
+        $pos = strpos($path, $marker);
+        if ($pos === false) {
+            return;
+        }
+        $relative = substr($path, $pos + strlen($marker));
+        if ($relative !== '' && Storage::disk('public')->exists($relative)) {
+            Storage::disk('public')->delete($relative);
+        }
     }
 
     /**
@@ -192,20 +216,36 @@ class DepartmentTaskController extends Controller
         $data = $request->validate([
             'response_data' => ['nullable', 'string', 'max:200000'],
             'attachment' => ['nullable', 'file', 'max:15360'],
+            'remove_attachment' => ['sometimes', 'boolean'],
         ]);
 
         $text = trim($data['response_data'] ?? '');
+        $prevText = trim((string) ($departmentTask->response_data ?? ''));
+        $prevAttach = trim((string) ($departmentTask->attachment_url ?? ''));
+        $removeAttachment = $request->boolean('remove_attachment');
+
         if ($text === '' && ! $request->hasFile('attachment')) {
-            return response()->json(['message' => 'Provide a written response and/or an attachment.'], 422);
+            $willKeepAttachment = $prevAttach !== '' && ! $removeAttachment;
+            if ($prevText === '' && ! $willKeepAttachment) {
+                return response()->json(['message' => 'Provide a written response and/or an attachment.'], 422);
+            }
         }
 
         $attachmentUrl = $departmentTask->attachment_url;
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
             if ($file && $file->isValid()) {
+                if ($attachmentUrl) {
+                    $this->deletePublicDiskFileByUrl($attachmentUrl);
+                }
                 $path = $file->store('department-tasks/'.$departmentTask->id, 'public');
                 $attachmentUrl = Storage::disk('public')->url($path);
             }
+        } elseif ($removeAttachment) {
+            if ($attachmentUrl) {
+                $this->deletePublicDiskFileByUrl($attachmentUrl);
+            }
+            $attachmentUrl = null;
         }
 
         $departmentTask->update([
@@ -241,6 +281,10 @@ class DepartmentTaskController extends Controller
             'quant_file.*' => ['nullable', 'file', 'max:15360'],
             'qual_file' => ['nullable', 'array'],
             'qual_file.*' => ['nullable', 'file', 'max:15360'],
+            'strip_quant' => ['sometimes', 'array'],
+            'strip_quant.*' => ['integer'],
+            'strip_qual' => ['sometimes', 'array'],
+            'strip_qual.*' => ['integer'],
         ]);
 
         $decoded = json_decode($validated['indicator_bundles'], true);
@@ -256,6 +300,9 @@ class DepartmentTaskController extends Controller
         $qualFilesRaw = $request->file('qual_file', []);
         $quantFiles = is_array($quantFilesRaw) ? $quantFilesRaw : [];
         $qualFiles = is_array($qualFilesRaw) ? $qualFilesRaw : [];
+
+        $stripQuantIds = array_values(array_unique(array_map('intval', (array) $request->input('strip_quant', []))));
+        $stripQualIds = array_values(array_unique(array_map('intval', (array) $request->input('strip_qual', []))));
 
         $outBy = [];
 
@@ -300,8 +347,20 @@ class DepartmentTaskController extends Controller
                 $qFile = $this->pickKeyedUploadedFile($quantFiles, (int) $indicator->id);
                 $qUrl = null;
                 if ($qFile && $qFile->isValid()) {
+                    $prevQ = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['quantitative'] ?? null) : null;
+                    $prevQUrl = is_array($prevQ) ? ($prevQ['attachment_url'] ?? null) : null;
+                    if (is_string($prevQUrl) && $prevQUrl !== '') {
+                        $this->deletePublicDiskFileByUrl($prevQUrl);
+                    }
                     $path = $qFile->store('department-tasks/'.$departmentTask->id.'/quant', 'public');
                     $qUrl = Storage::disk('public')->url($path);
+                } elseif (in_array((int) $indicator->id, $stripQuantIds, true)) {
+                    $prevQ = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['quantitative'] ?? null) : null;
+                    $prevQUrl = is_array($prevQ) ? ($prevQ['attachment_url'] ?? null) : null;
+                    if (is_string($prevQUrl) && $prevQUrl !== '') {
+                        $this->deletePublicDiskFileByUrl($prevQUrl);
+                    }
+                    $qUrl = null;
                 } else {
                     $prevQ = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['quantitative'] ?? null) : null;
                     $qUrl = is_array($prevQ) ? ($prevQ['attachment_url'] ?? null) : null;
@@ -324,8 +383,20 @@ class DepartmentTaskController extends Controller
                 $lFile = $this->pickKeyedUploadedFile($qualFiles, (int) $indicator->id);
                 $lUrl = null;
                 if ($lFile && $lFile->isValid()) {
+                    $prevL = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['qualitative'] ?? null) : null;
+                    $prevLUrl = is_array($prevL) ? ($prevL['attachment_url'] ?? null) : null;
+                    if (is_string($prevLUrl) && $prevLUrl !== '') {
+                        $this->deletePublicDiskFileByUrl($prevLUrl);
+                    }
                     $path = $lFile->store('department-tasks/'.$departmentTask->id.'/qual', 'public');
                     $lUrl = Storage::disk('public')->url($path);
+                } elseif (in_array((int) $indicator->id, $stripQualIds, true)) {
+                    $prevL = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['qualitative'] ?? null) : null;
+                    $prevLUrl = is_array($prevL) ? ($prevL['attachment_url'] ?? null) : null;
+                    if (is_string($prevLUrl) && $prevLUrl !== '') {
+                        $this->deletePublicDiskFileByUrl($prevLUrl);
+                    }
+                    $lUrl = null;
                 } else {
                     $prevL = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['qualitative'] ?? null) : null;
                     $lUrl = is_array($prevL) ? ($prevL['attachment_url'] ?? null) : null;
