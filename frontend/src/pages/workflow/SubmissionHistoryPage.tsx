@@ -1,44 +1,51 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../../api/lists'
-import { updateRegionalCompiledResponse } from '../../api/workflows'
 import { useAuth } from '../../auth/AuthContext'
-import { DepartmentSubmissionsForRequest } from '../../components/DepartmentSubmissionsForRequest'
 import { Button } from '../../components/ui/Button'
 import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
-import { ModalActions } from '../../components/ui/ModalChrome'
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu'
 import { PageSection } from '../../components/ui/PageSection'
+import { PaginationBar } from '../../components/ui/PaginationBar'
+import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
-import { RegionalResponsePreviewModal } from '../../components/RegionalResponsePreviewModal'
-import { hasDepartmentResponse, workflowPresentation } from '../../lib/departmentTaskWorkflow'
-import { isDepartmentAdmin, isRegionalAdmin, isViewer } from '../../lib/roles'
+import { TableToolbar } from '../../components/ui/TableToolbar'
+import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
+import {
+  countDepartmentTasksByWorkflow,
+  hasDepartmentResponse,
+  workflowPresentation,
+} from '../../lib/departmentTaskWorkflow'
+import {
+  filterDepartmentTasks,
+  WORKFLOW_BUCKET_FILTER_OPTIONS,
+} from '../../lib/departmentTaskTableFilters'
+import { isIctRegionalResponseRow } from '../../lib/ictRegion'
+import { regionalResponseReviewPresentation } from '../../lib/regionalResponseReviewStatus'
+import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isViewer } from '../../lib/roles'
+import { regionalCompilationViewPath } from '../../lib/workflowNavigation'
+
+const REVIEW_STATUSES = ['pending', 'accepted', 'needs-modification', 'rejected'] as const
 
 type Props = {
   title: string
 }
 
-function sortTasksByDept(a: DepartmentTaskRow, b: DepartmentTaskRow): number {
-  const an = (a.department_name ?? a.department_id).toLowerCase()
-  const bn = (b.department_name ?? b.department_id).toLowerCase()
-  return an.localeCompare(bn)
-}
-
 export function SubmissionHistoryPage({ title }: Props) {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const regional = isRegionalAdmin(user)
   const deptHistoryUser =
     (isDepartmentAdmin(user) || isViewer(user)) && user?.department != null
   const [rows, setRows] = useState<RegionalResponseRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [detail, setDetail] = useState<RegionalResponseRow | null>(null)
-  const [detailMode, setDetailMode] = useState<'view' | 'edit'>('view')
-  const [editTitle, setEditTitle] = useState('')
-  const [editContent, setEditContent] = useState('')
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [openActionId, setOpenActionId] = useState<string | null>(null)
+
+  const deptTable = useClientTableState({ pageSize: 10 })
+  const respTable = useClientTableState({ pageSize: 10 })
 
   const reload = useCallback(async () => {
     const taskRows = await fetchDepartmentTasks()
@@ -47,18 +54,16 @@ export function SubmissionHistoryPage({ title }: Props) {
       setRows([])
       return
     }
-    const respRows = await fetchRegionalResponses()
+    let respRows = await fetchRegionalResponses()
+    if (isFederalAdmin(user)) {
+      respRows = respRows.filter((r) => isIctRegionalResponseRow(r))
+    }
     setRows(respRows.sort((a, b) => b.submission_date.localeCompare(a.submission_date)))
-  }, [deptHistoryUser])
+  }, [deptHistoryUser, user])
 
   useEffect(() => {
     void reload().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
   }, [reload])
-
-  const tasksForDetail = useMemo(() => {
-    if (!detail) return []
-    return tasks.filter((t) => t.req_id === detail.req_id).sort(sortTasksByDept)
-  }, [tasks, detail])
 
   const submittedDeptTasks = useMemo(() => {
     return tasks
@@ -67,66 +72,107 @@ export function SubmissionHistoryPage({ title }: Props) {
   }, [tasks])
 
   const fromHistory = encodeURIComponent('/department-history')
+  const historyFrom = location.pathname
 
-  function openView(r: RegionalResponseRow) {
-    setDetailMode('view')
-    setDetail(r)
-    setSaveError(null)
-  }
+  const deptWorkflowFilter = deptTable.filters.workflow ?? ''
+  const filteredDeptTasks = useMemo(
+    () =>
+      filterDepartmentTasks(submittedDeptTasks, {
+        search: deptTable.search,
+        workflowFilter: deptWorkflowFilter,
+      }),
+    [submittedDeptTasks, deptTable.search, deptWorkflowFilter],
+  )
 
-  function openEdit(r: RegionalResponseRow) {
-    setDetailMode('edit')
-    setDetail(r)
-    setEditTitle(r.title)
-    setEditContent(r.content)
-    setSaveError(null)
-  }
+  const deptPage = useMemo(
+    () => derivePaginatedRows(filteredDeptTasks, deptTable.page, deptTable.pageSize),
+    [filteredDeptTasks, deptTable.page, deptTable.pageSize],
+  )
 
-  function closeDetail() {
-    setDetail(null)
-    setSaveError(null)
-  }
+  const deptWorkflowCounts = useMemo(
+    () => countDepartmentTasksByWorkflow(filteredDeptTasks),
+    [filteredDeptTasks],
+  )
 
-  async function saveEditedCompilation() {
-    if (!detail) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const updated = await updateRegionalCompiledResponse(detail.id, {
-        title: editTitle.trim(),
-        content: editContent.trim(),
-      })
-      setRows((prev) => {
-        const next = prev.map((r) => (r.id === updated.id ? updated : r))
-        return next.sort((a, b) => b.submission_date.localeCompare(a.submission_date))
-      })
-      setDetail(updated)
-      setDetailMode('view')
-      void fetchDepartmentTasks().then(setTasks).catch(() => {})
-    } catch (e: unknown) {
-      setSaveError(e instanceof Error ? e.message : 'Save failed')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const reviewStatusFilter = respTable.filters.status ?? ''
+  const filteredResponses = useMemo(() => {
+    const q = respTable.search.trim().toLowerCase()
+    return rows.filter((r) => {
+      if (reviewStatusFilter && r.review_status !== reviewStatusFilter) return false
+      if (!q) return true
+      return (
+        r.id.toLowerCase().includes(q) ||
+        r.req_id.toLowerCase().includes(q) ||
+        r.title.toLowerCase().includes(q) ||
+        (r.region_name ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [rows, respTable.search, reviewStatusFilter])
+
+  const respPage = useMemo(
+    () => derivePaginatedRows(filteredResponses, respTable.page, respTable.pageSize),
+    [filteredResponses, respTable.page, respTable.pageSize],
+  )
+
+  const reviewStats = useMemo(
+    () =>
+      REVIEW_STATUSES.map((status) => ({
+        label: regionalResponseReviewPresentation(status).label,
+        count: rows.filter((r) => r.review_status === status).length,
+      })),
+    [rows],
+  )
 
   return (
-    <PageSection
-      title={title}
-      subtitle={
-        deptHistoryUser
-          ? 'Your submitted department tasks. Use View response to open the full request page with the HR request, regional administration, and your response.'
-          : 'Compiled responses with per-department submissions, federal review status, and resubmission after modification.'
-      }
-    >
+    <PageSection title={deptHistoryUser ? 'Submission history' : title}>
       {error && <p className="login-error">{error}</p>}
 
       {deptHistoryUser && (
         <>
-          <h3 className="dashboard-panel-title" style={{ marginBottom: 12 }}>
-            Your department submissions
-          </h3>
-          <div style={{ marginBottom: 28 }}>
+          <div style={{ marginTop: 16 }}>
+            <StatsCards
+              items={[
+                { label: 'Submitted', value: filteredDeptTasks.length },
+                { label: 'Pending', value: deptWorkflowCounts.in_process },
+                { label: 'Review', value: deptWorkflowCounts.responded },
+                { label: 'Revision', value: deptWorkflowCounts.revision },
+                { label: 'Accepted', value: deptWorkflowCounts.accepted },
+              ]}
+            />
+          </div>
+
+          <TableToolbar>
+            <input
+              type="search"
+              placeholder="Search task ID, request…"
+              value={deptTable.search}
+              onChange={(e) => deptTable.setSearch(e.target.value)}
+              aria-label="Search submissions"
+            />
+            <select
+              value={deptWorkflowFilter}
+              onChange={(e) => deptTable.setFilter('workflow', e.target.value)}
+              aria-label="Filter by status"
+            >
+              {WORKFLOW_BUCKET_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value || 'all'} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="secondary"
+              compact
+              type="button"
+              onClick={() => {
+                deptTable.setSearch('')
+                deptTable.resetFilters()
+              }}
+            >
+              Reset filters
+            </Button>
+          </TableToolbar>
+
           <TableCard>
             <table className="data-table">
               <thead>
@@ -139,7 +185,7 @@ export function SubmissionHistoryPage({ title }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {submittedDeptTasks.map((t) => {
+                {deptPage.pageRows.map((t) => {
                   const wf = workflowPresentation(t)
                   return (
                     <tr key={t.id}>
@@ -150,164 +196,169 @@ export function SubmissionHistoryPage({ title }: Props) {
                         <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
                       </td>
                       <td className="table-actions">
-                        <Button
-                          variant="primary"
-                          compact
-                          onClick={() =>
-                            navigate(
-                              `/requests/${encodeURIComponent(t.req_id)}?task=${encodeURIComponent(t.id)}&from=${fromHistory}`,
-                            )
-                          }
+                        <RowActionsMenu
+                          isOpen={openActionId === `task-${t.id}`}
+                          onOpenChange={(open) => setOpenActionId(open ? `task-${t.id}` : null)}
                         >
-                          View response
-                        </Button>
+                          <Button
+                            variant="link"
+                            onClick={() => {
+                              navigate(
+                                `/requests/${encodeURIComponent(t.req_id)}?task=${encodeURIComponent(t.id)}&from=${fromHistory}`,
+                              )
+                              setOpenActionId(null)
+                            }}
+                          >
+                            View response
+                          </Button>
+                        </RowActionsMenu>
                       </td>
                     </tr>
                   )
                 })}
-                {submittedDeptTasks.length === 0 && (
-                  <EmptyStateRow colSpan={5} message="No submitted tasks yet." />
+                {deptPage.pageRows.length === 0 && (
+                  <EmptyStateRow
+                    colSpan={5}
+                    message={
+                      deptTable.search.trim() || deptWorkflowFilter
+                        ? 'No submissions match your filters.'
+                        : 'No submitted tasks yet.'
+                    }
+                  />
                 )}
               </tbody>
             </table>
           </TableCard>
-          </div>
+          <PaginationBar
+            page={deptTable.page}
+            pageSize={deptTable.pageSize}
+            totalItems={filteredDeptTasks.length}
+            onPageChange={deptTable.setPage}
+          />
         </>
       )}
 
       {!deptHistoryUser && (
-        <TableCard>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Response ID</th>
-                <th>Request</th>
-                <th>Title</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th className="table-actions">Compilation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.id}</td>
-                  <td>{r.req_id}</td>
-                  <td>{r.title}</td>
-                  <td>{r.submission_date}</td>
-                  <td>{r.review_status}</td>
-                  <td className="table-actions">
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                      <Button variant="primary" compact onClick={() => openView(r)}>
-                        View compilation
-                      </Button>
-                      {regional && r.review_status === 'needs-modification' && (
-                        <Button variant="secondary" compact onClick={() => openEdit(r)}>
-                          Edit
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <EmptyStateRow colSpan={6} message="No history found." />
-              )}
-            </tbody>
-          </table>
-        </TableCard>
-      )}
-
-      {detail && detailMode === 'view' && (
-        <RegionalResponsePreviewModal
-          row={detail}
-          tasksForDetail={tasksForDetail}
-          onClose={closeDetail}
-          introText="Consolidated submission for federal review. Department inputs and your compiled narrative are below."
-          footerExtra={
-            regional && detail.review_status === 'needs-modification' ? (
-              <Button variant="primary" compact onClick={() => openEdit(detail)}>
-                Edit compilation
-              </Button>
-            ) : null
-          }
-        />
-      )}
-
-      {detail && detailMode === 'edit' && regional && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={closeDetail}>
-          <div
-            className="modal-card modal-card-wide regional-response-detail-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-head dept-task-response-modal__head">
-              <div>
-                <h3>Edit compilation</h3>
-                <p className="dept-task-response-modal__head-meta muted small">
-                  Federal requested changes · Response <strong>{detail.id}</strong> · Request{' '}
-                  <strong>{detail.req_id}</strong>
-                </p>
-              </div>
-              <button type="button" className="modal-close" onClick={closeDetail} aria-label="Close">
-                ×
-              </button>
-            </div>
-            <div className="modal-form regional-response-detail-modal__form">
-              <p className="muted small" style={{ marginTop: 0 }}>
-                Update the consolidated narrative and save. Review status will return to <strong>pending</strong>.
-              </p>
-              {saveError && <p className="login-error">{saveError}</p>}
-
-              <div className="dept-task-response-modal__panel regional-response-detail-modal__panel">
-                <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                  <h2 className="card-section-heading">Reference — department submissions</h2>
-                  <DepartmentSubmissionsForRequest
-                    tasksForDetail={tasksForDetail}
-                    reqId={detail.req_id}
-                    filterByRegionName={detail.region_name ?? undefined}
-                    omitHeading
-                  />
-                </section>
-
-                <section className="hr-request-view-template__card regional-response-detail-modal__section">
-                  <h2 className="card-section-heading">Your compilation</h2>
-                  <div className="form-row">
-                    <label htmlFor="edit-compilation-title">Title</label>
-                    <input
-                      id="edit-compilation-title"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box' }}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label htmlFor="edit-compilation-content">Compiled regional response</label>
-                    <textarea
-                      id="edit-compilation-content"
-                      rows={12}
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box' }}
-                    />
-                  </div>
-                </section>
-              </div>
-              <ModalActions>
-                <Button variant="secondary" compact disabled={saving} onClick={closeDetail}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  compact
-                  disabled={saving || !editTitle.trim() || !editContent.trim()}
-                  onClick={() => void saveEditedCompilation()}
-                >
-                  {saving ? 'Saving…' : 'Save and resubmit'}
-                </Button>
-              </ModalActions>
-            </div>
+        <>
+          <div style={{ marginTop: 16 }}>
+            <StatsCards
+              items={[
+                { label: 'Total compilations', value: rows.length },
+                ...reviewStats.map((s) => ({ label: s.label, value: s.count })),
+              ]}
+            />
           </div>
-        </div>
+
+          <TableToolbar>
+            <input
+              type="search"
+              placeholder="Search response ID, request, title…"
+              value={respTable.search}
+              onChange={(e) => respTable.setSearch(e.target.value)}
+              aria-label="Search compilations"
+            />
+            <select
+              value={reviewStatusFilter}
+              onChange={(e) => respTable.setFilter('status', e.target.value)}
+              aria-label="Filter by review status"
+            >
+              <option value="">All statuses</option>
+              {REVIEW_STATUSES.map((status) => {
+                const { label } = regionalResponseReviewPresentation(status)
+                return (
+                  <option key={status} value={status}>
+                    {label}
+                  </option>
+                )
+              })}
+            </select>
+            <Button
+              variant="secondary"
+              compact
+              type="button"
+              onClick={() => {
+                respTable.setSearch('')
+                respTable.resetFilters()
+              }}
+            >
+              Reset filters
+            </Button>
+          </TableToolbar>
+
+          <TableCard>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Response ID</th>
+                  <th>Request</th>
+                  <th>Title</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th className="table-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {respPage.pageRows.map((r) => {
+                  const review = regionalResponseReviewPresentation(r.review_status)
+                  return (
+                    <tr key={r.id}>
+                      <td>{r.id}</td>
+                      <td>{r.req_id}</td>
+                      <td>{r.title}</td>
+                      <td>{r.submission_date}</td>
+                      <td>
+                        <StatusBadge tone={review.tone}>{review.label}</StatusBadge>
+                      </td>
+                      <td className="table-actions">
+                        <RowActionsMenu
+                          isOpen={openActionId === `resp-${r.id}`}
+                          onOpenChange={(open) => setOpenActionId(open ? `resp-${r.id}` : null)}
+                        >
+                          <Button
+                            variant="link"
+                            onClick={() => {
+                              navigate(regionalCompilationViewPath(r.id, historyFrom))
+                              setOpenActionId(null)
+                            }}
+                          >
+                            View compilation
+                          </Button>
+                          {regional && r.review_status === 'needs-modification' ? (
+                            <Button
+                              variant="link"
+                              onClick={() => {
+                                navigate(regionalCompilationViewPath(r.id, historyFrom, { edit: true }))
+                                setOpenActionId(null)
+                              }}
+                            >
+                              Edit compilation
+                            </Button>
+                          ) : null}
+                        </RowActionsMenu>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {respPage.pageRows.length === 0 && (
+                  <EmptyStateRow
+                    colSpan={6}
+                    message={
+                      respTable.search.trim() || reviewStatusFilter
+                        ? 'No compilations match your filters.'
+                        : 'No history found.'
+                    }
+                  />
+                )}
+              </tbody>
+            </table>
+          </TableCard>
+          <PaginationBar
+            page={respTable.page}
+            pageSize={respTable.pageSize}
+            totalItems={filteredResponses.length}
+            onPageChange={respTable.setPage}
+          />
+        </>
       )}
     </PageSection>
   )

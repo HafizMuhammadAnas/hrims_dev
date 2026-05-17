@@ -13,6 +13,10 @@ class NotificationService
 {
     public function notifyHrRequestCreated(HrRequest $requestModel, User $actor): void
     {
+        if ($requestModel->status !== 'active') {
+            return;
+        }
+
         $this->notifyUsers(
             $this->usersForHrRequest($requestModel),
             $actor,
@@ -30,6 +34,20 @@ class NotificationService
 
     public function notifyHrRequestUpdated(HrRequest $requestModel, User $actor, ?string $previousStatus = null): void
     {
+        if ($requestModel->status === 'draft' && $previousStatus === 'draft') {
+            return;
+        }
+
+        if ($previousStatus === 'draft' && $requestModel->status === 'active') {
+            $this->notifyHrRequestCreated($requestModel, $actor);
+
+            return;
+        }
+
+        if ($requestModel->status !== 'active') {
+            return;
+        }
+
         $message = sprintf('%s updated request %s.', $actor->name, $requestModel->id);
         if ($previousStatus !== null && $previousStatus !== $requestModel->status) {
             $message = sprintf(

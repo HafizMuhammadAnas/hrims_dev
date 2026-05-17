@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchHrRequests } from '../../api/hrRequests'
-import { createCompiledRecord, fetchCompilationPreview } from '../../api/workflows'
+import { createCompiledRecord } from '../../api/workflows'
 import {
   fetchCompiledRecords,
   fetchDepartmentTasks,
@@ -11,7 +11,14 @@ import {
   type RegionalResponseRow,
 } from '../../api/lists'
 import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../../components/CompiledRecordsWorkflowNav'
-import { RegionalResponsePreviewModal } from '../../components/RegionalResponsePreviewModal'
+import { RegionalSubmissionCoverageBar } from '../../components/RegionalSubmissionCoverageBar'
+import { regionalResponseFederalReviewPath } from '../../lib/workflowNavigation'
+import { hasDepartmentResponse } from '../../lib/departmentTaskWorkflow'
+import { isIctRegionSlug } from '../../lib/ictRegion'
+import {
+  buildProvincialSubmissionCoverage,
+  countProvincialSubmissionCoverage,
+} from '../../lib/regionalSubmissionCoverage'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
@@ -36,14 +43,24 @@ function sortTasksByDept(a: DepartmentTaskRow, b: DepartmentTaskRow): number {
   return an.localeCompare(bn)
 }
 
+function isIctLineTask(t: DepartmentTaskRow): boolean {
+  return isIctRegionSlug(t.region_slug ?? null)
+}
+
+function responseIdsSignature(ids: string[]): string {
+  return [...ids].sort().join('\u001f')
+}
+
 export function FederalCompilationPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const [requests, setRequests] = useState<HrRequestRow[]>([])
   const [responses, setResponses] = useState<RegionalResponseRow[]>([])
   const [deptTasks, setDeptTasks] = useState<DepartmentTaskRow[]>([])
-  const [viewingResponse, setViewingResponse] = useState<RegionalResponseRow | null>(null)
   const [selectedReqId, setSelectedReqId] = useState('')
-  const [preview, setPreview] = useState<{ region_names: string[]; response_count: number } | null>(null)
+  const [includedResponseIds, setIncludedResponseIds] = useState<string[]>([])
+  const [ictIncluded, setIctIncluded] = useState(false)
   const [summary, setSummary] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState<'draft' | 'submitted' | null>(null)
@@ -73,11 +90,15 @@ export function FederalCompilationPage() {
     setSelectedReqId(req)
   }, [searchParams])
 
-  const reqIdsWithResponses = useMemo(() => {
-    const ids = [...new Set(responses.map((r) => r.req_id))]
-    ids.sort((a, b) => a.localeCompare(b))
-    return ids
-  }, [responses])
+  /** Requests that have any regional compilation row, or any submitted ICT / national-line department task. */
+  const reqIdsForPicker = useMemo(() => {
+    const s = new Set<string>()
+    for (const r of responses) s.add(r.req_id)
+    for (const t of deptTasks) {
+      if (isIctLineTask(t) && hasDepartmentResponse(t)) s.add(t.req_id)
+    }
+    return [...s].sort((a, b) => a.localeCompare(b))
+  }, [responses, deptTasks])
 
   /** Requests already submitted to the ministry from this center — hide from the picker. */
   const reqIdsNationallySubmitted = useMemo(() => {
@@ -89,35 +110,29 @@ export function FederalCompilationPage() {
   }, [compiledRecords])
 
   const requestsForSelect = useMemo(() => {
-    const allowed = new Set(reqIdsWithResponses)
+    const allowed = new Set(reqIdsForPicker)
     return requests
       .filter((r) => allowed.has(r.id) && !reqIdsNationallySubmitted.has(r.id))
       .sort((a, b) => a.id.localeCompare(b.id))
-  }, [requests, reqIdsWithResponses, reqIdsNationallySubmitted])
+  }, [requests, reqIdsForPicker, reqIdsNationallySubmitted])
 
   useEffect(() => {
     if (selectedReqId && reqIdsNationallySubmitted.has(selectedReqId)) {
       setSelectedReqId('')
       setSummary('')
-      setPreview(null)
+      setIncludedResponseIds([])
+      setIctIncluded(false)
     }
   }, [selectedReqId, reqIdsNationallySubmitted])
 
   useEffect(() => {
-    if (!selectedReqId) {
-      setPreview(null)
-      return
-    }
-    void fetchCompilationPreview(selectedReqId)
-      .then(setPreview)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to preview'))
-  }, [selectedReqId])
-
-  useEffect(() => {
     if (!selectedReqId) return
     const refresh = () => {
-      void fetchCompilationPreview(selectedReqId)
-        .then(setPreview)
+      void Promise.all([fetchRegionalResponses(), fetchDepartmentTasks()])
+        .then(([responseRows, taskRows]) => {
+          setResponses(responseRows)
+          setDeptTasks(taskRows)
+        })
         .catch(() => {})
     }
     window.addEventListener('focus', refresh)
@@ -134,10 +149,30 @@ export function FederalCompilationPage() {
     [responses, selectedReqId],
   )
 
-  const tasksForViewingResponse = useMemo(() => {
-    if (!viewingResponse) return []
-    return deptTasks.filter((t) => t.req_id === viewingResponse.req_id).sort(sortTasksByDept)
-  }, [deptTasks, viewingResponse])
+  const selectedIctTasks = useMemo(
+    () => deptTasks.filter((t) => t.req_id === selectedReqId && isIctLineTask(t)).sort(sortTasksByDept),
+    [deptTasks, selectedReqId],
+  )
+  const selectedIctSubmitted = useMemo(
+    () => selectedIctTasks.filter((t) => hasDepartmentResponse(t)),
+    [selectedIctTasks],
+  )
+  const selectedIctAcceptedCount = useMemo(
+    () => selectedIctSubmitted.filter((t) => t.regional_review_status === 'accepted').length,
+    [selectedIctSubmitted],
+  )
+  const ictLineReadyForCompilation =
+    selectedIctSubmitted.length > 0 && selectedIctAcceptedCount === selectedIctSubmitted.length
+
+  const provinceCoverage = useMemo(() => {
+    if (!selectedReq) return []
+    return buildProvincialSubmissionCoverage(selectedReq.regions, selectedResponses)
+  }, [selectedReq, selectedResponses])
+
+  const provinceCounts = useMemo(
+    () => countProvincialSubmissionCoverage(provinceCoverage),
+    [provinceCoverage],
+  )
 
   const responseCounts = useMemo(() => {
     const counts = { pending: 0, accepted: 0, needs_modification: 0, rejected: 0 }
@@ -150,15 +185,86 @@ export function FederalCompilationPage() {
     return counts
   }, [selectedResponses])
 
-  /** Backend preview (and saved compiled records) only include regions with accepted regional responses. */
-  const canPersistCompilation = Boolean(
-    selectedReqId && preview && preview.region_names.length > 0,
+  const ictRegionName = useMemo(() => {
+    const fromReq = selectedReq?.regions?.find((r) => isIctRegionSlug(r.slug))?.name
+    if (fromReq) return fromReq
+    const fromTask = selectedIctTasks[0]?.region_name
+    return fromTask?.trim() || 'ICT'
+  }, [selectedReq, selectedIctTasks])
+
+  const includableAcceptedResponses = useMemo(
+    () =>
+      provinceCoverage.filter(
+        (item) => item.response != null && item.response.review_status === 'accepted',
+      ),
+    [provinceCoverage],
   )
 
+  const includableResponseIdKey = useMemo(
+    () => responseIdsSignature(includableAcceptedResponses.map((item) => item.response!.id)),
+    [includableAcceptedResponses],
+  )
+
+  useEffect(() => {
+    if (!selectedReqId) {
+      setIncludedResponseIds([])
+      setIctIncluded(false)
+      return
+    }
+    const ids = includableResponseIdKey ? includableResponseIdKey.split('\u001f') : []
+    setIncludedResponseIds(ids)
+    setIctIncluded(ictLineReadyForCompilation)
+  }, [selectedReqId, includableResponseIdKey, ictLineReadyForCompilation])
+
+  const includedResponseSet = useMemo(() => new Set(includedResponseIds), [includedResponseIds])
+
+  const selectedRegionNames = useMemo(() => {
+    const names: string[] = []
+    for (const item of provinceCoverage) {
+      const resp = item.response
+      if (resp && includedResponseSet.has(resp.id)) {
+        names.push(item.regionName)
+      }
+    }
+    if (ictIncluded && ictLineReadyForCompilation && !names.includes(ictRegionName)) {
+      names.push(ictRegionName)
+    }
+    return names.sort((a, b) => a.localeCompare(b))
+  }, [
+    provinceCoverage,
+    includedResponseSet,
+    ictIncluded,
+    ictLineReadyForCompilation,
+    ictRegionName,
+  ])
+
+  const includedProvincialCount = useMemo(
+    () => includableAcceptedResponses.filter((item) => includedResponseSet.has(item.response!.id)).length,
+    [includableAcceptedResponses, includedResponseSet],
+  )
+
+  function toggleResponseInclusion(responseId: string) {
+    setIncludedResponseIds((prev) =>
+      prev.includes(responseId) ? prev.filter((id) => id !== responseId) : [...prev, responseId],
+    )
+  }
+
+  function selectAllAcceptedProvinces() {
+    setIncludedResponseIds(includableAcceptedResponses.map((item) => item.response!.id))
+    if (ictLineReadyForCompilation) setIctIncluded(true)
+  }
+
+  function clearAllInclusions() {
+    setIncludedResponseIds([])
+    setIctIncluded(false)
+  }
+
+  const canPersistCompilation = Boolean(selectedReqId && selectedRegionNames.length > 0)
+
   async function save(status: 'draft' | 'submitted') {
-    if (!selectedReq || !preview || preview.region_names.length === 0) {
+    if (!selectedReq || selectedRegionNames.length === 0) {
       setError(
-        'Cannot save yet: open Regional responses, set at least one province’s review status to Accepted for this request, then try again (refresh the page if you already accepted).',
+        'Select at least one accepted provincial compilation (checkbox) or include the ICT national line, then save.',
       )
       return
     }
@@ -168,14 +274,15 @@ export function FederalCompilationPage() {
       await createCompiledRecord({
         hr_request_id: selectedReq.id,
         title: `Compiled Report - ${selectedReq.title}`,
-        region_names: preview.region_names,
+        region_names: selectedRegionNames,
         summary: summary || null,
         status,
         submitted_to: status === 'submitted' ? 'Ministry of Human Rights' : null,
       })
       setSummary('')
       setSelectedReqId('')
-      setPreview(null)
+      setIncludedResponseIds([])
+      setIctIncluded(false)
       void fetchCompiledRecords().then(setCompiledRecords).catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save')
@@ -187,16 +294,7 @@ export function FederalCompilationPage() {
   const fromCompiledRecords = isFromCompiledRecordsPath(searchParams.get('from'))
 
   return (
-    <PageSection
-      title="Compilation center"
-      subtitle={
-        <>
-          National record: only <strong>accepted</strong> regional compilations count toward the preview below. Review and accept
-          each province’s submission in <Link to="/responses">Regional responses</Link>, then prefill from those responses here.
-          Saved records appear under <Link to="/compiled-records">Compilation records</Link>.
-        </>
-      }
-    >
+    <PageSection title="Compilation center">
       {fromCompiledRecords && selectedReqId ? (
         <CompiledRecordsWorkflowNav reqId={selectedReqId} activeTab="compilation" />
       ) : null}
@@ -204,25 +302,25 @@ export function FederalCompilationPage() {
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'HR requests (with responses)', value: requestsForSelect.length },
-            { label: 'Regional responses (selected)', value: selectedResponses.length },
-            { label: 'Accepted (preview)', value: preview?.response_count ?? 0 },
-            { label: 'Regions in preview', value: preview?.region_names.length ?? 0 },
+            { label: 'Available for compilation', value: requestsForSelect.length },
+            { label: 'Compiled', value: reqIdsNationallySubmitted.size },
           ]}
         />
       </div>
       <TableCard padded>
         <label className="muted">HR request</label>
-        {requestsForSelect.length === 0 && reqIdsWithResponses.length === 0 ? (
+        {requestsForSelect.length === 0 && reqIdsForPicker.length === 0 ? (
           <p className="muted" style={{ margin: '8px 0 12px' }}>
-            No regional compilations are in the system yet for any request. Provinces submit from{' '}
-            <Link to="/region-compilation">Response compilation</Link>, then return here to build the national record.
+            No data yet for national compilation: provinces submit from <Link to="/region-compilation">Response compilation</Link>,
+            and national-line departments submit under ICT assignments from{' '}
+            <Link to="/federal-department-requests">Departmental responses</Link>.
           </p>
         ) : null}
-        {requestsForSelect.length === 0 && reqIdsWithResponses.length > 0 ? (
+        {requestsForSelect.length === 0 && reqIdsForPicker.length > 0 ? (
           <p className="muted" style={{ margin: '8px 0 12px' }}>
-            Every request with regional data has already been <strong>submitted to the ministry</strong> from this center.
-            Open <Link to="/compiled-records">Compilation records</Link> to review saved national records.
+            Every request that still had an open national compilation has already been{' '}
+            <strong>submitted to the ministry</strong> from this center. Open{' '}
+            <Link to="/compiled-records">Compiled records</Link> to review saved national records.
           </p>
         ) : null}
         <select
@@ -235,26 +333,33 @@ export function FederalCompilationPage() {
           disabled={requestsForSelect.length === 0}
         >
           <option value="">-- choose request --</option>
-          {requestsForSelect.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.id} — {r.title}
-            </option>
-          ))}
+          {requestsForSelect.map((r) => {
+            const cov = buildProvincialSubmissionCoverage(
+              r.regions,
+              responses.filter((x) => x.req_id === r.id),
+            )
+            const counts = countProvincialSubmissionCoverage(cov)
+            const suffix =
+              counts.assigned > 0 ? ` · ${counts.submitted}/${counts.assigned} provinces` : ''
+            return (
+              <option key={r.id} value={r.id}>
+                {r.id} — {r.title}
+                {suffix}
+              </option>
+            )
+          })}
         </select>
-        {preview && (
+        {selectedReqId && selectedRegionNames.length > 0 ? (
           <div className="chip-list" style={{ marginBottom: 10 }}>
-            <StatusBadge tone="pending">Accepted responses: {preview.response_count}</StatusBadge>
-            {preview.region_names.length > 0 ? (
-              preview.region_names.map((name) => (
-                <StatusBadge key={name}>{name}</StatusBadge>
-              ))
-            ) : (
-              <span className="muted">No regions in preview.</span>
-            )}
+            <StatusBadge tone="success">
+              Included in national compile: {selectedRegionNames.length}
+            </StatusBadge>
+            {selectedRegionNames.map((name) => (
+              <StatusBadge key={name}>{name}</StatusBadge>
+            ))}
           </div>
-        )}
+        ) : null}
         {selectedReqId &&
-          preview &&
           !canPersistCompilation &&
           selectedResponses.length > 0 &&
           responseCounts.accepted === 0 && (
@@ -263,55 +368,200 @@ export function FederalCompilationPage() {
                 This request has regional compilations, but none are <strong>accepted</strong> yet. Draft and submitted
                 national records only include <strong>accepted</strong> provinces. Go to{' '}
                 <Link to="/responses">Regional responses</Link>, open each row, set review status to{' '}
-                <strong>accepted</strong>, and save—then return here (refresh if the preview still shows zero).
+                <strong>accepted</strong>, and save—then return here and select provinces to include.
               </p>
             </Alert>
           )}
-        {selectedReqId && (
+        {selectedReqId &&
+          !canPersistCompilation &&
+          selectedResponses.length === 0 &&
+          selectedIctSubmitted.length > 0 &&
+          !ictLineReadyForCompilation && (
+            <Alert variant="warning" title="Accept all ICT departmental responses" className="compilation-gate-alert">
+              <p style={{ margin: 0 }}>
+                This request uses national-line (ICT) departments. The national preview includes ICT only after{' '}
+                <strong>every</strong> submitted departmental response is accepted. Open{' '}
+                <Link to="/federal-department-requests">Departmental responses</Link>, review each task, and accept—then
+                refresh this page if the preview is still empty.
+              </p>
+            </Alert>
+          )}
+        {selectedReqId && provinceCoverage.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <p className="muted font-semibold text-compact" style={{ margin: '0 0 8px' }}>
-              Response progress for <strong>{selectedReqId}</strong>
+              Provincial submissions for <strong>{selectedReqId}</strong> —{' '}
+              <strong>{provinceCounts.submitted}</strong> of <strong>{provinceCounts.assigned}</strong> submitted
+              {provinceCounts.pending > 0 ? (
+                <>
+                  {' '}
+                  · <strong>{provinceCounts.pending}</strong> awaiting submission
+                </>
+              ) : null}
             </p>
             <StatsCards
               items={[
-                { label: 'Pending', value: responseCounts.pending },
-                { label: 'Accepted', value: responseCounts.accepted },
-                { label: 'Needs modification', value: responseCounts.needs_modification },
-                { label: 'Rejected', value: responseCounts.rejected },
+                { label: 'Provinces assigned', value: provinceCounts.assigned },
+                { label: 'Submitted', value: provinceCounts.submitted },
+                { label: 'Awaiting submission', value: provinceCounts.pending },
+                { label: 'Accepted (review)', value: provinceCounts.accepted },
+                ...(selectedResponses.length > 0
+                  ? [
+                      { label: 'Pending review', value: responseCounts.pending },
+                      { label: 'Needs modification', value: responseCounts.needs_modification },
+                      { label: 'Rejected', value: responseCounts.rejected },
+                    ]
+                  : []),
               ]}
             />
+            <div style={{ marginTop: 10 }}>
+              <RegionalSubmissionCoverageBar items={provinceCoverage} />
+            </div>
           </div>
         )}
         {selectedReqId && (
           <div style={{ marginBottom: 14 }}>
-            {selectedResponses.length === 0 ? (
+            {selectedIctSubmitted.length > 0 ? (
+              <div style={{ marginBottom: 12 }}>
+                <p className="muted font-semibold text-compact" style={{ margin: '0 0 8px' }}>
+                  National-line (ICT) departmental tasks
+                </p>
+                <p className="muted text-compact" style={{ margin: '0 0 8px' }}>
+                  {selectedIctAcceptedCount} of {selectedIctSubmitted.length} submitted task
+                  {selectedIctSubmitted.length === 1 ? '' : 's'} accepted ·{' '}
+                  {ictLineReadyForCompilation ? (
+                    <strong>
+                      ICT line complete — use the checkbox below to include {ictRegionName} in the national record.
+                    </strong>
+                  ) : (
+                    <strong>Accept every submitted national-line task before ICT can be included.</strong>
+                  )}
+                </p>
+                <div className="compilation-dept-status-grid">
+                  {selectedIctSubmitted.map((t) => {
+                    const accepted = t.regional_review_status === 'accepted'
+                    return (
+                      <div key={t.id} className="compilation-dept-status-row">
+                        <span
+                          className="compilation-dept-status-row__check compilation-dept-status-row__check--disabled"
+                          aria-hidden
+                        >
+                          <input type="checkbox" disabled checked={false} tabIndex={-1} />
+                        </span>
+                        <div className="compilation-dept-status-row__body" style={{ cursor: 'default' }}>
+                          <span className="compilation-dept-status-row__label compilation-dept-status-row__label--stacked">
+                            <span className="compilation-dept-status-row__dept">
+                              {t.department_name ?? t.department_id}
+                            </span>
+                          </span>
+                          <StatusBadge tone={accepted ? 'success' : 'pending'}>
+                            {accepted ? 'Accepted' : 'Pending review'}
+                          </StatusBadge>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {ictLineReadyForCompilation ? (
+                    <div className="compilation-dept-status-row">
+                      <label className="compilation-dept-status-row__check">
+                        <input
+                          type="checkbox"
+                          checked={ictIncluded}
+                          onChange={() => setIctIncluded((v) => !v)}
+                          aria-label={`Include ${ictRegionName} national line in compilation`}
+                        />
+                      </label>
+                      <div className="compilation-dept-status-row__body" style={{ cursor: 'default' }}>
+                        <span className="compilation-dept-status-row__label compilation-dept-status-row__label--stacked">
+                          <span className="compilation-dept-status-row__title-sub muted small">
+                            National line (ICT)
+                          </span>
+                          <span className="compilation-dept-status-row__dept">{ictRegionName}</span>
+                        </span>
+                        <StatusBadge tone="success">Ready to include</StatusBadge>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {provinceCoverage.length === 0 ? (
               <p className="muted" style={{ margin: 0 }}>
-                No regional responses for this request yet.
+                {selectedIctSubmitted.length > 0
+                  ? 'No provincial regions assigned on this request (ICT-only path is fine if the preview above lists ICT).'
+                  : 'No provincial regions assigned and no ICT departmental submissions for this request yet.'}
               </p>
             ) : (
               <>
                 <p className="muted text-compact" style={{ margin: '0 0 8px' }}>
-                  <strong>{selectedResponses.length}</strong> regional response{selectedResponses.length === 1 ? '' : 's'} for
-                  this request. Open a row to read the provincial compilation; the ministry summary below is written only by
-                  federal staff (regional text is not copied in automatically).
+                  Select which accepted provincial compilations to include in the national record. Open a row to review;
+                  provinces still awaiting submission are shown for visibility only.{' '}
+                  <strong>{includedProvincialCount}</strong> of{' '}
+                  <strong>{includableAcceptedResponses.length}</strong> accepted province
+                  {includableAcceptedResponses.length === 1 ? '' : 's'} selected.
                 </p>
+                {includableAcceptedResponses.length > 0 ? (
+                  <FederalCompilationInclusionToolbar
+                    onSelectAll={selectAllAcceptedProvinces}
+                    onClearAll={clearAllInclusions}
+                  />
+                ) : null}
                 <div className="compilation-dept-status-grid" style={{ marginBottom: 10 }}>
-                  {selectedResponses.map((r) => {
+                  {provinceCoverage.map((item) => {
+                    if (item.status === 'pending_submission') {
+                      return (
+                        <div key={item.regionId} className="compilation-dept-status-row">
+                          <span
+                            className="compilation-dept-status-row__check compilation-dept-status-row__check--disabled"
+                            aria-hidden
+                          >
+                            <input type="checkbox" disabled checked={false} tabIndex={-1} />
+                          </span>
+                          <div className="compilation-dept-status-row__body" style={{ cursor: 'default' }}>
+                            <span className="compilation-dept-status-row__label compilation-dept-status-row__label--stacked">
+                              <span className="compilation-dept-status-row__title-sub muted small">
+                                {selectedReq?.title?.trim() || selectedReqId}
+                              </span>
+                              <span className="compilation-dept-status-row__dept">{item.regionName}</span>
+                            </span>
+                            <StatusBadge tone="pending">Awaiting submission</StatusBadge>
+                          </div>
+                        </div>
+                      )
+                    }
+                    const r = item.response!
                     const review = reviewStatusPresentation(r.review_status)
+                    const canInclude = r.review_status === 'accepted'
+                    const checked = canInclude && includedResponseSet.has(r.id)
                     return (
                       <div key={r.id} className="compilation-dept-status-row">
+                        <label
+                          className={
+                            'compilation-dept-status-row__check' +
+                            (canInclude ? '' : ' compilation-dept-status-row__check--disabled')
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!canInclude}
+                            onChange={() => toggleResponseInclusion(r.id)}
+                            aria-label={`Include ${item.regionName} in national compilation`}
+                          />
+                        </label>
                         <button
                           type="button"
                           className="compilation-dept-status-row__body"
-                          onClick={() => setViewingResponse(r)}
-                          title="View provincial compilation"
+                          onClick={() =>
+                            navigate(regionalResponseFederalReviewPath(r.id, location.pathname))
+                          }
+                          title="Open federal review (same as Regional responses)"
                         >
                           <span className="compilation-dept-status-row__label compilation-dept-status-row__label--stacked">
                             <span className="compilation-dept-status-row__title-sub muted small">
                               {r.title?.trim() || r.req_id}
                             </span>
                             <span className="compilation-dept-status-row__dept">
-                              {r.region_name ?? 'Unknown region'}
+                              {r.region_name ?? item.regionName}
                             </span>
                           </span>
                           <StatusBadge tone={review.tone}>{review.label}</StatusBadge>
@@ -330,7 +580,7 @@ export function FederalCompilationPage() {
           style={{ width: '100%', marginTop: 6 }}
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          placeholder="Write the federal administrator’s summary for ministry submission. Provincial narratives are not filled in here automatically—use each regional row above for source material."
+          placeholder="Write the federal administrator’s summary for ministry submission. Source material: provincial rows above when present, and national-line (ICT) departmental submissions accepted under Departmental responses."
         />
         <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
           <Button
@@ -351,18 +601,34 @@ export function FederalCompilationPage() {
           </Button>
           {!canPersistCompilation && selectedReqId ? (
             <span className="muted small" style={{ flex: '1 1 200px' }}>
-              Save is available after at least one region is <strong>accepted</strong> for this request.
+              Select at least one accepted province (checkbox) or include the ICT national line, then save.
             </span>
           ) : null}
         </div>
       </TableCard>
 
-      <RegionalResponsePreviewModal
-        row={viewingResponse}
-        tasksForDetail={tasksForViewingResponse}
-        onClose={() => setViewingResponse(null)}
-        introText="Provincial consolidated response received for national compilation. Department submissions below are limited to this region."
-      />
     </PageSection>
+  )
+}
+
+function FederalCompilationInclusionToolbar({
+  onSelectAll,
+  onClearAll,
+}: {
+  onSelectAll: () => void
+  onClearAll: () => void
+}) {
+  return (
+    <div
+      className="compilation-dept-toolbar"
+      style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginBottom: 10 }}
+    >
+      <button type="button" className="link-button" onClick={onSelectAll}>
+        Select all accepted
+      </button>
+      <button type="button" className="link-button" onClick={onClearAll}>
+        Clear all
+      </button>
+    </div>
   )
 }

@@ -66,6 +66,8 @@ export function buildDepartmentForwardedViewTemplateProps(
   dueDate: string
   regionNames: string[]
   showMetaAssigneeRow: boolean
+  ictDepartmentNames: string[] | null
+  assignedDepartmentNames: string[] | null
   conventionLabel: string
   issueTitle: string
   categoryName: string
@@ -73,6 +75,8 @@ export function buildDepartmentForwardedViewTemplateProps(
   description: string
   regionalInstructionsOnly: boolean
   regionalInstructionsText: string | null
+  /** Overrides the instructions block heading when `regionalInstructionsOnly` is true. */
+  instructionsHeading?: string | null
   articles: HrRequestIssueDetail['articles']
   indicators: HrRequestViewIndicatorRow[]
   attachments: HrRequestRow['attachments']
@@ -100,24 +104,53 @@ export function buildDepartmentForwardedViewTemplateProps(
     }
   })
 
+  const ictTask = isIctDepartmentTask(detail, task)
+  const assignedDepartmentNames = ictTask ? assignedDepartmentNamesForTask(detail, task) : null
+  const assignmentNotes = task.assignment_instructions?.trim() ?? ''
+  const useRegionalInstructions = !ictTask || Boolean(assignmentNotes)
+
   return {
     requestId: detail.id,
     title: detail.title,
     status: detail.status,
     dueDate: detail.date,
-    regionNames: regionNamesForDepartmentForwardedView(detail, task),
+    regionNames: ictTask ? [] : regionNamesForDepartmentForwardedView(detail, task),
     showMetaAssigneeRow: false,
+    ictDepartmentNames: null,
+    assignedDepartmentNames: assignedDepartmentNames?.length ? assignedDepartmentNames : null,
     conventionLabel,
     issueTitle: selectedIssue.issue_title,
     categoryName: selectedIssue.category?.name ?? '—',
     issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,
     description: detail.details ?? '',
-    regionalInstructionsOnly: true,
-    regionalInstructionsText: task.assignment_instructions ?? null,
+    regionalInstructionsOnly: useRegionalInstructions,
+    regionalInstructionsText: useRegionalInstructions ? assignmentNotes || null : null,
+    instructionsHeading: ictTask && assignmentNotes ? 'Federal assignment instructions' : null,
     articles: selectedIssue.articles,
     indicators,
     attachments: detail.attachments,
   }
+}
+
+export function isIctRegionSlug(slug: string | undefined): boolean {
+  return slug === 'ict' || slug === 'federal'
+}
+
+/** True when the task is on the ICT / federal national line (direct department distribution). */
+export function isIctDepartmentTask(detail: HrRequestRow, task: DepartmentTaskRow): boolean {
+  if (isIctRegionSlug(task.region_slug ?? undefined)) return true
+  const rn = task.region_name?.trim()
+  if (rn && /^ict$/i.test(rn)) return true
+  const fromDetail = detail.regions?.find((r) => r.id === task.region_id)
+  if (fromDetail && isIctRegionSlug(fromDetail.slug)) return true
+  return false
+}
+
+function assignedDepartmentNamesForTask(detail: HrRequestRow, task: DepartmentTaskRow): string[] {
+  const fromTask = task.department_name?.trim()
+  if (fromTask) return [fromTask]
+  const fromDetail = (detail.departments ?? []).map((d) => d.name).filter(Boolean)
+  return fromDetail
 }
 
 /** Region names as on the federal HR request (all targeted regions). */
@@ -126,6 +159,20 @@ export function regionNamesForFederalOriginalView(detail: HrRequestRow): string[
   if (detail.region?.name) return [detail.region.name]
   if (detail.region_name) return [detail.region_name]
   return []
+}
+
+/** True when the request targets ICT / federal national line. */
+export function requestHasIctRegion(detail: HrRequestRow): boolean {
+  if (detail.regions?.some((r) => isIctRegionSlug(r.slug))) return true
+  if (detail.region && isIctRegionSlug(detail.region.slug)) return true
+  return false
+}
+
+/** National-line department names when ICT is on the request; otherwise null (hide meta row). */
+export function ictDepartmentNamesForRequest(detail: HrRequestRow): string[] | null {
+  if (!requestHasIctRegion(detail)) return null
+  const names = (detail.departments ?? []).map((d) => d.name).filter(Boolean)
+  return names.length > 0 ? names : null
 }
 
 /**
@@ -139,6 +186,8 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
   dueDate: string
   regionNames: string[]
   showMetaAssigneeRow: boolean
+  ictDepartmentNames: string[] | null
+  assignedDepartmentNames: string[] | null
   conventionLabel: string
   issueTitle: string
   categoryName: string
@@ -146,6 +195,8 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
   description: string
   regionalInstructionsOnly: boolean
   regionalInstructionsText: string | null
+  /** Overrides the instructions block heading when `regionalInstructionsOnly` is true. */
+  instructionsHeading?: string | null
   articles: HrRequestIssueDetail['articles']
   indicators: HrRequestViewIndicatorRow[]
   attachments: HrRequestRow['attachments']
@@ -177,7 +228,9 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
     status: detail.status,
     dueDate: detail.date,
     regionNames: regionNamesForFederalOriginalView(detail),
-    showMetaAssigneeRow: true,
+    showMetaAssigneeRow: false,
+    ictDepartmentNames: ictDepartmentNamesForRequest(detail),
+    assignedDepartmentNames: null,
     conventionLabel,
     issueTitle: selectedIssue.issue_title,
     categoryName: selectedIssue.category?.name ?? '—',
@@ -185,6 +238,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
     description: detail.details ?? '',
     regionalInstructionsOnly: false,
     regionalInstructionsText: null,
+    instructionsHeading: null,
     articles: selectedIssue.articles,
     indicators,
     attachments: detail.attachments,

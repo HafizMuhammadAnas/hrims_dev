@@ -13,6 +13,8 @@ async function getData<T>(path: string): Promise<T> {
 export type RegionalResponseRow = {
   id: string
   req_id: string
+  region_id?: number | null
+  region_slug?: string | null
   region_name: string | null
   title: string
   submission_date: string
@@ -48,6 +50,8 @@ export type DepartmentTaskRow = {
   id: string
   req_id: string
   region_id: number
+  /** Present when API includes it; used to detect ICT / national-line tasks. */
+  region_slug?: string | null
   region_name: string | null
   department_id: string
   department_name: string | null
@@ -63,6 +67,16 @@ export type DepartmentTaskRow = {
 
 export async function fetchDepartmentTasks(): Promise<DepartmentTaskRow[]> {
   const j = await getData<{ data: DepartmentTaskRow[] }>('/api/v1/department-tasks')
+  return j.data
+}
+
+/** Provincial department tasks for federal review of a regional compilation. */
+export async function fetchRegionalResponseDepartmentTasks(
+  regionalResponseId: string,
+): Promise<DepartmentTaskRow[]> {
+  const j = await getData<{ data: DepartmentTaskRow[] }>(
+    `/api/v1/regional-responses/${encodeURIComponent(regionalResponseId)}/department-tasks`,
+  )
   return j.data
 }
 

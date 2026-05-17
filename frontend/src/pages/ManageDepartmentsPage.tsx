@@ -1,52 +1,74 @@
 import { useEffect, useMemo, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { createDepartment, deleteDepartment, fetchDepartments, updateDepartment, type DepartmentRow } from '../api/workflows'
 import { isApiError } from '../api/apiError'
-import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { FormControl } from '../components/ui/FormControl'
 import { FormGrid } from '../components/ui/FormGrid'
 import { FormRow } from '../components/ui/FormRow'
+import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { ModalActions } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
+import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
+import { StatsCards } from '../components/ui/StatsCards'
 import { TableCard } from '../components/ui/TableCard'
+import { TableToolbar } from '../components/ui/TableToolbar'
 import { useNotify } from '../context/NotificationsContext'
-import { isFederalAdmin, isRegionalAdmin } from '../lib/roles'
-
-type EditState = {
-  id: number
-  name: string
-  code: string
-  type: string
-}
+import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { workflowBackLabel } from '../lib/workflowNavigation'
+import {
+  departmentsMgmtBasePath,
+  departmentsMgmtEditId,
+  departmentsMgmtEditPath,
+  departmentsMgmtTabs,
+  resolveDepartmentsMgmtView,
+} from '../lib/departmentsMgmtNavigation'
 
 export function ManageDepartmentsPage() {
-  const { user } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const notify = useNotify()
-  const federal = isFederalAdmin(user)
-  const regional = isRegionalAdmin(user)
+  const basePath = departmentsMgmtBasePath(location.pathname)
+  const view = resolveDepartmentsMgmtView(location.pathname)
+  const editDepartmentId = departmentsMgmtEditId(location.pathname)
+  const tabs = departmentsMgmtTabs(basePath)
 
   const [rows, setRows] = useState<DepartmentRow[]>([])
   const [createName, setCreateName] = useState('')
   const [createCode, setCreateCode] = useState('')
   const [createType, setCreateType] = useState('')
-  const [edit, setEdit] = useState<EditState | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editCode, setEditCode] = useState('')
+  const [editType, setEditType] = useState('')
   const [saving, setSaving] = useState(false)
   const [openActionId, setOpenActionId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const table = useClientTableState({ pageSize: 10 })
+  const { search, setSearch, page, setPage, pageSize } = table
 
-  const subtitle = federal
-    ? 'Create and maintain federal department records (ICT scope).'
-    : regional
-      ? 'Create and maintain your region department records only.'
-      : 'Department management is available for federal and regional administrators.'
-
-  const regionLabel = useMemo(() => {
-    const labels = new Set(rows.map((r) => r.region_name).filter(Boolean) as string[])
-    return labels.size > 0 ? Array.from(labels).join(', ') : 'N/A'
+  const regionCount = useMemo(() => {
+    return new Set(rows.map((r) => r.region_name).filter(Boolean)).size
   }, [rows])
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(
+      (d) =>
+        d.name.toLowerCase().includes(q) ||
+        (d.code ?? '').toLowerCase().includes(q) ||
+        (d.type ?? '').toLowerCase().includes(q) ||
+        (d.region_name ?? '').toLowerCase().includes(q),
+    )
+  }, [rows, search])
+
+  const { pageRows } = useMemo(
+    () => derivePaginatedRows(filteredRows, page, pageSize),
+    [filteredRows, page, pageSize],
+  )
 
   async function load() {
     setRows(await fetchDepartments())
@@ -74,6 +96,7 @@ export function ManageDepartmentsPage() {
       setCreateType('')
       await load()
       notify.success('Department created.')
+      navigate(basePath)
     } catch (e: unknown) {
       setError(isApiError(e) ? e.message : e instanceof Error ? e.message : 'Create failed')
     } finally {
@@ -81,23 +104,35 @@ export function ManageDepartmentsPage() {
     }
   }
 
+  const editingDepartment = useMemo(() => {
+    if (editDepartmentId == null) return null
+    return rows.find((d) => d.id === editDepartmentId) ?? null
+  }, [rows, editDepartmentId])
+
+  useEffect(() => {
+    if (view !== 'edit' || !editingDepartment) return
+    setEditName(editingDepartment.name)
+    setEditCode(editingDepartment.code ?? '')
+    setEditType(editingDepartment.type ?? '')
+  }, [view, editingDepartment])
+
   async function handleUpdate() {
-    if (!edit) return
-    if (!edit.name.trim()) {
+    if (editDepartmentId == null) return
+    if (!editName.trim()) {
       setError('Department name is required.')
       return
     }
     setSaving(true)
     setError(null)
     try {
-      await updateDepartment(edit.id, {
-        name: edit.name.trim(),
-        code: edit.code.trim() || null,
-        type: edit.type.trim() || null,
+      await updateDepartment(editDepartmentId, {
+        name: editName.trim(),
+        code: editCode.trim() || null,
+        type: editType.trim() || null,
       })
-      setEdit(null)
       await load()
       notify.success('Department updated.')
+      navigate(basePath)
     } catch (e: unknown) {
       setError(isApiError(e) ? e.message : e instanceof Error ? e.message : 'Update failed')
     } finally {
@@ -119,127 +154,183 @@ export function ManageDepartmentsPage() {
     }
   }
 
+  const editBack =
+    view === 'edit' ? (
+      <WorkflowPageBack to={basePath} label={workflowBackLabel(basePath)} placement="header" />
+    ) : null
+
   return (
-    <PageSection title="Manage departments" subtitle={subtitle}>
+    <PageSection
+      title={view === 'edit' ? 'Edit department' : 'Manage departments'}
+      leading={editBack}
+    >
       {error && (
         <Alert variant="error" title="Something went wrong" onDismiss={() => setError(null)}>
           {error}
         </Alert>
       )}
 
-      <TableCard padded>
-        <p className="muted" style={{ marginTop: 0, marginBottom: 10 }}>
-          Department scope: <strong>{regionLabel}</strong>
-        </p>
-        <FormGrid>
-          <FormRow twoCol>
-            <FormControl label="Department name">
-              <input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="Department name" />
-            </FormControl>
-            <FormControl label="Code (optional)">
-              <input value={createCode} onChange={(e) => setCreateCode(e.target.value)} placeholder="Code" />
-            </FormControl>
-          </FormRow>
-          <FormControl label="Type (optional)">
-            <input value={createType} onChange={(e) => setCreateType(e.target.value)} placeholder="e.g. federal-line" />
-          </FormControl>
-          <ModalActions>
-            <Button variant="primary" compact disabled={saving} onClick={() => void handleCreate()}>
-              {saving ? 'Saving...' : 'Create department'}
-            </Button>
-          </ModalActions>
-        </FormGrid>
-      </TableCard>
+      {view !== 'edit' && (
+      <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label="Department management sections">
+        {tabs.map((tab) => (
+          <NavLink
+            key={tab.view}
+            to={tab.to}
+            end={tab.end}
+            className={({ isActive }) =>
+              `compiled-record-modal-tab issues-admin-tab${isActive ? ' compiled-record-modal-tab--active' : ''}`
+            }
+          >
+            {tab.label}
+          </NavLink>
+        ))}
+      </nav>
+      )}
 
-      <TableCard>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Region</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((d) =>
-              edit?.id === d.id ? (
-                <tr key={d.id}>
-                  <td>
-                    <input
-                      value={edit.code}
-                      onChange={(e) => setEdit((prev) => (prev ? { ...prev, code: e.target.value } : prev))}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={edit.name}
-                      onChange={(e) => setEdit((prev) => (prev ? { ...prev, name: e.target.value } : prev))}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={edit.type}
-                      onChange={(e) => setEdit((prev) => (prev ? { ...prev, type: e.target.value } : prev))}
-                    />
-                  </td>
-                  <td>{d.region_name ?? '—'}</td>
-                  <td>
-                    <Button variant="primary" compact disabled={saving} onClick={() => void handleUpdate()}>
-                      Save
-                    </Button>{' '}
-                    <Button variant="link" compact onClick={() => setEdit(null)}>
-                      Cancel
-                    </Button>
-                  </td>
+      {view === 'edit' && (
+        <>
+          {!editingDepartment && !error ? <p className="muted">Loading department…</p> : null}
+          {editingDepartment && (
+            <TableCard padded>
+              <FormGrid>
+                <FormRow twoCol>
+                  <FormControl label="Department name">
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  </FormControl>
+                  <FormControl label="Code (optional)">
+                    <input value={editCode} onChange={(e) => setEditCode(e.target.value)} />
+                  </FormControl>
+                </FormRow>
+                <FormControl label="Type (optional)">
+                  <input value={editType} onChange={(e) => setEditType(e.target.value)} />
+                </FormControl>
+                <ModalActions>
+                  <Button variant="secondary" compact onClick={() => navigate(basePath)}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" compact disabled={saving} onClick={() => void handleUpdate()}>
+                    {saving ? 'Saving...' : 'Save changes'}
+                  </Button>
+                </ModalActions>
+              </FormGrid>
+            </TableCard>
+          )}
+        </>
+      )}
+
+      {view === 'list' && (
+        <>
+          <div style={{ marginTop: 16 }}>
+            <StatsCards
+              items={[
+                { label: 'Total departments', value: filteredRows.length },
+                { label: 'Regions represented', value: regionCount },
+              ]}
+            />
+          </div>
+
+          <TableToolbar>
+            <input
+              type="search"
+              placeholder="Search name, code, type, region…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search departments"
+            />
+            <Button variant="secondary" compact type="button" onClick={() => setSearch('')}>
+              Reset search
+            </Button>
+          </TableToolbar>
+
+          <TableCard>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Region</th>
+                  <th>Action</th>
                 </tr>
-              ) : (
-                <tr key={d.id}>
-                  <td>{d.code ?? '—'}</td>
-                  <td>{d.name}</td>
-                  <td>{d.type ?? '—'}</td>
-                  <td>{d.region_name ?? '—'}</td>
-                  <td>
-                    <RowActionsMenu
-                      isOpen={openActionId === d.id}
-                      onOpenChange={(open) => setOpenActionId(open ? d.id : null)}
-                    >
-                      <Button
-                        variant="link"
-                        compact
-                        onClick={() =>
-                          setEdit({
-                            id: d.id,
-                            name: d.name,
-                            code: d.code ?? '',
-                            type: d.type ?? '',
-                          })
-                        }
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="link"
-                        compact
-                        dangerLink
-                        disabled={saving}
-                        onClick={() => {
-                          void handleDelete(d.id)
-                          setOpenActionId(null)
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </RowActionsMenu>
-                  </td>
-                </tr>
-              ),
-            )}
-            {rows.length === 0 && <EmptyStateRow colSpan={5} message="No departments in your scope." />}
-          </tbody>
-        </table>
-      </TableCard>
+              </thead>
+              <tbody>
+                {pageRows.map((d) => (
+                    <tr key={d.id}>
+                      <td>{d.code ?? '—'}</td>
+                      <td>{d.name}</td>
+                      <td>{d.type ?? '—'}</td>
+                      <td>{d.region_name ?? '—'}</td>
+                      <td>
+                        <RowActionsMenu
+                          isOpen={openActionId === d.id}
+                          onOpenChange={(open) => setOpenActionId(open ? d.id : null)}
+                        >
+                          <Button
+                            variant="link"
+                            compact
+                            onClick={() => {
+                              navigate(departmentsMgmtEditPath(basePath, d.id))
+                              setOpenActionId(null)
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="link"
+                            compact
+                            dangerLink
+                            disabled={saving}
+                            onClick={() => {
+                              void handleDelete(d.id)
+                              setOpenActionId(null)
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </RowActionsMenu>
+                      </td>
+                    </tr>
+                ))}
+                {pageRows.length === 0 && (
+                  <EmptyStateRow
+                    colSpan={5}
+                    message={
+                      search.trim() ? 'No departments match your search.' : 'No departments in your scope.'
+                    }
+                  />
+                )}
+              </tbody>
+            </table>
+          </TableCard>
+          <PaginationBar page={page} pageSize={pageSize} totalItems={filteredRows.length} onPageChange={setPage} />
+        </>
+      )}
+
+      {view === 'new' && (
+        <TableCard padded>
+          <FormGrid>
+            <FormRow twoCol>
+              <FormControl label="Department name">
+                <input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="Department name" />
+              </FormControl>
+              <FormControl label="Code (optional)">
+                <input value={createCode} onChange={(e) => setCreateCode(e.target.value)} placeholder="Code" />
+              </FormControl>
+            </FormRow>
+            <FormControl label="Type (optional)">
+              <input value={createType} onChange={(e) => setCreateType(e.target.value)} placeholder="e.g. federal-line" />
+            </FormControl>
+            <ModalActions>
+              <Button variant="secondary" compact onClick={() => navigate(basePath)}>
+                Cancel
+              </Button>
+              <Button variant="primary" compact disabled={saving} onClick={() => void handleCreate()}>
+                {saving ? 'Saving...' : 'Create department'}
+              </Button>
+            </ModalActions>
+          </FormGrid>
+        </TableCard>
+      )}
     </PageSection>
   )
 }

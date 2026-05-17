@@ -1,21 +1,9 @@
 import { parseDepartmentTaskResponseData } from '../lib/departmentTaskResponseFormat'
 
-export function attachmentFileLabel(url: string): string {
-  try {
-    const path = new URL(url).pathname
-    const base = path.split('/').filter(Boolean).pop() || 'file'
-    return decodeURIComponent(base)
-  } catch {
-    return 'file'
-  }
-}
-
 export function AttachmentViewLink({ url }: { url: string }) {
-  const name = attachmentFileLabel(url)
   return (
     <a href={url} target="_blank" rel="noreferrer" className="dept-response-attachment-btn">
-      <span className="dept-response-attachment-btn__action">View attachment</span>
-      <span className="dept-response-attachment-btn__name">{name}</span>
+      View attachment
     </a>
   )
 }
@@ -27,7 +15,11 @@ type Props = {
   onlyIndicatorIds?: number[]
 }
 
-export function DepartmentResponseDisplay({ responseData, attachmentUrl, onlyIndicatorIds }: Props) {
+export function DepartmentResponseDisplay({
+  responseData,
+  attachmentUrl,
+  onlyIndicatorIds,
+}: Props) {
   const parsed = parseDepartmentTaskResponseData(responseData, attachmentUrl)
 
   if (parsed.kind === 'legacy') {
@@ -121,3 +113,4 @@ export function DepartmentResponseDisplay({ responseData, attachmentUrl, onlyInd
     </div>
   )
 }
+

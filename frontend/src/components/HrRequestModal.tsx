@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import { isApiError } from '../api/apiError'
 import {
   createHrRequestFromIssueForm,
@@ -19,6 +19,10 @@ import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequest
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
 import { PendingFileAttachmentListItem } from './PendingFileAttachmentRow'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
+import {
+  ictDepartmentNamesForRequest,
+  regionNamesForFederalOriginalView,
+} from '../lib/hrRequestForwardedViewTemplateProps'
 import { Alert, FieldError } from './ui/Alert'
 import { Button } from './ui/Button'
 import { FormControl } from './ui/FormControl'
@@ -26,6 +30,13 @@ import { FormField } from './ui/FormField'
 import { FormGrid } from './ui/FormGrid'
 import { FormRow } from './ui/FormRow'
 import { ModalActions, ModalHeader } from './ui/ModalChrome'
+import { StatusBadge } from './ui/StatusBadge'
+import { WorkflowModalHero } from './ui/WorkflowModalHero'
+import {
+  formatDueDisplay,
+  statusDisplayLabel,
+  statusTone,
+} from './HrRequestViewTemplate'
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
@@ -201,6 +212,14 @@ export type HrRequestModalProps = {
    * instead of the federal request description. Omit for federal/regional admin viewers.
    */
   departmentPortalRegionalNotes?: string | null
+  /** Department portal: show assigned department name(s) instead of region in the request hero. */
+  departmentPortalAssignedDepartmentNames?: string[] | null
+  /** Rendered inside the page-layout view card, directly under the request template. */
+  pageViewBelowTemplate?: ReactNode
+  /** Footer actions for page-layout view (e.g. back navigation). */
+  pageViewActions?: ReactNode
+  /** Page layout: hide modal header (request ID already in template hero). */
+  hidePageHeader?: boolean
 }
 
 export function HrRequestModal({
@@ -217,6 +236,10 @@ export function HrRequestModal({
   layout = 'modal',
   pageCloseLabel,
   departmentPortalRegionalNotes,
+  departmentPortalAssignedDepartmentNames = null,
+  pageViewBelowTemplate,
+  pageViewActions,
+  hidePageHeader = false,
 }: HrRequestModalProps) {
   const { user: authUser } = useAuth()
   const portalDeptViewer = Boolean(
@@ -309,6 +332,11 @@ export function HrRequestModal({
   const ictAmongSelected = useMemo(() => {
     if (!issueForm) return false
     return issueForm.region_ids.some((id) => ictRegionIdSet.has(id))
+  }, [issueForm?.region_ids, ictRegionIdSet])
+
+  const ictOnlySelected = useMemo(() => {
+    if (!issueForm || issueForm.region_ids.length === 0) return false
+    return issueForm.region_ids.every((id) => ictRegionIdSet.has(id))
   }, [issueForm?.region_ids, ictRegionIdSet])
 
   const selectedRegionIdsKey = issueForm?.region_ids.join(',') ?? ''
@@ -489,12 +517,16 @@ export function HrRequestModal({
   }, [issueForm, issues, detail?.issue])
 
   const selectedIctDepartmentsText = useMemo(() => {
-    if (!issueForm || federalDepts.length === 0) return 'Select ICT departments'
+    if (!issueForm || federalDepts.length === 0) {
+      return ictOnlySelected ? 'Select ICT departments (required)' : 'Select ICT departments'
+    }
     const picked = federalDepts.filter((d) => issueForm.department_ids.includes(d.id))
-    if (picked.length === 0) return 'Select ICT departments'
+    if (picked.length === 0) {
+      return ictOnlySelected ? 'Select ICT departments (required)' : 'Select ICT departments'
+    }
     if (picked.length <= 2) return picked.map((d) => d.name).join(', ')
     return `${picked.length} departments selected`
-  }, [issueForm?.department_ids, federalDepts])
+  }, [issueForm?.department_ids, federalDepts, ictOnlySelected])
 
   const selectedRegions = useMemo(() => {
     if (!issueForm) return []
@@ -521,26 +553,44 @@ export function HrRequestModal({
     return '—'
   }, [detail?.convention, issueForm?.convention_id, conventions])
 
-  /** Regional / department portals: show only the viewer's region in the hero. */
+  const viewTemplateAssignedDepartmentNames = useMemo(() => {
+    if (!portalDeptViewer || !readOnly) return null
+    const fromProp = (departmentPortalAssignedDepartmentNames ?? []).filter((n) => n.trim().length > 0)
+    if (fromProp.length > 0) return fromProp
+    const mine = authUser?.department?.name?.trim()
+    return mine ? [mine] : null
+  }, [portalDeptViewer, readOnly, departmentPortalAssignedDepartmentNames, authUser?.department?.name])
+
+  /** Regional / department portals: single region; federal view: all assigned regions from detail. */
   const viewTemplateRegionNames = useMemo(() => {
+    if (portalDeptViewer && viewTemplateAssignedDepartmentNames?.length) {
+      return []
+    }
     if (lockedRegionId != null) {
       const nm =
         assignableRegions.find((r) => r.id === lockedRegionId)?.name ?? authUser?.region?.name ?? null
       if (nm) return [nm]
     }
-    if (portalDeptViewer && authUser?.region?.name) {
-      return [authUser.region.name]
+    if (readOnly && detail) {
+      const fromDetail = regionNamesForFederalOriginalView(detail)
+      if (fromDetail.length > 0) return fromDetail
     }
     return selectedRegions
   }, [
+    portalDeptViewer,
+    viewTemplateAssignedDepartmentNames,
     lockedRegionId,
     assignableRegions,
     selectedRegions,
-    portalDeptViewer,
     authUser?.region?.name,
+    readOnly,
+    detail,
   ])
 
-  const viewTemplateShowAssigneeMeta = lockedRegionId == null && !portalDeptViewer
+  const viewTemplateIctDepartmentNames = useMemo(() => {
+    if (!readOnly || lockedRegionId != null || portalDeptViewer || !detail) return null
+    return ictDepartmentNamesForRequest(detail)
+  }, [readOnly, lockedRegionId, portalDeptViewer, detail])
 
   function runIssueValidation(): boolean {
     if (!issueForm) return false
@@ -555,6 +605,12 @@ export function HrRequestModal({
       issueForm.selectedIndicatorIds.length === 0
     ) {
       fe.indicator_ids = 'Select at least one indicator for this issue.'
+    }
+    const ictOnly =
+      issueForm.region_ids.length > 0 && issueForm.region_ids.every((id) => ictRegionIdSet.has(id))
+    if (ictOnly && issueForm.department_ids.length === 0) {
+      fe.department_ids =
+        'Select at least one national-line department when the request is directed only to ICT.'
     }
     setFieldErrors(fe)
     if (Object.keys(fe).length > 0) {
@@ -690,21 +746,56 @@ export function HrRequestModal({
   const requestIdHint =
     mode === 'create' ? 'Assigned automatically on save (REQ-YYYY-####).' : detail?.id ?? '—'
 
+  const workflowViewModal = mode === 'view' && layout === 'modal' && usesIssueFlow
+  const workflowViewPage = mode === 'view' && layout === 'page' && usesIssueFlow
+  const useWorkflowHero = workflowViewModal || workflowViewPage
+
   const card = (
       <div
-        className={`modal-card modal-card-wide${layout === 'page' ? ' hr-request-modal--page' : ''}`}
+        className={`modal-card modal-card-wide${layout === 'page' ? ' hr-request-modal--page' : ''}${layout === 'page' && hidePageHeader ? ' hr-request-modal--page-embedded' : ''}${mode === 'view' && usesIssueFlow ? ' hr-request-modal--view' : ''}${useWorkflowHero ? ' workflow-tabbed-card' : ''}`}
         onClick={layout === 'modal' ? (e) => e.stopPropagation() : undefined}
       >
-        <ModalHeader
-          title={
-            mode === 'create'
-              ? 'New request'
-              : mode === 'edit'
-                ? 'Edit HR request'
-                : 'HR request'
-          }
-          onClose={onClose}
-        />
+        {useWorkflowHero ? (
+          <WorkflowModalHero
+            eyebrow="HR request"
+            titleId="hr-request-modal-title"
+            title={
+              (issueForm?.title ?? detail?.title ?? '').trim() ||
+              (showLoading ? 'Loading request…' : 'Request details')
+            }
+            onClose={workflowViewModal ? onClose : undefined}
+            embedded={workflowViewPage}
+          >
+            {issueForm && detail ? (
+              <>
+                <StatusBadge tone={statusTone(issueForm.status)}>
+                  {statusDisplayLabel(issueForm.status)}
+                </StatusBadge>
+                <span className="workflow-modal-hero__chip">{detail.id}</span>
+                {issueForm.date ? (
+                  <span className="workflow-modal-hero__chip">
+                    Due {formatDueDisplay(issueForm.date)}
+                  </span>
+                ) : null}
+              </>
+            ) : detail?.id ? (
+              <span className="workflow-modal-hero__chip">{detail.id}</span>
+            ) : null}
+          </WorkflowModalHero>
+        ) : !(layout === 'page' && hidePageHeader) ? (
+          <ModalHeader
+            title={
+              mode === 'create'
+                ? 'New request'
+                : mode === 'edit'
+                  ? 'Edit HR request'
+                  : mode === 'view' && detail?.id
+                    ? `Request — ${detail.id}`
+                    : 'Request details'
+            }
+            onClose={onClose}
+          />
+        ) : null}
 
         {showLoading && <p className="muted pad-modal">Loading…</p>}
         {showMissing && (
@@ -728,12 +819,14 @@ export function HrRequestModal({
               )}
               {selectedIssue ? (
                 <HrRequestViewTemplate
+                  className={useWorkflowHero ? 'hr-request-view-template--external-hero' : undefined}
                   requestId={detail?.id ?? requestIdHint}
                   title={issueForm.title}
                   status={issueForm.status}
                   dueDate={issueForm.date}
                   regionNames={viewTemplateRegionNames}
-                  showMetaAssigneeRow={viewTemplateShowAssigneeMeta}
+                  ictDepartmentNames={viewTemplateIctDepartmentNames}
+                  assignedDepartmentNames={viewTemplateAssignedDepartmentNames}
                   conventionLabel={conventionDisplayLabel}
                   issueTitle={selectedIssue.issue_title}
                   categoryName={selectedIssue.category?.name ?? '—'}
@@ -765,9 +858,15 @@ export function HrRequestModal({
                   <span>Issue metadata could not be loaded for this request.</span>
                 </Alert>
               )}
+              {layout === 'page' && pageViewBelowTemplate ? (
+                <div className="hr-request-view-template-modal__workflow">{pageViewBelowTemplate}</div>
+              ) : null}
             </div>
+            {layout === 'page' && mode === 'view' && pageViewActions ? (
+              <div className="hr-request-modal-page-actions pad-modal">{pageViewActions}</div>
+            ) : null}
             {!(layout === 'page' && mode === 'view') && (
-              <ModalActions>
+              <ModalActions className="hr-request-modal-view-footer">
                 <Button variant="secondary" compact type="button" onClick={onClose}>
                   {readOnlyCloseLabel}
                 </Button>
@@ -1082,15 +1181,19 @@ export function HrRequestModal({
 
               {!readOnly && ictAmongSelected && federalDepts.length > 0 && (
                 <FormField
-                  label="ICT departments (optional)"
-                  hint="Select one or more national-line departments for this request."
+                  label={ictOnlySelected ? 'ICT departments' : 'ICT departments (optional)'}
+                  hint={
+                    ictOnlySelected
+                      ? 'Choose departments to distribute this request immediately to national-line units under ICT.'
+                      : 'When routing to ICT together with other regions, pick departments here for the ICT portion; regional admins distribute the rest.'
+                  }
                 >
                   <details className="hr-request-ict-dept-dropdown">
                     <summary>{selectedIctDepartmentsText}</summary>
                     <div
                       className="hr-request-ict-dept-dropdown__menu"
                       role="group"
-                      aria-label="ICT departments (optional)"
+                      aria-label={ictOnlySelected ? 'ICT departments (required)' : 'ICT departments (optional)'}
                     >
                       {federalDepts.map((d) => (
                         <label key={d.id} className="checkbox-label">
@@ -1115,6 +1218,7 @@ export function HrRequestModal({
                       ))}
                     </div>
                   </details>
+                  <FieldError id="hr-ict-dept-err" message={fieldErrors.department_ids} />
                 </FormField>
               )}
 

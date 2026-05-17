@@ -180,6 +180,8 @@ export async function createRegionalResponse(body: {
   hr_request_id: string
   title: string
   content: string
+  /** Required for federal ICT / national-line compilation (not the request’s primary region). */
+  region_id?: number
 }): Promise<RegionalResponseRow> {
   await ensureCsrfCookie()
   const res = await fetch('/api/v1/regional-responses', {

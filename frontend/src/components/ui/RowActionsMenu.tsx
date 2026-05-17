@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -19,7 +20,7 @@ export function RowActionsMenu({
   isOpen,
   onOpenChange,
   children,
-  triggerLabel = 'Action',
+  triggerLabel = 'Actions',
 }: RowActionsMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
@@ -82,12 +83,13 @@ export function RowActionsMenu({
       <button
         ref={triggerRef}
         type="button"
-        className="row-actions-trigger"
+        className={'row-actions-trigger' + (isOpen ? ' row-actions-trigger--open' : '')}
         aria-expanded={isOpen}
         aria-haspopup="menu"
         onClick={() => onOpenChange(!isOpen)}
       >
-        {triggerLabel}
+        <span className="row-actions-trigger__label">{triggerLabel}</span>
+        <ChevronDown className="row-actions-trigger__icon" size={15} strokeWidth={2.25} aria-hidden />
       </button>
       {isOpen &&
         pos &&

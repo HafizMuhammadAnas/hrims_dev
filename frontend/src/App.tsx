@@ -6,8 +6,9 @@ import { ProtectedLayout } from './layouts/ProtectedLayout'
 import { CompiledRecordsPage } from './pages/CompiledRecordsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DepartmentTasksPage } from './pages/DepartmentTasksPage'
+import { HrRequestEditPage } from './pages/HrRequestEditPage'
 import { HrRequestViewPage } from './pages/HrRequestViewPage'
-import { HrRequestsPage } from './pages/HrRequestsPage'
+import { FederalRequestManagementPage } from './pages/FederalRequestManagementPage'
 import { AnalysisPage } from './pages/AnalysisPage'
 import { ConventionsInfoPage } from './pages/knowledge/ConventionsInfoPage'
 import { IndicatorsInfoPage } from './pages/knowledge/IndicatorsInfoPage'
@@ -18,8 +19,13 @@ import { LoginPage } from './pages/LoginPage'
 import { ManageDepartmentsPage } from './pages/ManageDepartmentsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { CompiledRecordViewPage } from './pages/CompiledRecordViewPage'
+import { RegionalCompilationViewPage } from './pages/RegionalCompilationViewPage'
+import { RegionalResponseFederalReviewPage } from './pages/RegionalResponseFederalReviewPage'
 import { RegionalResponsesPage } from './pages/RegionalResponsesPage'
 import { ReportGeneratorPage } from './pages/ReportGeneratorPage'
+import { IssuesMappingsAdminPage } from './pages/IssuesMappingsAdminPage'
+import { RegionsDistrictsAdminPage } from './pages/RegionsDistrictsAdminPage'
 import { SuperAdminConsolePage } from './pages/SuperAdminConsolePage'
 import { UserManagementPage } from './pages/UserManagementPage'
 import { ViolationEntriesPage } from './pages/ViolationEntriesPage'
@@ -41,43 +47,55 @@ function App() {
           <Route element={<ProtectedLayout />}>
             <Route element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="requests/:id/edit" element={<HrRequestEditPage />} />
               <Route path="requests/:id" element={<HrRequestViewPage />} />
-              <Route path="requests" element={<HrRequestsPage />} />
+              <Route path="regional-responses/:responseId" element={<RegionalResponseFederalReviewPage />} />
+              <Route path="regional-compilations/:responseId" element={<RegionalCompilationViewPage />} />
+              <Route path="compiled-records/:recordId" element={<CompiledRecordViewPage />} />
+              <Route path="requests/new" element={<FederalRequestManagementPage />} />
+              <Route path="requests/clarifications" element={<FederalRequestManagementPage />} />
+              <Route path="requests/regional-responses" element={<FederalRequestManagementPage />} />
+              <Route path="requests" element={<FederalRequestManagementPage />} />
               <Route path="federal-upr-requests" element={<UprRequestsPage />} />
               <Route path="responses" element={<RegionalResponsesPage />} />
               <Route path="compilation" element={<FederalCompilationPage />} />
               <Route path="compiled-records" element={<CompiledRecordsPage />} />
+              <Route path="federal-users-mgmt/new" element={<UserManagementPage />} />
+              <Route path="federal-users-mgmt/:userId/edit" element={<UserManagementPage />} />
               <Route path="federal-users-mgmt" element={<UserManagementPage />} />
+              <Route path="federal-departments-mgmt/new" element={<ManageDepartmentsPage />} />
+              <Route path="federal-departments-mgmt/:departmentId/edit" element={<ManageDepartmentsPage />} />
               <Route path="federal-departments-mgmt" element={<ManageDepartmentsPage />} />
               <Route
                 path="federal-department-requests"
-                element={
-                  <ReceivedRequestsPage
-                    title="Federal — departmental requests"
-                    distributionPath="/federal-department-responses"
-                    monitoringPath="/federal-department-responses"
-                    historyPath="/federal-history"
-                    enableRequestCrud
-                  />
-                }
+                element={<DepartmentMonitoringPage title="Departmental responses" />}
               />
               <Route path="federal-distribution" element={<Navigate to="/federal-department-requests" replace />} />
               <Route
                 path="federal-department-responses"
-                element={<DepartmentMonitoringPage title="Federal — departmental responses" />}
+                element={<Navigate to="/federal-department-requests" replace />}
               />
               <Route path="federal-received" element={<Navigate to="/federal-department-requests" replace />} />
-              <Route path="federal-monitoring" element={<Navigate to="/federal-department-responses" replace />} />
-              <Route path="federal-compilation" element={<FederalCompilationPage />} />
+              <Route path="federal-monitoring" element={<Navigate to="/federal-department-requests" replace />} />
+              <Route
+                path="federal-compilation"
+                element={
+                  <ResponseCompilationPage
+                    title="Response compilation"
+                    nextPath="/federal-history"
+                    scope="ict"
+                  />
+                }
+              />
               <Route
                 path="federal-history"
-                element={<SubmissionHistoryPage title="Federal — internal history" />}
+                element={<SubmissionHistoryPage title="Compiled responses" />}
               />
               <Route
                 path="region-received"
                 element={
                   <ReceivedRequestsPage
-                    title="Regional — received requests"
+                    title="Received Requests"
                     distributionPath="/region-distribution"
                     monitoringPath="/region-monitoring"
                     historyPath="/region-history"
@@ -95,27 +113,32 @@ function App() {
               />
               <Route
                 path="region-monitoring"
-                element={<DepartmentMonitoringPage title="Distributed requests" />}
+                element={<DepartmentMonitoringPage title="Departmental responses" />}
               />
               <Route
                 path="region-compilation"
                 element={
                   <ResponseCompilationPage
-                    title="Regional — response compilation"
+                    title="Response compilation"
                     nextPath="/region-history"
+                    scope="regional"
                   />
                 }
               />
+              <Route path="regional-users-mgmt/new" element={<UserManagementPage />} />
+              <Route path="regional-users-mgmt/:userId/edit" element={<UserManagementPage />} />
               <Route path="regional-users-mgmt" element={<UserManagementPage />} />
               <Route
                 path="region-history"
-                element={<SubmissionHistoryPage title="Regional — compiled and submitted" />}
+                element={<SubmissionHistoryPage title="Compiled and submitted" />}
               />
               <Route path="department-tasks" element={<DepartmentTasksPage />} />
+              <Route path="regional-departments-mgmt/new" element={<ManageDepartmentsPage />} />
+              <Route path="regional-departments-mgmt/:departmentId/edit" element={<ManageDepartmentsPage />} />
               <Route path="regional-departments-mgmt" element={<ManageDepartmentsPage />} />
               <Route
                 path="department-history"
-                element={<SubmissionHistoryPage title="Department — submission history" />}
+                element={<SubmissionHistoryPage title="Submission history" />}
               />
               <Route path="report-generator" element={<ReportGeneratorPage />} />
               <Route path="analysis" element={<AnalysisPage />} />
@@ -125,7 +148,12 @@ function App() {
               <Route path="upr" element={<UprInfoPage />} />
               <Route path="violation-entries" element={<ViolationEntriesPage />} />
               <Route path="profile" element={<ProfilePage />} />
-              <Route path="admin" element={<Navigate to="/admin/regions-districts" replace />} />
+              <Route path="admin" element={<Navigate to="/admin/issues" replace />} />
+              <Route path="admin/issues/edit/:issueId" element={<IssuesMappingsAdminPage />} />
+              <Route path="admin/issues" element={<IssuesMappingsAdminPage />} />
+              <Route path="admin/issues/:issuesView" element={<IssuesMappingsAdminPage />} />
+              <Route path="admin/regions-districts" element={<RegionsDistrictsAdminPage />} />
+              <Route path="admin/regions-districts/:geoView" element={<RegionsDistrictsAdminPage />} />
               <Route path="admin/:section" element={<SuperAdminConsolePage />} />
             </Route>
           </Route>

@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   deleteHrRequest,
-  fetchHrRequest,
   fetchHrRequests,
 } from '../api/hrRequests'
-import { fetchRegions } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
-import { canManageHrRequests, hrRequestLockedRegionId } from '../auth/rbac'
-import { HrRequestModal } from '../components/HrRequestModal'
+import { canManageHrRequests } from '../auth/rbac'
 import { Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
@@ -16,40 +14,34 @@ import { PageSection } from '../components/ui/PageSection'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { TableCard } from '../components/ui/TableCard'
+import { StatsCards } from '../components/ui/StatsCards'
+import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableToolbar } from '../components/ui/TableToolbar'
-import { HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
-import type { HrRequestRow } from '../types/hrRequest'
+import { hrRequestListStats, hrRequestStatusPresentation } from '../lib/hrRequestListMetrics'
+import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
+import { hrRequestEditPath, hrRequestViewPath } from '../lib/workflowNavigation'
 
 export function HrRequestsPage() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const canManage = canManageHrRequests(user)
-  const lockedRegionId = hrRequestLockedRegionId(user)
 
   const [rows, setRows] = useState<HrRequestRow[]>([])
-  const [regions, setRegions] = useState<Awaited<ReturnType<typeof fetchRegions>>>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const table = useClientTableState({ pageSize: 10 })
   const { search, setSearch, filters, setFilter, resetFilters, page, setPage, pageSize } = table
 
-  const [modal, setModal] = useState<{
-    mode: 'create' | 'edit' | 'view'
-    id: string | null
-  } | null>(null)
-  const [detail, setDetail] = useState<HrRequestRow | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<HrRequestRow | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
-    const [reqRows, regRows] = await Promise.all([fetchHrRequests(), fetchRegions()])
+    const reqRows = await fetchHrRequests()
     setRows(reqRows)
-    setRegions(regRows)
   }, [])
 
   useEffect(() => {
@@ -67,42 +59,6 @@ export function HrRequestsPage() {
       cancelled = true
     }
   }, [reload])
-
-  useEffect(() => {
-    if (!modal || modal.mode === 'create') {
-      setDetail(null)
-      setDetailLoading(false)
-      setDetailError(null)
-      return
-    }
-    if (!modal.id) return
-    let cancelled = false
-    setDetailLoading(true)
-    setDetail(null)
-    setDetailError(null)
-    void fetchHrRequest(modal.id)
-      .then((row) => {
-        if (!cancelled) setDetail(row)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
-          setDetailError(e instanceof Error ? e.message : 'Failed to load request')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setDetailLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [modal])
-
-  const refreshModalDetail = useCallback(async () => {
-    if (modal?.id) {
-      const row = await fetchHrRequest(modal.id)
-      setDetail(row)
-    }
-  }, [modal?.id])
 
   const statusFilter = filters.status ?? ''
 
@@ -153,6 +109,12 @@ export function HrRequestsPage() {
         </Alert>
       )}
 
+      {!loading && !error && (
+        <div style={{ marginTop: 16 }}>
+          <StatsCards items={hrRequestListStats(rows)} />
+        </div>
+      )}
+
       <TableToolbar className="hr-requests-toolbar">
         <input
           type="search"
@@ -181,7 +143,7 @@ export function HrRequestsPage() {
           Reset filters
         </Button>
         {canManage && (
-          <Button variant="primary" compact onClick={() => setModal({ mode: 'create', id: null })}>
+          <Button variant="primary" compact onClick={() => navigate('/requests/new')}>
             New request
           </Button>
         )}
@@ -204,7 +166,9 @@ export function HrRequestsPage() {
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((r) => (
+                {pageRows.map((r) => {
+                  const status = hrRequestStatusPresentation(r.status)
+                  return (
                   <tr key={r.id}>
                     <td>{r.id}</td>
                     <td>{r.title}</td>
@@ -215,7 +179,9 @@ export function HrRequestsPage() {
                         : (r.region_name ?? '—')}
                     </td>
                     <td>{r.date}</td>
-                    <td>{HR_REQUEST_STATUS_LABELS[r.status] ?? r.status}</td>
+                    <td>
+                      <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                    </td>
                     <td className="table-actions">
                       <RowActionsMenu
                         isOpen={openActionId === r.id}
@@ -224,18 +190,18 @@ export function HrRequestsPage() {
                         <Button
                           variant="link"
                           onClick={() => {
-                            setModal({ mode: 'view', id: r.id })
+                            navigate(hrRequestViewPath(r.id, '/requests'))
                             setOpenActionId(null)
                           }}
                         >
                           View
                         </Button>
-                        {canManage && (
+                        {canManage && hrRequestAllowsEditDelete(r.status) ? (
                           <>
                             <Button
                               variant="link"
                               onClick={() => {
-                                setModal({ mode: 'edit', id: r.id })
+                                navigate(hrRequestEditPath(r.id, '/requests'))
                                 setOpenActionId(null)
                               }}
                             >
@@ -253,11 +219,12 @@ export function HrRequestsPage() {
                               Delete
                             </Button>
                           </>
-                        )}
+                        ) : null}
                       </RowActionsMenu>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
                 {pageRows.length === 0 && (
                   <EmptyStateRow colSpan={7} message="No requests match your filters." />
                 )}
@@ -268,21 +235,6 @@ export function HrRequestsPage() {
       )}
       {!loading && !error && (
         <PaginationBar page={page} pageSize={pageSize} totalItems={filteredRows.length} onPageChange={setPage} />
-      )}
-
-      {modal && (
-        <HrRequestModal
-          mode={modal.mode}
-          detail={detail}
-          detailLoading={detailLoading}
-          detailError={detailError}
-          regions={regions}
-          canManage={canManage}
-          lockedRegionId={lockedRegionId}
-          onClose={() => setModal(null)}
-          onSaved={() => void reload()}
-          onDetailRefresh={refreshModalDetail}
-        />
       )}
 
       {deleteTarget && (

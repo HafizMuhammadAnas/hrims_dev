@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\DepartmentTask;
 use App\Models\HrRequest;
+use App\Models\Region;
 use App\Models\RegionalResponse;
 use App\Models\User;
 use App\Support\HrimsAccess;
@@ -27,22 +29,36 @@ class RegionalResponseController extends Controller
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
             'title' => ['required', 'string', 'max:500'],
             'content' => ['required', 'string'],
+            'region_id' => ['sometimes', 'integer', 'exists:regions,id'],
         ]);
 
-        $hrRequest = HrRequest::query()->find($data['hr_request_id']);
-        if (! $hrRequest || $hrRequest->region_id === null) {
-            return response()->json(['message' => 'Request has no region assignment'], 422);
+        $hrRequest = HrRequest::query()->with('regions')->find($data['hr_request_id']);
+        if (! $hrRequest) {
+            return response()->json(['message' => 'Not found'], 404);
         }
 
-        $regionIds = HrimsAccess::scopedRegionIds($request->user());
-        if ($regionIds !== null && ! in_array((int) $hrRequest->region_id, $regionIds, true)) {
-            return response()->json(['message' => 'Forbidden'], 403);
+        $user = $request->user();
+        $targetRegionId = $this->resolveCompilationRegionId($user, $hrRequest, $data['region_id'] ?? null);
+        if ($targetRegionId === null) {
+            return response()->json(['message' => 'Could not determine region for this compilation.'], 422);
+        }
+
+        if (! $this->hrRequestTouchesRegion($hrRequest, $targetRegionId)) {
+            return response()->json(['message' => 'This HR request is not assigned to the selected region.'], 422);
+        }
+
+        $dup = RegionalResponse::query()
+            ->where('hr_request_id', $hrRequest->id)
+            ->where('region_id', $targetRegionId)
+            ->exists();
+        if ($dup) {
+            return response()->json(['message' => 'A compilation already exists for this request in this region.'], 422);
         }
 
         $model = RegionalResponse::query()->create([
             'id' => 'RES-'.strtoupper(Str::random(10)),
             'hr_request_id' => $hrRequest->id,
-            'region_id' => $hrRequest->region_id,
+            'region_id' => $targetRegionId,
             'title' => $data['title'],
             'submission_date' => now()->toDateString(),
             'review_status' => 'pending',
@@ -103,10 +119,13 @@ class RegionalResponseController extends Controller
 
         $user = $request->user();
 
-        if ($user->hasRole('regional_admin') && $user->region_id !== null) {
-            if ((int) $model->region_id !== (int) $user->region_id) {
-                return response()->json(['message' => 'Forbidden'], 403);
-            }
+        $mayResubmit =
+            ($user->hasRole('regional_admin') && $user->region_id !== null
+                && (int) $model->region_id === (int) $user->region_id)
+            || ($user->hasRole('federal_admin')
+                && $model->region && in_array((string) $model->region->slug, ['ict', 'federal'], true));
+
+        if ($mayResubmit) {
             if ($model->review_status !== 'needs-modification') {
                 return response()->json(['message' => 'Only responses returned for modification can be updated.'], 422);
             }
@@ -175,6 +194,42 @@ class RegionalResponseController extends Controller
         return response()->json(['data' => $this->serialize($model)]);
     }
 
+    /**
+     * Department submissions for a regional compilation (federal / super-admin review).
+     * Federal list endpoints only expose ICT tasks; provincial tasks are loaded here.
+     */
+    public function departmentTasks(Request $request, string $regionalResponse): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('super_admin') && ! $user->hasRole('federal_admin')) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $model = RegionalResponse::query()->with(['region'])->find($regionalResponse);
+        if (! $model) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if (! $this->userMayView($user, $model)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $tasks = DepartmentTask::query()
+            ->with(['region', 'department'])
+            ->where('hr_request_id', $model->hr_request_id)
+            ->where('region_id', $model->region_id)
+            ->orderBy('department_id')
+            ->get();
+
+        return response()
+            ->json([
+                'data' => $tasks->map(
+                    fn (DepartmentTask $t) => DepartmentTaskController::serializeDepartmentTask($t, false),
+                )->values()->all(),
+            ])
+            ->header('Cache-Control', 'no-store, private');
+    }
+
     private function userMayView(User $user, RegionalResponse $model): bool
     {
         if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
@@ -198,11 +253,57 @@ class RegionalResponseController extends Controller
     /**
      * @return array<string, mixed>
      */
+    private function hrRequestTouchesRegion(HrRequest $hrRequest, int $regionId): bool
+    {
+        if ((int) $hrRequest->region_id === $regionId) {
+            return true;
+        }
+        if ($hrRequest->regions()->where('regions.id', $regionId)->exists()) {
+            return true;
+        }
+
+        return DepartmentTask::query()
+            ->where('hr_request_id', $hrRequest->id)
+            ->where('region_id', $regionId)
+            ->exists();
+    }
+
+    private function resolveCompilationRegionId(User $user, HrRequest $hrRequest, ?int $requestedRegionId): ?int
+    {
+        if ($user->hasRole('regional_admin') && $user->region_id !== null) {
+            $home = (int) $user->region_id;
+            if ($requestedRegionId !== null && (int) $requestedRegionId !== $home) {
+                return null;
+            }
+
+            return $home;
+        }
+
+        if ($user->hasRole('federal_admin') || $user->hasRole('super_admin')) {
+            if ($requestedRegionId !== null) {
+                $region = Region::query()->find($requestedRegionId);
+                if (! $region || ! in_array((string) $region->slug, ['ict', 'federal'], true)) {
+                    return null;
+                }
+
+                return (int) $region->id;
+            }
+
+            if ($hrRequest->region_id !== null) {
+                return (int) $hrRequest->region_id;
+            }
+        }
+
+        return null;
+    }
+
     private function serialize(RegionalResponse $r): array
     {
         return [
             'id' => $r->id,
             'req_id' => $r->hr_request_id,
+            'region_id' => $r->region_id,
+            'region_slug' => $r->region?->slug,
             'region_name' => $r->region?->name,
             'title' => $r->title,
             'submission_date' => $r->submission_date->format('Y-m-d'),

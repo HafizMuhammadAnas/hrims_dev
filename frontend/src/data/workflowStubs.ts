@@ -54,7 +54,7 @@ export const STUB_FEDERAL_MONITORING: WorkflowStubSpec = {
 }
 
 export const STUB_FEDERAL_COMPILATION: WorkflowStubSpec = {
-  title: 'Federal — compilation',
+  title: 'Response compilation',
   intro: 'Federal-side compilation steps before treaty submission. Related data is under Compilation center and Compiled records.',
   links: [
     { to: '/compilation', label: 'Compilation center' },
@@ -63,14 +63,14 @@ export const STUB_FEDERAL_COMPILATION: WorkflowStubSpec = {
 }
 
 export const STUB_FEDERAL_HISTORY: WorkflowStubSpec = {
-  title: 'Federal — internal history',
+  title: 'Compiled responses',
   intro:
     'Audit trail of federal actions (legacy SubmissionHistory). Persistent history API is planned; export logs may be added later.',
   links: [{ to: '/requests', label: 'HR requests' }],
 }
 
 export const STUB_REGION_RECEIVED: WorkflowStubSpec = {
-  title: 'Regional — received requests',
+  title: 'Received Requests',
   intro:
     'Regional inbox for requests routed from federal focal points. Use Request management for your region until the dedicated inbox UI is rebuilt.',
   links: [{ to: '/requests', label: 'Request management' }],
@@ -92,7 +92,7 @@ export const STUB_REGION_MONITORING: WorkflowStubSpec = {
 }
 
 export const STUB_REGION_COMPILATION: WorkflowStubSpec = {
-  title: 'Regional — response compilation',
+  title: 'Response compilation',
   intro: 'Compile regional responses before federal review. Start from Review responses and Regional registers.',
   links: [
     { to: '/responses', label: 'Review responses' },
@@ -116,7 +116,7 @@ export const STUB_REGION_HISTORY: WorkflowStubSpec = {
 }
 
 export const STUB_DEPARTMENT_HISTORY: WorkflowStubSpec = {
-  title: 'Department — submission history',
+  title: 'Submission history',
   intro: 'Department-level submission log. Use Assigned tasks for current work.',
   links: [{ to: '/department-tasks', label: 'Assigned tasks' }],
 }

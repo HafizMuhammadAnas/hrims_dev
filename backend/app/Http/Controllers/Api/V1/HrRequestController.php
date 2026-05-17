@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\HrRequestResource;
 use App\Models\Convention;
 use App\Models\Department;
+use App\Models\DepartmentTask;
 use App\Models\HrRequest;
 use App\Models\HrRequestAttachment;
 use App\Models\HrRequestIndicatorResponse;
@@ -20,6 +21,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -216,6 +218,12 @@ class HrRequestController extends Controller
         }
         $previousStatus = $model->status;
 
+        if ($previousStatus === 'active') {
+            return response()->json([
+                'message' => 'Active requests cannot be edited. Only draft requests can be updated.',
+            ], 422);
+        }
+
         $regionIds = HrimsAccess::scopedRegionIds($request->user());
         if ($regionIds !== null && ! $this->requestTouchesAllowedRegions($model, $regionIds)) {
             return response()->json(['message' => 'Forbidden'], 403);
@@ -344,7 +352,7 @@ class HrRequestController extends Controller
             'indicatorResponses',
         ]);
 
-        app(NotificationService::class)->notifyHrRequestUpdated($model, $request->user(), $previousStatus);
+        $this->syncDepartmentTasksAndNotifyAfterSave($model, $request, $previousStatus, $data);
 
         return new HrRequestResource($model);
     }
@@ -363,6 +371,12 @@ class HrRequestController extends Controller
         $regionIds = HrimsAccess::scopedRegionIds($request->user());
         if ($regionIds !== null && ! $this->requestTouchesAllowedRegions($model, $regionIds)) {
             return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if ($model->status !== 'draft') {
+            return response()->json([
+                'message' => 'Only draft requests can be deleted. Active requests cannot be removed.',
+            ], 422);
         }
 
         foreach ($model->attachments as $att) {
@@ -448,7 +462,9 @@ class HrRequestController extends Controller
         }
 
         $row = $row->load(['region', 'regions', 'convention', 'issue', 'departments']);
-        app(NotificationService::class)->notifyHrRequestCreated($row, $request->user());
+        if ($row->status === 'active') {
+            app(NotificationService::class)->notifyHrRequestCreated($row, $request->user());
+        }
 
         return new HrRequestResource($row);
     }
@@ -497,6 +513,11 @@ class HrRequestController extends Controller
         if ($departmentIds !== []) {
             $this->assertIctRegionAmongRequestRegions($regionIds);
             $this->validateFederalDepartments($departmentIds);
+        }
+        if ($this->regionIdsAreIctOnly($regionIds) && $departmentIds === []) {
+            throw ValidationException::withMessages([
+                'department_ids' => ['Assign at least one national-line department when routing this request only to ICT.'],
+            ]);
         }
 
         $row = DB::transaction(function () use ($request, $data, $issue, $indicatorPayload, $departmentIds) {
@@ -555,9 +576,48 @@ class HrRequestController extends Controller
             ]);
         });
 
-        app(NotificationService::class)->notifyHrRequestCreated($row, $request->user());
+        if ($row->status === 'active') {
+            if ($departmentIds !== []) {
+                $this->autoCreateDepartmentTasks($row->fresh(['regions']), $departmentIds, $request);
+            }
+            app(NotificationService::class)->notifyHrRequestCreated($row, $request->user());
+        }
 
         return new HrRequestResource($row);
+    }
+
+    /**
+     * @param  array<string, mixed>  $updateData
+     */
+    private function syncDepartmentTasksAndNotifyAfterSave(
+        HrRequest $model,
+        Request $request,
+        string $previousStatus,
+        array $updateData,
+    ): void {
+        $publishedNow = $previousStatus === 'draft' && $model->status === 'active';
+
+        if ($publishedNow) {
+            $deptIds = $model->departments()->pluck('id')->map(fn ($id) => (int) $id)->all();
+            if ($deptIds === [] && array_key_exists('department_ids', $updateData)) {
+                $deptIds = array_values(array_unique(array_map('intval', $updateData['department_ids'])));
+            }
+            if ($deptIds !== []) {
+                $this->autoCreateDepartmentTasks($model->load(['regions']), $deptIds, $request);
+            }
+            app(NotificationService::class)->notifyHrRequestUpdated($model, $request->user(), $previousStatus);
+
+            return;
+        }
+
+        if ($model->status === 'active' && array_key_exists('department_ids', $updateData)) {
+            $deptIds = array_values(array_unique(array_map('intval', $updateData['department_ids'])));
+            if ($deptIds !== []) {
+                $this->autoCreateDepartmentTasks($model->load(['regions']), $deptIds, $request);
+            }
+        }
+
+        app(NotificationService::class)->notifyHrRequestUpdated($model, $request->user(), $previousStatus);
     }
 
     /**
@@ -764,4 +824,112 @@ class HrRequestController extends Controller
             })->values()->all(),
         ];
     }
+
+    /**
+     * Auto-create department tasks for selected departments.
+     * Picks the task {@see DepartmentTask::$region_id} from the intersection of the request’s
+     * regions and each department’s regions (preferring ICT when both match), so multi-region
+     * requests still create ICT-line tasks when ICT is not the first saved region.
+     *
+     * @param  array<int>  $departmentIds
+     */
+    private function autoCreateDepartmentTasks(HrRequest $hrRequest, array $departmentIds, Request $request): void
+    {
+        if ($departmentIds === []) {
+            return;
+        }
+
+        $hrRequest->loadMissing('regions');
+        $requestRegionIds = $hrRequest->regions->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        if ($requestRegionIds === []) {
+            return;
+        }
+
+        $ictRegionId = $hrRequest->regions->first(fn (Region $r) => in_array($r->slug, ['ict', 'federal'], true))?->id;
+        $ictRegionId = $ictRegionId !== null ? (int) $ictRegionId : null;
+
+        foreach ($departmentIds as $deptId) {
+            $department = Department::query()->with('regions')->find((int) $deptId);
+            if (! $department) {
+                continue;
+            }
+
+            $taskRegionId = $this->resolveTaskRegionIdForDepartmentAssignment($department, $requestRegionIds, $ictRegionId);
+            if ($taskRegionId === null) {
+                continue;
+            }
+
+            $taskExists = DepartmentTask::query()
+                ->where('hr_request_id', $hrRequest->id)
+                ->where('department_id', (int) $deptId)
+                ->where('region_id', $taskRegionId)
+                ->exists();
+
+            if ($taskExists) {
+                continue;
+            }
+
+            $task = DepartmentTask::query()->create([
+                'id' => 'TSK-'.strtoupper(Str::random(10)),
+                'hr_request_id' => $hrRequest->id,
+                'region_id' => $taskRegionId,
+                'department_id' => (int) $deptId,
+                'status' => 'assigned',
+                'assigned_date' => now()->toDateString(),
+            ]);
+
+            try {
+                $task->load(['region', 'department']);
+                app(NotificationService::class)->notifyDepartmentTaskAssigned($task, $request->user());
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+    }
+
+    /**
+     * @param  list<int>  $requestRegionIds
+     */
+    private function resolveTaskRegionIdForDepartmentAssignment(Department $department, array $requestRegionIds, ?int $preferredIctRegionId): ?int
+    {
+        $deptRegionIds = $department->regions->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $matches = [];
+        foreach ($requestRegionIds as $rid) {
+            $rid = (int) $rid;
+            if (in_array($rid, $deptRegionIds, true)) {
+                $matches[] = $rid;
+            }
+        }
+        if ($matches === []) {
+            return null;
+        }
+        if ($preferredIctRegionId !== null && in_array($preferredIctRegionId, $matches, true)) {
+            return $preferredIctRegionId;
+        }
+
+        return $matches[0];
+    }
+
+    /**
+     * @param  list<int|string>  $regionIds
+     */
+    private function regionIdsAreIctOnly(array $regionIds): bool
+    {
+        $ids = array_values(array_unique(array_map('intval', $regionIds)));
+        if ($ids === []) {
+            return false;
+        }
+        $rows = Region::query()->whereIn('id', $ids)->get(['slug']);
+        if ($rows->count() !== count($ids)) {
+            return false;
+        }
+        foreach ($rows as $r) {
+            if (! in_array((string) $r->slug, ['ict', 'federal'], true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
+

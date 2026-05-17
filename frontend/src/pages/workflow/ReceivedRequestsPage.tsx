@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { deleteHrRequest, fetchHrRequest, fetchHrRequests } from '../../api/hrRequests'
+import { deleteHrRequest, fetchHrRequests } from '../../api/hrRequests'
+import { fetchClarifications, type HrRequestClarificationRow } from '../../api/clarifications'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../../api/lists'
-import { fetchRegions } from '../../api/regions'
 import { useAuth } from '../../auth/AuthContext'
-import { canManageHrRequests, hrRequestLockedRegionId } from '../../auth/rbac'
-import { HrRequestModal } from '../../components/HrRequestModal'
+import { canManageHrRequests } from '../../auth/rbac'
 import { Button } from '../../components/ui/Button'
 import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
 import { ModalActions, ModalHeader } from '../../components/ui/ModalChrome'
@@ -17,8 +16,14 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { TableToolbar } from '../../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
+import {
+  RECEIVED_REQUEST_STATUS_FILTER_OPTIONS,
+  receivedRequestStatusPresentation,
+  type ReceivedRequestWorkflowStatus,
+} from '../../lib/receivedRequestWorkflow'
 import { isRegionalAdmin } from '../../lib/roles'
-import type { HrRequestRow } from '../../types/hrRequest'
+import { hrRequestEditPath } from '../../lib/workflowNavigation'
+import { hrRequestAllowsEditDelete, type HrRequestRow } from '../../types/hrRequest'
 
 type Props = {
   title: string
@@ -28,7 +33,7 @@ type Props = {
   enableRequestCrud?: boolean
 }
 
-type RowStatus = 'pending' | 'Distributed' | 'In Process' | 'Response Delivered'
+type RowStatus = ReceivedRequestWorkflowStatus
 
 export function ReceivedRequestsPage({
   title,
@@ -40,17 +45,12 @@ export function ReceivedRequestsPage({
   const { user } = useAuth()
   const navigate = useNavigate()
   const canManage = canManageHrRequests(user)
-  const lockedRegionId = hrRequestLockedRegionId(user)
   const [rows, setRows] = useState<HrRequestRow[]>([])
-  const [regions, setRegions] = useState<Awaited<ReturnType<typeof fetchRegions>>>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [responses, setResponses] = useState<RegionalResponseRow[]>([])
+  const [clarifications, setClarifications] = useState<HrRequestClarificationRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
-  const [modal, setModal] = useState<{ mode: 'view' | 'edit'; id: string } | null>(null)
-  const [detail, setDetail] = useState<HrRequestRow | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<HrRequestRow | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -58,17 +58,17 @@ export function ReceivedRequestsPage({
   const { search, setSearch, filters, setFilter, resetFilters, page, setPage, pageSize } = table
 
   const load = useCallback(async () => {
-    const [reqs, regRows, deptTasks, resp] = await Promise.all([
+    const [reqs, deptTasks, resp, clarRows] = await Promise.all([
       fetchHrRequests(),
-      enableRequestCrud ? fetchRegions() : Promise.resolve([]),
       fetchDepartmentTasks(),
       fetchRegionalResponses(),
+      isRegionalAdmin(user) ? fetchClarifications() : Promise.resolve([]),
     ])
     setRows(reqs)
-    setRegions(regRows)
     setTasks(deptTasks)
     setResponses(resp)
-  }, [enableRequestCrud])
+    setClarifications(clarRows)
+  }, [enableRequestCrud, user])
 
   useEffect(() => {
     let cancelled = false
@@ -84,65 +84,39 @@ export function ReceivedRequestsPage({
     }
   }, [load])
 
-  useEffect(() => {
-    if (!modal) {
-      setDetail(null)
-      setDetailLoading(false)
-      setDetailError(null)
-      return
-    }
-    let cancelled = false
-    setDetailLoading(true)
-    setDetail(null)
-    setDetailError(null)
-    void fetchHrRequest(modal.id)
-      .then((row) => {
-        if (!cancelled) setDetail(row)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setDetailError(e instanceof Error ? e.message : 'Failed to load request')
-      })
-      .finally(() => {
-        if (!cancelled) setDetailLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [modal])
-
-  const refreshModalDetail = useCallback(async () => {
-    if (modal?.id) {
-      const row = await fetchHrRequest(modal.id)
-      setDetail(row)
-    }
-  }, [modal?.id])
-
   const mapped = useMemo(() => {
     const scopedRows = enableRequestCrud
       ? rows.filter((r) => (r.departments?.length ?? 0) > 0)
       : rows
+    const clarByRequest = new Map(
+      clarifications.map((c) => [c.hr_request_id, c] as const),
+    )
     return scopedRows.map((r) => {
       const reqTasks = tasks.filter((t) => t.req_id === r.id)
       const reqResp = responses.find((x) => x.req_id === r.id)
+      const clar = clarByRequest.get(r.id)
       let status: RowStatus = 'pending'
       if (reqResp) {
         status = 'Response Delivered'
       } else if (reqTasks.length > 0) {
         status = reqTasks.some((t) => t.status === 'submitted') ? 'In Process' : 'Distributed'
+      } else if (clar?.status === 'pending_federal') {
+        status = 'Clarification pending'
+      } else if (clar?.status === 'pending_region') {
+        status = 'Clarification answered'
       }
       return { ...r, _status: status }
     })
-  }, [rows, tasks, responses])
+  }, [rows, tasks, responses, clarifications])
 
   const regionalMode = isRegionalAdmin(user)
 
   const statusCounts = useMemo(
-    () => [
-      { label: 'pending', count: mapped.filter((x) => x._status === 'pending').length },
-      { label: 'Distributed', count: mapped.filter((x) => x._status === 'Distributed').length },
-      { label: 'In process', count: mapped.filter((x) => x._status === 'In Process').length },
-      { label: 'Delivered', count: mapped.filter((x) => x._status === 'Response Delivered').length },
-    ],
+    () =>
+      RECEIVED_REQUEST_STATUS_FILTER_OPTIONS.map((opt) => ({
+        label: opt.label,
+        count: mapped.filter((x) => x._status === opt.value).length,
+      })),
     [mapped],
   )
 
@@ -211,7 +185,6 @@ export function ReceivedRequestsPage({
   return (
     <PageSection
       title={title}
-      subtitle="Master list of requests with workflow-state intelligence and direct action routing."
     >
       {error && <p className="login-error">{error}</p>}
       <div style={{ marginTop: 16 }}>
@@ -227,10 +200,11 @@ export function ReceivedRequestsPage({
         />
         <select value={statusFilter} onChange={(e) => setFilter('status', e.target.value)} aria-label="Filter by status">
           <option value="">All statuses</option>
-          <option value="pending">pending</option>
-          <option value="Distributed">Distributed</option>
-          <option value="In Process">In Process</option>
-          <option value="Response Delivered">Response Delivered</option>
+          {RECEIVED_REQUEST_STATUS_FILTER_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
         </select>
         <Button
           variant="secondary"
@@ -256,26 +230,16 @@ export function ReceivedRequestsPage({
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((r) => (
+            {pageRows.map((r) => {
+              const status = receivedRequestStatusPresentation(r._status)
+              return (
               <tr key={r.id}>
                 <td>{r.id}</td>
                 <td>{r.title}</td>
                 <td>{r.conv}</td>
                 <td>{r.date}</td>
                 <td>
-                  <StatusBadge
-                    tone={
-                      r._status === 'Response Delivered'
-                        ? 'success'
-                        : r._status === 'In Process'
-                          ? 'warning'
-                          : r._status === 'Distributed'
-                            ? 'pending'
-                            : 'default'
-                    }
-                  >
-                    {r._status}
-                  </StatusBadge>
+                  <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                 </td>
                 <td className="table-actions">
                   <RowActionsMenu
@@ -287,25 +251,25 @@ export function ReceivedRequestsPage({
                       <Button
                         variant="link"
                         onClick={() => {
-                          setModal({ mode: 'view', id: r.id })
+                          navigate(regionalRequestViewUrl(r.id))
                           setOpenActionId(null)
                         }}
                       >
                         View
                       </Button>
                     )}
-                    {enableRequestCrud && canManage && (
+                    {enableRequestCrud && canManage && hrRequestAllowsEditDelete(r.status) ? (
                       <Button
                         variant="link"
                         onClick={() => {
-                          setModal({ mode: 'edit', id: r.id })
+                          navigate(hrRequestEditPath(r.id, '/region-received'))
                           setOpenActionId(null)
                         }}
                       >
                         Edit
                       </Button>
-                    )}
-                    {enableRequestCrud && canManage && (
+                    ) : null}
+                    {enableRequestCrud && canManage && hrRequestAllowsEditDelete(r.status) ? (
                       <Button
                         variant="link"
                         dangerLink
@@ -317,7 +281,7 @@ export function ReceivedRequestsPage({
                       >
                         Delete
                       </Button>
-                    )}
+                    ) : null}
                     <Button
                       variant="link"
                       onClick={() => {
@@ -335,28 +299,13 @@ export function ReceivedRequestsPage({
                   </RowActionsMenu>
                 </td>
               </tr>
-            ))}
+            )})}
             {pageRows.length === 0 && <EmptyStateRow colSpan={6} message="No requests found in current scope." />}
           </tbody>
         </table>
       </TableCard>
       <PaginationBar page={page} pageSize={pageSize} totalItems={filteredRows.length} onPageChange={setPage} />
       {user?.region && <p className="muted" style={{ marginTop: 10 }}>Scope: {user.region.name}</p>}
-
-      {modal && (
-        <HrRequestModal
-          mode={modal.mode}
-          detail={detail}
-          detailLoading={detailLoading}
-          detailError={detailError}
-          regions={regions}
-          canManage={canManage}
-          lockedRegionId={lockedRegionId}
-          onClose={() => setModal(null)}
-          onSaved={() => void load()}
-          onDetailRefresh={refreshModalDetail}
-        />
-      )}
 
       {deleteTarget && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteTarget(null)}>

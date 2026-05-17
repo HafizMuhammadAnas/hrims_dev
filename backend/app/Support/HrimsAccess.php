@@ -49,6 +49,9 @@ final class HrimsAccess
             return;
         }
 
+        // Draft requests are federal-only until published (status = active).
+        $query->where('status', 'active');
+
         if ($user->hasRole('regional_admin') && $user->region_id !== null) {
             $rid = (int) $user->region_id;
             $query->where(function (Builder $q) use ($rid) {
@@ -94,6 +97,10 @@ final class HrimsAccess
     {
         if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
             return true;
+        }
+
+        if ($model->status !== 'active') {
+            return false;
         }
 
         if ($user->hasRole('regional_admin') && $user->region_id !== null) {

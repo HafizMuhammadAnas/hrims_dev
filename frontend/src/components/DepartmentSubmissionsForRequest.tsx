@@ -1,36 +1,57 @@
 import type { DepartmentTaskRow } from '../api/lists'
 import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
 import { StatusBadge } from './ui/StatusBadge'
-import { workflowPresentation } from '../lib/departmentTaskWorkflow'
+import { hasDepartmentResponse, workflowPresentation } from '../lib/departmentTaskWorkflow'
 
 type Props = {
   tasksForDetail: DepartmentTaskRow[]
   reqId: string
   /** Only show tasks whose region matches (federal consolidated view per province). */
   filterByRegionName?: string | null
+  filterByRegionId?: number | null
   /** When the parent already provides a section title (e.g. modal card). */
   omitHeading?: boolean
+  /** Show task id and submission date on cards when omitHeading is set. */
+  showCardMeta?: boolean
+  /** Hide per-task workflow badge (e.g. federal modal hero already shows review status). */
+  hideStatusBadge?: boolean
+  /** When set, only list tasks that have a submitted response. */
+  onlyWithSubmission?: boolean
 }
 
 export function DepartmentSubmissionsForRequest({
   tasksForDetail,
   reqId,
   filterByRegionName,
+  filterByRegionId,
   omitHeading = false,
+  showCardMeta = false,
+  hideStatusBadge = false,
+  onlyWithSubmission = false,
 }: Props) {
   const scoped = (() => {
-    if (filterByRegionName === undefined) {
-      return tasksForDetail
+    let rows = tasksForDetail
+    if (filterByRegionId != null) {
+      rows = rows.filter((t) => t.region_id === filterByRegionId)
+    } else if (filterByRegionName !== undefined) {
+      const want = (filterByRegionName ?? '').trim()
+      rows = rows.filter((t) => (t.region_name ?? '').trim() === want)
     }
-    const want = (filterByRegionName ?? '').trim()
-    return tasksForDetail.filter((t) => (t.region_name ?? '').trim() === want)
+    if (onlyWithSubmission) {
+      rows = rows.filter((t) => hasDepartmentResponse(t))
+    }
+    return rows
   })()
 
   if (scoped.length === 0) {
-    if (filterByRegionName !== undefined) {
+    if (filterByRegionId != null || filterByRegionName !== undefined) {
+      const regionLabel =
+        filterByRegionName?.trim() ||
+        tasksForDetail.find((t) => t.region_id === filterByRegionId)?.region_name?.trim() ||
+        '—'
       return (
         <p className="muted" style={{ margin: '12px 0' }}>
-          No distributed department tasks for region <strong>{filterByRegionName?.trim() || '—'}</strong> on request{' '}
+          No distributed department tasks for region <strong>{regionLabel}</strong> on request{' '}
           <strong>{reqId}</strong>.
         </p>
       )
@@ -43,7 +64,11 @@ export function DepartmentSubmissionsForRequest({
     )
   }
   return (
-    <div className="submission-history-dept-sections" style={{ marginTop: omitHeading ? 0 : 12 }}>
+    <div
+      className={
+        'submission-history-dept-sections' + (omitHeading ? ' submission-history-dept-sections--flat' : '')
+      }
+    >
       {!omitHeading ? (
         <h4 className="dept-submissions-heading">
           Department submissions
@@ -58,41 +83,28 @@ export function DepartmentSubmissionsForRequest({
       {scoped.map((t) => {
         const wf = workflowPresentation(t)
         return (
-          <div
-            key={t.id}
-            className="dept-submission-card"
-            style={{
-              marginBottom: 14,
-              padding: 12,
-              border: '1px solid var(--field-border, #e1e7f5)',
-              borderRadius: 10,
-              background: '#fafbfd',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-                flexWrap: 'wrap',
-              }}
-            >
-              <strong className="text-sm font-semibold">{t.department_name ?? t.department_id}</strong>
-              <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
-            </div>
-            <p className="muted small" style={{ margin: '8px 0 6px' }}>
-              Task {t.id}
-              {t.region_name ? ` · ${t.region_name}` : ''}
-              {t.submission_date ? ` · Submitted ${t.submission_date}` : ''}
-            </p>
-            <label className="muted small" style={{ display: 'block', marginBottom: 4 }}>
-              Department response
-            </label>
-            <div style={{ marginTop: 4 }}>
-              <DepartmentResponseDisplay responseData={t.response_data} attachmentUrl={t.attachment_url} />
-            </div>
-          </div>
+          <article key={t.id} className="dept-submission-card">
+            <header className="dept-submission-card__head">
+              <strong className="dept-submission-card__dept">{t.department_name ?? t.department_id}</strong>
+              {!hideStatusBadge ? <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge> : null}
+            </header>
+            {(!omitHeading || showCardMeta) && (t.id || t.submission_date) ? (
+              <p className="muted small dept-submission-card__meta">
+                Task {t.id}
+                {t.submission_date ? ` · Submitted ${t.submission_date}` : ''}
+              </p>
+            ) : null}
+            {hasDepartmentResponse(t) ? (
+            <DepartmentResponseDisplay
+              responseData={t.response_data}
+              attachmentUrl={t.attachment_url}
+            />
+            ) : (
+              <p className="muted small" style={{ margin: 0 }}>
+                No submission recorded for this department yet.
+              </p>
+            )}
+          </article>
         )
       })}
     </div>

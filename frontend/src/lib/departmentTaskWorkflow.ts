@@ -40,8 +40,18 @@ export function workflowPresentation(t: DepartmentTaskRow): {
   tone: 'pending' | 'success' | 'warning' | 'danger' | 'default'
 } {
   const b = departmentTaskWorkflowBucket(t)
-  if (b === 'in_process') return { label: 'Pending submission', tone: 'pending' }
-  if (b === 'revision') return { label: 'Resubmission requested', tone: 'warning' }
-  if (b === 'accepted') return { label: 'Accepted by region', tone: 'success' }
-  return { label: 'Pending regional review', tone: 'pending' }
+  if (b === 'in_process') return { label: 'Pending', tone: 'pending' }
+  if (b === 'revision') return { label: 'Revision', tone: 'warning' }
+  if (b === 'accepted') return { label: 'Accepted', tone: 'success' }
+  return { label: 'Review', tone: 'pending' }
+}
+
+export function workflowStatsLabels(scope: 'regional' | 'federal-ict'): {
+  responded: string
+  accepted: string
+} {
+  if (scope === 'federal-ict') {
+    return { responded: 'Review', accepted: 'Accepted' }
+  }
+  return { responded: 'Review', accepted: 'Accepted' }
 }

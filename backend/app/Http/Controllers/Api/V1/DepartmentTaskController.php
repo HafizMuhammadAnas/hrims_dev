@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\DepartmentTask;
 use App\Models\HrRequest;
+use App\Models\HrRequestClarification;
+use App\Models\Region;
 use App\Models\IssueIndicator;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
@@ -23,7 +25,7 @@ class DepartmentTaskController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function serializeTask(DepartmentTask $t, bool $redact): array
+    public static function serializeDepartmentTask(DepartmentTask $t, bool $redact): array
     {
         $t->loadMissing(['region', 'department']);
 
@@ -31,6 +33,7 @@ class DepartmentTaskController extends Controller
             'id' => $t->id,
             'req_id' => $t->hr_request_id,
             'region_id' => $t->region_id,
+            'region_slug' => $t->region?->slug,
             'region_name' => $t->region?->name,
             'department_id' => $t->department?->code ?? (string) $t->department_id,
             'department_name' => $t->department?->name,
@@ -43,6 +46,14 @@ class DepartmentTaskController extends Controller
             'response_data' => $redact ? null : $t->response_data,
             'attachment_url' => $redact ? null : $t->attachment_url,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeTask(DepartmentTask $t, bool $redact): array
+    {
+        return self::serializeDepartmentTask($t, $redact);
     }
 
     public function store(Request $request): JsonResponse
@@ -59,28 +70,59 @@ class DepartmentTaskController extends Controller
             'assignment_instructions' => ['nullable', 'string', 'max:20000'],
         ]);
 
-        $hrRequest = HrRequest::query()->find($data['hr_request_id']);
-        if (! $hrRequest || $hrRequest->region_id === null) {
+        $hrRequest = HrRequest::query()->with('regions')->find($data['hr_request_id']);
+        if (! $hrRequest) {
+            return response()->json(['message' => 'Request not found'], 404);
+        }
+
+        $requestRegionIds = $hrRequest->regions->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        if ($requestRegionIds === [] && $hrRequest->region_id !== null) {
+            $requestRegionIds = [(int) $hrRequest->region_id];
+        }
+        if ($requestRegionIds === []) {
             return response()->json(['message' => 'Request has no region assignment'], 422);
         }
 
+        $department = Department::query()->with('regions')->find($data['department_id']);
+        if (! $department) {
+            return response()->json(['message' => 'Department not found'], 422);
+        }
+
+        $actorRegionId = $request->user()?->region_id !== null ? (int) $request->user()->region_id : null;
+        $preferredIctId = $hrRequest->regions->first(fn (Region $r) => in_array($r->slug, ['ict', 'federal'], true))?->id;
+        $preferredIctId = $preferredIctId !== null ? (int) $preferredIctId : null;
+
+        $taskRegionId = null;
+        if ($actorRegionId !== null && in_array($actorRegionId, $requestRegionIds, true)) {
+            $deptRegionIds = $department->regions->pluck('id')->map(fn ($id) => (int) $id)->all();
+            if (in_array($actorRegionId, $deptRegionIds, true)) {
+                $taskRegionId = $actorRegionId;
+            }
+        }
+        if ($taskRegionId === null) {
+            $taskRegionId = $this->resolveTaskRegionIdForDepartmentAssignment($department, $requestRegionIds, $preferredIctId);
+        }
+        if ($taskRegionId === null) {
+            return response()->json(['message' => 'Department must be linked to the same region as the request.'], 422);
+        }
+
         $regionIds = HrimsAccess::scopedRegionIds($request->user());
-        if ($regionIds !== null && ! in_array((int) $hrRequest->region_id, $regionIds, true)) {
+        if ($regionIds !== null && ! in_array($taskRegionId, $regionIds, true)) {
             return response()->json([
-                'message' => 'This HR request is not assigned to your region. Check the request’s primary region matches your account after import.',
+                'message' => 'This HR request is not assigned to your region.',
             ], 403);
         }
 
-        $department = Department::query()->with('regions')->find($data['department_id']);
-        $reqRegionId = (int) $hrRequest->region_id;
-        if (! $department || ! $department->regions->pluck('id')->contains($reqRegionId)) {
-            return response()->json(['message' => 'Department must be linked to the same region as the request.'], 422);
+        if ($hrRequest->status !== 'active') {
+            return response()->json([
+                'message' => 'This request is still a draft. Set status to Active in Request management before assigning departments.',
+            ], 422);
         }
 
         $dup = DepartmentTask::query()
             ->where('hr_request_id', $hrRequest->id)
             ->where('department_id', $data['department_id'])
-            ->where('region_id', $hrRequest->region_id)
+            ->where('region_id', $taskRegionId)
             ->exists();
         if ($dup) {
             return response()->json(['message' => 'This department is already assigned to the request'], 422);
@@ -90,7 +132,7 @@ class DepartmentTaskController extends Controller
         $payload = [
             'id' => 'TSK-'.strtoupper(Str::random(10)),
             'hr_request_id' => $hrRequest->id,
-            'region_id' => $hrRequest->region_id,
+            'region_id' => $taskRegionId,
             'department_id' => $data['department_id'],
             'status' => 'assigned',
             'assigned_date' => now()->toDateString(),
@@ -100,17 +142,13 @@ class DepartmentTaskController extends Controller
         }
         $task = DepartmentTask::query()->create($payload);
 
-        if ($hrRequest->status === 'draft') {
-            $hrRequest->update(['status' => 'active']);
-            try {
-                app(NotificationService::class)->notifyHrRequestUpdated(
-                    $hrRequest->fresh(['regions', 'departments']),
-                    $request->user(),
-                    'draft',
-                );
-            } catch (\Throwable $e) {
-                report($e);
-            }
+        $actorRegionId = $request->user()?->region_id;
+        if ($actorRegionId) {
+            HrRequestClarification::query()
+                ->where('hr_request_id', $hrRequest->id)
+                ->where('region_id', (int) $actorRegionId)
+                ->whereIn('status', ['pending_federal', 'pending_region'])
+                ->update(['status' => 'closed']);
         }
 
         $task->load(['region', 'department']);
@@ -514,14 +552,23 @@ class DepartmentTaskController extends Controller
         $user = $request->user();
         $query = DepartmentTask::query()->with(['region', 'department']);
 
-        if (HrimsAccess::seesAllRegions($user)) {
+        // Super admin sees all tasks
+        if (HrimsAccess::isSuperAdmin($user)) {
             // no filter
-        } elseif (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
+        }
+        // Federal admin sees only ICT/Federal region department tasks
+        elseif ($user->hasRole('federal_admin')) {
+            $query->whereHas('region', fn ($q) => $q->where('slug', 'ict'));
+        }
+        // Department admin/viewer see only their department tasks
+        elseif (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
             $query->where('department_id', $user->department_id);
             if ($user->region_id) {
                 $query->where('region_id', $user->region_id);
             }
-        } else {
+        }
+        // Regional admin sees tasks for their region only
+        else {
             $regionIds = HrimsAccess::scopedRegionIds($user);
             if ($regionIds !== null) {
                 $query->whereIn('region_id', $regionIds);
@@ -536,5 +583,28 @@ class DepartmentTaskController extends Controller
         return response()->json([
             'data' => $rows->map(fn (DepartmentTask $t) => $this->serializeTask($t, $redact)),
         ]);
+    }
+
+    /**
+     * @param  list<int>  $requestRegionIds
+     */
+    private function resolveTaskRegionIdForDepartmentAssignment(Department $department, array $requestRegionIds, ?int $preferredIctRegionId): ?int
+    {
+        $deptRegionIds = $department->regions->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $matches = [];
+        foreach ($requestRegionIds as $rid) {
+            $rid = (int) $rid;
+            if (in_array($rid, $deptRegionIds, true)) {
+                $matches[] = $rid;
+            }
+        }
+        if ($matches === []) {
+            return null;
+        }
+        if ($preferredIctRegionId !== null && in_array($preferredIctRegionId, $matches, true)) {
+            return $preferredIctRegionId;
+        }
+
+        return $matches[0];
     }
 }

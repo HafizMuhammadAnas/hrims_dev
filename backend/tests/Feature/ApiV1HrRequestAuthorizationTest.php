@@ -165,7 +165,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'due_date' => now(),
-            'status' => 'draft',
+            'status' => 'active',
         ]);
         HrRequest::query()->create([
             'id' => 'REQ-DEPT-B',
@@ -173,7 +173,7 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
             'conv' => 'CEDAW',
             'region_id' => $punjab->id,
             'due_date' => now(),
-            'status' => 'draft',
+            'status' => 'active',
         ]);
 
         DepartmentTask::query()->create([
@@ -236,5 +236,121 @@ class ApiV1HrRequestAuthorizationTest extends TestCase
         ]);
 
         $response->assertUnprocessable();
+    }
+
+    public function test_regional_admin_cannot_see_draft_requests_in_index(): void
+    {
+        $punjab = Region::query()->where('slug', 'punjab')->firstOrFail();
+        $role = RbacRole::query()->where('slug', 'regional_admin')->firstOrFail();
+        $user = User::factory()->create(['region_id' => $punjab->id]);
+        $user->roles()->attach($role);
+
+        HrRequest::query()->create([
+            'id' => 'REQ-DRAFT-HIDDEN',
+            'title' => 'Draft only',
+            'conv' => 'CEDAW',
+            'region_id' => $punjab->id,
+            'due_date' => now(),
+            'status' => 'draft',
+        ]);
+        HrRequest::query()->create([
+            'id' => 'REQ-ACTIVE-VISIBLE',
+            'title' => 'Published',
+            'conv' => 'CEDAW',
+            'region_id' => $punjab->id,
+            'due_date' => now(),
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/v1/hr-requests');
+
+        $response->assertOk();
+        $ids = collect($response->json('data'))->pluck('id')->all();
+        $this->assertSame(['REQ-ACTIVE-VISIBLE'], $ids);
+    }
+
+    public function test_regional_admin_cannot_view_draft_request_detail(): void
+    {
+        $punjab = Region::query()->where('slug', 'punjab')->firstOrFail();
+        $role = RbacRole::query()->where('slug', 'regional_admin')->firstOrFail();
+        $user = User::factory()->create(['region_id' => $punjab->id]);
+        $user->roles()->attach($role);
+
+        HrRequest::query()->create([
+            'id' => 'REQ-DRAFT-SHOW',
+            'title' => 'Draft detail',
+            'conv' => 'CEDAW',
+            'region_id' => $punjab->id,
+            'due_date' => now(),
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)->getJson('/api/v1/hr-requests/REQ-DRAFT-SHOW')->assertForbidden();
+    }
+
+    public function test_federal_admin_cannot_delete_active_request(): void
+    {
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
+        $role = RbacRole::query()->where('slug', 'federal_admin')->firstOrFail();
+        $user = User::factory()->create(['region_id' => $federal->id]);
+        $user->roles()->attach($role);
+
+        HrRequest::query()->create([
+            'id' => 'REQ-ACTIVE-DEL',
+            'title' => 'Published',
+            'conv' => 'CEDAW',
+            'region_id' => $federal->id,
+            'due_date' => now(),
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user)->deleteJson('/api/v1/hr-requests/REQ-ACTIVE-DEL')->assertUnprocessable();
+    }
+
+    public function test_federal_admin_cannot_update_active_request(): void
+    {
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
+        $role = RbacRole::query()->where('slug', 'federal_admin')->firstOrFail();
+        $user = User::factory()->create(['region_id' => $federal->id]);
+        $user->roles()->attach($role);
+
+        HrRequest::query()->create([
+            'id' => 'REQ-ACTIVE-EDIT',
+            'title' => 'Published',
+            'conv' => 'CEDAW',
+            'region_id' => $federal->id,
+            'due_date' => now(),
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user)->patchJson('/api/v1/hr-requests/REQ-ACTIVE-EDIT', [
+            'title' => 'Changed',
+        ])->assertUnprocessable();
+    }
+
+    public function test_federal_admin_can_publish_draft_to_active(): void
+    {
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
+        $role = RbacRole::query()->where('slug', 'federal_admin')->firstOrFail();
+        $user = User::factory()->create(['region_id' => $federal->id]);
+        $user->roles()->attach($role);
+
+        HrRequest::query()->create([
+            'id' => 'REQ-DRAFT-PUB',
+            'title' => 'Will publish',
+            'conv' => 'CEDAW',
+            'region_id' => $federal->id,
+            'due_date' => now(),
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)->patchJson('/api/v1/hr-requests/REQ-DRAFT-PUB', [
+            'status' => 'active',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('hr_requests', [
+            'id' => 'REQ-DRAFT-PUB',
+            'status' => 'active',
+        ]);
     }
 }

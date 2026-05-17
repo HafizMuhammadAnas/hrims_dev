@@ -744,6 +744,60 @@ body:has(.modal-overlay) {
   max-width: 960px;
 }
 
+/* Request view modal — scroll body, pinned footer close */
+.modal-card.hr-request-modal--view {
+  display: flex;
+  flex-direction: column;
+  max-height: min(92vh, 920px);
+  overflow: hidden;
+}
+
+.modal-card.hr-request-modal--view.workflow-tabbed-card {
+  padding: 0;
+}
+
+.modal-card.hr-request-modal--view .modal-form.hr-request-view-template-modal {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 22px 20px;
+}
+
+.modal-card.hr-request-modal--view.workflow-tabbed-card .modal-form.hr-request-view-template-modal {
+  padding: 20px 24px 24px;
+}
+
+/* List “View” modal: gradient WorkflowModalHero + regions/depts meta strip only */
+.hr-request-view-template--external-hero .hr-request-view-template__hero-top,
+.hr-request-view-template--external-hero .hr-request-view-template__title {
+  display: none;
+}
+
+.hr-request-view-template--external-hero .hr-request-view-template__hero {
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.hr-request-view-template--external-hero .hr-request-view-template__meta-chip {
+  display: none;
+}
+
+.modal-card.hr-request-modal--view .hr-request-modal-view-footer {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 14px 22px 18px;
+  justify-content: flex-start;
+  background: linear-gradient(to bottom, #fafbfd, #fff);
+  border-top: 1px solid var(--field-border, #e1e7f5);
+  box-shadow: 0 -4px 12px rgba(46, 79, 163, 0.06);
+}
+
+.modal-card.hr-request-modal--view .hr-request-modal-view-footer .btn {
+  min-width: 120px;
+}
+
 .compiled-record-modal-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -874,6 +928,310 @@ button.compiled-record-modal-tab {
   cursor: default;
 }
 
+/* Workflow tabbed views — shared gradient hero (modals + embedded page cards) */
+.workflow-modal-hero {
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid #dce4f5;
+  background: linear-gradient(135deg, #1e3a6e 0%, #2e4fa3 48%, #3d6fd4 100%);
+  color: #fff;
+  border-radius: 12px 12px 0 0;
+}
+
+.workflow-modal-hero--embedded {
+  border-radius: 12px 12px 0 0;
+}
+
+.workflow-modal-hero__inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 20px;
+}
+
+.workflow-modal-hero__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.workflow-modal-hero__eyebrow {
+  margin: 0 0 6px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.88;
+  color: #fff;
+}
+
+.workflow-modal-hero__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #fff;
+}
+
+.workflow-modal-hero__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.workflow-modal-hero__chip {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.workflow-modal-hero__close {
+  flex-shrink: 0;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.workflow-modal-hero__close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff !important;
+}
+
+.workflow-modal-hero .status-badge {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Tabbed modal / page card shell */
+.workflow-tabbed-card.modal-card,
+.ministry-compiled-modal.modal-card {
+  display: flex;
+  flex-direction: column;
+  max-height: min(92dvh, 920px);
+  overflow: hidden;
+  padding: 0;
+}
+
+.workflow-tabbed-card.modal-card.hr-request-modal--page {
+  max-height: none;
+  overflow: visible;
+}
+
+.workflow-tabbed-card .compiled-record-modal-tabs,
+.workflow-tabbed-card .dept-task-response-modal__tabs {
+  flex-shrink: 0;
+  margin: 0;
+  border-radius: 0;
+  padding-top: 0;
+}
+
+.workflow-tabbed-card .workflow-tabbed-card__body,
+.workflow-tabbed-card .ministry-compiled-modal__body,
+.workflow-tabbed-card .dept-task-response-modal__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  min-height: 0;
+}
+
+.ministry-compiled-overlay {
+  padding: 24px 16px;
+}
+
+.ministry-compiled-modal__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  min-height: 0;
+}
+
+.ministry-compiled-panel {
+  animation: ministry-compiled-fade 0.18s ease-out;
+}
+
+@keyframes ministry-compiled-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ministry-compiled-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.ministry-compiled-overview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ministry-compiled-overview-item--wide {
+  grid-column: 1 / -1;
+}
+
+.ministry-compiled-overview-item__label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7a99;
+}
+
+.ministry-compiled-overview-item__value {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--txt);
+  line-height: 1.35;
+}
+
+.ministry-compiled-regions {
+  margin-bottom: 16px;
+}
+
+.ministry-compiled-regions__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ministry-compiled-regions__pill {
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--solid-blue);
+  background: #eef3ff;
+  border: 1px solid #cfd9f3;
+  border-radius: 999px;
+}
+
+.ministry-compiled-draft-alert {
+  margin-top: 8px;
+}
+
+.ministry-compiled-regions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ministry-compiled-region-card {
+  padding: 18px 20px;
+  border: 1px solid #dce4f5;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(46, 79, 163, 0.06);
+}
+
+.ministry-compiled-region-card__title {
+  margin: 0 0 10px;
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: #1e3a6e;
+}
+
+.ministry-compiled-region-card__section-label {
+  margin: 0 0 12px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7a99;
+}
+
+.ministry-compiled-region-card__responses {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ministry-compiled-region-card__empty {
+  margin: 0;
+}
+
+.ministry-compiled-summary-card {
+  margin: 0;
+  border: 1px solid #dce4f5;
+  box-shadow: 0 4px 20px rgba(46, 79, 163, 0.08);
+}
+
+.ministry-compiled-summary-card__body {
+  min-height: 160px;
+}
+
+.ministry-compiled-summary-card .hr-request-view-template__prose {
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+}
+
+.ministry-compiled-modal__error {
+  margin: 12px 0 0;
+}
+
+.ministry-compiled-modal__actions {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e8edf7;
+}
+
+.ministry-compiled-single.hr-request-modal--page {
+  max-height: none;
+  overflow: visible;
+}
+
+.ministry-compiled-single__body {
+  padding: 20px 24px 24px;
+}
+
+.ministry-compiled-print-root {
+  background: #fff;
+}
+
+.ministry-compiled-single__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px 16px;
+}
+
+.ministry-compiled-dept-response-item {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8edf7;
+}
+
+.ministry-compiled-dept-response-item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.ministry-compiled-request-card {
+  margin-bottom: 18px;
+}
+
+.ministry-compiled-summary-card {
+  margin-top: 18px;
+}
+
+.ministry-compiled-summary-card__prose {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 /* Regional compilation: department row — checkbox vs open submission */
 .compilation-dept-status-row {
   display: flex;
@@ -894,6 +1252,11 @@ button.compiled-record-modal-tab {
   background: rgba(255, 255, 255, 0.65);
   cursor: pointer;
   flex-shrink: 0;
+}
+
+.compilation-dept-status-row__check--disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .compilation-dept-status-row__body {
@@ -961,6 +1324,37 @@ button.compiled-record-modal-tab {
   color: var(--txt, #1a2233);
 }
 
+.compilation-dept-status-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.regional-submission-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.regional-submission-coverage__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #d8e0f0);
+  background: var(--surface, #f8faff);
+}
+
+.regional-submission-coverage__name {
+  font-weight: 600;
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--txt, #1a2233);
+}
+
+.data-table-row--muted td {
+  background: rgba(248, 250, 255, 0.85);
+}
+
 /* Department submission inspector (monitoring + compilation) */
 .dept-task-response-modal__head {
   align-items: flex-start;
@@ -1007,6 +1401,15 @@ button.compiled-record-modal-tab {
 /* Same card layout as department portal — nested in scroll panel */
 .dept-task-response-modal__request-template .hr-request-view-template {
   padding-bottom: 4px;
+}
+
+.regional-federal-review-feedback--hero-gap {
+  margin: 0 0 12px;
+  max-width: 100%;
+}
+
+.regional-federal-review-feedback {
+  margin-bottom: 14px;
 }
 
 /* Regional compilation detail (submission history) — align with dept submission modal */
@@ -1113,19 +1516,6 @@ button.compiled-record-modal-tab {
   color: #243f8a;
 }
 
-.dept-response-attachment-btn__action {
-  font-weight: 700;
-}
-
-.dept-response-attachment-btn__name {
-  font-weight: 500;
-  font-size: var(--font-size-xs);
-  color: var(--txt-lt, #5a6b8a);
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Full-page request view (no overlay) — beat .modal-card max-height (incl. 92vh in mobile media query). */
 .modal-card.hr-request-modal--page {
@@ -1233,12 +1623,76 @@ textarea.hr-request-readonly-prose {
   color: var(--txt);
 }
 
-.hr-request-view-template__meta-row {
+.hr-request-view-template__hero-meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 18px 28px;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--field-border);
+}
+
+.hr-request-view-template__meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--font-size-sm);
   color: var(--txt);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--field-bg-soft, #f4f7fc);
+  border: 1px solid var(--field-border);
+  width: fit-content;
+}
+
+.hr-request-view-template__meta-chip-label {
+  font-weight: var(--font-weight-semibold);
+  margin-right: 4px;
+  color: var(--txt-lt);
+}
+
+.hr-request-view-template__meta-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hr-request-view-template__meta-block-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--txt-lt);
+}
+
+.hr-request-view-template__meta-pills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hr-request-view-template__meta-pill {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--theme-primary, #2e4fa3);
+  color: var(--theme-primary, #2e4fa3);
+  background: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.hr-request-view-template__meta-pill--ict {
+  border-color: var(--solid-teal, #0d9488);
+  color: #0f766e;
+  background: #f0fdfa;
 }
 
 .hr-request-view-template__meta-item {
@@ -1293,6 +1747,49 @@ textarea.hr-request-readonly-prose {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* Light panels (dept response form): secondary buttons must not use chrome (white-on-white) styles. */
+.hr-request-view-panel .btn.btn-secondary,
+.hr-request-view-panel a.btn.btn-secondary,
+.hr-request-dept-portal-tabs__form-attach .btn.btn-secondary,
+.hr-request-dept-portal-tabs__form-attach a.btn.btn-secondary {
+  background: #fff;
+  color: var(--solid-blue);
+  border: 1px solid #cfd9f3;
+  text-decoration: none;
+}
+
+.hr-request-view-panel .btn.btn-secondary:hover:not(:disabled),
+.hr-request-view-panel a.btn.btn-secondary:hover,
+.hr-request-dept-portal-tabs__form-attach .btn.btn-secondary:hover:not(:disabled),
+.hr-request-dept-portal-tabs__form-attach a.btn.btn-secondary:hover {
+  background: #f5f9ff;
+  border-color: #b8ccff;
+  color: var(--solid-blue-hover);
+}
+
+.dept-task-revision-feedback {
+  margin: 0 0 16px;
+}
+
+.dept-task-revision-feedback__lead {
+  margin: 0 0 10px;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.dept-task-revision-feedback__content {
+  margin: 0;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid rgba(180, 83, 9, 0.25);
+  border-radius: 8px;
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  color: var(--txt);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .hr-request-view-template__grid2 {
@@ -1439,6 +1936,38 @@ textarea.hr-request-readonly-prose {
   margin-bottom: 0;
 }
 
+/* Full-page HR request view — gradient hero + flat body (all routes using layout="page") */
+.hr-request-modal--page.hr-request-modal--view.workflow-tabbed-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  max-width: min(960px, 100%);
+  overflow: visible;
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(46, 79, 163, 0.1);
+}
+
+.hr-request-modal--page.hr-request-modal--view.workflow-tabbed-card .modal-form.hr-request-view-template-modal {
+  padding: 20px 24px 24px;
+  flex: none;
+  min-height: 0;
+  overflow: visible;
+}
+
+.hr-request-modal--page.hr-request-modal--view.workflow-tabbed-card
+  .hr-request-view-template--external-hero
+  .hr-request-view-template__hero-meta {
+  margin-top: 0;
+  padding-top: 4px;
+}
+
+.hr-request-modal--page.hr-request-modal--view.workflow-tabbed-card .hr-request-modal-page-actions {
+  border-top: 1px solid var(--field-border, #e1e7f5);
+  padding: 14px 24px 18px;
+  margin: 0;
+}
+
 .hr-request-view-panel {
   background: #fff;
   border: 1px solid var(--field-border, #e1e7f5);
@@ -1455,6 +1984,164 @@ textarea.hr-request-readonly-prose {
 .hr-request-view-footnote {
   margin: 0;
   line-height: 1.5;
+}
+
+.hr-request-view-stack--embedded-footer {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 200px);
+}
+
+.hr-request-view-stack--embedded-footer .hr-request-view-footback--actions {
+  margin-top: auto;
+}
+
+/* Full-page HR request view (`/requests/:id`, regional received, etc.) */
+.hr-request-view-stack--request-page {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: min(960px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.hr-request-view-stack--request-page > .hr-request-modal--page {
+  width: 100%;
+}
+
+/* Tabbed task view (dept / monitor): keep back actions directly under content. */
+.hr-request-view-stack--tabbed-page {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: min(960px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.hr-request-view-stack--tabbed-page .hr-request-dept-portal-tabs {
+  flex: 0 0 auto;
+}
+
+.hr-request-view-stack--tabbed-page .hr-request-dept-portal-tabs__form-attach {
+  margin-top: 16px;
+}
+
+.hr-request-view-stack--tabbed-page .hr-request-view-footback--actions {
+  margin-top: 16px;
+  flex: 0 0 auto;
+}
+
+.hr-request-view-footback {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.hr-request-view-footback--actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 24px;
+  max-width: min(960px, 100%);
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.workflow-action-footback {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.workflow-action-footback__alert {
+  width: 100%;
+  margin: 0;
+}
+
+.workflow-action-footback__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Footer sits on page shell (not inside .modal-card) — use light-surface secondary button styles. */
+.hr-request-view-footback .btn.btn-secondary {
+  background: #fff;
+  color: var(--solid-blue);
+  border: 1px solid #cfd9f3;
+  width: auto;
+}
+
+.hr-request-view-footback .btn.btn-secondary:hover:not(:disabled) {
+  background: #f5f9ff;
+  border-color: #b8ccff;
+  color: var(--solid-blue-hover);
+}
+
+/* Department portal page — Response / Request tabs (submission history & assigned tasks) */
+.hr-request-dept-portal-tabs.modal-card.hr-request-modal--page,
+.hr-request-dept-portal-tabs.workflow-tabbed-card.modal-card.hr-request-modal--page {
+  display: flex;
+  flex-direction: column;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+.hr-request-dept-portal-tabs__review-outcome {
+  margin-top: 16px;
+}
+
+.hr-request-dept-portal-tabs__body {
+  padding-top: 12px;
+}
+
+.hr-request-dept-portal-tabs__panel {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.hr-request-dept-portal-tabs__panel.hr-request-view-panel {
+  box-shadow: none;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.hr-request-dept-portal-tabs + .hr-request-dept-portal-tabs__form-attach {
+  margin-top: 0;
+  border-top: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 0 0 12px 12px;
+}
+
+.hr-request-dept-portal-tabs:has(+ .hr-request-dept-portal-tabs__form-attach) {
+  border-radius: 12px 12px 0 0;
+}
+
+/* Full-page request without workflow hero (legacy / non–issue-flow) */
+.modal-card.hr-request-modal--page.hr-request-modal--view:not(.workflow-tabbed-card) {
+  display: block;
+  max-height: none;
+  overflow: visible;
+}
+
+.modal-card.hr-request-modal--page.hr-request-modal--view:not(.workflow-tabbed-card)
+  .modal-form.hr-request-view-template-modal {
+  flex: none;
+  min-height: 0;
+  overflow: visible;
 }
 
 /* Full-page request: keep due date & status in one vertical column for calmer layout */
@@ -1622,13 +2309,43 @@ textarea.hr-request-readonly-prose {
 
 /* Issues create / edit — top row grid + article multi-select dropdown */
 .issues-create-form {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--field-border);
 }
 
 .issues-create-form__title {
   margin: 0 0 12px;
   font-size: var(--font-size-base);
   font-weight: 600;
+}
+
+.issues-inline-panel {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--field-border);
+}
+
+.issues-inline-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.issues-inline-panel-header h4 {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+
+.issues-inline-panel-table-wrap {
+  margin-top: 12px;
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
 }
 
 .issues-form-top-grid {
@@ -1776,6 +2493,148 @@ textarea.hr-request-readonly-prose {
 
 .issues-page-header-row h3 {
   margin: 0;
+}
+
+.issues-page-toolbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.issues-admin-tabs {
+  margin-bottom: 16px;
+  border-radius: var(--field-radius);
+  overflow: hidden;
+}
+
+.issues-admin-tab__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.issues-admin-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #d32f2f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.hr-request-regional-path__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hr-request-view-template-modal__workflow {
+  margin-top: 20px;
+  padding-top: 4px;
+  border-top: 1px solid var(--field-border, #e1e7f5);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hr-request-regional-workflow-section {
+  margin-top: 0;
+}
+
+.hr-request-modal-page-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--field-border, #e1e7f5);
+}
+
+.clarification-federal-view {
+  max-width: min(960px, 100%);
+  margin: 0 auto;
+}
+
+.clarification-federal-view__toolbar {
+  margin-bottom: 12px;
+}
+
+.clarification-federal-view__card {
+  margin-bottom: 24px;
+}
+
+.clarification-federal-view__header {
+  border-bottom: 1px solid var(--field-border, #e1e7f5);
+}
+
+.clarification-federal-view__header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.clarification-federal-view__heading {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.clarification-federal-view__region {
+  margin: 8px 0 0;
+}
+
+.clarification-federal-view__section-label {
+  margin: 0 0 12px;
+}
+
+.clarification-federal-view__body {
+  padding-top: 8px;
+}
+
+.clarification-thread-card__title {
+  margin: 0 0 8px;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--theme-primary, #2e4fa3);
+}
+
+.clarification-thread-card__meta {
+  margin: 0 0 12px;
+}
+
+.clarification-thread-card__attachments {
+  margin-top: 12px;
+}
+
+.clarification-thread-card--region {
+  border-left: 4px solid var(--theme-primary, #2e4fa3);
+}
+
+.clarification-thread-card--federal {
+  border-left: 4px solid var(--solid-teal, #0d9488);
+}
+
+.clarification-thread-card--federal-form {
+  border-left: 4px solid var(--solid-teal, #0d9488);
+}
+
+.clarification-workflow-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+}
+
+.issues-list-toolbar {
+  margin-bottom: 12px;
 }
 
 .mapping-preview legend {
@@ -1978,6 +2837,81 @@ textarea.hr-request-readonly-prose {
   margin: 0 0 10px;
   font-size: var(--font-size-base);
   font-weight: 650;
+}
+
+.submission-history-dept-sections--flat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dept-submission-card {
+  padding: 14px 16px;
+  border: 1px solid var(--field-border, #e1e7f5);
+  border-radius: 10px;
+  background: var(--field-bg, #fafbfd);
+}
+
+.dept-submission-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dept-submission-card__dept {
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+}
+
+.dept-submission-card__meta {
+  margin: -4px 0 10px;
+}
+
+/* Federal regional response modal — flat sections (matches other workflow views) */
+.regional-response-detail-modal__form--flat {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.regional-response-detail-modal__form--flat .card-section-heading {
+  margin: 0;
+}
+
+.regional-response-detail-modal__form--flat .hr-request-view-template__prose-box {
+  margin: 0;
+}
+
+.regional-response-detail-modal__summary {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.regional-response-detail-modal__summary-empty {
+  margin: 0;
+}
+
+.regional-response-detail-modal__feedback-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.regional-responses-others {
+  padding-top: 4px;
+  border-top: 1px dashed var(--field-border, #e1e7f5);
+}
+
+.regional-responses-others__label {
+  margin: 0 0 8px;
+}
+
+.regional-responses-others__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .form-grid {
@@ -2589,6 +3523,23 @@ textarea.hr-request-readonly-prose {
   gap: 14px;
 }
 
+.page-header-back {
+  margin: 0 0 10px;
+}
+
+.page-header-back .btn.btn-secondary {
+  background: #fff;
+  color: var(--solid-blue);
+  border: 1px solid #cfd9f3;
+  width: auto;
+}
+
+.page-header-back .btn.btn-secondary:hover:not(:disabled) {
+  background: #f5f9ff;
+  border-color: #b8ccff;
+  color: var(--solid-blue-hover);
+}
+
 .page-header h2 {
   margin: 0;
 }
@@ -2970,25 +3921,61 @@ textarea.hr-request-readonly-prose {
 }
 
 .row-actions-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   cursor: pointer;
   user-select: none;
-  border: 1px solid var(--bdr);
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: var(--font-size-xs);
-  font-weight: 700;
+  border: 1px solid #cfd9f3;
+  border-radius: 10px;
+  padding: 7px 12px;
+  min-height: 34px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.2;
   color: var(--solid-blue);
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 1px 2px rgba(46, 79, 163, 0.08);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    color 0.15s ease;
+}
+
+.row-actions-trigger__label {
+  white-space: nowrap;
+}
+
+.row-actions-trigger__icon {
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: transform 0.2s ease, opacity 0.15s ease;
 }
 
 .row-actions-trigger:hover {
   border-color: #b8ccff;
-  background: #f7faff;
+  background: linear-gradient(180deg, #ffffff 0%, #f0f5ff 100%);
+  box-shadow: 0 2px 8px rgba(46, 79, 163, 0.12);
+}
+
+.row-actions-trigger--open,
+.row-actions-trigger[aria-expanded='true'] {
+  border-color: #9eb8f5;
+  background: #eef3ff;
+  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.14);
+}
+
+.row-actions-trigger--open .row-actions-trigger__icon,
+.row-actions-trigger[aria-expanded='true'] .row-actions-trigger__icon {
+  transform: rotate(180deg);
+  opacity: 1;
 }
 
 .row-actions-trigger:focus-visible {
   border-color: #b8ccff;
-  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.18);
+  box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.22);
   outline: none;
 }
 
@@ -2997,21 +3984,89 @@ textarea.hr-request-readonly-prose {
   top: calc(100% + 6px);
   right: 0;
   z-index: 50;
-  min-width: 100px;
-  border: 1px solid var(--bdr);
-  border-radius: 10px;
+  min-width: 148px;
+  border: 1px solid #dce4f5;
+  border-radius: 12px;
   background: #fff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-  padding: 8px 10px;
+  box-shadow:
+    0 16px 40px rgba(46, 79, 163, 0.14),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+  padding: 6px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: stretch;
+  gap: 2px;
+  animation: row-actions-menu-in 0.16s ease-out;
 }
 
 .row-actions-list--portal {
   top: auto;
   right: auto;
+}
+
+@keyframes row-actions-menu-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.row-actions-list > .link-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  text-decoration: none;
+  color: #2e4fa3;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.row-actions-list > .link-button:hover {
+  background: #eef3ff;
+  color: var(--solid-blue-hover);
+  text-decoration: none;
+}
+
+.row-actions-list > .link-button:focus-visible {
+  outline: none;
+  background: #eef3ff;
+  box-shadow: inset 0 0 0 2px rgba(91, 141, 239, 0.35);
+}
+
+.row-actions-list > .link-button:active {
+  background: #e3ebff;
+}
+
+.row-actions-list > .link-button.danger {
+  color: #c53030;
+}
+
+.row-actions-list > .link-button.danger:hover {
+  background: #fff5f5;
+  color: #9b2c2c;
+}
+
+.row-actions-list > .link-button.danger:focus-visible {
+  background: #fff5f5;
+  box-shadow: inset 0 0 0 2px rgba(197, 48, 48, 0.28);
+}
+
+.row-actions-list > .link-button.danger:active {
+  background: #fee8e8;
 }
 
 /* Following tbody rows are painted after this row and would cover the trigger row without a higher stack level. */

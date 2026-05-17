@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchDepartmentTasks, type DepartmentTaskRow } from '../../api/lists'
-import { updateDepartmentTaskReview } from '../../api/workflows'
-import { useAuth } from '../../auth/AuthContext'
-import { DepartmentTaskResponseModal } from '../../components/DepartmentTaskResponseModal'
 import { Button } from '../../components/ui/Button'
 import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu'
 import { PageSection } from '../../components/ui/PageSection'
 import { PaginationBar } from '../../components/ui/PaginationBar'
 import { StatsCards } from '../../components/ui/StatsCards'
@@ -16,28 +15,22 @@ import {
   countDepartmentTasksByWorkflow,
   workflowPresentation,
 } from '../../lib/departmentTaskWorkflow'
-import { isFederalAdmin, isRegionalAdmin } from '../../lib/roles'
-import type { AuthUser } from '../../types/auth'
-
+import {
+  filterDepartmentTasks,
+  WORKFLOW_BUCKET_FILTER_OPTIONS,
+} from '../../lib/departmentTaskTableFilters'
 type Props = {
   title: string
 }
 
-function userMayReviewTask(user: AuthUser | null, t: DepartmentTaskRow): boolean {
-  if (!user) return false
-  if (isFederalAdmin(user)) return true
-  if (isRegionalAdmin(user) && user.region && user.region.id === t.region_id) return true
-  return false
-}
-
 export function DepartmentMonitoringPage({ title }: Props) {
-  const { user } = useAuth()
+  const navigate = useNavigate()
+  const federalIctScope = title.toLowerCase().includes('federal')
+  const fromPath = federalIctScope ? '/federal-department-requests' : '/region-monitoring'
+  const fromParam = encodeURIComponent(fromPath)
   const [rows, setRows] = useState<DepartmentTaskRow[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [viewing, setViewing] = useState<DepartmentTaskRow | null>(null)
-  const [reviewComments, setReviewComments] = useState('')
-  const [reviewError, setReviewError] = useState<string | null>(null)
-  const [savingReview, setSavingReview] = useState(false)
+  const [openActionId, setOpenActionId] = useState<string | null>(null)
   const table = useClientTableState({ pageSize: 10 })
   const { search, setSearch, filters, setFilter, resetFilters, page, setPage, pageSize } = table
 
@@ -50,21 +43,17 @@ export function DepartmentMonitoringPage({ title }: Props) {
     void load().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
   }, [])
 
-  const requestIds = useMemo(() => Array.from(new Set(rows.map((r) => r.req_id))), [rows])
+  const requestIds = useMemo(() => Array.from(new Set(rows.map((r) => r.req_id))).sort(), [rows])
   const requestFilter = filters.requestId ?? ''
+  const workflowFilter = filters.workflow ?? ''
   const filtered = useMemo(
     () =>
-      rows.filter((r) => {
-        if (requestFilter && r.req_id !== requestFilter) return false
-        const q = search.trim().toLowerCase()
-        if (!q) return true
-        return (
-          r.id.toLowerCase().includes(q) ||
-          r.req_id.toLowerCase().includes(q) ||
-          String(r.department_name ?? r.department_id).toLowerCase().includes(q)
-        )
+      filterDepartmentTasks(rows, {
+        search,
+        workflowFilter,
+        reqIdFilter: requestFilter || undefined,
       }),
-    [rows, requestFilter, search],
+    [rows, requestFilter, search, workflowFilter],
   )
   const { pageRows } = useMemo(
     () => derivePaginatedRows(filtered, page, pageSize),
@@ -73,49 +62,17 @@ export function DepartmentMonitoringPage({ title }: Props) {
 
   const workflowCounts = useMemo(() => countDepartmentTasksByWorkflow(filtered), [filtered])
 
-  function openView(row: DepartmentTaskRow) {
-    setViewing(row)
-    setReviewComments(row.regional_review_comments ?? '')
-    setReviewError(null)
-  }
-
-  async function submitReview(status: 'accepted' | 'needs-modification') {
-    if (!viewing) return
-    if (status === 'needs-modification' && !reviewComments.trim()) {
-      setReviewError('Add a short note for the department when requesting changes.')
-      return
-    }
-    setSavingReview(true)
-    setReviewError(null)
-    try {
-      const updated = await updateDepartmentTaskReview(viewing.id, {
-        regional_review_status: status,
-        regional_review_comments: reviewComments.trim() || null,
-      })
-      setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
-      setViewing(null)
-      setReviewComments('')
-      setReviewError(null)
-    } catch (e: unknown) {
-      setReviewError(e instanceof Error ? e.message : 'Could not save review')
-    } finally {
-      setSavingReview(false)
-    }
-  }
-
   return (
-    <PageSection
-      title={title}
-      subtitle="Distributed requests by department: track progress, read submissions, and accept or request changes."
-    >
+    <PageSection title={title}>
       {error && <p className="login-error">{error}</p>}
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'Pending submission', value: workflowCounts.in_process },
-            { label: 'Pending regional review', value: workflowCounts.responded },
-            { label: 'Resubmission requested', value: workflowCounts.revision },
-            { label: 'Accepted by region', value: workflowCounts.accepted },
+            { label: 'Total tasks', value: filtered.length },
+            { label: 'Pending', value: workflowCounts.in_process },
+            { label: 'Review', value: workflowCounts.responded },
+            { label: 'Revision', value: workflowCounts.revision },
+            { label: 'Accepted', value: workflowCounts.accepted },
           ]}
         />
       </div>
@@ -128,6 +85,17 @@ export function DepartmentMonitoringPage({ title }: Props) {
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search department tasks"
         />
+        <select
+          value={workflowFilter}
+          onChange={(e) => setFilter('workflow', e.target.value)}
+          aria-label="Filter by status"
+        >
+          {WORKFLOW_BUCKET_FILTER_OPTIONS.map((opt) => (
+            <option key={opt.value || 'all'} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <select value={requestFilter} onChange={(e) => setFilter('requestId', e.target.value)}>
           <option value="">All request IDs</option>
           {requestIds.map((id) => (
@@ -158,7 +126,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
               <th>Workflow</th>
               <th>Assigned</th>
               <th>Submitted</th>
-              <th className="table-actions">Task details</th>
+              <th className="table-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -175,9 +143,22 @@ export function DepartmentMonitoringPage({ title }: Props) {
                   <td>{t.assigned_date}</td>
                   <td>{t.submission_date ?? '—'}</td>
                   <td className="table-actions">
-                    <Button variant="primary" compact onClick={() => openView(t)}>
-                      Open task
-                    </Button>
+                    <RowActionsMenu
+                      isOpen={openActionId === t.id}
+                      onOpenChange={(open) => setOpenActionId(open ? t.id : null)}
+                    >
+                      <Button
+                        variant="link"
+                        onClick={() => {
+                          navigate(
+                            `/requests/${encodeURIComponent(t.req_id)}?task=${encodeURIComponent(t.id)}&from=${fromParam}`,
+                          )
+                          setOpenActionId(null)
+                        }}
+                      >
+                        View & response
+                      </Button>
+                    </RowActionsMenu>
                   </td>
                 </tr>
               )
@@ -187,27 +168,6 @@ export function DepartmentMonitoringPage({ title }: Props) {
         </table>
       </TableCard>
       <PaginationBar page={page} pageSize={pageSize} totalItems={filtered.length} onPageChange={setPage} />
-
-      <DepartmentTaskResponseModal
-        task={viewing}
-        onClose={() => {
-          setViewing(null)
-          setReviewComments('')
-          setReviewError(null)
-        }}
-        review={
-          viewing && userMayReviewTask(user, viewing)
-            ? {
-                comments: reviewComments,
-                onCommentsChange: setReviewComments,
-                onAccept: () => void submitReview('accepted'),
-                onRequestModification: () => void submitReview('needs-modification'),
-                saving: savingReview,
-                error: reviewError,
-              }
-            : undefined
-        }
-      />
     </PageSection>
   )
 }

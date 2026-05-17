@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\CompiledRecord;
+use App\Models\DepartmentTask;
 use App\Models\RegionalResponse;
+use App\Models\Region;
 use App\Support\HrimsAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,7 +96,8 @@ class CompiledRecordController extends Controller
     }
 
     /**
-     * Preview which region names would compile for an HR request (accepted regional responses only).
+     * Preview which region names would compile for an HR request: accepted regional responses,
+     * plus ICT / national-line when every submitted departmental task for that request is accepted.
      */
     public function preview(Request $request): JsonResponse
     {
@@ -112,12 +115,34 @@ class CompiledRecordController extends Controller
             ->where('review_status', 'accepted')
             ->get();
 
-        $names = $responses->map(fn (RegionalResponse $r) => $r->region?->name)->filter()->unique()->values()->all();
+        $names = $responses->map(fn (RegionalResponse $r) => $r->region?->name)->filter()->unique()->values();
+        $responseCount = $responses->count();
+
+        $ictRegion = Region::query()->whereIn('slug', ['ict', 'federal'])->orderByRaw("CASE WHEN slug = 'ict' THEN 0 ELSE 1 END")->first();
+        if ($ictRegion) {
+            $ictTasks = DepartmentTask::query()
+                ->where('hr_request_id', $data['hr_request_id'])
+                ->where('region_id', $ictRegion->id)
+                ->where(function ($q) {
+                    $q->whereNotNull('submission_date')->orWhere('status', 'submitted');
+                })
+                ->get(['id', 'regional_review_status']);
+
+            $ictSubmitted = $ictTasks->count();
+            $ictAccepted = $ictTasks->where('regional_review_status', 'accepted')->count();
+            if ($ictSubmitted > 0 && $ictAccepted === $ictSubmitted) {
+                $nm = $ictRegion->name;
+                if ($nm !== null && $nm !== '' && ! $names->contains($nm)) {
+                    $names->push($nm);
+                }
+                $responseCount += $ictAccepted;
+            }
+        }
 
         return response()->json([
             'data' => [
-                'region_names' => $names,
-                'response_count' => $responses->count(),
+                'region_names' => $names->values()->all(),
+                'response_count' => $responseCount,
             ],
         ]);
     }

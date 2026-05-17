@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchHrRequests } from '../../api/hrRequests'
+import { coerceHrRequestStatus } from '../../types/hrRequest'
 import { fetchDepartmentTasks, type DepartmentTaskRow } from '../../api/lists'
 import { createDepartmentTask, fetchDepartments, type DepartmentRow } from '../../api/workflows'
 import { Button } from '../../components/ui/Button'
@@ -41,7 +42,9 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
   }, [])
 
   const openRequests = useMemo(() => {
-    return requests.filter((r) => !tasks.some((t) => t.req_id === r.id))
+    return requests.filter(
+      (r) => coerceHrRequestStatus(r.status) === 'active' && !tasks.some((t) => t.req_id === r.id),
+    )
   }, [requests, tasks])
 
   useEffect(() => {
@@ -90,7 +93,6 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
   return (
     <PageSection
       title={title}
-      subtitle="Step 1: assign incoming requests to relevant departments with clear ownership."
     >
       {error && <p className="login-error">{error}</p>}
       {preselectUnavailable && (

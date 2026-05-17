@@ -25,7 +25,9 @@ class UserController extends Controller
         $query = User::query()->with(['roles.permissions', 'region', 'department'])->orderBy('name');
 
         if ($creator->hasRole('super_admin')) {
-            $rows = $query->get();
+            $rows = $query
+                ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['federal_admin', 'regional_admin']))
+                ->get();
         } elseif ($creator->hasRole('federal_admin')) {
             $rows = $query
                 ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
@@ -151,7 +153,11 @@ class UserController extends Controller
             return response()->json(['message' => 'Super administrator accounts cannot be edited here.'], 422);
         }
 
-        if ($creator->hasRole('federal_admin')) {
+        if ($creator->hasRole('super_admin')) {
+            if (! $model->roles()->whereIn('slug', ['federal_admin', 'regional_admin'])->exists()) {
+                return response()->json(['message' => 'Only federal and regional administrator accounts can be managed here.'], 403);
+            }
+        } elseif ($creator->hasRole('federal_admin')) {
             if (! $model->department?->coversRegionSlug('ict')) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
@@ -217,7 +223,9 @@ class UserController extends Controller
 
         $creator = $request->user();
         if ($creator->hasRole('super_admin')) {
-            // allowed (except super accounts, above)
+            if (! $model->roles()->whereIn('slug', ['federal_admin', 'regional_admin'])->exists()) {
+                return response()->json(['message' => 'Only federal and regional administrator accounts can be managed here.'], 403);
+            }
         } elseif ($creator->hasRole('federal_admin')) {
             if (! $model->department?->coversRegionSlug('ict')) {
                 return response()->json(['message' => 'Forbidden'], 403);

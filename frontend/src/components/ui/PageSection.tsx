@@ -7,13 +7,16 @@ type PageSectionProps = {
   detail?: ReactNode
   /** Optional icon or badge shown before the title (e.g. report generator). */
   titleIcon?: ReactNode
+  /** Back link or actions rendered above the page title. */
+  leading?: ReactNode
   children: ReactNode
 }
 
-export function PageSection({ title, subtitle, detail, titleIcon, children }: PageSectionProps) {
+export function PageSection({ title, subtitle, detail, titleIcon, leading, children }: PageSectionProps) {
   return (
     <div className="page-shell">
       <div className="page-header">
+        {leading}
         <h2 className={titleIcon ? 'page-header-title-with-icon' : undefined}>
           {titleIcon}
           {title}

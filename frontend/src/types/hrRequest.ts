@@ -9,6 +9,11 @@ export function coerceHrRequestStatus(raw: string | undefined | null): HrRequest
   return 'draft'
 }
 
+/** Draft requests are federal-only until published; edit/delete apply only while draft. */
+export function hrRequestAllowsEditDelete(status: string | undefined | null): boolean {
+  return coerceHrRequestStatus(status) === 'draft'
+}
+
 export type HrRequestIssueIndicator = {
   id: number
   indicator_text: string

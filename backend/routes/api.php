@@ -65,6 +65,7 @@ Route::prefix('v1')->group(function (): void {
         Route::patch('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update'])->name('api.v1.regional-responses.update');
         Route::put('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update']);
         Route::get('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'show'])->name('api.v1.regional-responses.show');
+        Route::get('/regional-responses/{regionalResponse}/department-tasks', [RegionalResponseController::class, 'departmentTasks'])->name('api.v1.regional-responses.department-tasks');
 
         Route::get('/compiled-records/preview', [CompiledRecordController::class, 'preview'])->name('api.v1.compiled-records.preview');
         Route::get('/compiled-records', [CompiledRecordController::class, 'index'])->name('api.v1.compiled-records.index');
@@ -88,6 +89,20 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('hr-requests', HrRequestController::class)->parameters([
             'hr-requests' => 'hrRequest',
         ]);
+
+        Route::get('/hr-request-clarifications/pending-federal-count', [\App\Http\Controllers\Api\V1\HrRequestClarificationController::class, 'pendingFederalCount'])
+            ->name('api.v1.hr-request-clarifications.pending-federal-count');
+        Route::get('/hr-request-clarifications/for-request/{hrRequest}', [\App\Http\Controllers\Api\V1\HrRequestClarificationController::class, 'activeForRequest'])
+            ->name('api.v1.hr-request-clarifications.for-request');
+        Route::get('/hr-request-clarifications/{hrRequestClarification}/attachments/{attachment}/file', [\App\Http\Controllers\Api\V1\HrRequestClarificationController::class, 'downloadAttachment'])
+            ->name('api.v1.hr-request-clarifications.attachments.file');
+        Route::post('/hr-request-clarifications/{hrRequestClarification}/respond', [\App\Http\Controllers\Api\V1\HrRequestClarificationController::class, 'respond'])
+            ->name('api.v1.hr-request-clarifications.respond');
+        Route::post('/hr-request-clarifications/{hrRequestClarification}/close', [\App\Http\Controllers\Api\V1\HrRequestClarificationController::class, 'close'])
+            ->name('api.v1.hr-request-clarifications.close');
+        Route::apiResource('hr-request-clarifications', \App\Http\Controllers\Api\V1\HrRequestClarificationController::class)
+            ->only(['index', 'show', 'store'])
+            ->parameters(['hr-request-clarifications' => 'hrRequestClarification']);
 
         Route::middleware('super.admin')->prefix('admin')->group(function (): void {
             Route::post('/regions', [AdminRegionController::class, 'store'])->name('api.v1.admin.regions.store');

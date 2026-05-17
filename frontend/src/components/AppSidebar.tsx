@@ -96,12 +96,12 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
           <>
             <div className="nav-section-title">Super admin</div>
             <div className="nav-sub">
+              <NavItem to="/admin/issues" icon={GitBranch} label="Issues & mappings" onPick={onPick} />
               <NavItem to="/admin/regions-districts" icon={MapPin} label="Regions & districts" onPick={onPick} />
               <NavItem to="/admin/conventions" icon={Scale} label="Conventions & components" onPick={onPick} />
               <NavItem to="/admin/sdg-nodes" icon={Layers} label="SDG nodes" onPick={onPick} />
               <NavItem to="/admin/upr-recommendations" icon={ScrollText} label="UPR recommendations" onPick={onPick} />
               <NavItem to="/admin/knowledge-hub" icon={LayoutGrid} label="Knowledge hub pages" onPick={onPick} />
-              <NavItem to="/admin/issues" icon={GitBranch} label="Issues & mappings" onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label="User management" onPick={onPick} />
             </div>
           </>
@@ -112,19 +112,17 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-section-title">Federal actions</div>
             <div className="nav-sub">
               <NavItem to="/requests" icon={Send} label="Request management" onPick={onPick} />
-              <NavItem to="/federal-upr-requests" icon={ScrollText} label="UPR Requests" onPick={onPick} />
               <NavItem to="/responses" icon={Inbox} label="Regional responses" onPick={onPick} />
               <NavItem to="/compilation" icon={Layers} label="Compilation center" onPick={onPick} />
-              <NavItem to="/compiled-records" icon={FileCheck} label="Compilation records" onPick={onPick} />
+              <NavItem to="/compiled-records" icon={FileCheck} label="Compiled records" onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label="User management" onPick={onPick} />
               <NavItem to="/federal-departments-mgmt" icon={Building2} label="Manage departments" onPick={onPick} />
             </div>
             <div className="nav-section-title">Federal department actions</div>
             <div className="nav-sub">
-              <NavItem to="/federal-department-requests" icon={List} label="Departmental requests" onPick={onPick} />
-              <NavItem to="/federal-department-responses" icon={Activity} label="Departmental responses" onPick={onPick} />
-              <NavItem to="/federal-compilation" icon={FileText} label="Federal compilation" onPick={onPick} />
-              <NavItem to="/federal-history" icon={History} label="Internal history" onPick={onPick} />
+              <NavItem to="/federal-department-requests" icon={Activity} label="Departmental responses" onPick={onPick} />
+              <NavItem to="/federal-compilation" icon={FileText} label="Response compilation" onPick={onPick} />
+              <NavItem to="/federal-history" icon={History} label="Compiled record" onPick={onPick} />
             </div>
           </>
         )}
@@ -134,7 +132,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-section-title">Province actions</div>
             <div className="nav-sub">
               <NavItem to="/region-received" icon={List} label="Received requests" onPick={onPick} />
-              <NavItem to="/region-monitoring" icon={Activity} label="Distributed requests" onPick={onPick} />
+              <NavItem to="/region-monitoring" icon={Activity} label="Departmental responses" onPick={onPick} />
               <NavItem to="/region-compilation" icon={FileText} label="Response compilation" onPick={onPick} />
               <NavItem to="/region-history" icon={History} label="Compiled and submitted" onPick={onPick} />
               <NavItem to="/regional-users-mgmt" icon={Users} label="User management" onPick={onPick} />

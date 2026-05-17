@@ -2,14 +2,29 @@ import { useEffect, useMemo, useState } from 'react'
 import type { DepartmentTaskRow } from '../api/lists'
 import { fetchHrRequest } from '../api/hrRequests'
 import { buildDepartmentForwardedViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
-import { hasDepartmentResponse, workflowPresentation } from '../lib/departmentTaskWorkflow'
+import {
+  departmentTaskWorkflowBucket,
+  hasDepartmentResponse,
+  workflowPresentation,
+} from '../lib/departmentTaskWorkflow'
+import { isIctLineTask, reviewFeedbackLabelForTask } from '../lib/ictRegion'
 import type { HrRequestRow } from '../types/hrRequest'
 import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
 import { Alert } from './ui/Alert'
 import { Button } from './ui/Button'
+import { WorkflowActionAlert } from './WorkflowActionFootback'
 import { ModalActions } from './ui/ModalChrome'
 import { StatusBadge } from './ui/StatusBadge'
+import { WorkflowModalHero } from './ui/WorkflowModalHero'
+
+function reviewErrorAsFeedback(error: string) {
+  const validation = /required|note|feedback|describe|add a short/i.test(error)
+  return {
+    kind: validation ? ('validation' as const) : ('error' as const),
+    message: error,
+  }
+}
 
 export type DepartmentTaskResponseModalReviewProps = {
   comments: string
@@ -75,34 +90,35 @@ export function DepartmentTaskResponseModal({
   if (!task) return null
 
   const wf = workflowPresentation(task)
+  const ictLine = isIctLineTask(task)
+  const reviewFeedbackLabel = reviewFeedbackLabelForTask(task)
   const responded = hasDepartmentResponse(task)
-  const showReviewForm = Boolean(review && (!showReviewWhenResponded || responded))
+  const bucket = departmentTaskWorkflowBucket(task)
+  /** Only tasks awaiting regional/federal review — not already accepted or in revision. */
+  const showReviewActions = Boolean(
+    review && (!showReviewWhenResponded || responded) && bucket === 'responded',
+  )
+  const showReviewOutcomeBanner =
+    Boolean(review && responded && !showReviewActions && (bucket === 'accepted' || bucket === 'revision'))
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modal-card modal-card-wide dept-task-response-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head dept-task-response-modal__head">
-          <div>
-            <h3>Department submission</h3>
-            <p className="dept-task-response-modal__head-meta muted small">
-              Task <strong>{task.id}</strong> · Request <strong>{task.req_id}</strong>
-              {task.region_name ? (
-                <>
-                  {' '}
-                  · <strong>{task.region_name}</strong>
-                </>
-              ) : null}
-              <br />
-              {task.department_name ?? task.department_id}
-              <span style={{ marginLeft: 8 }}>
-                <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
-              </span>
-            </p>
-          </div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
+      <div
+        className="modal-card modal-card-wide dept-task-response-modal workflow-tabbed-card"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <WorkflowModalHero
+          eyebrow={ictLine ? 'National line' : 'Department submission'}
+          title={String(task.department_name ?? task.department_id)}
+          onClose={onClose}
+        >
+          <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
+          <span className="workflow-modal-hero__chip">Task {task.id}</span>
+          <span className="workflow-modal-hero__chip">{task.req_id}</span>
+          {!ictLine && task.region_name ? (
+            <span className="workflow-modal-hero__chip">{task.region_name}</span>
+          ) : null}
+        </WorkflowModalHero>
 
         <nav className="compiled-record-modal-tabs dept-task-response-modal__tabs" aria-label="Submission views">
           <button
@@ -153,16 +169,28 @@ export function DepartmentTaskResponseModal({
             </>
           ) : (
             <div className="dept-task-response-modal__panel">
-              <div className="form-row dept-task-response-modal__response-block">
-                <label className="dept-task-response-modal__block-label">Department response</label>
-                {responded ? (
-                  <DepartmentResponseDisplay responseData={task.response_data} attachmentUrl={task.attachment_url} />
-                ) : (
-                  <p className="muted">The department has not submitted a response yet.</p>
-                )}
-              </div>
+              {responded ? (
+                <>
+                  {task.submission_date ? (
+                    <p className="muted small" style={{ margin: '0 0 12px' }}>
+                      Submitted {task.submission_date}
+                    </p>
+                  ) : null}
+                  {task.regional_review_comments?.trim() ? (
+                    <p className="muted small" style={{ margin: '0 0 12px' }}>
+                      <strong>{reviewFeedbackLabel}:</strong> {task.regional_review_comments}
+                    </p>
+                  ) : null}
+                  <DepartmentResponseDisplay
+                    responseData={task.response_data}
+                    attachmentUrl={task.attachment_url}
+                  />
+                </>
+              ) : (
+                <p className="muted">The department has not submitted a response yet.</p>
+              )}
 
-              {showReviewForm && review ? (
+              {showReviewActions && review ? (
                 <>
                   <div className="form-row">
                     <label htmlFor="dept-review-comments">Notes to department (required for modification)</label>
@@ -175,8 +203,13 @@ export function DepartmentTaskResponseModal({
                       style={{ width: '100%', boxSizing: 'border-box' }}
                     />
                   </div>
-                  {review.error ? <p className="login-error">{review.error}</p> : null}
-                  <ModalActions>
+                  {review.error ? (
+                    <WorkflowActionAlert
+                      feedback={reviewErrorAsFeedback(review.error)}
+                      className="workflow-action-footback__alert"
+                    />
+                  ) : null}
+                  <ModalActions className="workflow-action-footback__actions">
                     <Button variant="secondary" compact disabled={review.saving} onClick={onClose}>
                       Close
                     </Button>
@@ -195,6 +228,35 @@ export function DepartmentTaskResponseModal({
                       onClick={() => void review.onRequestModification()}
                     >
                       Request modification
+                    </Button>
+                  </ModalActions>
+                </>
+              ) : showReviewOutcomeBanner ? (
+                <>
+                  {bucket === 'accepted' ? (
+                    <Alert variant="success" title="Submission accepted">
+                      <p style={{ margin: 0 }}>This response has already been accepted. No further review actions apply.</p>
+                      {task.regional_review_comments?.trim() ? (
+                        <p style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
+                          <strong>Reviewer notes:</strong> {task.regional_review_comments}
+                        </p>
+                      ) : null}
+                    </Alert>
+                  ) : (
+                    <Alert variant="warning" title="Resubmission requested">
+                      <p style={{ margin: 0 }}>
+                        The department must submit an updated response before you can accept or request changes again.
+                      </p>
+                      {task.regional_review_comments?.trim() ? (
+                        <p style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
+                          <strong>Feedback sent to the department:</strong> {task.regional_review_comments}
+                        </p>
+                      ) : null}
+                    </Alert>
+                  )}
+                  <ModalActions>
+                    <Button variant="secondary" compact onClick={onClose}>
+                      Close
                     </Button>
                   </ModalActions>
                 </>

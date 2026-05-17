@@ -18,8 +18,9 @@ export function ModalHeader({ title, onClose }: ModalHeaderProps) {
 
 type ModalActionsProps = {
   children: ReactNode
+  className?: string
 }
 
-export function ModalActions({ children }: ModalActionsProps) {
-  return <div className="modal-actions">{children}</div>
+export function ModalActions({ children, className = '' }: ModalActionsProps) {
+  return <div className={`modal-actions${className ? ` ${className}` : ''}`}>{children}</div>
 }

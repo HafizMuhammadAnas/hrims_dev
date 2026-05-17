@@ -1,4 +1,4 @@
-import { Calendar, CheckCircle2, MapPin, User } from 'lucide-react'
+import { Building2, Calendar, CheckCircle2, MapPin } from 'lucide-react'
 import type { HrRequestAttachmentRow, HrRequestIssueArticle, HrRequestStatus } from '../types/hrRequest'
 import { StatusBadge } from './ui/StatusBadge'
 
@@ -17,34 +17,38 @@ type Props = {
   title: string
   status: HrRequestStatus
   dueDate: string
-  /** Region names for this request */
+  /** Region names for this request (shown as pills). */
   regionNames: string[]
-  /** When false, hides the third meta item (regional assignee / multi-region summary). */
+  /** @deprecated No longer used; kept for call-site compatibility. */
   showMetaAssigneeRow?: boolean
+  /** ICT national-line departments when this request includes ICT; omit or null to hide. */
+  ictDepartmentNames?: string[] | null
+  /** Direct ICT department assignment (departmental requests); shows instead of region pills. */
+  assignedDepartmentNames?: string[] | null
   conventionLabel: string
   issueTitle: string
   categoryName: string
-  /** Catalog issue narrative (Super Admin → Issues), distinct from per-request details below. */
   issueDescription?: string | null
-  /** Federal / HR request notes (not shown to department portal when regionalInstructionsOnly is set). */
   description: string
-  /** When true, the prose block shows regional assignment instructions instead of federal request description. */
   regionalInstructionsOnly?: boolean
-  /** Text from regional admin when assigning the task (may be empty). */
   regionalInstructionsText?: string | null
+  /** When set with `regionalInstructionsOnly`, replaces the default regional heading. */
+  instructionsHeading?: string | null
   articles: HrRequestIssueArticle[]
   indicators: HrRequestViewIndicatorRow[]
   attachments?: HrRequestAttachmentRow[] | null
+  /** Modifier class on root (e.g. external gradient hero). */
+  className?: string
 }
 
-function formatDueDisplay(iso: string): string {
+export function formatDueDisplay(iso: string): string {
   if (!iso?.trim()) return '—'
   const d = new Date(`${iso.trim()}T12:00:00`)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function statusDisplayLabel(status: HrRequestStatus): string {
+export function statusDisplayLabel(status: HrRequestStatus): string {
   switch (status) {
     case 'draft':
       return 'Draft'
@@ -55,7 +59,7 @@ function statusDisplayLabel(status: HrRequestStatus): string {
   }
 }
 
-function statusTone(status: HrRequestStatus): 'pending' | 'success' | 'warning' | 'danger' | 'default' {
+export function statusTone(status: HrRequestStatus): 'pending' | 'success' | 'warning' | 'danger' | 'default' {
   switch (status) {
     case 'draft':
       return 'pending'
@@ -66,19 +70,14 @@ function statusTone(status: HrRequestStatus): 'pending' | 'success' | 'warning' 
   }
 }
 
-function metaAssigneeLine(regionNames: string[]): string {
-  if (regionNames.length === 0) return '—'
-  if (regionNames.length === 1) return `${regionNames[0]} regional admin`
-  return `${regionNames.length} regions`
-}
-
 export function HrRequestViewTemplate({
   requestId,
   title,
   status,
   dueDate,
   regionNames,
-  showMetaAssigneeRow = true,
+  ictDepartmentNames = null,
+  assignedDepartmentNames = null,
   conventionLabel,
   issueTitle,
   categoryName,
@@ -86,15 +85,23 @@ export function HrRequestViewTemplate({
   description,
   regionalInstructionsOnly = false,
   regionalInstructionsText = null,
+  instructionsHeading = null,
   articles,
   indicators,
   attachments,
+  className,
 }: Props) {
   const metaIconSize = 18
-  const regionLine = regionNames.length > 0 ? regionNames.join(', ') : '—'
+  const ictDepts = (ictDepartmentNames ?? []).filter((n) => n.trim().length > 0)
+  const assignedDepts = (assignedDepartmentNames ?? []).filter((n) => n.trim().length > 0)
+  const showIctDeptRow = ictDepts.length > 0 && assignedDepts.length === 0
 
   return (
-    <div className="hr-request-view-template">
+    <div
+      className={
+        'hr-request-view-template' + (className?.trim() ? ` ${className.trim()}` : '')
+      }
+    >
       <header className="hr-request-view-template__hero">
         <div className="hr-request-view-template__hero-top">
           <div>
@@ -104,20 +111,66 @@ export function HrRequestViewTemplate({
           <StatusBadge tone={statusTone(status)}>{statusDisplayLabel(status)}</StatusBadge>
         </div>
         <h1 className="hr-request-view-template__title">{title.trim() || '—'}</h1>
-        <div className="hr-request-view-template__meta-row">
-          <span className="hr-request-view-template__meta-item">
+
+        <div className="hr-request-view-template__hero-meta">
+          <div className="hr-request-view-template__meta-chip">
             <Calendar size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
-            Due: {formatDueDisplay(dueDate)}
-          </span>
-          <span className="hr-request-view-template__meta-item">
-            <MapPin size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
-            {regionLine}
-          </span>
-          {showMetaAssigneeRow ? (
-            <span className="hr-request-view-template__meta-item">
-              <User size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
-              {metaAssigneeLine(regionNames)}
+            <span>
+              <span className="hr-request-view-template__meta-chip-label">Due:</span>{' '}
+              {formatDueDisplay(dueDate)}
             </span>
+          </div>
+
+          {regionNames.length > 0 ? (
+            <div className="hr-request-view-template__meta-block hr-request-view-template__meta-block--regions">
+              <div className="hr-request-view-template__meta-block-heading">
+                <MapPin size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
+                <span>Assigned regions</span>
+              </div>
+              <ul className="hr-request-view-template__meta-pills" aria-label="Assigned regions">
+                {regionNames.map((name) => (
+                  <li key={name}>
+                    <span className="hr-request-view-template__meta-pill">{name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {assignedDepts.length > 0 ? (
+            <div className="hr-request-view-template__meta-block hr-request-view-template__meta-block--ict">
+              <div className="hr-request-view-template__meta-block-heading">
+                <Building2 size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
+                <span>Assigned departments</span>
+              </div>
+              <ul className="hr-request-view-template__meta-pills" aria-label="Assigned departments">
+                {assignedDepts.map((name) => (
+                  <li key={name}>
+                    <span className="hr-request-view-template__meta-pill hr-request-view-template__meta-pill--ict">
+                      {name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {showIctDeptRow ? (
+            <div className="hr-request-view-template__meta-block hr-request-view-template__meta-block--ict">
+              <div className="hr-request-view-template__meta-block-heading">
+                <Building2 size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
+                <span>ICT departments</span>
+              </div>
+              <ul className="hr-request-view-template__meta-pills" aria-label="ICT departments">
+                {ictDepts.map((name) => (
+                  <li key={name}>
+                    <span className="hr-request-view-template__meta-pill hr-request-view-template__meta-pill--ict">
+                      {name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
         </div>
       </header>
@@ -242,7 +295,7 @@ export function HrRequestViewTemplate({
 
         <div className="hr-request-view-template__field-label" style={{ margin: '22px 0 10px' }}>
           {regionalInstructionsOnly
-            ? 'Instructions from your regional administration'
+            ? instructionsHeading?.trim() || 'Instructions from your regional administration'
             : 'Request description'}
         </div>
         <div className="hr-request-view-template__prose-box">
@@ -251,7 +304,7 @@ export function HrRequestViewTemplate({
               <p className="hr-request-view-template__prose">{regionalInstructionsText.trim()}</p>
             ) : (
               <p className="muted" style={{ margin: 0 }}>
-                No instructions were provided by your regional administration for this assignment.
+                No assignment instructions were provided for this task.
               </p>
             )
           ) : description?.trim() ? (

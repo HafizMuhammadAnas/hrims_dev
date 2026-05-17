@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { isApiError } from '../api/apiError'
 import { fetchRegions } from '../api/regions'
 import { createUser, deleteUser, fetchUsers, updateUser } from '../api/users'
@@ -10,7 +11,8 @@ import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { FormControl } from '../components/ui/FormControl'
 import { FormGrid } from '../components/ui/FormGrid'
 import { FormRow } from '../components/ui/FormRow'
-import { ModalActions, ModalHeader } from '../components/ui/ModalChrome'
+import { WorkflowPageBack } from '../components/WorkflowPageBack'
+import { ModalActions } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
@@ -20,22 +22,37 @@ import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
-import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
+import { isSuperAdmin } from '../lib/roles'
+import { workflowBackLabel } from '../lib/workflowNavigation'
+import {
+  resolveUsersMgmtView,
+  usersMgmtBasePath,
+  usersMgmtEditPath,
+  usersMgmtEditUserId,
+  usersMgmtTabs,
+} from '../lib/usersMgmtNavigation'
 import type { AuthUser } from '../types/auth'
 
 type RoleSlug = 'federal_admin' | 'regional_admin' | 'department_admin' | 'viewer'
 
+const ADMIN_ROLE_SLUGS = ['federal_admin', 'regional_admin'] as const
+
 export function UserManagementPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const notify = useNotify()
   const superUser = isSuperAdmin(user)
+  const basePath = usersMgmtBasePath(location.pathname)
+  const view = resolveUsersMgmtView(location.pathname)
+  const editUserId = usersMgmtEditUserId(location.pathname)
+  const createTabLabel = superUser ? 'Create admin' : 'Create user'
+  const tabs = usersMgmtTabs(basePath, createTabLabel)
   const [rows, setRows] = useState<AuthUser[]>([])
   const [regions, setRegions] = useState<Awaited<ReturnType<typeof fetchRegions>>>([])
   const [departments, setDepartments] = useState<Awaited<ReturnType<typeof fetchDepartments>>>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingUser, setEditingUser] = useState<AuthUser | null>(null)
   const [openActionId, setOpenActionId] = useState<number | null>(null)
   const [form, setForm] = useState({
     name: '',
@@ -133,9 +150,9 @@ export function UserManagementPage() {
         region_id: '',
         department_id: '',
       })
-      setShowCreateModal(false)
       await load()
-      notify.success(`User “${uname}” was created.`)
+      notify.success(`User "${uname}" was created.`)
+      navigate(basePath)
     } catch (e) {
       if (isApiError(e)) {
         setError(e.message)
@@ -157,27 +174,19 @@ export function UserManagementPage() {
     }
   }
 
-  const activeCount = rows.filter((u) => u.is_active).length
-  const roleBreakdown = useMemo(() => {
-    const counts: Record<string, number> = {}
-    rows.forEach((u) => {
-      const key = u.roles[0]?.slug ?? 'unknown'
-      counts[key] = (counts[key] ?? 0) + 1
-    })
-    return Object.entries(counts)
-  }, [rows])
+  const scopedRows = useMemo(() => {
+    if (!superUser) return rows
+    return rows.filter((u) =>
+      u.roles.some((r) => ADMIN_ROLE_SLUGS.includes(r.slug as (typeof ADMIN_ROLE_SLUGS)[number])),
+    )
+  }, [rows, superUser])
 
-  const subtitle = superUser
-    ? 'Create federal and regional administrators only. Define department records per region under Super admin → Departments; federal and regional admins assign department user accounts.'
-    : isRegionalAdmin(user)
-      ? undefined
-      : 'Federal admins add federal-line department accounts; regional admins add accounts for departments in their region only. Regional administrator accounts are created by a super administrator.'
-  const showRoleBreakdownChips = superUser || isFederalAdmin(user)
+  const activeCount = scopedRows.filter((u) => u.is_active).length
   const roleFilter = filters.role ?? ''
   const statusFilter = filters.status ?? ''
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((u) => {
+    return scopedRows.filter((u) => {
       if (roleFilter && !u.roles.some((r) => r.slug === roleFilter)) return false
       if (statusFilter) {
         const normalized = u.is_active ? 'active' : 'inactive'
@@ -192,10 +201,11 @@ export function UserManagementPage() {
         (u.department?.name ?? '').toLowerCase().includes(q)
       )
     })
-  }, [rows, search, roleFilter, statusFilter])
+  }, [scopedRows, search, roleFilter, statusFilter])
   const roleOptions = useMemo(() => {
-    return Array.from(new Set(rows.flatMap((u) => u.roles.map((r) => r.slug)))).sort()
-  }, [rows])
+    if (superUser) return [...ADMIN_ROLE_SLUGS]
+    return Array.from(new Set(scopedRows.flatMap((u) => u.roles.map((r) => r.slug)))).sort()
+  }, [scopedRows, superUser])
   const { pageRows } = useMemo(
     () => derivePaginatedRows(filteredRows, page, pageSize),
     [filteredRows, page, pageSize],
@@ -207,19 +217,23 @@ export function UserManagementPage() {
     password: '',
   })
 
-  function openEditModal(target: AuthUser) {
-    setEditingUser(target)
+  const editingUser = useMemo(() => {
+    if (editUserId == null) return null
+    return scopedRows.find((u) => Number(u.id) === editUserId) ?? null
+  }, [scopedRows, editUserId])
+
+  useEffect(() => {
+    if (view !== 'edit' || !editingUser) return
     setEditForm({
-      name: target.name,
-      email: target.email ?? '',
-      is_active: target.is_active,
+      name: editingUser.name,
+      email: editingUser.email ?? '',
+      is_active: editingUser.is_active,
       password: '',
     })
-    setOpenActionId(null)
-  }
+  }, [view, editingUser])
 
   async function submitEdit() {
-    if (!editingUser) return
+    if (editUserId == null) return
     if (!editForm.name.trim()) {
       setError('Name is required.')
       return
@@ -227,15 +241,15 @@ export function UserManagementPage() {
     setSaving(true)
     setError(null)
     try {
-      await updateUser(Number(editingUser.id), {
+      await updateUser(editUserId, {
         name: editForm.name.trim(),
         email: editForm.email.trim() || null,
         is_active: editForm.is_active,
         ...(editForm.password.trim() ? { password: editForm.password.trim() } : {}),
       })
-      setEditingUser(null)
       await load()
       notify.success('User updated.')
+      navigate(basePath)
     } catch (e) {
       setError(isApiError(e) ? e.message : e instanceof Error ? e.message : 'Update failed')
     } finally {
@@ -243,31 +257,106 @@ export function UserManagementPage() {
     }
   }
 
+  const editBack =
+    view === 'edit' ? (
+      <WorkflowPageBack to={basePath} label={workflowBackLabel(basePath)} placement="header" />
+    ) : null
+
   return (
-    <PageSection title="User management" subtitle={subtitle}>
+    <PageSection
+      title={view === 'edit' ? 'Edit user' : 'User management'}
+      leading={editBack}
+    >
       {error && (
         <Alert variant="error" title="Something went wrong" onDismiss={() => setError(null)}>
           {error}
         </Alert>
       )}
+
+      {view !== 'edit' && (
+      <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label="User management sections">
+        {tabs.map((tab) => (
+          <NavLink
+            key={tab.view}
+            to={tab.to}
+            end={tab.end}
+            className={({ isActive }) =>
+              `compiled-record-modal-tab issues-admin-tab${isActive ? ' compiled-record-modal-tab--active' : ''}`
+            }
+          >
+            {tab.label}
+          </NavLink>
+        ))}
+      </nav>
+      )}
+
+      {view === 'edit' && (
+        <>
+          {!editingUser && !error ? <p className="muted">Loading user…</p> : null}
+          {editingUser && (
+            <TableCard padded>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Username: <strong>{editingUser.username}</strong>
+                {' | '}
+                Role: {editingUser.roles.map((r) => r.slug).join(', ')}
+              </p>
+              <FormGrid>
+                <FormRow twoCol>
+                  <FormControl label="Name">
+                    <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
+                  </FormControl>
+                  <FormControl label="Email">
+                    <input
+                      value={editForm.email}
+                      onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="email@example.com"
+                    />
+                  </FormControl>
+                </FormRow>
+                <FormRow twoCol>
+                  <FormControl label="Temporary password (optional)">
+                    <input
+                      type="password"
+                      value={editForm.password}
+                      onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
+                      placeholder="Leave blank to keep existing password"
+                    />
+                  </FormControl>
+                  <FormControl label="Status">
+                    <select
+                      value={editForm.is_active ? 'active' : 'inactive'}
+                      onChange={(e) => setEditForm((f) => ({ ...f, is_active: e.target.value === 'active' }))}
+                    >
+                      <option value="active">active</option>
+                      <option value="inactive">inactive</option>
+                    </select>
+                  </FormControl>
+                </FormRow>
+              </FormGrid>
+              <ModalActions>
+                <Button variant="secondary" compact onClick={() => navigate(basePath)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" compact disabled={saving} onClick={() => void submitEdit()}>
+                  {saving ? 'Saving...' : 'Save changes'}
+                </Button>
+              </ModalActions>
+            </TableCard>
+          )}
+        </>
+      )}
+
+      {view === 'list' && (
+        <>
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'Users in scope', value: rows.length },
+            { label: 'Users in scope', value: scopedRows.length },
             { label: 'Active users', value: activeCount },
-            { label: 'Inactive users', value: rows.length - activeCount },
+            { label: 'Inactive users', value: scopedRows.length - activeCount },
           ]}
         />
       </div>
-      {showRoleBreakdownChips && roleBreakdown.length > 0 && (
-        <div className="chip-list" style={{ marginTop: 10 }}>
-          {roleBreakdown.map(([role, count]) => (
-            <StatusBadge key={role} tone="pending">
-              {role}: {count}
-            </StatusBadge>
-          ))}
-        </div>
-      )}
 
       <TableToolbar className="user-management-toolbar">
         <input
@@ -304,9 +393,6 @@ export function UserManagementPage() {
         >
           Reset filters
         </Button>
-        <Button variant="primary" compact className="user-management-toolbar__create" onClick={() => setShowCreateModal(true)}>
-          {superUser ? 'Create admin' : 'Create user'}
-        </Button>
       </TableToolbar>
 
       <TableCard>
@@ -317,7 +403,7 @@ export function UserManagementPage() {
               <th>Username</th>
               <th>Role</th>
               <th>Region</th>
-              <th>Department</th>
+              {!superUser ? <th>Department</th> : null}
               <th>Status</th>
               <th>Action</th>
             </tr>
@@ -328,8 +414,8 @@ export function UserManagementPage() {
                 <td>{u.name}</td>
                 <td>{u.username}</td>
                 <td>{u.roles.map((r) => r.slug).join(', ')}</td>
-                <td>{u.region?.name ?? '—'}</td>
-                <td>{u.department?.name ?? '—'}</td>
+                <td>{u.region?.name ?? '-'}</td>
+                {!superUser ? <td>{u.department?.name ?? '-'}</td> : null}
                 <td>
                   <StatusBadge tone={u.is_active ? 'success' : 'pending'}>
                     {u.is_active ? 'Active' : 'Inactive'}
@@ -344,7 +430,8 @@ export function UserManagementPage() {
                       <Button
                         variant="link"
                         onClick={() => {
-                          openEditModal(u)
+                          navigate(usersMgmtEditPath(basePath, Number(u.id)))
+                          setOpenActionId(null)
                         }}
                       >
                         Edit
@@ -364,150 +451,106 @@ export function UserManagementPage() {
                 </td>
               </tr>
             ))}
-            {pageRows.length === 0 && <EmptyStateRow colSpan={7} message="No users found in current scope." />}
+            {pageRows.length === 0 && (
+              <EmptyStateRow
+                colSpan={superUser ? 6 : 7}
+                message={
+                  superUser
+                    ? 'No federal or regional administrators found.'
+                    : 'No users found in current scope.'
+                }
+              />
+            )}
           </tbody>
         </table>
       </TableCard>
       <PaginationBar page={page} pageSize={pageSize} totalItems={filteredRows.length} onPageChange={setPage} />
-
-      {showCreateModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-card modal-card-wide" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader title={superUser ? 'Create administrator' : 'Create user'} onClose={() => setShowCreateModal(false)} />
-            <div className="modal-form">
-              <FormGrid>
-                <FormRow twoCol>
-                  <FormControl label="Name">
-                    <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-                  </FormControl>
-                  <FormControl label="Username">
-                    <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
-                  </FormControl>
-                </FormRow>
-                <FormRow twoCol>
-                  <FormControl label="Email">
-                    <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-                  </FormControl>
-                  <FormControl label="Temporary password">
-                    <input
-                      type="password"
-                      value={form.password}
-                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                    />
-                  </FormControl>
-                </FormRow>
-                <FormRow twoCol>
-                  <FormControl label="Role">
-                    <select
-                      value={form.role_slug}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          role_slug: e.target.value as RoleSlug,
-                          region_id: '',
-                          department_id: '',
-                        }))
-                      }
-                    >
-                      {superUser && <option value="federal_admin">Federal admin</option>}
-                      {superUser && <option value="regional_admin">Regional admin</option>}
-                      {!superUser && <option value="department_admin">Department admin</option>}
-                      {!superUser && <option value="viewer">Viewer</option>}
-                    </select>
-                  </FormControl>
-                  {superUser && form.role_slug === 'regional_admin' && (
-                    <FormControl label="Region">
-                      <select value={form.region_id} onChange={(e) => setForm((f) => ({ ...f, region_id: e.target.value }))}>
-                        <option value="">Select region…</option>
-                        {regions.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                          </option>
-                        ))}
-                      </select>
-                    </FormControl>
-                  )}
-                  {!superUser && (
-                    <FormControl label="Department">
-                      <select
-                        value={form.department_id}
-                        onChange={(e) => setForm((f) => ({ ...f, department_id: e.target.value }))}
-                      >
-                        <option value="">Select department…</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.code ? `${d.code} — ` : ''}
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </FormControl>
-                  )}
-                </FormRow>
-              </FormGrid>
-              <ModalActions>
-                <Button variant="secondary" compact onClick={() => setShowCreateModal(false)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" compact disabled={saving} onClick={() => void submit()}>
-                  {saving ? 'Creating...' : 'Create user'}
-                </Button>
-              </ModalActions>
-            </div>
-          </div>
-        </div>
+        </>
       )}
 
-      {editingUser && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setEditingUser(null)}>
-          <div className="modal-card modal-card-wide" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader title={`Edit user — ${editingUser.username}`} onClose={() => setEditingUser(null)} />
-            <div className="modal-form">
-              <FormGrid>
-                <FormRow twoCol>
-                  <FormControl label="Name">
-                    <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
-                  </FormControl>
-                  <FormControl label="Email">
-                    <input
-                      value={editForm.email}
-                      onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-                      placeholder="email@example.com"
-                    />
-                  </FormControl>
-                </FormRow>
-                <FormRow twoCol>
-                  <FormControl label="Temporary password (optional)">
-                    <input
-                      type="password"
-                      value={editForm.password}
-                      onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
-                      placeholder="Leave blank to keep existing password"
-                    />
-                  </FormControl>
-                  <FormControl label="Status">
-                    <select
-                      value={editForm.is_active ? 'active' : 'inactive'}
-                      onChange={(e) => setEditForm((f) => ({ ...f, is_active: e.target.value === 'active' }))}
-                    >
-                      <option value="active">active</option>
-                      <option value="inactive">inactive</option>
-                    </select>
-                  </FormControl>
-                </FormRow>
-              </FormGrid>
-              <ModalActions>
-                <Button variant="secondary" compact onClick={() => setEditingUser(null)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" compact disabled={saving} onClick={() => void submitEdit()}>
-                  {saving ? 'Saving...' : 'Save changes'}
-                </Button>
-              </ModalActions>
-            </div>
-          </div>
-        </div>
+      {view === 'new' && (
+        <TableCard padded>
+          <FormGrid>
+            <FormRow twoCol>
+              <FormControl label="Name">
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              </FormControl>
+              <FormControl label="Username">
+                <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
+              </FormControl>
+            </FormRow>
+            <FormRow twoCol>
+              <FormControl label="Email">
+                <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+              </FormControl>
+              <FormControl label="Temporary password">
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                />
+              </FormControl>
+            </FormRow>
+            <FormRow twoCol>
+              <FormControl label="Role">
+                <select
+                  value={form.role_slug}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      role_slug: e.target.value as RoleSlug,
+                      region_id: '',
+                      department_id: '',
+                    }))
+                  }
+                >
+                  {superUser && <option value="federal_admin">Federal admin</option>}
+                  {superUser && <option value="regional_admin">Regional admin</option>}
+                  {!superUser && <option value="department_admin">Department admin</option>}
+                  {!superUser && <option value="viewer">Viewer</option>}
+                </select>
+              </FormControl>
+              {superUser && form.role_slug === 'regional_admin' && (
+                <FormControl label="Region">
+                  <select value={form.region_id} onChange={(e) => setForm((f) => ({ ...f, region_id: e.target.value }))}>
+                    <option value="">Select region...</option>
+                    {regions.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormControl>
+              )}
+              {!superUser && (
+                <FormControl label="Department">
+                  <select
+                    value={form.department_id}
+                    onChange={(e) => setForm((f) => ({ ...f, department_id: e.target.value }))}
+                  >
+                    <option value="">Select department...</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.code ? `${d.code} - ` : ''}
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormControl>
+              )}
+            </FormRow>
+          </FormGrid>
+          <ModalActions>
+            <Button variant="secondary" compact onClick={() => navigate(basePath)}>
+              Cancel
+            </Button>
+            <Button variant="primary" compact disabled={saving} onClick={() => void submit()}>
+              {saving ? 'Creating...' : createTabLabel}
+            </Button>
+          </ModalActions>
+        </TableCard>
       )}
+
     </PageSection>
   )
 }
