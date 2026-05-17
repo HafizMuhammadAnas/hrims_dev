@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\CompiledRecord;
 use App\Models\DepartmentTask;
 use App\Models\HrRequest;
+use App\Models\HrRequestClarification;
 use App\Models\RegionalResponse;
 use App\Models\User;
 use App\Support\HrimsAccess;
@@ -72,6 +74,13 @@ class DashboardController extends Controller
                 ->pluck('c', 'review_status')
                 ->map(fn ($c) => (int) $c)
                 ->all();
+        }
+
+        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
+            $data['compiled_records_total'] = CompiledRecord::query()->count();
+            $data['clarifications_pending_federal'] = HrRequestClarification::query()
+                ->where('status', 'pending_federal')
+                ->count();
         }
 
         if ($user->hasRole('department_admin') || $user->hasRole('viewer')) {

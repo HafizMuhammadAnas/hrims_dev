@@ -20,7 +20,8 @@ class IssueController extends Controller
                 'articles:id,article_name',
                 'indicators',
             ])
-            ->orderBy('issue_title')
+            ->orderBy('created_at')
+            ->orderBy('id')
             ->get();
 
         return response()->json([

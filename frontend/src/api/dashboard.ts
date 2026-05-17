@@ -29,6 +29,8 @@ export interface DashboardSummary {
   requests_created_by_month: MonthCountPoint[]
   regional_responses_total?: number
   regional_responses_by_review?: Record<string, number>
+  compiled_records_total?: number
+  clarifications_pending_federal?: number
   department_tasks_total?: number
   department_tasks_by_status?: Record<string, number>
   department_tasks_by_month?: MonthCountPoint[]

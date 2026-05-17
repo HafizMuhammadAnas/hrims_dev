@@ -1,8 +1,10 @@
 import {
   AlertCircle,
+  Bell,
   BookOpen,
   CheckCircle,
   Clock,
+  FileText,
   Globe,
   RefreshCcw,
   Target,
@@ -29,6 +31,7 @@ import type {
   UrgentRequestRow,
 } from '../api/dashboard'
 import { useAuth } from '../auth/AuthContext'
+import { useNotify } from '../context/NotificationsContext'
 import { Alert } from '../components/ui/Alert'
 import {
   isDepartmentAdmin,
@@ -103,6 +106,7 @@ function taskPieData(byStatus: Record<string, number>) {
 export function DashboardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { inbox, inboxLoading, markRead } = useNotify()
   const variant = dashboardVariant(user)
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -129,8 +133,6 @@ export function DashboardPage() {
   const respTotal = summary?.regional_responses_total ?? 0
   const acceptedResp = count(review, 'accepted')
   const needsMod = count(review, 'needs-modification')
-  const pendingReview = count(review, 'pending')
-
   const taskBy = summary?.department_tasks_by_status
   const taskTotal = summary?.department_tasks_total ?? 0
   const taskAssigned = count(taskBy, 'assigned')
@@ -185,6 +187,9 @@ export function DashboardPage() {
   const urgentList = summary?.urgent_requests ?? []
   const urgentDeptTasks = summary?.urgent_department_tasks ?? []
   const urgentRequestCount = urgentList.length
+  const compiledReportsTotal = summary?.compiled_records_total ?? 0
+  const clarificationsPending = summary?.clarifications_pending_federal ?? 0
+  const federalNotifications = useMemo(() => inbox.slice(0, 8), [inbox])
 
   const requestsPanelRows: (UrgentRequestRow | (UrgentDepartmentTaskRow & { task_id: string }))[] =
     variant === 'department' || variant === 'viewer'
@@ -300,6 +305,35 @@ export function DashboardPage() {
                   </div>
                 </div>
               </>
+            ) : variant === 'federal' ? (
+              <>
+                <div className="dashboard-card brown">
+                  <div className="dashboard-card-icon">
+                    <Clock size={22} strokeWidth={2.2} />
+                  </div>
+                  <div className="dashboard-card-title">Total requests</div>
+                  <div className="dashboard-card-value">{summary.hr_requests_total}</div>
+                  <div className="dashboard-card-subtitle">
+                    {draft} draft · {active} active in your scope
+                  </div>
+                </div>
+                <div className="dashboard-card blue">
+                  <div className="dashboard-card-icon">
+                    <TrendingUp size={22} strokeWidth={2.2} />
+                  </div>
+                  <div className="dashboard-card-title">Active requests</div>
+                  <div className="dashboard-card-value">{active}</div>
+                  <div className="dashboard-card-subtitle">Requests marked active (circulated to regions)</div>
+                </div>
+                <div className="dashboard-card teal">
+                  <div className="dashboard-card-icon">
+                    <FileText size={22} strokeWidth={2.2} />
+                  </div>
+                  <div className="dashboard-card-title">Compiled reports</div>
+                  <div className="dashboard-card-value">{compiledReportsTotal}</div>
+                  <div className="dashboard-card-subtitle">National records saved from federal compilation</div>
+                </div>
+              </>
             ) : (
               <>
                 <div className="dashboard-card brown">
@@ -326,7 +360,6 @@ export function DashboardPage() {
                   <div className="dashboard-card-value">{urgentRequestCount}</div>
                   <div className="dashboard-card-subtitle">
                     {draft} draft total · draft or past-due active requests listed below
-                    {variant === 'federal' && respTotal > 0 ? ` · ${pendingReview} responses awaiting review` : ''}
                   </div>
                 </div>
               </>
@@ -334,25 +367,56 @@ export function DashboardPage() {
           </div>
 
           <div className="stats-row" style={{ marginBottom: 28 }}>
-            <div className="stat-card">
-              <div className="stat-card-value">{summary.hr_requests_total}</div>
-              <div className="stat-card-label">
-                {variant === 'federal' || variant === 'minimal' ? 'Requests in scope' : 'HR requests'}
-              </div>
-            </div>
-            <div className="stat-card" style={{ borderLeft: '4px solid #ffb300' }}>
-              <div className="stat-card-value" style={{ color: '#ffb300' }}>
-                {draft}
-              </div>
-              <div className="stat-card-label">Draft</div>
-            </div>
-            <div className="stat-card" style={{ borderLeft: '4px solid #00bcd4' }}>
-              <div className="stat-card-value" style={{ color: '#00bcd4' }}>
-                {active}
-              </div>
-              <div className="stat-card-label">Active</div>
-            </div>
-            {variant === 'regional' ? (
+            {variant === 'federal' ? (
+              <>
+                <div className="stat-card">
+                  <div className="stat-card-value">{respTotal}</div>
+                  <div className="stat-card-label">Responses</div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #ffb300' }}>
+                  <div className="stat-card-value" style={{ color: '#ffb300' }}>
+                    {draft}
+                  </div>
+                  <div className="stat-card-label">Draft</div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #00bcd4' }}>
+                  <div className="stat-card-value" style={{ color: '#00bcd4' }}>
+                    {clarificationsPending}
+                  </div>
+                  <div className="stat-card-label">Clarification</div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #4caf50' }}>
+                  <div className="stat-card-value" style={{ color: '#4caf50' }}>
+                    {needsMod}
+                  </div>
+                  <div className="stat-card-label">Modifications</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="stat-card">
+                  <div className="stat-card-value">{summary.hr_requests_total}</div>
+                  <div className="stat-card-label">
+                    {variant === 'minimal' ? 'Requests in scope' : 'HR requests'}
+                  </div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #ffb300' }}>
+                  <div className="stat-card-value" style={{ color: '#ffb300' }}>
+                    {draft}
+                  </div>
+                  <div className="stat-card-label">Draft</div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #00bcd4' }}>
+                  <div className="stat-card-value" style={{ color: '#00bcd4' }}>
+                    {active}
+                  </div>
+                  <div className="stat-card-label">Active</div>
+                </div>
+              </>
+            )}
+            {variant !== 'federal' && (
+              <>
+                {variant === 'regional' ? (
               <>
                 <div className="stat-card" style={{ borderLeft: '4px solid #4caf50' }}>
                   <div className="stat-card-value" style={{ color: '#4caf50' }}>
@@ -382,7 +446,7 @@ export function DashboardPage() {
                   <div className="stat-card-label">Tasks open</div>
                 </div>
               </>
-            ) : (
+            ) : variant === 'minimal' ? (
               <>
                 <div className="stat-card" style={{ borderLeft: '4px solid #4caf50' }}>
                   <div className="stat-card-value" style={{ color: '#4caf50' }}>
@@ -391,13 +455,15 @@ export function DashboardPage() {
                   <div className="stat-card-label">Urgent queue</div>
                 </div>
               </>
+            ) : null}
+              </>
             )}
           </div>
 
           {(variant === 'federal' || variant === 'regional') && respTotal > 0 && (
             <div className="table-card table-card-padded" style={{ marginBottom: 24 }}>
               <h3 className="dashboard-panel-title" style={{ marginBottom: 12 }}>
-                Regional response pipeline
+                {variant === 'federal' ? 'Regional responses' : 'Regional response pipeline'}
               </h3>
               <div className="summary-metric-grid">
                 {['pending', 'accepted', 'needs-modification', 'rejected'].map((k) => (
@@ -421,19 +487,58 @@ export function DashboardPage() {
             <div className="table-card table-card-padded">
               <div className="dashboard-panel-head">
                 <h3 className="dashboard-panel-title">
-                  <Clock size={20} />
-                  Requests
+                  {variant === 'federal' ? <Bell size={20} /> : <Clock size={20} />}
+                  {variant === 'federal' ? 'Notifications' : 'Requests'}
                 </h3>
                 <button
                   type="button"
                   className="btn btn-secondary btn-compact"
-                  onClick={() => navigate('/requests')}
+                  onClick={() =>
+                    variant === 'federal' ? navigate('/requests/clarifications') : navigate('/requests')
+                  }
                 >
                   View all
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {requestsPanelRows.length > 0 ? (
+                {variant === 'federal' ? (
+                  federalNotifications.length > 0 ? (
+                    federalNotifications.map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => {
+                          void (async () => {
+                            if (n.read_at === null) await markRead(n.id)
+                            if (n.route) navigate(n.route)
+                          })()
+                        }}
+                        style={{
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          padding: 12,
+                          background: n.read_at ? '#f5f7fb' : '#e8eefb',
+                          borderRadius: 8,
+                          border: 'none',
+                          borderLeft: `4px solid ${n.read_at ? '#c5d0e6' : '#2e4fa3'}`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4,
+                          font: 'inherit',
+                          color: 'inherit',
+                        }}
+                      >
+                        <div className="font-semibold text-sm">{n.title}</div>
+                        <div className="muted small">{n.message}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="empty-state">
+                      <CheckCircle size={32} style={{ margin: '0 auto 10px', display: 'block' }} />
+                      {inboxLoading ? 'Loading notifications…' : 'No notifications yet.'}
+                    </div>
+                  )
+                ) : requestsPanelRows.length > 0 ? (
                   requestsPanelRows.map((r) => {
                     const chrome = urgentRowChrome(r.status)
                     const taskId = 'task_id' in r ? r.task_id : null

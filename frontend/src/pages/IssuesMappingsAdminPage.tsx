@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   adminCreateArticle,
@@ -213,16 +213,7 @@ function IssuesListSection({
   const navigate = useNavigate()
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
 
-  const sortedIssues = useMemo(() => {
-    return [...issues].sort((a, b) => {
-      const byTitle = a.issue_title.localeCompare(b.issue_title, undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      })
-      if (byTitle !== 0) return byTitle
-      return a.id - b.id
-    })
-  }, [issues])
+  const sortedIssues = useMemo(() => [...issues].sort((a, b) => a.id - b.id), [issues])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -251,7 +242,7 @@ function IssuesListSection({
       <TableToolbar className="issues-list-toolbar">
         <input
           type="search"
-          placeholder="Search ID, title, convention, category, articles..."
+          placeholder="Search ID, issue, convention, category, articles..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search issues"
@@ -269,7 +260,7 @@ function IssuesListSection({
                 <th>Convention</th>
                 <th>Articles</th>
                 <th>Category</th>
-                <th>Title</th>
+                <th>Issue</th>
                 <th>Indicators</th>
                 <th>Indicator data types</th>
                 <th />
@@ -1008,8 +999,8 @@ function IssuesCreateForm({
             </select>
           </FormControl>
         </div>
-        <FormField label="Title">
-          <input placeholder="Title" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} />
+        <FormField label="Issue">
+          <input placeholder="Issue" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} />
         </FormField>
         <FormField label="Description">
           <textarea
@@ -1247,8 +1238,8 @@ function IssuesEditPanel({
             </select>
           </FormControl>
         </div>
-        <FormField label="Title">
-          <input placeholder="Title" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} />
+        <FormField label="Issue">
+          <input placeholder="Issue" value={issueTitle} onChange={(e) => setIssueTitle(e.target.value)} />
         </FormField>
         <FormField label="Description">
           <textarea
