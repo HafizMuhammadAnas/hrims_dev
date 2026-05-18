@@ -27,6 +27,7 @@ import { Alert, FieldError } from './ui/Alert'
 import { Button } from './ui/Button'
 import { FormControl } from './ui/FormControl'
 import { FormField } from './ui/FormField'
+import { SearchableSelect } from './ui/SearchableSelect'
 import { FormGrid } from './ui/FormGrid'
 import { FormRow } from './ui/FormRow'
 import { ModalActions, ModalHeader } from './ui/ModalChrome'
@@ -507,6 +508,11 @@ export function HrRequestModal({
     return list
   }, [issues, detail?.issue, issueForm?.issue_id])
 
+  const issueSelectOptions = useMemo(
+    () => issueOptions.map((i) => ({ value: String(i.id), label: i.issue_title })),
+    [issueOptions],
+  )
+
   const selectedIssue = useMemo(() => {
     if (!issueForm || issueForm.issue_id === '') return null
     return (
@@ -937,36 +943,36 @@ export function HrRequestModal({
               </FormField>
 
               <FormField label="Issue" htmlFor="hr-issue">
-                <select
+                <SearchableSelect
                   id="hr-issue"
                   value={issueForm.issue_id === '' ? '' : String(issueForm.issue_id)}
-                  onChange={(e) => {
-                    const v = e.target.value === '' ? '' : Number(e.target.value)
+                  onChange={(v) => {
+                    const next = v === '' ? '' : Number(v)
                     setIssueForm((f) =>
                       f
                         ? {
                             ...f,
-                            issue_id: v === '' ? '' : v,
+                            issue_id: next === '' ? '' : next,
                             selectedIndicatorIds: [],
                           }
                         : f,
                     )
                   }}
+                  options={issueSelectOptions}
                   disabled={
                     readOnly || issueForm.convention_id === '' || (!readOnly && issuesLoading)
                   }
+                  placeholder={
+                    issueForm.convention_id === ''
+                      ? 'Select a convention first'
+                      : issuesLoading
+                        ? 'Loading issues…'
+                        : 'Search or select issue'
+                  }
+                  emptyFilterMessage="No issues match your search"
                   aria-invalid={Boolean(fieldErrors.issue_id)}
                   aria-describedby={fieldErrors.issue_id ? 'hr-issue-err' : undefined}
-                >
-                  <option value="">
-                    {issueForm.convention_id === '' ? 'Select a convention first' : 'Select issue'}
-                  </option>
-                  {issueOptions.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.issue_title}
-                    </option>
-                  ))}
-                </select>
+                />
                 <FieldError id="hr-issue-err" message={fieldErrors.issue_id} />
               </FormField>
 
@@ -1022,6 +1028,48 @@ export function HrRequestModal({
                     <div>
                       <strong>Indicators for this request</strong>
                       <FieldError id="hr-ind-sel-err" message={fieldErrors.indicator_ids} />
+                      {!readOnly && indicatorsForMappingUi.length > 0 ? (
+                        <div className="mapping-indicators-toolbar">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            compact
+                            onClick={() => {
+                              setIssueForm((f) => {
+                                if (!f) return f
+                                const ids = indicatorsForMappingUi.map((ind) => ind.id)
+                                return {
+                                  ...f,
+                                  selectedIndicatorIds: [...ids].sort((a, b) => a - b),
+                                }
+                              })
+                            }}
+                          >
+                            Select all
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            compact
+                            onClick={() => {
+                              setIssueForm((f) => {
+                                if (!f) return f
+                                const nextVals = { ...f.indicatorValues }
+                                for (const id of f.selectedIndicatorIds) {
+                                  nextVals[id] = { quantitative: '', qualitative: '' }
+                                }
+                                return {
+                                  ...f,
+                                  selectedIndicatorIds: [],
+                                  indicatorValues: nextVals,
+                                }
+                              })
+                            }}
+                          >
+                            Deselect all
+                          </Button>
+                        </div>
+                      ) : null}
                       {indicatorsForMappingUi.length === 0 ? (
                         <p className="muted">—</p>
                       ) : (

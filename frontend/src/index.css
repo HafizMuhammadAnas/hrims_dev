@@ -2208,6 +2208,121 @@ textarea.hr-request-readonly-prose {
   padding: 12px 16px;
   margin: 0;
   background: var(--field-bg);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mapping-indicators-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.searchable-select {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.searchable-select__control {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.searchable-select__input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.searchable-select__toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  margin-left: -1px;
+  padding: 0;
+  border: 1px solid var(--field-border);
+  border-left: none;
+  border-radius: 0 var(--field-radius) var(--field-radius) 0;
+  background: var(--field-bg);
+  color: var(--txt-muted);
+  cursor: pointer;
+}
+
+.searchable-select__toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.92;
+}
+
+.searchable-select__control:focus-within .searchable-select__input,
+.searchable-select__control:focus-within .searchable-select__toggle {
+  border-color: var(--field-border-focus, #2e4fa3);
+}
+
+.searchable-select__list {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  max-height: min(280px, 50vh);
+  margin: 0;
+  padding: 4px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.searchable-select__option {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--txt);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchable-select__option:hover,
+.searchable-select__option[aria-selected='true'] {
+  background: var(--field-bg-soft, #e8eefb);
+}
+
+.searchable-select__option[aria-selected='true'] {
+  font-weight: 600;
+}
+
+.searchable-select__empty {
+  padding: 10px 12px;
+  font-size: var(--font-size-sm);
+}
+
+.form-row .searchable-select__input {
+  border-radius: var(--field-radius) 0 0 var(--field-radius);
 }
 
 /* Super Admin — Issues & mapping panels */
