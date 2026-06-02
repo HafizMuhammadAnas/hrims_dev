@@ -1,9 +1,19 @@
 export const DEPARTMENT_INDICATOR_FORMAT = 'department_indicator_v1' as const
 
-export type DepartmentIndicatorQuantitative = {
+export type DepartmentYearGenderCell = {
   value: number
+  comment?: string | null
+}
+
+/** year_id → gender_id → cell */
+export type DepartmentQuantitativeByYearGender = Record<string, Record<string, DepartmentYearGenderCell>>
+
+export type DepartmentIndicatorQuantitative = {
+  /** Legacy single value when indicator does not use year/gender matrix. */
+  value?: number | null
   comment: string | null
   attachment_url: string | null
+  by_year_gender?: DepartmentQuantitativeByYearGender | null
 }
 
 export type DepartmentIndicatorQualitative = {
@@ -71,7 +81,16 @@ export function formatDepartmentResponseAsPlaintext(
     lines.push(`— ${title} —`)
     if (bundle.quantitative) {
       const q = bundle.quantitative
-      lines.push(`  Quantitative: ${q.value}`)
+      if (q.by_year_gender && Object.keys(q.by_year_gender).length > 0) {
+        for (const [yearId, genders] of Object.entries(q.by_year_gender)) {
+          for (const [genderId, cell] of Object.entries(genders)) {
+            if (cell?.value == null || Number.isNaN(cell.value)) continue
+            lines.push(`  ${yearId}/${genderId}: ${cell.value}`)
+          }
+        }
+      } else if (q.value != null && !Number.isNaN(q.value)) {
+        lines.push(`  Quantitative: ${q.value}`)
+      }
       if (q.comment) lines.push(`  Comment: ${q.comment}`)
       if (q.attachment_url) lines.push(`  Quant attachment: ${q.attachment_url}`)
     }
@@ -101,7 +120,16 @@ export function formatDepartmentResponseTextOnly(
     lines.push(`— ${title} —`)
     if (bundle.quantitative) {
       const q = bundle.quantitative
-      lines.push(`  Quantitative: ${q.value}`)
+      if (q.by_year_gender && Object.keys(q.by_year_gender).length > 0) {
+        for (const [yearId, genders] of Object.entries(q.by_year_gender)) {
+          for (const [genderId, cell] of Object.entries(genders)) {
+            if (cell?.value == null || Number.isNaN(cell.value)) continue
+            lines.push(`  ${yearId}/${genderId}: ${cell.value}`)
+          }
+        }
+      } else if (q.value != null && !Number.isNaN(q.value)) {
+        lines.push(`  Quantitative: ${q.value}`)
+      }
       if (q.comment) lines.push(`  Comment: ${q.comment}`)
     }
     if (bundle.qualitative) {

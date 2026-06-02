@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { fetchHrRequest } from '../api/hrRequests'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../api/lists'
+import type { HrRequestRow } from '../types/hrRequest'
 import { updateRegionalCompiledResponse } from '../api/workflows'
 import { useAuth } from '../auth/AuthContext'
 import { DepartmentSubmissionsForRequest } from '../components/DepartmentSubmissionsForRequest'
@@ -38,6 +40,7 @@ export function RegionalCompilationViewPage() {
   const [editContent, setEditContent] = useState('')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [hrDetail, setHrDetail] = useState<HrRequestRow | null>(null)
 
   const backTo = from.startsWith('/') ? from : `/${from}`
 
@@ -75,6 +78,24 @@ export function RegionalCompilationViewPage() {
     setEditContent(row.content)
     setSaveError(null)
   }, [row])
+
+  useEffect(() => {
+    if (!row) {
+      setHrDetail(null)
+      return
+    }
+    let cancelled = false
+    void fetchHrRequest(row.req_id)
+      .then((r) => {
+        if (!cancelled) setHrDetail(r)
+      })
+      .catch(() => {
+        if (!cancelled) setHrDetail(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [row?.req_id])
 
   const tasksForDetail = useMemo(() => {
     if (!row) return []
@@ -148,6 +169,7 @@ export function RegionalCompilationViewPage() {
                 <DepartmentSubmissionsForRequest
                   tasksForDetail={tasksForDetail}
                   reqId={row.req_id}
+                  issueIndicators={hrDetail?.issue?.indicators}
                   filterByRegionName={row.region_name ?? undefined}
                   omitHeading
                 />

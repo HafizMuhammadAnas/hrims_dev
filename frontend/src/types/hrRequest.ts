@@ -21,16 +21,25 @@ export type HrRequestIssueIndicator = {
   /** Effective flags (per-indicator mapping; omitted on older payloads falls back to issue). */
   has_quantitative?: boolean
   has_qualitative?: boolean
+  collects_by_year?: boolean
+  collection_by_year?: Array<{
+    year_id: number
+    label: string
+    gender_ids: number[]
+    genders: { id: number; name: string }[]
+  }>
 }
 
 export type HrRequestIssueArticle = {
   id: number
   article_name: string
+  description?: string | null
   relevant_paragraph: string | null
 }
 
 export type HrRequestIssueDetail = {
   id: number
+  entry_kind?: 'issue' | 'recommendation'
   issue_title: string
   description?: string | null
   has_quantitative: boolean

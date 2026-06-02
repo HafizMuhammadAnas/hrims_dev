@@ -1,5 +1,8 @@
 import { Building2, Calendar, CheckCircle2, MapPin } from 'lucide-react'
+import type { IndicatorYearGenderLine } from '../lib/indicatorCollectionDisplay'
+import { hrViewIssueDescriptionLabel, hrViewIssueTitleLabel } from '../lib/issueEntryKind'
 import type { HrRequestAttachmentRow, HrRequestIssueArticle, HrRequestStatus } from '../types/hrRequest'
+import type { IssueEntryKind } from '../lib/issueEntryKind'
 import { StatusBadge } from './ui/StatusBadge'
 
 export type HrRequestViewIndicatorRow = {
@@ -8,6 +11,7 @@ export type HrRequestViewIndicatorRow = {
   disaggregation: string | null
   hasQuantitative: boolean
   hasQualitative: boolean
+  collectionByYear?: IndicatorYearGenderLine[]
   quantitative_value: number | null | undefined
   qualitative_text: string | null | undefined
 }
@@ -27,6 +31,8 @@ type Props = {
   assignedDepartmentNames?: string[] | null
   conventionLabel: string
   issueTitle: string
+  /** Issue vs recommendation (from issue catalog). */
+  issueEntryKind?: IssueEntryKind | null
   categoryName: string
   issueDescription?: string | null
   description: string
@@ -80,6 +86,7 @@ export function HrRequestViewTemplate({
   assignedDepartmentNames = null,
   conventionLabel,
   issueTitle,
+  issueEntryKind = null,
   categoryName,
   issueDescription = null,
   description,
@@ -177,7 +184,7 @@ export function HrRequestViewTemplate({
 
       <section className="hr-request-view-template__card" aria-labelledby="hr-vt-conv-issue">
         <h2 id="hr-vt-conv-issue" className="card-section-heading">
-          Convention &amp; issue
+          Convention &amp; {hrViewIssueTitleLabel(issueEntryKind).toLowerCase()}
         </h2>
         <div className="hr-request-view-template__grid2">
           <div>
@@ -185,7 +192,7 @@ export function HrRequestViewTemplate({
             <p className="hr-request-view-template__field-value">{conventionLabel}</p>
           </div>
           <div>
-            <div className="hr-request-view-template__field-label">Issue</div>
+            <div className="hr-request-view-template__field-label">{hrViewIssueTitleLabel(issueEntryKind)}</div>
             <p className="hr-request-view-template__field-value">{issueTitle}</p>
           </div>
           <div className="hr-request-view-template__grid2-full">
@@ -193,7 +200,9 @@ export function HrRequestViewTemplate({
             <p className="hr-request-view-template__field-value">{categoryName}</p>
           </div>
           <div className="hr-request-view-template__grid2-full">
-            <div className="hr-request-view-template__field-label">Issue description</div>
+            <div className="hr-request-view-template__field-label">
+              {hrViewIssueDescriptionLabel(issueEntryKind)}
+            </div>
             {issueDescription?.trim() ? (
               <p
                 className="hr-request-view-template__field-value"
@@ -222,10 +231,13 @@ export function HrRequestViewTemplate({
             —
           </p>
         ) : (
-          <ul className="hr-request-view-template__article-pills">
+          <ul className="hr-request-view-template__article-list">
             {articles.map((a) => (
-              <li key={a.id}>
+              <li key={a.id} className="hr-request-view-template__article-item">
                 <span className="hr-request-view-template__article-pill">{a.article_name}</span>
+                {a.description?.trim() ? (
+                  <p className="hr-request-view-template__article-desc muted">{a.description.trim()}</p>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -269,7 +281,17 @@ export function HrRequestViewTemplate({
                             </span>
                           ))}
                         </div>
-                        {ind.disaggregation?.trim() ? (
+                        {(ind.collectionByYear?.length ?? 0) > 0 ? (
+                          <div className="indicator-year-gender-hint muted small" style={{ margin: '6px 0 0' }}>
+                            {ind.collectionByYear!.map((line) => (
+                              <div key={line.year_id}>
+                                <span className="indicator-year-gender-hint__year">{line.label}</span>
+                                {': '}
+                                <span>{line.genders.length > 0 ? line.genders.join(', ') : '—'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : ind.disaggregation?.trim() ? (
                           <p className="muted small" style={{ margin: '6px 0 0' }}>
                             {ind.disaggregation}
                           </p>

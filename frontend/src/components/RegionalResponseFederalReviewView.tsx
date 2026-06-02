@@ -187,6 +187,7 @@ export function RegionalResponseFederalReviewView({
             <DepartmentSubmissionsForRequest
               tasksForDetail={tasksForViewing}
               reqId={viewingRow.req_id}
+              issueIndicators={hrDetail?.issue?.indicators}
               filterByRegionId={viewingRow.region_id ?? undefined}
               omitHeading
               showCardMeta

@@ -1,7 +1,9 @@
 import type { DepartmentTaskRow } from '../api/lists'
+import { coerceIssueEntryKind } from './issueEntryKind'
 import type { HrRequestIssueDetail } from '../types/hrRequest'
 import type { HrRequestRow } from '../types/hrRequest'
 import type { HrRequestViewIndicatorRow } from '../components/HrRequestViewTemplate'
+import { indicatorYearGenderLines } from './indicatorCollectionDisplay'
 
 /** Matches Super Admin → Issues & mapping label style. */
 function conventionOptionLabel(c: { code?: string | null; name?: string | null }): string {
@@ -70,6 +72,7 @@ export function buildDepartmentForwardedViewTemplateProps(
   assignedDepartmentNames: string[] | null
   conventionLabel: string
   issueTitle: string
+  issueEntryKind: ReturnType<typeof coerceIssueEntryKind>
   categoryName: string
   issueDescription: string | null
   description: string
@@ -99,6 +102,7 @@ export function buildDepartmentForwardedViewTemplateProps(
       disaggregation: ind.disaggregation,
       hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
       hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
+      collectionByYear: indicatorYearGenderLines(ind),
       quantitative_value: resp?.quantitative_value,
       qualitative_text: resp?.qualitative_text,
     }
@@ -120,6 +124,7 @@ export function buildDepartmentForwardedViewTemplateProps(
     assignedDepartmentNames: assignedDepartmentNames?.length ? assignedDepartmentNames : null,
     conventionLabel,
     issueTitle: selectedIssue.issue_title,
+    issueEntryKind: coerceIssueEntryKind(selectedIssue.entry_kind),
     categoryName: selectedIssue.category?.name ?? '—',
     issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,
     description: detail.details ?? '',
@@ -190,6 +195,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
   assignedDepartmentNames: string[] | null
   conventionLabel: string
   issueTitle: string
+  issueEntryKind: ReturnType<typeof coerceIssueEntryKind>
   categoryName: string
   issueDescription: string | null
   description: string
@@ -217,6 +223,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
       disaggregation: ind.disaggregation,
       hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
       hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
+      collectionByYear: indicatorYearGenderLines(ind),
       quantitative_value: resp?.quantitative_value,
       qualitative_text: resp?.qualitative_text,
     }
@@ -233,6 +240,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
     assignedDepartmentNames: null,
     conventionLabel,
     issueTitle: selectedIssue.issue_title,
+    issueEntryKind: coerceIssueEntryKind(selectedIssue.entry_kind),
     categoryName: selectedIssue.category?.name ?? '—',
     issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,
     description: detail.details ?? '',

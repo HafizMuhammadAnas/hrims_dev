@@ -63,7 +63,7 @@ export function DepartmentTaskResponseModal({
   }, [task?.id])
 
   useEffect(() => {
-    if (!task || tab !== 'request') return
+    if (!task) return
     let cancelled = false
     setReqLoading(true)
     setReqErr(null)
@@ -80,7 +80,7 @@ export function DepartmentTaskResponseModal({
     return () => {
       cancelled = true
     }
-  }, [task?.id, task?.req_id, tab])
+  }, [task?.id, task?.req_id])
 
   const forwardedTemplateProps = useMemo(
     () => (reqRow && task ? buildDepartmentForwardedViewTemplateProps(reqRow, task) : null),
@@ -184,6 +184,7 @@ export function DepartmentTaskResponseModal({
                   <DepartmentResponseDisplay
                     responseData={task.response_data}
                     attachmentUrl={task.attachment_url}
+                    issueIndicators={reqRow?.issue?.indicators}
                   />
                 </>
               ) : (

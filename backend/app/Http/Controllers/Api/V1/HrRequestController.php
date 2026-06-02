@@ -65,7 +65,12 @@ class HrRequestController extends Controller
 
         $issues = Issue::query()
             ->where('convention_id', $data['convention_id'])
-            ->with(['category', 'articles', 'indicators'])
+            ->with([
+                'category',
+                'articles',
+                'indicators.yearGenderCells.collectionYear:id,label,sort_order',
+                'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+            ])
             ->orderBy('issue_title')
             ->get();
 
@@ -795,10 +800,16 @@ class HrRequestController extends Controller
      */
     private function serializeIssueForForm(Issue $i): array
     {
-        $i->loadMissing(['category', 'articles', 'indicators']);
+        $i->loadMissing([
+            'category',
+            'articles',
+            'indicators.yearGenderCells.collectionYear:id,label,sort_order',
+            'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+        ]);
 
         return [
             'id' => $i->id,
+            'entry_kind' => $i->entry_kind === 'recommendation' ? 'recommendation' : 'issue',
             'issue_title' => $i->issue_title,
             'description' => $i->description,
             'has_quantitative' => (bool) $i->has_quantitative,
@@ -809,19 +820,13 @@ class HrRequestController extends Controller
             'articles' => $i->articles->sortBy('id')->values()->map(fn ($a) => [
                 'id' => $a->id,
                 'article_name' => $a->article_name,
+                'description' => $a->description,
                 'relevant_paragraph' => $a->pivot->relevant_paragraph ?? null,
             ])->values()->all(),
-            'indicators' => $i->indicators->map(function (IssueIndicator $ind) use ($i) {
-                $flags = $i->effectiveIndicatorFlags($ind);
-
-                return [
-                    'id' => $ind->id,
-                    'indicator_text' => $ind->indicator_text,
-                    'disaggregation' => $ind->disaggregation,
-                    'has_quantitative' => $flags['has_quantitative'],
-                    'has_qualitative' => $flags['has_qualitative'],
-                ];
-            })->values()->all(),
+            'indicators' => $i->indicators
+                ->map(fn (IssueIndicator $ind) => $ind->toHrApiArray($i))
+                ->values()
+                ->all(),
         ];
     }
 

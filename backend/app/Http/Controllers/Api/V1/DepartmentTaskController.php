@@ -223,6 +223,63 @@ class DepartmentTaskController extends Controller
         return $d;
     }
 
+    /**
+     * @param  mixed  $raw
+     * @return array<string, array<string, array{value: float}>>|JsonResponse
+     */
+    private function normalizeQuantitativeByYearGender(IssueIndicator $indicator, mixed $raw): array|JsonResponse
+    {
+        if (! is_array($raw)) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': year/gender values are required.',
+            ], 422);
+        }
+
+        $indicator->loadMissing(['yearGenderCells.collectionYear', 'yearGenderCells.collectionGender']);
+        $expected = [];
+        foreach ($indicator->yearGenderCells as $cell) {
+            $yearId = (int) $cell->collection_year_id;
+            $genderId = (int) $cell->collection_gender_id;
+            $expected[$yearId][$genderId] = true;
+        }
+
+        if ($expected === []) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': no year/gender mapping configured on the issue.',
+            ], 422);
+        }
+
+        $out = [];
+        foreach ($expected as $yearId => $genders) {
+            $yearKey = (string) $yearId;
+            $yearIn = $raw[$yearKey] ?? $raw[$yearId] ?? null;
+            if (! is_array($yearIn)) {
+                return response()->json([
+                    'message' => 'Indicator '.$indicator->id.': missing values for year '.$yearId.'.',
+                ], 422);
+            }
+            $out[$yearKey] = [];
+            foreach (array_keys($genders) as $genderId) {
+                $genderKey = (string) $genderId;
+                $cellIn = $yearIn[$genderKey] ?? $yearIn[$genderId] ?? null;
+                $valRaw = is_array($cellIn) ? ($cellIn['value'] ?? null) : $cellIn;
+                if ($valRaw === null || trim((string) $valRaw) === '') {
+                    return response()->json([
+                        'message' => 'Indicator '.$indicator->id.': a number is required for each year and gender.',
+                    ], 422);
+                }
+                if (! is_numeric($valRaw)) {
+                    return response()->json([
+                        'message' => 'Indicator '.$indicator->id.': all year/gender values must be numeric.',
+                    ], 422);
+                }
+                $out[$yearKey][$genderKey] = ['value' => (float) $valRaw];
+            }
+        }
+
+        return $out;
+    }
+
     private function departmentTaskUsesIndicatorBundles(?HrRequest $hrRequest): bool
     {
         if (! $hrRequest || ! $hrRequest->issue) {
@@ -310,7 +367,10 @@ class DepartmentTaskController extends Controller
             return response()->json(['message' => 'Request has no issue for indicator responses.'], 422);
         }
         $hrRequest->loadMissing('indicatorResponses');
-        $issue->loadMissing('indicators');
+        $issue->loadMissing([
+            'indicators.yearGenderCells.collectionYear',
+            'indicators.yearGenderCells.collectionGender',
+        ]);
         $selectedIds = $hrRequest->indicatorResponses->pluck('issue_indicator_id')->map(fn ($id) => (int) $id)->all();
 
         $validated = $request->validate([
@@ -369,17 +429,15 @@ class DepartmentTaskController extends Controller
                 'indicator_label' => $labelRaw !== '' ? $labelRaw : null,
             ];
 
-            if ($flags['has_quantitative']) {
+            $collectsYearGender = (bool) $indicator->collects_by_year;
+            if ($collectsYearGender || $flags['has_quantitative']) {
                 $qIn = $entry['quantitative'] ?? null;
                 if (! is_array($qIn)) {
-                    return response()->json(['message' => 'Indicator '.$indicator->id.': quantitative fields are required.'], 422);
-                }
-                $valRaw = $qIn['value'] ?? null;
-                if ($valRaw === null || trim((string) $valRaw) === '') {
-                    return response()->json(['message' => 'Indicator '.$indicator->id.': a number is required.'], 422);
-                }
-                if (! is_numeric($valRaw)) {
-                    return response()->json(['message' => 'Indicator '.$indicator->id.': the number must be numeric.'], 422);
+                    $msg = $collectsYearGender
+                        ? 'Indicator '.$indicator->id.': year/gender data is required.'
+                        : 'Indicator '.$indicator->id.': quantitative fields are required.';
+
+                    return response()->json(['message' => $msg], 422);
                 }
                 $comment = trim((string) ($qIn['comment'] ?? ''));
                 $qFile = $this->pickKeyedUploadedFile($quantFiles, (int) $indicator->id);
@@ -403,11 +461,31 @@ class DepartmentTaskController extends Controller
                     $prevQ = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['quantitative'] ?? null) : null;
                     $qUrl = is_array($prevQ) ? ($prevQ['attachment_url'] ?? null) : null;
                 }
-                $row['quantitative'] = [
-                    'value' => (float) $valRaw,
-                    'comment' => $comment !== '' ? $comment : null,
-                    'attachment_url' => $qUrl,
-                ];
+
+                if ($collectsYearGender) {
+                    $normalized = $this->normalizeQuantitativeByYearGender($indicator, $qIn['by_year_gender'] ?? null);
+                    if ($normalized instanceof JsonResponse) {
+                        return $normalized;
+                    }
+                    $row['quantitative'] = [
+                        'by_year_gender' => $normalized,
+                        'comment' => $comment !== '' ? $comment : null,
+                        'attachment_url' => $qUrl,
+                    ];
+                } else {
+                    $valRaw = $qIn['value'] ?? null;
+                    if ($valRaw === null || trim((string) $valRaw) === '') {
+                        return response()->json(['message' => 'Indicator '.$indicator->id.': a number is required.'], 422);
+                    }
+                    if (! is_numeric($valRaw)) {
+                        return response()->json(['message' => 'Indicator '.$indicator->id.': the number must be numeric.'], 422);
+                    }
+                    $row['quantitative'] = [
+                        'value' => (float) $valRaw,
+                        'comment' => $comment !== '' ? $comment : null,
+                        'attachment_url' => $qUrl,
+                    ];
+                }
             } else {
                 $row['quantitative'] = null;
             }

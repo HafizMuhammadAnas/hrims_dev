@@ -14,10 +14,7 @@ class ArticleController extends Controller
         $rows = Article::query()->orderBy('article_name')->get();
 
         return response()->json([
-            'data' => $rows->map(fn (Article $a) => [
-                'id' => $a->id,
-                'article_name' => $a->article_name,
-            ]),
+            'data' => $rows->map(fn (Article $a) => $this->serialize($a)),
         ]);
     }
 
@@ -25,30 +22,42 @@ class ArticleController extends Controller
     {
         $data = $request->validate([
             'article_name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
         ]);
-        $article = Article::query()->create($data);
+        $article = Article::query()->create([
+            'article_name' => $data['article_name'],
+            'description' => isset($data['description']) && $data['description'] !== ''
+                ? (string) $data['description']
+                : null,
+        ]);
 
-        return response()->json([
-            'data' => [
-                'id' => $article->id,
-                'article_name' => $article->article_name,
-            ],
-        ], 201);
+        return response()->json(['data' => $this->serialize($article)], 201);
     }
 
     public function update(Request $request, Article $article): JsonResponse
     {
         $data = $request->validate([
-            'article_name' => ['required', 'string', 'max:255'],
+            'article_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
         ]);
+        if (array_key_exists('description', $data) && ($data['description'] === '' || $data['description'] === null)) {
+            $data['description'] = null;
+        }
         $article->forceFill($data)->save();
 
-        return response()->json([
-            'data' => [
-                'id' => $article->id,
-                'article_name' => $article->article_name,
-            ],
-        ]);
+        return response()->json(['data' => $this->serialize($article->fresh())]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serialize(Article $a): array
+    {
+        return [
+            'id' => $a->id,
+            'article_name' => $a->article_name,
+            'description' => $a->description,
+        ];
     }
 
     public function destroy(Article $article): JsonResponse

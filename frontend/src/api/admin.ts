@@ -84,6 +84,19 @@ export type AdminIssueCategory = {
 export type AdminArticleRow = {
   id: number
   article_name: string
+  description: string | null
+}
+
+export type AdminCollectionYear = {
+  id: number
+  label: string
+  sort_order: number
+}
+
+export type AdminCollectionGender = {
+  id: number
+  name: string
+  sort_order: number
 }
 
 export type AdminIssueIndicator = {
@@ -92,11 +105,21 @@ export type AdminIssueIndicator = {
   disaggregation: string | null
   has_quantitative: boolean
   has_qualitative: boolean
+  collects_by_year: boolean
+  collection_by_year: AdminIssueIndicatorYearRow[]
+}
+
+export type AdminIssueIndicatorYearRow = {
+  year_id: number
+  label: string
+  gender_ids: number[]
+  genders: { id: number; name: string }[]
 }
 
 export type AdminIssueArticleRow = {
   id: number
   article_name: string
+  description?: string | null
   relevant_paragraph: string | null
 }
 
@@ -105,10 +128,13 @@ export type AdminIssueArticlePayload = {
   relevant_paragraph?: string | null
 }
 
+export type IssueEntryKind = 'issue' | 'recommendation'
+
 export type AdminIssue = {
   id: number
   convention_id: number
   category_id: number
+  entry_kind: IssueEntryKind
   issue_title: string
   description: string | null
   has_quantitative: boolean
@@ -455,13 +481,19 @@ export async function adminFetchArticles(): Promise<AdminArticleRow[]> {
   return json.data
 }
 
-export async function adminCreateArticle(body: { article_name: string }): Promise<AdminArticleRow> {
+export async function adminCreateArticle(body: {
+  article_name: string
+  description?: string | null
+}): Promise<AdminArticleRow> {
   const res = await adminSend('POST', '/articles', body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminArticleRow
 }
 
-export async function adminUpdateArticle(id: number, body: { article_name: string }): Promise<AdminArticleRow> {
+export async function adminUpdateArticle(
+  id: number,
+  body: { article_name?: string; description?: string | null },
+): Promise<AdminArticleRow> {
   const res = await adminSend('PATCH', `/articles/${id}`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminArticleRow
@@ -469,6 +501,56 @@ export async function adminUpdateArticle(id: number, body: { article_name: strin
 
 export async function adminDeleteArticle(id: number): Promise<void> {
   const res = await adminSend('DELETE', `/articles/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchCollectionYears(): Promise<AdminCollectionYear[]> {
+  const json = await adminGet<{ data: AdminCollectionYear[] }>('/collection-years')
+  return json.data
+}
+
+export async function adminCreateCollectionYear(body: { label: string }): Promise<AdminCollectionYear> {
+  const res = await adminSend('POST', '/collection-years', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminCollectionYear
+}
+
+export async function adminUpdateCollectionYear(
+  id: number,
+  body: { label: string },
+): Promise<AdminCollectionYear> {
+  const res = await adminSend('PATCH', `/collection-years/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminCollectionYear
+}
+
+export async function adminDeleteCollectionYear(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/collection-years/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchCollectionGenders(): Promise<AdminCollectionGender[]> {
+  const json = await adminGet<{ data: AdminCollectionGender[] }>('/collection-genders')
+  return json.data
+}
+
+export async function adminCreateCollectionGender(body: { name: string }): Promise<AdminCollectionGender> {
+  const res = await adminSend('POST', '/collection-genders', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminCollectionGender
+}
+
+export async function adminUpdateCollectionGender(
+  id: number,
+  body: { name: string },
+): Promise<AdminCollectionGender> {
+  const res = await adminSend('PATCH', `/collection-genders/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminCollectionGender
+}
+
+export async function adminDeleteCollectionGender(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/collection-genders/${id}`)
   await throwIfNotOk(res)
 }
 
@@ -485,6 +567,7 @@ export async function adminFetchIssue(id: number): Promise<AdminIssue> {
 export type AdminIssuePayload = {
   convention_id: number
   category_id: number
+  entry_kind: IssueEntryKind
   issue_title: string
   description?: string | null
   has_quantitative: boolean
@@ -495,6 +578,11 @@ export type AdminIssuePayload = {
     disaggregation?: string | null
     has_quantitative?: boolean
     has_qualitative?: boolean
+    collects_by_year?: boolean
+    collection_by_year?: Array<{
+      collection_year_id: number
+      collection_gender_ids: number[]
+    }>
   }>
 }
 

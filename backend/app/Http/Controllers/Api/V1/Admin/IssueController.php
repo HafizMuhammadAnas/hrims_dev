@@ -17,8 +17,9 @@ class IssueController extends Controller
             ->with([
                 'convention:id,code,name',
                 'category:id,name',
-                'articles:id,article_name',
-                'indicators',
+                'articles:id,article_name,description',
+                'indicators.yearGenderCells.collectionYear:id,label,sort_order',
+                'indicators.yearGenderCells.collectionGender:id,name,sort_order',
             ])
             ->orderBy('created_at')
             ->orderBy('id')
@@ -35,7 +36,8 @@ class IssueController extends Controller
             'convention:id,code,name',
             'category:id,name',
             'articles:id,article_name',
-            'indicators',
+            'indicators.yearGenderCells.collectionYear:id,label,sort_order',
+            'indicators.yearGenderCells.collectionGender:id,name,sort_order',
         ]);
 
         return response()->json(['data' => $this->serializeDetail($issue)]);
@@ -49,6 +51,7 @@ class IssueController extends Controller
             $issue = Issue::query()->create([
                 'convention_id' => $data['convention_id'],
                 'category_id' => $data['category_id'],
+                'entry_kind' => $data['entry_kind'] ?? 'issue',
                 'issue_title' => $data['issue_title'],
                 'description' => isset($data['description']) && $data['description'] !== ''
                     ? (string) $data['description']
@@ -62,8 +65,9 @@ class IssueController extends Controller
             return $issue->fresh([
                 'convention:id,code,name',
                 'category:id,name',
-                'articles:id,article_name',
-                'indicators',
+                'articles:id,article_name,description',
+                'indicators.yearGenderCells.collectionYear:id,label,sort_order',
+                'indicators.yearGenderCells.collectionGender:id,name,sort_order',
             ]);
         });
 
@@ -78,6 +82,7 @@ class IssueController extends Controller
             $scalar = collect($data)->only([
                 'convention_id',
                 'category_id',
+                'entry_kind',
                 'issue_title',
                 'description',
                 'has_quantitative',
@@ -102,7 +107,8 @@ class IssueController extends Controller
             'convention:id,code,name',
             'category:id,name',
             'articles:id,article_name',
-            'indicators',
+            'indicators.yearGenderCells.collectionYear:id,label,sort_order',
+            'indicators.yearGenderCells.collectionGender:id,name,sort_order',
         ]);
 
         return response()->json(['data' => $this->serializeDetail($issue)]);
@@ -125,6 +131,7 @@ class IssueController extends Controller
         return $request->validate([
             'convention_id' => [$req, 'integer', 'exists:conventions,id'],
             'category_id' => [$req, 'integer', 'exists:issue_categories,id'],
+            'entry_kind' => [$partial ? 'sometimes' : 'required', 'string', 'in:issue,recommendation'],
             'issue_title' => [$req, 'string', 'max:500'],
             'description' => ['nullable', 'string'],
             'has_quantitative' => [$partial ? 'sometimes' : 'required', 'boolean'],
@@ -137,6 +144,11 @@ class IssueController extends Controller
             'indicators.*.disaggregation' => ['nullable', 'string'],
             'indicators.*.has_quantitative' => ['sometimes', 'boolean'],
             'indicators.*.has_qualitative' => ['sometimes', 'boolean'],
+            'indicators.*.collects_by_year' => ['sometimes', 'boolean'],
+            'indicators.*.collection_by_year' => ['sometimes', 'array'],
+            'indicators.*.collection_by_year.*.collection_year_id' => ['required', 'integer', 'exists:collection_years,id'],
+            'indicators.*.collection_by_year.*.collection_gender_ids' => ['required', 'array', 'min:1'],
+            'indicators.*.collection_by_year.*.collection_gender_ids.*' => ['integer', 'exists:collection_genders,id'],
         ]);
     }
 
@@ -168,7 +180,24 @@ class IssueController extends Controller
             if ($text === '') {
                 continue;
             }
-            IssueIndicator::query()->create([
+            $collectsByYear = (bool) ($row['collects_by_year'] ?? false);
+            $collectionByYear = $this->normalizeCollectionByYear($row['collection_by_year'] ?? []);
+
+            if ($collectsByYear && $collectionByYear === []) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'indicators' => ['Each indicator with year/gender collection must include at least one year with genders.'],
+                ]);
+            }
+
+            foreach ($collectionByYear as $yearRow) {
+                if ($yearRow['collection_gender_ids'] === []) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'indicators' => ['Each selected year must include at least one gender.'],
+                    ]);
+                }
+            }
+
+            $indicator = IssueIndicator::query()->create([
                 'issue_id' => $issue->id,
                 'indicator_text' => $text,
                 'disaggregation' => isset($row['disaggregation']) && $row['disaggregation'] !== ''
@@ -176,8 +205,50 @@ class IssueController extends Controller
                     : null,
                 'has_quantitative' => (bool) ($row['has_quantitative'] ?? false),
                 'has_qualitative' => (bool) ($row['has_qualitative'] ?? false),
+                'collects_by_year' => $collectsByYear,
             ]);
+
+            if ($collectsByYear) {
+                $indicator->syncCollectionByYear($collectionByYear);
+            }
         }
+    }
+
+    /**
+     * @param  mixed  $rows
+     * @return list<array{collection_year_id: int, collection_gender_ids: list<int>}>
+     */
+    private function normalizeCollectionByYear(mixed $rows): array
+    {
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $out = [];
+        $seenYears = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $yearId = (int) ($row['collection_year_id'] ?? $row['year_id'] ?? 0);
+            if ($yearId <= 0 || isset($seenYears[$yearId])) {
+                continue;
+            }
+            $seenYears[$yearId] = true;
+            $genderIds = array_values(array_unique(array_map(
+                'intval',
+                is_array($row['collection_gender_ids'] ?? null)
+                    ? $row['collection_gender_ids']
+                    : (is_array($row['gender_ids'] ?? null) ? $row['gender_ids'] : []),
+            )));
+            $genderIds = array_values(array_filter($genderIds, fn (int $id) => $id > 0));
+            $out[] = [
+                'collection_year_id' => $yearId,
+                'collection_gender_ids' => $genderIds,
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -191,6 +262,7 @@ class IssueController extends Controller
                 $articlesOut[] = [
                     'id' => $a->id,
                     'article_name' => $a->article_name,
+                    'description' => $a->description,
                     'relevant_paragraph' => $a->pivot->relevant_paragraph ?? null,
                 ];
             }
@@ -198,19 +270,14 @@ class IssueController extends Controller
 
         $indicatorsOut = [];
         if ($i->relationLoaded('indicators')) {
-            $indicatorsOut = $i->indicators->map(fn (IssueIndicator $ind) => [
-                'id' => $ind->id,
-                'indicator_text' => $ind->indicator_text,
-                'disaggregation' => $ind->disaggregation,
-                'has_quantitative' => (bool) $ind->has_quantitative,
-                'has_qualitative' => (bool) $ind->has_qualitative,
-            ])->values()->all();
+            $indicatorsOut = $i->indicators->map(fn (IssueIndicator $ind) => $ind->toAdminApiArray())->values()->all();
         }
 
         return [
             'id' => $i->id,
             'convention_id' => $i->convention_id,
             'category_id' => $i->category_id,
+            'entry_kind' => $i->entry_kind === 'recommendation' ? 'recommendation' : 'issue',
             'issue_title' => $i->issue_title,
             'description' => $i->description,
             'has_quantitative' => (bool) $i->has_quantitative,
@@ -226,4 +293,5 @@ class IssueController extends Controller
             'indicators' => $indicatorsOut,
         ];
     }
+
 }

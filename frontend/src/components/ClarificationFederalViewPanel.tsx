@@ -92,6 +92,8 @@ export function ClarificationFederalViewPanel({ clarificationId, onClose, onResp
       ictDepartmentNames: hrRequest ? ictDepartmentNamesForRequest(hrRequest) : null,
       conventionLabel: conventionLabel(hrRequest),
       issueTitle: issue.issue_title,
+      issueEntryKind:
+        issue.entry_kind === 'recommendation' ? ('recommendation' as const) : ('issue' as const),
       categoryName: issue.category?.name ?? '—',
       issueDescription: issue.description ?? null,
       description: hrRequest.details ?? '',

@@ -9,6 +9,7 @@ class Article extends Model
 {
     protected $fillable = [
         'article_name',
+        'description',
     ];
 
     public function issues(): BelongsToMany

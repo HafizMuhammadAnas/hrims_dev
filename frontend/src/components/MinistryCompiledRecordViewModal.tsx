@@ -302,6 +302,7 @@ export function MinistryCompiledRecordViewModal({
                             <DepartmentResponseDisplay
                               responseData={t.response_data}
                               attachmentUrl={t.attachment_url}
+                              issueIndicators={hrDetail?.issue?.indicators}
                             />
                           </div>
                         ))}

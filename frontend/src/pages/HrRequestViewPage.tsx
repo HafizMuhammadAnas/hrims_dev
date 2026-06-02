@@ -25,7 +25,18 @@ import { useAuth } from '../auth/AuthContext'
 import { canManageHrRequests, hrRequestLockedRegionId } from '../auth/rbac'
 import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../components/CompiledRecordsWorkflowNav'
 import { isFederalRequestManagementView } from '../lib/workflowNavigation'
+import { DepartmentIndicatorDataMatrix } from '../components/DepartmentIndicatorDataMatrix'
+import {
+  DepartmentIndicatorSupplementaryFields,
+  emptyDeptIndicatorDraft,
+  type DeptIndicatorDraft,
+} from '../components/DepartmentIndicatorSupplementaryFields'
 import { DepartmentResponseDisplay } from '../components/DepartmentResponseDisplay'
+import {
+  deptFormUsesIndicatorMatrix,
+  indicatorUsesDataMatrix,
+  matrixCellKey,
+} from '../lib/indicatorMatrixColumns'
 import { HrRequestModal } from '../components/HrRequestModal'
 import { HrRequestViewTemplate } from '../components/HrRequestViewTemplate'
 import { Alert } from '../components/ui/Alert'
@@ -72,28 +83,19 @@ function userMayReviewDepartmentTask(user: AuthUser | null, t: DepartmentTaskRow
   return false
 }
 
-type DeptIndicatorDraft = {
-  value: string
-  comment: string
-  qualText: string
-  quantFile: File | null
-  qualFile: File | null
-  /** Resubmit: drop previously saved quantitative attachment. */
-  clearSavedQuantAttachment: boolean
-  /** Resubmit: drop previously saved qualitative attachment. */
-  clearSavedQualAttachment: boolean
-}
-
-function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
-  return {
-    value: '',
-    comment: '',
-    qualText: '',
-    quantFile: null,
-    qualFile: null,
-    clearSavedQuantAttachment: false,
-    clearSavedQualAttachment: false,
+function loadYearGenderValuesFromBundle(
+  byYearGender: Record<string, Record<string, { value?: number }>> | null | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!byYearGender) return out
+  for (const [yearKey, genders] of Object.entries(byYearGender)) {
+    for (const [genderKey, cell] of Object.entries(genders)) {
+      if (cell?.value != null && !Number.isNaN(cell.value)) {
+        out[`${yearKey}-${genderKey}`] = String(cell.value)
+      }
+    }
   }
+  return out
 }
 
 export function HrRequestViewPage() {
@@ -306,15 +308,18 @@ export function HrRequestViewPage() {
         let value = ''
         let comment = ''
         let qualText = ''
+        let yearGenderValues: Record<string, string> = {}
         if (parsed.kind === 'structured') {
           const b = parsed.payload.by_indicator[String(ind.id)]
-          if (b?.quantitative && b.quantitative.value != null && !Number.isNaN(b.quantitative.value)) {
+          if (b?.quantitative?.by_year_gender) {
+            yearGenderValues = loadYearGenderValuesFromBundle(b.quantitative.by_year_gender)
+          } else if (b?.quantitative && b.quantitative.value != null && !Number.isNaN(b.quantitative.value)) {
             value = String(b.quantitative.value)
           }
           if (b?.quantitative?.comment) comment = b.quantitative.comment
           if (b?.qualitative?.text) qualText = b.qualitative.text
         }
-        next[ind.id] = { ...emptyDeptIndicatorDraft(), value, comment, qualText }
+        next[ind.id] = { ...emptyDeptIndicatorDraft(), value, comment, qualText, yearGenderValues }
       }
       setIndicatorDrafts(next)
       return
@@ -335,7 +340,14 @@ export function HrRequestViewPage() {
     for (const ind of deptIndicatorsForForm) {
       const d = indicatorDrafts[ind.id]
       if (!d) return false
-      if (ind.has_quantitative) {
+      if (indicatorUsesDataMatrix(ind)) {
+        for (const y of ind.collection_by_year ?? []) {
+          for (const g of y.genders ?? []) {
+            const v = d.yearGenderValues[matrixCellKey(y.year_id, g.id)]?.trim() ?? ''
+            if (!v || !Number.isFinite(Number(v))) return false
+          }
+        }
+      } else if (ind.has_quantitative) {
         const v = d.value.trim()
         if (!v || !Number.isFinite(Number(v))) return false
       }
@@ -472,7 +484,12 @@ export function HrRequestViewPage() {
           string,
           {
             indicator_label: string
-            quantitative?: { value: string; comment: string }
+            quantitative?:
+              | { value: string; comment: string }
+              | {
+                  by_year_gender: Record<string, Record<string, { value: string }>>
+                  comment: string
+                }
             qualitative?: { text: string }
           }
         > = {}
@@ -484,7 +501,24 @@ export function HrRequestViewPage() {
           const d = indicatorDrafts[ind.id]
           if (!d) continue
           const entry: (typeof by_indicator)[string] = { indicator_label: ind.indicator_text }
-          if (ind.has_quantitative) {
+          if (indicatorUsesDataMatrix(ind)) {
+            const by_year_gender: Record<string, Record<string, { value: string }>> = {}
+            for (const y of ind.collection_by_year ?? []) {
+              const yearKey = String(y.year_id)
+              by_year_gender[yearKey] = {}
+              for (const g of y.genders ?? []) {
+                by_year_gender[yearKey][String(g.id)] = {
+                  value: d.yearGenderValues[matrixCellKey(y.year_id, g.id)]?.trim() ?? '',
+                }
+              }
+            }
+            entry.quantitative = {
+              by_year_gender,
+              comment: d.comment.trim(),
+            }
+            if (d.quantFile) quantFiles[ind.id] = d.quantFile
+            if (d.clearSavedQuantAttachment) stripQuantIndicatorIds.push(ind.id)
+          } else if (ind.has_quantitative) {
             entry.quantitative = { value: d.value.trim(), comment: d.comment.trim() }
             if (d.quantFile) quantFiles[ind.id] = d.quantFile
             if (d.clearSavedQuantAttachment) stripQuantIndicatorIds.push(ind.id)
@@ -556,6 +590,14 @@ export function HrRequestViewPage() {
       activeTask &&
       userMayReviewDepartmentTask(user, activeTask) &&
       !fromResponseCompilation,
+  )
+
+  /** Region/federal task views and department “submitted” state — never edit the matrix here. */
+  const showTaskSubmittedResponseReadonly = Boolean(
+    taskTabbedPageView &&
+      activeTask &&
+      hasDepartmentResponse(activeTask) &&
+      (showDeptResponseReadonly || !deptUser),
   )
 
   useEffect(() => {
@@ -888,9 +930,7 @@ export function HrRequestViewPage() {
             <div className="modal-form dept-task-response-modal__body hr-request-dept-portal-tabs__body">
               {deptPortalTab === 'response' ? (
                 <div className="dept-task-response-modal__panel hr-request-view-panel hr-request-dept-portal-tabs__panel">
-                  {showDeptResponseReadonly ||
-                  (monitorTaskReview && hasDepartmentResponse(activeTask)) ||
-                  (fromResponseCompilation && hasDepartmentResponse(activeTask)) ? (
+                  {showTaskSubmittedResponseReadonly ? (
                     <>
                       {activeTask.submission_date ? (
                         <p className="muted small" style={{ margin: '0 0 12px' }}>
@@ -906,6 +946,7 @@ export function HrRequestViewPage() {
                         responseData={activeTask.response_data}
                         attachmentUrl={activeTask.attachment_url}
                         onlyIndicatorIds={deptResponseDisplayScopeIds}
+                        issueIndicators={detail?.issue?.indicators}
                       />
                       {showMonitorReviewActions ? (
                         <div style={{ marginTop: 20 }}>
@@ -1130,22 +1171,52 @@ export function HrRequestViewPage() {
             ) : null}
             {deptIndicatorsForForm.length > 0 ? (
               <>
+                <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
+                  Complete each indicator required for this request. Use the data table for year and gender
+                  breakdowns where configured; add comments, narrative responses, and attachments as needed.
+                </p>
+                {deptFormUsesIndicatorMatrix(deptIndicatorsForForm) ? (
+                  <DepartmentIndicatorDataMatrix
+                    indicators={deptIndicatorsForForm}
+                    cellValues={Object.fromEntries(
+                      deptIndicatorsForForm.map((ind) => [
+                        ind.id,
+                        indicatorDrafts[ind.id]?.yearGenderValues ?? {},
+                      ]),
+                    )}
+                    onCellChange={(indicatorId, yearId, genderId, value) => {
+                      const key = matrixCellKey(yearId, genderId)
+                      setIndicatorDrafts((prev) => {
+                        const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        return {
+                          ...prev,
+                          [indicatorId]: {
+                            ...cur,
+                            yearGenderValues: { ...cur.yearGenderValues, [key]: value },
+                          },
+                        }
+                      })
+                    }}
+                  />
+                ) : null}
+                <h4 className="font-semibold text-compact" style={{ margin: '16px 0 10px' }}>
+                  {deptFormUsesIndicatorMatrix(deptIndicatorsForForm)
+                    ? 'Comments, narrative responses, and attachments'
+                    : 'Indicator responses'}
+                </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {deptIndicatorsForForm.map((ind) => {
                     const d = indicatorDrafts[ind.id] ?? emptyDeptIndicatorDraft()
-                    const prevQuantUrl =
-                      deptParsedTaskResponse?.kind === 'structured'
-                        ? deptParsedTaskResponse.payload.by_indicator[String(ind.id)]?.quantitative?.attachment_url?.trim() ??
-                          ''
-                        : ''
-                    const prevQualUrl =
-                      deptParsedTaskResponse?.kind === 'structured'
-                        ? deptParsedTaskResponse.payload.by_indicator[String(ind.id)]?.qualitative?.attachment_url?.trim() ??
-                          ''
-                        : ''
+                    const usesMatrix = indicatorUsesDataMatrix(ind)
+                    if (!ind.has_quantitative && !ind.has_qualitative) return null
+                    const typeBits = [
+                      ind.has_quantitative ? 'Quantitative' : null,
+                      ind.has_qualitative ? 'Qualitative' : null,
+                    ].filter(Boolean) as string[]
                     return (
                       <div
                         key={ind.id}
+                        className="dept-indicator-response-card"
                         style={{
                           padding: 14,
                           border: '1px solid var(--field-border, #e1e7f5)',
@@ -1153,215 +1224,25 @@ export function HrRequestViewPage() {
                           background: 'var(--field-bg, #fafbfd)',
                         }}
                       >
-                        <strong className="text-sm font-semibold" style={{ display: 'block', marginBottom: 10 }}>
-                          {ind.indicator_text}
-                        </strong>
-                        {ind.disaggregation?.trim() ? (
-                          <p className="muted small" style={{ margin: '0 0 12px' }}>
-                            {ind.disaggregation}
-                          </p>
-                        ) : null}
-                        {ind.has_quantitative ? (
-                          <div style={{ marginBottom: ind.has_qualitative ? 14 : 0 }}>
-                            <div className="muted small" style={{ marginBottom: 8 }}>
-                              Quantitative
-                            </div>
-                            <div className="form-row" style={{ marginBottom: 8 }}>
-                              <label htmlFor={`dept-ind-${ind.id}-num`}>Number</label>
-                              <input
-                                id={`dept-ind-${ind.id}-num`}
-                                type="text"
-                                inputMode="decimal"
-                                value={d.value}
-                                onChange={(e) =>
-                                  setIndicatorDrafts((prev) => ({
-                                    ...prev,
-                                    [ind.id]: { ...d, value: e.target.value },
-                                  }))
-                                }
-                                style={{ width: '100%', boxSizing: 'border-box' }}
-                              />
-                            </div>
-                            <div className="form-row" style={{ marginBottom: 8 }}>
-                              <label htmlFor={`dept-ind-${ind.id}-comment`}>Comment (optional)</label>
-                              <textarea
-                                id={`dept-ind-${ind.id}-comment`}
-                                rows={2}
-                                value={d.comment}
-                                onChange={(e) =>
-                                  setIndicatorDrafts((prev) => ({
-                                    ...prev,
-                                    [ind.id]: { ...d, comment: e.target.value },
-                                  }))
-                                }
-                                style={{ width: '100%', boxSizing: 'border-box' }}
-                              />
-                            </div>
-                            {prevQuantUrl && !d.clearSavedQuantAttachment ? (
-                              <div className="form-row" style={{ marginBottom: 8 }}>
-                                <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
-                                  Saved quantitative file
-                                </span>
-                                <span className="hr-request-attachments-list__actions">
-                                  <a
-                                    href={prevQuantUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="btn btn-secondary btn-compact"
-                                  >
-                                    View
-                                  </a>
-                                  <Button
-                                    type="button"
-                                    variant="danger"
-                                    compact
-                                    onClick={() =>
-                                      setIndicatorDrafts((prev) => ({
-                                        ...prev,
-                                        [ind.id]: {
-                                          ...(prev[ind.id] ?? emptyDeptIndicatorDraft()),
-                                          clearSavedQuantAttachment: true,
-                                        },
-                                      }))
-                                    }
-                                  >
-                                    Remove
-                                  </Button>
-                                </span>
-                              </div>
-                            ) : null}
-                            {d.clearSavedQuantAttachment && prevQuantUrl ? (
-                              <p className="muted small" style={{ margin: '0 0 8px' }}>
-                                Saved quantitative file will be removed when you submit.
-                              </p>
-                            ) : null}
-                            <div className="form-row">
-                              <label htmlFor={`dept-ind-${ind.id}-qfile`}>Attach file (optional)</label>
-                              <input
-                                id={`dept-ind-${ind.id}-qfile`}
-                                key={`q-${ind.id}-${deptFileInputRev[`q-${ind.id}`] ?? 0}`}
-                                type="file"
-                                onChange={(e) => {
-                                  const f = e.target.files?.[0] ?? null
-                                  e.target.value = ''
-                                  setIndicatorDrafts((prev) => {
-                                    const cur = prev[ind.id] ?? emptyDeptIndicatorDraft()
-                                    return {
-                                      ...prev,
-                                      [ind.id]: { ...cur, quantFile: f, clearSavedQuantAttachment: false },
-                                    }
-                                  })
-                                }}
-                              />
-                            </div>
-                            {d.quantFile ? (
-                              <PendingFileAttachmentRow
-                                file={d.quantFile}
-                                listStyle={{ marginTop: 8 }}
-                                onRemove={() => {
-                                  bumpDeptFileInput(`q-${ind.id}`)
-                                  setIndicatorDrafts((prev) => {
-                                    const cur = prev[ind.id] ?? emptyDeptIndicatorDraft()
-                                    return { ...prev, [ind.id]: { ...cur, quantFile: null } }
-                                  })
-                                }}
-                              />
-                            ) : null}
-                          </div>
-                        ) : null}
-                        {ind.has_qualitative ? (
-                          <div>
-                            <div className="muted small" style={{ marginBottom: 8 }}>
-                              Qualitative
-                            </div>
-                            <div className="form-row" style={{ marginBottom: 8 }}>
-                              <label htmlFor={`dept-ind-${ind.id}-qual`}>Response</label>
-                              <textarea
-                                id={`dept-ind-${ind.id}-qual`}
-                                rows={5}
-                                value={d.qualText}
-                                onChange={(e) =>
-                                  setIndicatorDrafts((prev) => ({
-                                    ...prev,
-                                    [ind.id]: { ...d, qualText: e.target.value },
-                                  }))
-                                }
-                                placeholder="Narrative response for this indicator…"
-                                style={{ width: '100%', boxSizing: 'border-box' }}
-                              />
-                            </div>
-                            {prevQualUrl && !d.clearSavedQualAttachment ? (
-                              <div className="form-row" style={{ marginBottom: 8 }}>
-                                <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
-                                  Saved qualitative file
-                                </span>
-                                <span className="hr-request-attachments-list__actions">
-                                  <a
-                                    href={prevQualUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="btn btn-secondary btn-compact"
-                                  >
-                                    View
-                                  </a>
-                                  <Button
-                                    type="button"
-                                    variant="danger"
-                                    compact
-                                    onClick={() =>
-                                      setIndicatorDrafts((prev) => ({
-                                        ...prev,
-                                        [ind.id]: {
-                                          ...(prev[ind.id] ?? emptyDeptIndicatorDraft()),
-                                          clearSavedQualAttachment: true,
-                                        },
-                                      }))
-                                    }
-                                  >
-                                    Remove
-                                  </Button>
-                                </span>
-                              </div>
-                            ) : null}
-                            {d.clearSavedQualAttachment && prevQualUrl ? (
-                              <p className="muted small" style={{ margin: '0 0 8px' }}>
-                                Saved qualitative file will be removed when you submit.
-                              </p>
-                            ) : null}
-                            <div className="form-row">
-                              <label htmlFor={`dept-ind-${ind.id}-lfile`}>Attach file (optional)</label>
-                              <input
-                                id={`dept-ind-${ind.id}-lfile`}
-                                key={`l-${ind.id}-${deptFileInputRev[`l-${ind.id}`] ?? 0}`}
-                                type="file"
-                                onChange={(e) => {
-                                  const f = e.target.files?.[0] ?? null
-                                  e.target.value = ''
-                                  setIndicatorDrafts((prev) => {
-                                    const cur = prev[ind.id] ?? emptyDeptIndicatorDraft()
-                                    return {
-                                      ...prev,
-                                      [ind.id]: { ...cur, qualFile: f, clearSavedQualAttachment: false },
-                                    }
-                                  })
-                                }}
-                              />
-                            </div>
-                            {d.qualFile ? (
-                              <PendingFileAttachmentRow
-                                file={d.qualFile}
-                                listStyle={{ marginTop: 8 }}
-                                onRemove={() => {
-                                  bumpDeptFileInput(`l-${ind.id}`)
-                                  setIndicatorDrafts((prev) => {
-                                    const cur = prev[ind.id] ?? emptyDeptIndicatorDraft()
-                                    return { ...prev, [ind.id]: { ...cur, qualFile: null } }
-                                  })
-                                }}
-                              />
-                            ) : null}
-                          </div>
-                        ) : null}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                          <strong className="text-sm font-semibold">{ind.indicator_text}</strong>
+                          {typeBits.map((t) => (
+                            <span key={t} className="dept-data-matrix-block__type-pill">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                        <DepartmentIndicatorSupplementaryFields
+                          indicator={ind}
+                          draft={d}
+                          parsed={deptParsedTaskResponse}
+                          matrixMode={usesMatrix}
+                          fileInputRev={deptFileInputRev}
+                          onBumpFileInput={bumpDeptFileInput}
+                          onChange={(next) =>
+                            setIndicatorDrafts((prev) => ({ ...prev, [ind.id]: next }))
+                          }
+                        />
                       </div>
                     )
                   })}
@@ -1477,6 +1358,7 @@ export function HrRequestViewPage() {
               responseData={activeTask.response_data}
               attachmentUrl={activeTask.attachment_url}
               onlyIndicatorIds={deptResponseDisplayScopeIds}
+              issueIndicators={detail?.issue?.indicators}
             />
           </div>
         )}

@@ -115,6 +115,7 @@ export function RegionalResponsePreviewView({
             <DepartmentSubmissionsForRequest
               tasksForDetail={tasksForDetail}
               reqId={row.req_id}
+              issueIndicators={hrDetail?.issue?.indicators}
               filterByRegionName={row.region_name ?? undefined}
               omitHeading
               hideStatusBadge

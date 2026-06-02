@@ -150,6 +150,8 @@ function App() {
               <Route path="profile" element={<ProfilePage />} />
               <Route path="admin" element={<Navigate to="/admin/issues" replace />} />
               <Route path="admin/issues/edit/:issueId" element={<IssuesMappingsAdminPage />} />
+              <Route path="admin/issues/view/:issueId" element={<IssuesMappingsAdminPage />} />
+              <Route path="admin/issues/articles/view/:articleId" element={<IssuesMappingsAdminPage />} />
               <Route path="admin/issues" element={<IssuesMappingsAdminPage />} />
               <Route path="admin/issues/:issuesView" element={<IssuesMappingsAdminPage />} />
               <Route path="admin/regions-districts" element={<RegionsDistrictsAdminPage />} />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
-import { fetchHrRequests } from '../../api/hrRequests'
+import { fetchHrRequest, fetchHrRequests } from '../../api/hrRequests'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow } from '../../api/lists'
 import { fetchRegions } from '../../api/regions'
 import { createRegionalResponse } from '../../api/workflows'
@@ -11,11 +11,16 @@ import { PageSection } from '../../components/ui/PageSection'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
+import { DepartmentSubmissionsForRequest } from '../../components/DepartmentSubmissionsForRequest'
 import { formatDepartmentResponseAsPlaintext } from '../../lib/departmentTaskResponseFormat'
-import { countDepartmentTasksByWorkflow, workflowPresentation } from '../../lib/departmentTaskWorkflow'
+import {
+  countDepartmentTasksByWorkflow,
+  hasDepartmentResponse,
+  workflowPresentation,
+} from '../../lib/departmentTaskWorkflow'
 import { isIctLineTask, isIctRegionalResponseRow, isIctRegionSlug } from '../../lib/ictRegion'
 import { isFederalAdmin, isRegionalAdmin } from '../../lib/roles'
-import type { HrRequestRow } from '../../types/hrRequest'
+import type { HrRequestIssueIndicator, HrRequestRow } from '../../types/hrRequest'
 
 function taskListSignature(tasks: DepartmentTaskRow[]): string {
   return [...tasks.map((t) => t.id)].sort().join('\u001f')
@@ -43,6 +48,7 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [includedTaskIds, setIncludedTaskIds] = useState<string[]>([])
+  const [hrDetail, setHrDetail] = useState<HrRequestRow | null>(null)
   const compilationFrom = ictScope ? '/federal-compilation' : '/region-compilation'
 
   useEffect(() => {
@@ -102,6 +108,24 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
     () => requests.find((r) => r.id === selectedReqId) ?? null,
     [requests, selectedReqId],
   )
+
+  useEffect(() => {
+    if (!selectedReqId) {
+      setHrDetail(null)
+      return
+    }
+    let cancelled = false
+    void fetchHrRequest(selectedReqId)
+      .then((r) => {
+        if (!cancelled) setHrDetail(r)
+      })
+      .catch(() => {
+        if (!cancelled) setHrDetail(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedReqId])
 
   const selectedTasks = useMemo(
     () => scopedTasks.filter((t) => t.req_id === selectedReqId),
@@ -233,6 +257,7 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
             ictScope={ictScope}
             distributionPath={distributionPath}
             distributionLabel={distributionLabel}
+            issueIndicators={hrDetail?.issue?.indicators}
             onSelectAll={() => setIncludedTaskIds(selectedTasks.map((t) => t.id))}
             onClearAll={() => setIncludedTaskIds([])}
             onToggle={toggleTaskInclusion}
@@ -285,6 +310,7 @@ function CompilationDeptBlock({
   ictScope,
   distributionPath,
   distributionLabel,
+  issueIndicators,
   onSelectAll,
   onClearAll,
   onToggle,
@@ -298,6 +324,7 @@ function CompilationDeptBlock({
   ictScope: boolean
   distributionPath: string
   distributionLabel: string
+  issueIndicators?: HrRequestIssueIndicator[]
   onSelectAll: () => void
   onClearAll: () => void
   onToggle: (id: string) => void
@@ -326,6 +353,24 @@ function CompilationDeptBlock({
             onToggle={onToggle}
             onOpenTask={onOpenTask}
           />
+          {selectedTasks.some((t) => hasDepartmentResponse(t)) ? (
+            <section className="hr-request-view-template__card" style={{ marginTop: 16, padding: 14 }}>
+              <h4 className="card-section-heading" style={{ marginTop: 0 }}>
+                Department submissions (view only)
+              </h4>
+              <p className="muted text-compact" style={{ margin: '0 0 12px' }}>
+                Year and gender figures, comments, narratives, and attachments from each department. Open a row
+                above for the full task view.
+              </p>
+              <DepartmentSubmissionsForRequest
+                tasksForDetail={selectedTasks}
+                reqId={selectedTasks[0]?.req_id ?? ''}
+                issueIndicators={issueIndicators}
+                omitHeading
+                onlyWithSubmission
+              />
+            </section>
+          ) : null}
           <Button variant="secondary" compact disabled={includedTaskIds.length === 0} onClick={onPrefill}>
             {content.trim() ? 'Replace draft with selected departments' : 'Prefill from selected departments'}
           </Button>

@@ -1,4 +1,5 @@
 import type { DepartmentTaskRow } from '../api/lists'
+import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
 import { StatusBadge } from './ui/StatusBadge'
 import { hasDepartmentResponse, workflowPresentation } from '../lib/departmentTaskWorkflow'
@@ -6,6 +7,8 @@ import { hasDepartmentResponse, workflowPresentation } from '../lib/departmentTa
 type Props = {
   tasksForDetail: DepartmentTaskRow[]
   reqId: string
+  /** Issue indicators (for year/gender matrix when viewing structured department responses). */
+  issueIndicators?: HrRequestIssueIndicator[]
   /** Only show tasks whose region matches (federal consolidated view per province). */
   filterByRegionName?: string | null
   filterByRegionId?: number | null
@@ -22,6 +25,7 @@ type Props = {
 export function DepartmentSubmissionsForRequest({
   tasksForDetail,
   reqId,
+  issueIndicators,
   filterByRegionName,
   filterByRegionId,
   omitHeading = false,
@@ -98,6 +102,7 @@ export function DepartmentSubmissionsForRequest({
             <DepartmentResponseDisplay
               responseData={t.response_data}
               attachmentUrl={t.attachment_url}
+              issueIndicators={issueIndicators}
             />
             ) : (
               <p className="muted small" style={{ margin: 0 }}>

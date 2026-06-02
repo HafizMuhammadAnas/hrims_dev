@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\V1\Admin\DepartmentController as AdminDepartmentCon
 use App\Http\Controllers\Api\V1\Admin\DistrictController as AdminDistrictController;
 use App\Http\Controllers\Api\V1\Admin\KnowledgeCardController as AdminKnowledgeCardController;
 use App\Http\Controllers\Api\V1\Admin\ArticleController as AdminArticleController;
+use App\Http\Controllers\Api\V1\Admin\CollectionGenderController as AdminCollectionGenderController;
+use App\Http\Controllers\Api\V1\Admin\CollectionYearController as AdminCollectionYearController;
 use App\Http\Controllers\Api\V1\Admin\IssueCategoryController as AdminIssueCategoryController;
 use App\Http\Controllers\Api\V1\Admin\IssueController as AdminIssueController;
 use App\Http\Controllers\Api\V1\Admin\RegionController as AdminRegionController;
@@ -153,6 +155,16 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/articles', [AdminArticleController::class, 'store'])->name('api.v1.admin.articles.store');
             Route::patch('/articles/{article}', [AdminArticleController::class, 'update'])->name('api.v1.admin.articles.update');
             Route::delete('/articles/{article}', [AdminArticleController::class, 'destroy'])->name('api.v1.admin.articles.destroy');
+
+            Route::get('/collection-years', [AdminCollectionYearController::class, 'index'])->name('api.v1.admin.collection-years.index');
+            Route::post('/collection-years', [AdminCollectionYearController::class, 'store'])->name('api.v1.admin.collection-years.store');
+            Route::patch('/collection-years/{collection_year}', [AdminCollectionYearController::class, 'update'])->name('api.v1.admin.collection-years.update');
+            Route::delete('/collection-years/{collection_year}', [AdminCollectionYearController::class, 'destroy'])->name('api.v1.admin.collection-years.destroy');
+
+            Route::get('/collection-genders', [AdminCollectionGenderController::class, 'index'])->name('api.v1.admin.collection-genders.index');
+            Route::post('/collection-genders', [AdminCollectionGenderController::class, 'store'])->name('api.v1.admin.collection-genders.store');
+            Route::patch('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'update'])->name('api.v1.admin.collection-genders.update');
+            Route::delete('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'destroy'])->name('api.v1.admin.collection-genders.destroy');
 
             Route::get('/issues', [AdminIssueController::class, 'index'])->name('api.v1.admin.issues.index');
             Route::post('/issues', [AdminIssueController::class, 'store'])->name('api.v1.admin.issues.store');

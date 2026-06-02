@@ -12,6 +12,7 @@ class Issue extends Model
     protected $fillable = [
         'convention_id',
         'category_id',
+        'entry_kind',
         'issue_title',
         'description',
         'has_quantitative',

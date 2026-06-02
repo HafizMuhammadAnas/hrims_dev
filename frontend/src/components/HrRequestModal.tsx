@@ -16,9 +16,12 @@ import type { RegionRow } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
 import { isDepartmentAdmin, isViewer } from '../lib/roles'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
+import { issueEntryTitleColumnLabel } from '../lib/issueEntryKind'
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
+import { IndicatorYearGenderHint } from './IndicatorYearGenderHint'
 import { PendingFileAttachmentListItem } from './PendingFileAttachmentRow'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
+import { indicatorYearGenderLines } from '../lib/indicatorCollectionDisplay'
 import {
   ictDepartmentNamesForRequest,
   regionNamesForFederalOriginalView,
@@ -835,6 +838,7 @@ export function HrRequestModal({
                   assignedDepartmentNames={viewTemplateAssignedDepartmentNames}
                   conventionLabel={conventionDisplayLabel}
                   issueTitle={selectedIssue.issue_title}
+                  issueEntryKind={selectedIssue.entry_kind === 'recommendation' ? 'recommendation' : 'issue'}
                   categoryName={selectedIssue.category?.name ?? '—'}
                   issueDescription={selectedIssue.description ?? null}
                   description={issueForm.details}
@@ -853,6 +857,7 @@ export function HrRequestModal({
                       disaggregation: ind.disaggregation,
                       hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
                       hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
+                      collectionByYear: indicatorYearGenderLines(ind),
                       quantitative_value: resp?.quantitative_value,
                       qualitative_text: resp?.qualitative_text,
                     }
@@ -942,7 +947,7 @@ export function HrRequestModal({
                 <FieldError id="hr-conv-err" message={fieldErrors.convention_id} />
               </FormField>
 
-              <FormField label="Issue" htmlFor="hr-issue">
+              <FormField label={issueEntryTitleColumnLabel()} htmlFor="hr-issue">
                 <SearchableSelect
                   id="hr-issue"
                   value={issueForm.issue_id === '' ? '' : String(issueForm.issue_id)}
@@ -1004,7 +1009,6 @@ export function HrRequestModal({
                       <strong>Category:</strong> {selectedIssue.category?.name ?? '—'}
                     </p>
                     <div>
-                      <strong>Articles</strong>
                       {selectedIssue.articles.length === 0 ? (
                         <p className="muted">—</p>
                       ) : (
@@ -1012,6 +1016,14 @@ export function HrRequestModal({
                           {selectedIssue.articles.map((a) => (
                             <li key={a.id}>
                               {a.article_name}
+                              {a.description?.trim() ? (
+                                <p
+                                  className="muted"
+                                  style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}
+                                >
+                                  {a.description.trim()}
+                                </p>
+                              ) : null}
                               {a.relevant_paragraph ? (
                                 <p
                                   className="muted"
@@ -1119,11 +1131,10 @@ export function HrRequestModal({
                                     ) : null}
                                   </span>
                                 </label>
-                                {ind.disaggregation && (
-                                  <div className="muted small" style={{ marginLeft: 28 }}>
-                                    Disaggregation: {ind.disaggregation}
-                                  </div>
-                                )}
+                                <IndicatorYearGenderHint
+                                  indicator={ind}
+                                  style={{ marginLeft: 28, marginTop: 4 }}
+                                />
                                 {checked &&
                                   readOnly &&
                                   (() => {
