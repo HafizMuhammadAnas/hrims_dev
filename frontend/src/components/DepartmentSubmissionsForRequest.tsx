@@ -2,6 +2,7 @@ import type { DepartmentTaskRow } from '../api/lists'
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
 import { StatusBadge } from './ui/StatusBadge'
+import { formatAppDate } from '../lib/dateFormat'
 import { hasDepartmentResponse, workflowPresentation } from '../lib/departmentTaskWorkflow'
 
 type Props = {
@@ -95,7 +96,7 @@ export function DepartmentSubmissionsForRequest({
             {(!omitHeading || showCardMeta) && (t.id || t.submission_date) ? (
               <p className="muted small dept-submission-card__meta">
                 Task {t.id}
-                {t.submission_date ? ` · Submitted ${t.submission_date}` : ''}
+                {t.submission_date ? ` · Submitted ${formatAppDate(t.submission_date)}` : ''}
               </p>
             ) : null}
             {hasDepartmentResponse(t) ? (

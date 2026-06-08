@@ -25,6 +25,8 @@ import { useAuth } from '../auth/AuthContext'
 import { canManageHrRequests, hrRequestLockedRegionId } from '../auth/rbac'
 import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../components/CompiledRecordsWorkflowNav'
 import { isFederalRequestManagementView } from '../lib/workflowNavigation'
+import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
+import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import { DepartmentIndicatorDataMatrix } from '../components/DepartmentIndicatorDataMatrix'
 import {
   DepartmentIndicatorSupplementaryFields,
@@ -34,6 +36,7 @@ import {
 import { DepartmentResponseDisplay } from '../components/DepartmentResponseDisplay'
 import {
   deptFormUsesIndicatorMatrix,
+  forEachIndicatorMatrixCell,
   indicatorUsesDataMatrix,
   matrixCellKey,
 } from '../lib/indicatorMatrixColumns'
@@ -341,12 +344,12 @@ export function HrRequestViewPage() {
       const d = indicatorDrafts[ind.id]
       if (!d) return false
       if (indicatorUsesDataMatrix(ind)) {
-        for (const y of ind.collection_by_year ?? []) {
-          for (const g of y.genders ?? []) {
-            const v = d.yearGenderValues[matrixCellKey(y.year_id, g.id)]?.trim() ?? ''
-            if (!v || !Number.isFinite(Number(v))) return false
-          }
-        }
+        let matrixReady = true
+        forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
+          const v = d.yearGenderValues[matrixCellKey(yearId, genderId)]?.trim() ?? ''
+          if (!v || !Number.isFinite(Number(v))) matrixReady = false
+        })
+        if (!matrixReady) return false
       } else if (ind.has_quantitative) {
         const v = d.value.trim()
         if (!v || !Number.isFinite(Number(v))) return false
@@ -503,15 +506,13 @@ export function HrRequestViewPage() {
           const entry: (typeof by_indicator)[string] = { indicator_label: ind.indicator_text }
           if (indicatorUsesDataMatrix(ind)) {
             const by_year_gender: Record<string, Record<string, { value: string }>> = {}
-            for (const y of ind.collection_by_year ?? []) {
-              const yearKey = String(y.year_id)
-              by_year_gender[yearKey] = {}
-              for (const g of y.genders ?? []) {
-                by_year_gender[yearKey][String(g.id)] = {
-                  value: d.yearGenderValues[matrixCellKey(y.year_id, g.id)]?.trim() ?? '',
-                }
+            forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
+              const yearKey = String(yearId)
+              if (!by_year_gender[yearKey]) by_year_gender[yearKey] = {}
+              by_year_gender[yearKey][String(genderId)] = {
+                value: d.yearGenderValues[matrixCellKey(yearId, genderId)]?.trim() ?? '',
               }
-            }
+            })
             entry.quantitative = {
               by_year_gender,
               comment: d.comment.trim(),
@@ -693,7 +694,7 @@ export function HrRequestViewPage() {
               title="Your clarification request"
               meta={
                 activeClarification.region_submitted_at
-                  ? `Submitted ${new Date(activeClarification.region_submitted_at).toLocaleString()}`
+                  ? `Submitted ${formatAppDateTime(activeClarification.region_submitted_at)}`
                   : null
               }
               message={activeClarification.region_message}
@@ -715,7 +716,7 @@ export function HrRequestViewPage() {
                 title="Your clarification request"
                 meta={
                   activeClarification.region_submitted_at
-                    ? `Submitted ${new Date(activeClarification.region_submitted_at).toLocaleString()}`
+                    ? `Submitted ${formatAppDateTime(activeClarification.region_submitted_at)}`
                     : null
                 }
                 message={activeClarification.region_message}
@@ -726,7 +727,7 @@ export function HrRequestViewPage() {
                 title="Federal clarification response"
                 meta={
                   activeClarification.federal_responded_at
-                    ? `Responded ${new Date(activeClarification.federal_responded_at).toLocaleString()}`
+                    ? `Responded ${formatAppDateTime(activeClarification.federal_responded_at)}`
                     : null
                 }
                 message={activeClarification.federal_response}
@@ -934,7 +935,7 @@ export function HrRequestViewPage() {
                     <>
                       {activeTask.submission_date ? (
                         <p className="muted small" style={{ margin: '0 0 12px' }}>
-                          Submitted {activeTask.submission_date}
+                          Submitted {formatAppDate(activeTask.submission_date)}
                         </p>
                       ) : null}
                       {activeTask.regional_review_comments?.trim() ? (
@@ -1102,10 +1103,12 @@ export function HrRequestViewPage() {
                       }}
                     >
                       <strong className="text-sm font-semibold">{r.title}</strong>
-                      <StatusBadge tone="default">{r.review_status}</StatusBadge>
+                      <StatusBadge tone={regionalResponseReviewPresentation(r.review_status).tone}>
+                        {regionalResponseReviewPresentation(r.review_status).label}
+                      </StatusBadge>
                     </div>
                     <p className="muted small" style={{ margin: '8px 0 10px' }}>
-                      Submitted {r.submission_date}
+                      Submitted {formatAppDate(r.submission_date)}
                       {r.region_name ? ` · ${r.region_name}` : ''}
                     </p>
                     {r.comments?.trim() ? (
@@ -1343,7 +1346,7 @@ export function HrRequestViewPage() {
                 {workflowPresentation(activeTask).label}
               </StatusBadge>
               {activeTask.submission_date ? (
-                <span className="muted small">Submitted {activeTask.submission_date}</span>
+                <span className="muted small">Submitted {formatAppDate(activeTask.submission_date)}</span>
               ) : null}
             </div>
             {activeTask.regional_review_comments?.trim() ? (

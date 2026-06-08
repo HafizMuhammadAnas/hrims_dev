@@ -2,7 +2,10 @@ import { indicatorYearGenderLines } from '../lib/indicatorCollectionDisplay'
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 
 type Props = {
-  indicator: Pick<HrRequestIssueIndicator, 'collects_by_year' | 'collection_by_year' | 'disaggregation'>
+  indicator: Pick<
+    HrRequestIssueIndicator,
+    'collects_by_year' | 'collects_by_gender' | 'collection_by_year' | 'disaggregation'
+  >
   className?: string
   style?: React.CSSProperties
 }
@@ -16,8 +19,12 @@ export function IndicatorYearGenderHint({ indicator, className, style }: Props) 
         {lines.map((line) => (
           <div key={line.year_id}>
             <span className="indicator-year-gender-hint__year">{line.label}</span>
-            {': '}
-            <span>{line.genders.length > 0 ? line.genders.join(', ') : '—'}</span>
+            {line.genders.length > 0 ? (
+              <>
+                {': '}
+                <span>{line.genders.join(', ')}</span>
+              </>
+            ) : null}
           </div>
         ))}
       </div>

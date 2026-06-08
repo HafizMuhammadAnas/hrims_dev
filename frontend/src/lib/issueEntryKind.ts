@@ -14,7 +14,27 @@ export function issueEntryTitleFieldLabel(kind: IssueEntryKind): string {
 }
 
 export function issueEntryTitleColumnLabel(): string {
-  return 'Issue / recommendation'
+  return 'Issue / Recommendation'
+}
+
+export function issuesNavLabel(): string {
+  return 'Issues / Recommendation'
+}
+
+export function issuesListTabLabel(): string {
+  return 'Issues / Recommendation list'
+}
+
+export function issuesCreateTabLabel(): string {
+  return 'Create issue / Recommendation'
+}
+
+export function issuesEmptyListHint(): string {
+  return 'No issues or recommendations yet. Use Create issue / Recommendation to add one.'
+}
+
+export function issueEntryKindToggleAriaLabel(): string {
+  return 'Issue or Recommendation'
 }
 
 export function issueEntryViewPageTitle(kind: IssueEntryKind, id: number): string {

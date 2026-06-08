@@ -111,7 +111,7 @@ class HrRequestController extends Controller
         HrimsAccess::applyHrRequestScope($query, $request->user());
 
         return HrRequestResource::collection(
-            $query->orderByDesc('due_date')->get()
+            $query->orderByDesc('created_at')->orderByDesc('id')->get()
         );
     }
 

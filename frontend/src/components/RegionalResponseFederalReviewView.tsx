@@ -5,6 +5,7 @@ import type { DepartmentTaskRow, RegionalResponseRow } from '../api/lists'
 import { updateRegionalReview } from '../api/workflows'
 import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import { regionalResponseFederalReviewPath } from '../lib/workflowNavigation'
+import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import type { HrRequestRow } from '../types/hrRequest'
 import { DepartmentSubmissionsForRequest } from './DepartmentSubmissionsForRequest'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
@@ -17,22 +18,6 @@ import { WorkflowModalHero } from './ui/WorkflowModalHero'
 type Tab = 'responses' | 'request'
 
 type ReviewStatus = 'pending' | 'accepted' | 'needs-modification' | 'rejected'
-
-function federalReviewTone(
-  status: string,
-): 'pending' | 'success' | 'warning' | 'danger' | 'default' {
-  if (status === 'accepted') return 'success'
-  if (status === 'needs-modification') return 'warning'
-  if (status === 'rejected') return 'danger'
-  return 'pending'
-}
-
-function formatReviewStatusLabel(status: string): string {
-  if (status === 'needs-modification') return 'Needs modification'
-  const s = status.replace(/-/g, ' ')
-  if (!s) return status
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
 
 type Props = {
   viewing: RegionalResponseRow
@@ -150,8 +135,8 @@ export function RegionalResponseFederalReviewView({
         title={viewingRow.region_name ?? 'Regional response'}
         embedded
       >
-        <StatusBadge tone={federalReviewTone(viewingRow.review_status)}>
-          {formatReviewStatusLabel(viewingRow.review_status)}
+        <StatusBadge tone={regionalResponseReviewPresentation(viewingRow.review_status).tone}>
+          {regionalResponseReviewPresentation(viewingRow.review_status).label}
         </StatusBadge>
         <span className="workflow-modal-hero__chip">{viewingRow.req_id}</span>
       </WorkflowModalHero>
@@ -180,10 +165,6 @@ export function RegionalResponseFederalReviewView({
         {tab === 'responses' ? (
           <>
             <h2 className="card-section-heading">Department submissions</h2>
-            <p className="muted text-compact" style={{ margin: '0 0 12px' }}>
-              Individual responses gathered in <strong>{viewingRow.region_name ?? 'this region'}</strong> before
-              regional compilation.
-            </p>
             <DepartmentSubmissionsForRequest
               tasksForDetail={tasksForViewing}
               reqId={viewingRow.req_id}

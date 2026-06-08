@@ -19,6 +19,8 @@ import { StatsCards } from '../components/ui/StatsCards'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
+import { sortRowsLatestFirst } from '../lib/tableRowSort'
 import { hrRequestListStats, hrRequestStatusPresentation } from '../lib/hrRequestListMetrics'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
 import {
@@ -115,7 +117,7 @@ export function FederalRequestManagementPage() {
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
+    const filtered = rows.filter((r) => {
       if (statusFilter && r.status !== statusFilter) return false
       if (!q) return true
       const regionBlob =
@@ -127,6 +129,7 @@ export function FederalRequestManagementPage() {
         regionBlob.toLowerCase().includes(q)
       )
     })
+    return sortRowsLatestFirst(filtered, (r) => r.id)
   }, [rows, search, statusFilter])
 
   const { pageRows } = useMemo(
@@ -154,14 +157,16 @@ export function FederalRequestManagementPage() {
     let data = [...clarifications]
     const statusFilter = clarTable.filters.status ?? ''
     if (statusFilter) data = data.filter((c) => c.status === statusFilter)
-    if (!q) return data
-    return data.filter(
-      (c) =>
-        String(c.id).includes(q) ||
-        c.hr_request_id.toLowerCase().includes(q) ||
-        (c.region_name ?? '').toLowerCase().includes(q) ||
-        c.region_message.toLowerCase().includes(q),
-    )
+    if (q) {
+      data = data.filter(
+        (c) =>
+          String(c.id).includes(q) ||
+          c.hr_request_id.toLowerCase().includes(q) ||
+          (c.region_name ?? '').toLowerCase().includes(q) ||
+          c.region_message.toLowerCase().includes(q),
+      )
+    }
+    return sortRowsLatestFirst(data, (c) => c.updated_at ?? c.created_at ?? c.id)
   }, [clarifications, clarTable.search, clarTable.filters.status])
 
   const { pageRows: clarPageRows } = useMemo(
@@ -265,7 +270,7 @@ export function FederalRequestManagementPage() {
                         ? r.regions.map((x) => x.name).join(', ')
                         : (r.region_name ?? '—')}
                     </td>
-                    <td>{r.date}</td>
+                    <td>{formatAppDate(r.date)}</td>
                     <td>
                       <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                     </td>
@@ -440,7 +445,7 @@ export function FederalRequestManagementPage() {
                           </td>
                           <td>
                             {c.region_submitted_at
-                              ? new Date(c.region_submitted_at).toLocaleDateString()
+                              ? formatAppDateTime(c.region_submitted_at)
                               : '—'}
                           </td>
                           <td className="table-actions">

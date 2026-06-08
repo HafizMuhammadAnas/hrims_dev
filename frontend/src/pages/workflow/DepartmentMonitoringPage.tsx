@@ -11,6 +11,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { TableToolbar } from '../../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
+import { formatAppDate } from '../../lib/dateFormat'
 import {
   countDepartmentTasksByWorkflow,
   workflowPresentation,
@@ -140,8 +141,8 @@ export function DepartmentMonitoringPage({ title }: Props) {
                   <td>
                     <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
                   </td>
-                  <td>{t.assigned_date}</td>
-                  <td>{t.submission_date ?? '—'}</td>
+                  <td>{formatAppDate(t.assigned_date)}</td>
+                  <td>{formatAppDate(t.submission_date)}</td>
                   <td className="table-actions">
                     <RowActionsMenu
                       isOpen={openActionId === t.id}

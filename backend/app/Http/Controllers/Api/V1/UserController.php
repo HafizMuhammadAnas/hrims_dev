@@ -22,7 +22,7 @@ class UserController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $query = User::query()->with(['roles.permissions', 'region', 'department'])->orderBy('name');
+        $query = User::query()->with(['roles.permissions', 'region', 'department'])->orderByDesc('created_at')->orderByDesc('id');
 
         if ($creator->hasRole('super_admin')) {
             $rows = $query

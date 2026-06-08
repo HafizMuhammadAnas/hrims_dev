@@ -16,6 +16,8 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { TableToolbar } from '../../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
+import { formatAppDate } from '../../lib/dateFormat'
+import { sortRowsLatestFirst } from '../../lib/tableRowSort'
 import {
   RECEIVED_REQUEST_STATUS_FILTER_OPTIONS,
   receivedRequestStatusPresentation,
@@ -166,7 +168,7 @@ export function ReceivedRequestsPage({
   const statusFilter = filters.status ?? ''
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return mapped.filter((r) => {
+    const filtered = mapped.filter((r) => {
       if (statusFilter && r._status !== statusFilter) return false
       if (!q) return true
       return (
@@ -176,6 +178,7 @@ export function ReceivedRequestsPage({
         r.date.toLowerCase().includes(q)
       )
     })
+    return sortRowsLatestFirst(filtered, (r) => r.id)
   }, [mapped, search, statusFilter])
   const { pageRows } = useMemo(
     () => derivePaginatedRows(filteredRows, page, pageSize),
@@ -237,7 +240,7 @@ export function ReceivedRequestsPage({
                 <td>{r.id}</td>
                 <td>{r.title}</td>
                 <td>{r.conv}</td>
-                <td>{r.date}</td>
+                <td>{formatAppDate(r.date)}</td>
                 <td>
                   <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                 </td>

@@ -22,6 +22,8 @@ export type HrRequestIssueIndicator = {
   has_quantitative?: boolean
   has_qualitative?: boolean
   collects_by_year?: boolean
+  /** When false with collects_by_year, one value per year (no gender columns). */
+  collects_by_gender?: boolean
   collection_by_year?: Array<{
     year_id: number
     label: string

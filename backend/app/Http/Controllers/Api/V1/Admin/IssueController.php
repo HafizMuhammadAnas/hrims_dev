@@ -20,9 +20,10 @@ class IssueController extends Controller
                 'articles:id,article_name,description',
                 'indicators.yearGenderCells.collectionYear:id,label,sort_order',
                 'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+                'indicators.collectionYearRows.collectionYear:id,label,sort_order',
             ])
-            ->orderBy('created_at')
-            ->orderBy('id')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         return response()->json([
@@ -38,6 +39,7 @@ class IssueController extends Controller
             'articles:id,article_name',
             'indicators.yearGenderCells.collectionYear:id,label,sort_order',
             'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+            'indicators.collectionYearRows.collectionYear:id,label,sort_order',
         ]);
 
         return response()->json(['data' => $this->serializeDetail($issue)]);
@@ -68,6 +70,7 @@ class IssueController extends Controller
                 'articles:id,article_name,description',
                 'indicators.yearGenderCells.collectionYear:id,label,sort_order',
                 'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+                'indicators.collectionYearRows.collectionYear:id,label,sort_order',
             ]);
         });
 
@@ -109,6 +112,7 @@ class IssueController extends Controller
             'articles:id,article_name',
             'indicators.yearGenderCells.collectionYear:id,label,sort_order',
             'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+            'indicators.collectionYearRows.collectionYear:id,label,sort_order',
         ]);
 
         return response()->json(['data' => $this->serializeDetail($issue)]);
@@ -145,9 +149,10 @@ class IssueController extends Controller
             'indicators.*.has_quantitative' => ['sometimes', 'boolean'],
             'indicators.*.has_qualitative' => ['sometimes', 'boolean'],
             'indicators.*.collects_by_year' => ['sometimes', 'boolean'],
+            'indicators.*.collects_by_gender' => ['sometimes', 'boolean'],
             'indicators.*.collection_by_year' => ['sometimes', 'array'],
             'indicators.*.collection_by_year.*.collection_year_id' => ['required', 'integer', 'exists:collection_years,id'],
-            'indicators.*.collection_by_year.*.collection_gender_ids' => ['required', 'array', 'min:1'],
+            'indicators.*.collection_by_year.*.collection_gender_ids' => ['sometimes', 'array'],
             'indicators.*.collection_by_year.*.collection_gender_ids.*' => ['integer', 'exists:collection_genders,id'],
         ]);
     }
@@ -181,19 +186,22 @@ class IssueController extends Controller
                 continue;
             }
             $collectsByYear = (bool) ($row['collects_by_year'] ?? false);
+            $collectsByGender = (bool) ($row['collects_by_gender'] ?? false);
             $collectionByYear = $this->normalizeCollectionByYear($row['collection_by_year'] ?? []);
 
             if ($collectsByYear && $collectionByYear === []) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'indicators' => ['Each indicator with year/gender collection must include at least one year with genders.'],
+                    'indicators' => ['Each indicator with year collection must include at least one year.'],
                 ]);
             }
 
-            foreach ($collectionByYear as $yearRow) {
-                if ($yearRow['collection_gender_ids'] === []) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'indicators' => ['Each selected year must include at least one gender.'],
-                    ]);
+            if ($collectsByYear && $collectsByGender) {
+                foreach ($collectionByYear as $yearRow) {
+                    if ($yearRow['collection_gender_ids'] === []) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'indicators' => ['Each selected year must include at least one gender when collecting by year and gender.'],
+                        ]);
+                    }
                 }
             }
 
@@ -206,10 +214,11 @@ class IssueController extends Controller
                 'has_quantitative' => (bool) ($row['has_quantitative'] ?? false),
                 'has_qualitative' => (bool) ($row['has_qualitative'] ?? false),
                 'collects_by_year' => $collectsByYear,
+                'collects_by_gender' => $collectsByYear && $collectsByGender,
             ]);
 
             if ($collectsByYear) {
-                $indicator->syncCollectionByYear($collectionByYear);
+                $indicator->syncCollectionByYear($collectionByYear, $collectsByGender);
             }
         }
     }

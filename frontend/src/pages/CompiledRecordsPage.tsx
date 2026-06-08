@@ -14,12 +14,14 @@ import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { compiledRecordViewPath } from '../lib/workflowNavigation'
+import { formatAppDate } from '../lib/dateFormat'
+import type { StatusBadgeTone } from '../lib/statusBadgeTone'
 
 type CompiledSortKey = 'id' | 'req_id' | 'title' | 'status' | 'compilation_date'
 
-function compiledStatusTone(status: string): 'pending' | 'success' | 'warning' | 'danger' | 'default' {
+function compiledStatusTone(status: string): StatusBadgeTone {
   if (status === 'submitted') return 'success'
-  if (status === 'draft') return 'pending'
+  if (status === 'draft') return 'warning'
   return 'default'
 }
 
@@ -206,7 +208,7 @@ export function CompiledRecordsPage() {
                 <td>
                   <StatusBadge tone={compiledStatusTone(r.status)}>{formatCompiledStatusLabel(r.status)}</StatusBadge>
                 </td>
-                <td>{r.compilation_date ?? '—'}</td>
+                <td>{formatAppDate(r.compilation_date)}</td>
                 <td className="table-actions">
                   <RowActionsMenu
                     isOpen={openActionId === r.id}

@@ -185,13 +185,7 @@ function RegionsListSection({
   const [editRegionSlug, setEditRegionSlug] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: GEO_PAGE_SIZE })
 
-  const sortedRegions = useMemo(
-    () =>
-      [...regions].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }),
-      ),
-    [regions],
-  )
+  const sortedRegions = useMemo(() => [...regions].sort((a, b) => b.id - a.id), [regions])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -359,18 +353,7 @@ function DistrictsListSection({
   const [editDistrictSlug, setEditDistrictSlug] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: GEO_PAGE_SIZE })
 
-  const sortedDistricts = useMemo(
-    () =>
-      [...districts].sort((a, b) => {
-        const byRegion = (a.region_name ?? '').localeCompare(b.region_name ?? '', undefined, {
-          numeric: true,
-          sensitivity: 'base',
-        })
-        if (byRegion !== 0) return byRegion
-        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
-      }),
-    [districts],
-  )
+  const sortedDistricts = useMemo(() => [...districts].sort((a, b) => b.id - a.id), [districts])
 
   const processed = useMemo(() => {
     let data = sortedDistricts

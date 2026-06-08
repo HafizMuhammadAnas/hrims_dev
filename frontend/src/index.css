@@ -505,6 +505,7 @@ body:has(.modal-overlay) {
 
 .app-main {
   flex: 1;
+  width: 100%;
   padding: 30px;
   margin-left: 0;
   max-width: 100vw;
@@ -522,11 +523,17 @@ body:has(.modal-overlay) {
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: visible;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Horizontal scroll for wide tables; outer card stays overflow:visible so row action menus are not clipped. */
 .table-card-scroll {
+  display: block;
+  width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
   overflow-x: auto;
   overflow-y: visible;
 }
@@ -741,7 +748,13 @@ body:has(.modal-overlay) {
 }
 
 .modal-card-wide {
-  max-width: 960px;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-overlay .modal-card-wide {
+  max-width: min(960px, 100%);
 }
 
 /* Request view modal — scroll body, pinned footer close */
@@ -1232,6 +1245,124 @@ button.compiled-record-modal-tab {
   white-space: pre-wrap;
 }
 
+/* Compiled record page + PDF: continuous document (no nested scroll panes). */
+.ministry-compiled-single.hr-request-modal--page.ministry-compiled-modal {
+  display: block;
+  max-height: none;
+  overflow: visible;
+}
+
+.ministry-compiled-single.hr-request-modal--page .ministry-compiled-print-root,
+.ministry-compiled-single.hr-request-modal--page .ministry-compiled-modal__body,
+.ministry-compiled-single.hr-request-modal--page .ministry-compiled-single__body {
+  overflow: visible;
+  flex: none;
+  max-height: none;
+  min-height: 0;
+}
+
+.ministry-compiled-embedded-request {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-height: none;
+  overflow: visible;
+}
+
+.ministry-compiled-embedded-request .hr-request-view-template {
+  padding-top: 0;
+}
+
+.ministry-compiled-embedded-request .hr-request-view-template--ministry-document {
+  padding: 0;
+  gap: 12px;
+}
+
+.ministry-compiled-embedded-request .hr-request-view-template--ministry-document .hr-request-view-template__hero {
+  padding: 16px 18px;
+}
+
+.ministry-compiled-embedded-request .hr-request-view-template--ministry-document .hr-request-view-template__title {
+  margin: 10px 0 12px;
+  font-size: var(--font-size-base);
+}
+
+.ministry-compiled-dept-response-item__dept {
+  margin: 0 0 10px;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: #1e3a6e;
+}
+
+/* PDF export — A4 document width, preserve colours, avoid clipped tables. */
+.ministry-compiled-pdf-capture {
+  width: 794px !important;
+  max-width: 794px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  background: #ffffff !important;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.ministry-compiled-pdf-capture .workflow-modal-hero,
+.ministry-compiled-pdf-capture .status-badge,
+.ministry-compiled-pdf-capture .hr-request-view-template__meta-pill,
+.ministry-compiled-pdf-capture .hr-request-view-template__article-pill {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.ministry-compiled-pdf-capture .ministry-compiled-modal__body,
+.ministry-compiled-pdf-capture .ministry-compiled-single__body {
+  padding: 18px 22px 26px !important;
+}
+
+.ministry-compiled-pdf-capture .ministry-compiled-region-card {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  box-shadow: none;
+  margin-bottom: 16px;
+}
+
+.ministry-compiled-pdf-capture .ministry-compiled-draft-alert {
+  display: none !important;
+}
+
+.ministry-compiled-pdf-capture a {
+  color: inherit;
+  text-decoration: none;
+  pointer-events: none;
+}
+
+.ministry-compiled-pdf-capture .dept-data-matrix-wrap,
+.ministry-compiled-pdf-capture .table-card-scroll {
+  overflow: visible !important;
+  max-width: 100% !important;
+}
+
+.ministry-compiled-pdf-capture .dept-data-matrix {
+  width: 100% !important;
+  min-width: 0 !important;
+  font-size: 11px;
+}
+
+.ministry-compiled-pdf-capture .hr-request-readonly-prose {
+  min-height: 0;
+  height: auto !important;
+}
+
+.ministry-compiled-pdf-capture .workflow-modal-hero {
+  border-radius: 10px 10px 0 0;
+}
+
+.ministry-compiled-pdf-capture .hr-request-view-template {
+  padding: 0;
+  gap: 12px;
+}
+
 /* Regional compilation: department row — checkbox vs open submission */
 .compilation-dept-status-row {
   display: flex;
@@ -1519,10 +1650,10 @@ button.compiled-record-modal-tab {
 
 /* Full-page request view (no overlay) — beat .modal-card max-height (incl. 92vh in mobile media query). */
 .modal-card.hr-request-modal--page {
-  max-width: min(960px, 100%);
+  max-width: 100%;
   width: 100%;
   max-height: none;
-  margin: 0 auto 24px;
+  margin: 0 0 24px;
   box-sizing: border-box;
   box-shadow: 0 2px 12px rgba(46, 79, 163, 0.1);
   border: 1px solid var(--field-border, #e1e7f5);
@@ -1531,15 +1662,13 @@ button.compiled-record-modal-tab {
   overflow: visible;
 }
 
-/* Single centered column: request card + action panels share width (no narrow-over-wide jump). */
+/* Stacked request card + action panels share full content width. */
 .hr-request-view-stack {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: min(960px, 100%);
+  max-width: 100%;
   width: 100%;
-  margin-left: auto;
-  margin-right: auto;
   box-sizing: border-box;
 }
 
@@ -1941,7 +2070,7 @@ textarea.hr-request-readonly-prose {
   display: flex;
   flex-direction: column;
   padding: 0;
-  max-width: min(960px, 100%);
+  max-width: 100%;
   overflow: visible;
   border: 1px solid var(--field-border, #e1e7f5);
   border-radius: 12px;
@@ -2001,9 +2130,7 @@ textarea.hr-request-readonly-prose {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  max-width: min(960px, 100%);
-  margin-left: auto;
-  margin-right: auto;
+  max-width: 100%;
   width: 100%;
 }
 
@@ -2016,9 +2143,7 @@ textarea.hr-request-readonly-prose {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  max-width: min(960px, 100%);
-  margin-left: auto;
-  margin-right: auto;
+  max-width: 100%;
   width: 100%;
 }
 
@@ -2049,10 +2174,8 @@ textarea.hr-request-readonly-prose {
   gap: 12px;
   align-items: center;
   margin-top: 24px;
-  max-width: min(960px, 100%);
+  max-width: 100%;
   width: 100%;
-  margin-left: auto;
-  margin-right: auto;
   margin-bottom: 16px;
   box-sizing: border-box;
 }
@@ -2861,9 +2984,14 @@ textarea.hr-request-readonly-prose {
 }
 
 .issues-admin-tabs {
+  width: 100%;
   margin-bottom: 16px;
   border-radius: var(--field-radius);
   overflow: hidden;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .issues-admin-tab__label {
@@ -2915,8 +3043,8 @@ textarea.hr-request-readonly-prose {
 }
 
 .clarification-federal-view {
-  max-width: min(960px, 100%);
-  margin: 0 auto;
+  max-width: 100%;
+  width: 100%;
 }
 
 .clarification-federal-view__toolbar {
@@ -3038,23 +3166,73 @@ textarea.hr-request-readonly-prose {
   min-width: 80px;
 }
 
+.issues-mapping-table__issue-col {
+  vertical-align: bottom;
+}
+
+.issues-mapping-table__issue-col-title {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.issues-mapping-table__kind-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted, #5a6478);
+}
+
+.issues-mapping-table__kind-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.issues-mapping-table__kind-legend-item::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.issues-mapping-table__kind-legend-item--issue::before {
+  background: #1e4fd6;
+}
+
+.issues-mapping-table__kind-legend-item--recommendation::before {
+  background: #7c3aed;
+}
+
 .issues-mapping-table__issue {
   width: 28%;
   min-width: 180px;
 }
 
-.issues-mapping-table__kind-badge {
-  display: inline-block;
-  margin-right: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  background: var(--field-bg, #eef2fb);
-  color: var(--text-muted, #5a6478);
-  vertical-align: middle;
+.issues-mapping-table tbody tr.issues-mapping-table__row--issue td {
+  background: rgba(30, 79, 214, 0.07);
+}
+
+.issues-mapping-table tbody tr.issues-mapping-table__row--recommendation td {
+  background: rgba(124, 58, 237, 0.07);
+}
+
+.issues-mapping-table tbody tr.issues-mapping-table__row--issue td:first-child {
+  box-shadow: inset 4px 0 0 #1e4fd6;
+}
+
+.issues-mapping-table tbody tr.issues-mapping-table__row--recommendation td:first-child {
+  box-shadow: inset 4px 0 0 #7c3aed;
+}
+
+.issues-mapping-table tbody tr.issues-mapping-table__row--issue:hover td {
+  background: rgba(30, 79, 214, 0.11);
+}
+
+.issues-mapping-table tbody tr.issues-mapping-table__row--recommendation:hover td {
+  background: rgba(124, 58, 237, 0.11);
 }
 
 .issue-entry-kind-toggle {
@@ -3083,6 +3261,24 @@ textarea.hr-request-readonly-prose {
 .issue-entry-kind-toggle__btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.issue-indicator-collection-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 12px 0;
+}
+
+.issue-indicator-collection-checks__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.issue-indicator-collection-checks__item input {
+  margin: 0;
 }
 
 .issue-indicator-year-gender-section {
@@ -3147,8 +3343,35 @@ textarea.hr-request-readonly-prose {
   margin-top: 4px;
 }
 
-/* Category, article, year, gender list tables — single scroll wrapper via TableCard. */
+.issues-catalog-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  box-sizing: border-box;
+}
+
+.issues-catalog-page > .table-card,
+.issues-catalog-page > .page-toolbar {
+  align-self: stretch;
+  width: 100%;
+}
+
+.issues-catalog-page .page-toolbar {
+  width: 100%;
+}
+
+/* Category, article, year, gender list tables — full width of the content area. */
+.issues-catalog-list-card.table-card {
+  width: 100%;
+  max-width: 100%;
+}
+
 .issues-catalog-list-card > .table-card-scroll {
+  width: 100%;
   max-width: 100%;
   overflow-x: auto;
   overflow-y: visible;
@@ -3157,6 +3380,7 @@ textarea.hr-request-readonly-prose {
 
 .issues-catalog-table {
   width: 100%;
+  min-width: 100%;
   table-layout: fixed;
 }
 
@@ -3165,9 +3389,27 @@ textarea.hr-request-readonly-prose {
   vertical-align: middle;
 }
 
+.issues-catalog-table__col-id {
+  width: 72px;
+}
+
+.issues-catalog-table__col-actions {
+  width: 120px;
+}
+
+.issues-catalog-table th:first-child,
+.issues-catalog-table td:first-child {
+  width: 72px;
+}
+
+.issues-catalog-table th:last-child,
+.issues-catalog-table td:last-child {
+  width: 120px;
+}
+
 .issues-catalog-table .table-actions {
-  width: 110px;
-  min-width: 110px;
+  width: 120px;
+  min-width: 120px;
   text-align: right;
 }
 
@@ -3289,8 +3531,20 @@ textarea.hr-request-readonly-prose {
     box-shadow: -6px 0 8px -4px rgba(0, 0, 0, 0.08);
   }
 
-  .issues-mapping-table tbody tr:hover .issues-mapping-table__actions {
-    background: #fafafa;
+  .issues-mapping-table tbody tr.issues-mapping-table__row--issue .issues-mapping-table__actions {
+    background: rgba(30, 79, 214, 0.07);
+  }
+
+  .issues-mapping-table tbody tr.issues-mapping-table__row--recommendation .issues-mapping-table__actions {
+    background: rgba(124, 58, 237, 0.07);
+  }
+
+  .issues-mapping-table tbody tr.issues-mapping-table__row--issue:hover .issues-mapping-table__actions {
+    background: rgba(30, 79, 214, 0.11);
+  }
+
+  .issues-mapping-table tbody tr.issues-mapping-table__row--recommendation:hover .issues-mapping-table__actions {
+    background: rgba(124, 58, 237, 0.11);
   }
 }
 
@@ -3337,9 +3591,21 @@ textarea.hr-request-readonly-prose {
 }
 
 .mapping-article-list {
-  list-style: disc !important;
-  list-style-position: outside;
-  padding-left: 1.25rem;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.mapping-article-list__item {
+  margin-bottom: 12px;
+}
+
+.mapping-article-list__item:last-child {
+  margin-bottom: 0;
+}
+
+.mapping-article-list__item > strong {
+  display: block;
+  font-weight: 600;
 }
 
 .mapping-indicators li {
@@ -3450,6 +3716,11 @@ textarea.hr-request-readonly-prose {
 }
 
 .regional-responses-full-modal.regional-responses-full-modal {
+  max-width: 100%;
+  width: 100%;
+}
+
+.modal-overlay .regional-responses-full-modal.regional-responses-full-modal {
   max-width: min(1040px, 100%);
 }
 
@@ -4133,17 +4404,24 @@ textarea.hr-request-readonly-prose {
   text-transform: capitalize;
 }
 
+/* Awaiting action / not started — light red (distinct from distributed & draft). */
 .status-badge.pending {
-  background: #fff7e6;
-  border-color: #f7dca3;
-  color: #916100;
+  background: #fff0f0;
+  border-color: #f5c2c2;
+  color: #b42318;
 }
 
-/* Distinct from pending (amber) — aligns with primary blue chrome */
+/* In pipeline: distributed, under review, submitted for processing. */
 .status-badge.in-progress {
   background: #e8eefb;
   border-color: #8fb4f0;
   color: #1a3a5c;
+}
+
+.status-badge.default {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #4b5563;
 }
 
 .status-badge.success {
@@ -4210,6 +4488,10 @@ textarea.hr-request-readonly-prose {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .page-header-back {
@@ -4949,6 +5231,19 @@ textarea.hr-request-readonly-prose {
   min-width: 680px;
 }
 
+/* Catalog lists (category, article, year, gender) must span the full content width. */
+.issues-catalog-list-card .issues-catalog-table.data-table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none;
+  table-layout: fixed;
+}
+
+.issues-catalog-list-card .issues-catalog-table.data-table th:nth-child(2),
+.issues-catalog-list-card .issues-catalog-table.data-table td:nth-child(2) {
+  width: auto;
+}
+
 @media (max-width: 1100px) {
   .main-area,
   .app-main {
@@ -5063,8 +5358,7 @@ textarea.hr-request-readonly-prose {
 
 /* —— AI report generator (client-approved layout from hrims_old) —— */
 .report-generator-page {
-  max-width: min(1220px, 100%);
-  margin-inline: auto;
+  max-width: 100%;
   width: 100%;
 }
 
@@ -5818,8 +6112,7 @@ textarea.hr-request-readonly-prose {
 
 /* —— Analysis dashboard (hrims_old: Data Analytics & Performance) —— */
 .analysis-page {
-  max-width: min(1280px, 100%);
-  margin-inline: auto;
+  max-width: 100%;
   width: 100%;
   display: flex;
   flex-direction: column;

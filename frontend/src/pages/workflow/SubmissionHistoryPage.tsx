@@ -12,6 +12,8 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { TableToolbar } from '../../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
+import { formatAppDate } from '../../lib/dateFormat'
+import { sortRowsLatestFirst } from '../../lib/tableRowSort'
 import {
   countDepartmentTasksByWorkflow,
   hasDepartmentResponse,
@@ -97,7 +99,7 @@ export function SubmissionHistoryPage({ title }: Props) {
   const reviewStatusFilter = respTable.filters.status ?? ''
   const filteredResponses = useMemo(() => {
     const q = respTable.search.trim().toLowerCase()
-    return rows.filter((r) => {
+    const matched = rows.filter((r) => {
       if (reviewStatusFilter && r.review_status !== reviewStatusFilter) return false
       if (!q) return true
       return (
@@ -107,6 +109,7 @@ export function SubmissionHistoryPage({ title }: Props) {
         (r.region_name ?? '').toLowerCase().includes(q)
       )
     })
+    return sortRowsLatestFirst(matched, (r) => r.submission_date || r.id)
   }, [rows, respTable.search, reviewStatusFilter])
 
   const respPage = useMemo(
@@ -191,7 +194,7 @@ export function SubmissionHistoryPage({ title }: Props) {
                     <tr key={t.id}>
                       <td>{t.id}</td>
                       <td>{t.req_id}</td>
-                      <td>{t.submission_date ?? '—'}</td>
+                      <td>{formatAppDate(t.submission_date)}</td>
                       <td>
                         <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
                       </td>
@@ -305,7 +308,7 @@ export function SubmissionHistoryPage({ title }: Props) {
                       <td>{r.id}</td>
                       <td>{r.req_id}</td>
                       <td>{r.title}</td>
-                      <td>{r.submission_date}</td>
+                      <td>{formatAppDate(r.submission_date)}</td>
                       <td>
                         <StatusBadge tone={review.tone}>{review.label}</StatusBadge>
                       </td>

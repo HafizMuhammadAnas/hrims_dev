@@ -12,7 +12,6 @@ import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { DepartmentSubmissionsForRequest } from '../../components/DepartmentSubmissionsForRequest'
-import { formatDepartmentResponseAsPlaintext } from '../../lib/departmentTaskResponseFormat'
 import {
   countDepartmentTasksByWorkflow,
   hasDepartmentResponse,
@@ -149,21 +148,6 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
 
   const includedSet = useMemo(() => new Set(includedTaskIds), [includedTaskIds])
 
-  const prefill = useMemo(() => {
-    const picked = selectedTasks.filter((t) => includedSet.has(t.id))
-    if (!picked.length) return ''
-    return picked
-      .map((t) => {
-        const wf = workflowPresentation(t)
-        return (
-          `[${t.department_name ?? t.department_id}]` +
-          `\nProgress: ${wf.label}` +
-          `\n${formatDepartmentResponseAsPlaintext(t.response_data, t.attachment_url)}`
-        )
-      })
-      .join('\n\n')
-  }, [selectedTasks, includedSet])
-
   function toggleTaskInclusion(taskId: string) {
     setIncludedTaskIds((prev) =>
       prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId],
@@ -178,10 +162,6 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
       setError('Select a request first.')
       return
     }
-    if (!content.trim()) {
-      setError('Compiled response content is required.')
-      return
-    }
     if (ictScope && ictRegionId == null) {
       setError('ICT region is not configured in the system.')
       return
@@ -192,7 +172,7 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
       await createRegionalResponse({
         hr_request_id: selectedReq.id,
         title: `${selectedReq.title} - consolidated response`,
-        content: content.trim(),
+        content: content.trim() || '',
         ...(ictScope && ictRegionId != null ? { region_id: ictRegionId } : {}),
       })
       navigate(nextPath)
@@ -253,7 +233,6 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
             selectedTasks={selectedTasks}
             includedTaskIds={includedTaskIds}
             includedSet={includedSet}
-            content={content}
             ictScope={ictScope}
             distributionPath={distributionPath}
             distributionLabel={distributionLabel}
@@ -262,11 +241,10 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
             onClearAll={() => setIncludedTaskIds([])}
             onToggle={toggleTaskInclusion}
             onOpenTask={(t) => navigate(hrRequestViewPath(t.req_id, compilationFrom, t.id))}
-            onPrefill={() => setContent(prefill)}
           />
         )}
 
-        <label className="muted">Compiled response content</label>
+        <label className="muted">Compiled response content (optional)</label>
         <textarea
           rows={8}
           style={{ width: '100%', marginTop: 6 }}
@@ -306,7 +284,6 @@ function CompilationDeptBlock({
   selectedTasks,
   includedTaskIds,
   includedSet,
-  content,
   ictScope,
   distributionPath,
   distributionLabel,
@@ -315,12 +292,10 @@ function CompilationDeptBlock({
   onClearAll,
   onToggle,
   onOpenTask,
-  onPrefill,
 }: {
   selectedTasks: DepartmentTaskRow[]
   includedTaskIds: string[]
   includedSet: Set<string>
-  content: string
   ictScope: boolean
   distributionPath: string
   distributionLabel: string
@@ -329,7 +304,6 @@ function CompilationDeptBlock({
   onClearAll: () => void
   onToggle: (id: string) => void
   onOpenTask: (t: DepartmentTaskRow) => void
-  onPrefill: () => void
 }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -356,12 +330,8 @@ function CompilationDeptBlock({
           {selectedTasks.some((t) => hasDepartmentResponse(t)) ? (
             <section className="hr-request-view-template__card" style={{ marginTop: 16, padding: 14 }}>
               <h4 className="card-section-heading" style={{ marginTop: 0 }}>
-                Department submissions (view only)
+                Department submissions
               </h4>
-              <p className="muted text-compact" style={{ margin: '0 0 12px' }}>
-                Year and gender figures, comments, narratives, and attachments from each department. Open a row
-                above for the full task view.
-              </p>
               <DepartmentSubmissionsForRequest
                 tasksForDetail={selectedTasks}
                 reqId={selectedTasks[0]?.req_id ?? ''}
@@ -371,14 +341,6 @@ function CompilationDeptBlock({
               />
             </section>
           ) : null}
-          <Button variant="secondary" compact disabled={includedTaskIds.length === 0} onClick={onPrefill}>
-            {content.trim() ? 'Replace draft with selected departments' : 'Prefill from selected departments'}
-          </Button>
-          {includedTaskIds.length === 0 && (
-            <p className="muted small" style={{ margin: '8px 0 0' }}>
-              Select at least one department to build text from task notes.
-            </p>
-          )}
         </>
       )}
     </div>

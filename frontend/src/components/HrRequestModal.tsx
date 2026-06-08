@@ -1012,10 +1012,10 @@ export function HrRequestModal({
                       {selectedIssue.articles.length === 0 ? (
                         <p className="muted">—</p>
                       ) : (
-                        <ul className="mapping-indicators mapping-article-list">
+                        <div className="mapping-article-list">
                           {selectedIssue.articles.map((a) => (
-                            <li key={a.id}>
-                              {a.article_name}
+                            <div key={a.id} className="mapping-article-list__item">
+                              <strong>{a.article_name}</strong>
                               {a.description?.trim() ? (
                                 <p
                                   className="muted"
@@ -1032,9 +1032,9 @@ export function HrRequestModal({
                                   {a.relevant_paragraph}
                                 </p>
                               ) : null}
-                            </li>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       )}
                     </div>
                     <div>

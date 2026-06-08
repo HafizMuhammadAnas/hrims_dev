@@ -103,6 +103,7 @@ class HrRequestResource extends JsonResource
             'articles',
             'indicators.yearGenderCells.collectionYear:id,label,sort_order',
             'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+            'indicators.collectionYearRows.collectionYear:id,label,sort_order',
         ]);
 
         return [

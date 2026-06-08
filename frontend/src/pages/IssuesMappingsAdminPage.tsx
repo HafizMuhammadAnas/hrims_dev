@@ -50,9 +50,13 @@ import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTabl
 import {
   coerceIssueEntryKind,
   issueEntryKindBadgeLabel,
+  issueEntryKindToggleAriaLabel,
   issueEntryTitleColumnLabel,
   issueEntryTitleFieldLabel,
   issueEntryViewPageTitle,
+  issuesCreateTabLabel,
+  issuesEmptyListHint,
+  issuesListTabLabel,
   type IssueEntryKind,
 } from '../lib/issueEntryKind'
 import { isSuperAdmin } from '../lib/roles'
@@ -63,8 +67,8 @@ const ISSUES_PAGE_SIZE = 10
 type IssuesView = 'list' | 'create' | 'categories' | 'articles' | 'years' | 'genders'
 
 const ISSUES_TABS: { view: IssuesView; to: string; label: string; end?: boolean }[] = [
-  { view: 'list', to: '/admin/issues', label: 'Issues / recommendation list', end: true },
-  { view: 'create', to: '/admin/issues/create', label: 'Create issue / recommendation' },
+  { view: 'list', to: '/admin/issues', label: issuesListTabLabel(), end: true },
+  { view: 'create', to: '/admin/issues/create', label: issuesCreateTabLabel() },
   { view: 'categories', to: '/admin/issues/categories', label: 'Category list' },
   { view: 'articles', to: '/admin/issues/articles', label: 'Article list' },
   { view: 'years', to: '/admin/issues/years', label: 'Year list' },
@@ -313,7 +317,7 @@ function IssuesListSection({
   const navigate = useNavigate()
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
 
-  const sortedIssues = useMemo(() => [...issues].sort((a, b) => a.id - b.id), [issues])
+  const sortedIssues = useMemo(() => [...issues].sort((a, b) => b.id - a.id), [issues])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -359,7 +363,17 @@ function IssuesListSection({
                 <th>Convention</th>
                 <th>Articles</th>
                 <th>Category</th>
-                <th>{issueEntryTitleColumnLabel()}</th>
+                <th className="issues-mapping-table__issue-col">
+                  <span className="issues-mapping-table__issue-col-title">{issueEntryTitleColumnLabel()}</span>
+                  <span className="issues-mapping-table__kind-legend">
+                    <span className="issues-mapping-table__kind-legend-item issues-mapping-table__kind-legend-item--issue">
+                      Issue
+                    </span>
+                    <span className="issues-mapping-table__kind-legend-item issues-mapping-table__kind-legend-item--recommendation">
+                      Recommendation
+                    </span>
+                  </span>
+                </th>
                 <th className="issues-mapping-table__actions-col">Actions</th>
               </tr>
             </thead>
@@ -370,22 +384,28 @@ function IssuesListSection({
                   message={
                     search.trim()
                       ? 'No entries match your search.'
-                      : 'No issues or recommendations yet. Use Create issue / recommendation to add one.'
+                      : issuesEmptyListHint()
                   }
                 />
               ) : (
-                pageRows.map((i) => (
-                  <tr key={i.id}>
+                pageRows.map((i) => {
+                  const entryKind = coerceIssueEntryKind(i.entry_kind ?? 'issue')
+                  return (
+                  <tr
+                    key={i.id}
+                    className={`issues-mapping-table__row issues-mapping-table__row--${entryKind}`}
+                    title={issueEntryKindBadgeLabel(entryKind)}
+                  >
                     <td className="text-compact issues-mapping-table__convention">{issueConventionLabel(i)}</td>
                     <td className="text-compact issues-mapping-table__articles">
                       {i.articles.map((a) => a.article_name).join(', ') || 'None'}
                     </td>
                     <td className="issues-mapping-table__category">{i.category?.name ?? i.category_id}</td>
-                    <td className="issues-mapping-table__issue">
-                      <span className="issues-mapping-table__kind-badge">
-                        {issueEntryKindBadgeLabel(coerceIssueEntryKind(i.entry_kind ?? 'issue'))}
-                      </span>
-                      <span>{i.issue_title}</span>
+                    <td
+                      className="issues-mapping-table__issue"
+                      aria-label={`${issueEntryKindBadgeLabel(entryKind)}: ${i.issue_title}`}
+                    >
+                      {i.issue_title}
                     </td>
                     <td className="issues-mapping-table__actions">
                       <ActionMenu>
@@ -422,7 +442,8 @@ function IssuesListSection({
                       </ActionMenu>
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -451,13 +472,7 @@ function IssuesCategoriesSection({
   const [editCategoryName, setEditCategoryName] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
 
-  const sortedCategories = useMemo(
-    () =>
-      [...categories].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }),
-      ),
-    [categories],
-  )
+  const sortedCategories = useMemo(() => [...categories].sort((a, b) => b.id - a.id), [categories])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -470,7 +485,7 @@ function IssuesCategoriesSection({
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
   return (
-    <>
+    <div className="issues-catalog-page">
       <div style={{ marginBottom: 16 }}>
         <TableCard padded>
           <div className="issues-catalog-add-form">
@@ -525,6 +540,7 @@ function IssuesCategoriesSection({
 
       <TableCard className="issues-catalog-list-card">
         <table className="data-table issues-catalog-table">
+          <IssuesCatalogTableColgroup />
           <thead>
             <tr>
               <th>ID</th>
@@ -622,7 +638,7 @@ function IssuesCategoriesSection({
         </table>
       </TableCard>
       <PaginationBar page={page} pageSize={pageSize} totalItems={processed.length} onPageChange={setPage} />
-    </>
+    </div>
   )
 }
 
@@ -648,13 +664,7 @@ function IssuesArticlesSection({
   const [editArticleDescription, setEditArticleDescription] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
 
-  const sortedArticles = useMemo(
-    () =>
-      [...articles].sort((a, b) =>
-        a.article_name.localeCompare(b.article_name, undefined, { numeric: true, sensitivity: 'base' }),
-      ),
-    [articles],
-  )
+  const sortedArticles = useMemo(() => [...articles].sort((a, b) => b.id - a.id), [articles])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -670,7 +680,7 @@ function IssuesArticlesSection({
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
   return (
-    <>
+    <div className="issues-catalog-page">
       <div style={{ marginBottom: 16 }}>
       <TableCard padded>
         <div className="issues-catalog-add-form">
@@ -740,6 +750,7 @@ function IssuesArticlesSection({
 
       <TableCard className="issues-catalog-list-card">
         <table className="data-table issues-catalog-table">
+          <IssuesCatalogTableColgroup />
           <thead>
             <tr>
               <th>ID</th>
@@ -862,17 +873,8 @@ function IssuesArticlesSection({
         </table>
       </TableCard>
       <PaginationBar page={page} pageSize={pageSize} totalItems={processed.length} onPageChange={setPage} />
-    </>
+    </div>
   )
-}
-
-function compareCollectionYearLabels(a: AdminCollectionYear, b: AdminCollectionYear): number {
-  const na = Number(a.label)
-  const nb = Number(b.label)
-  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) {
-    return na - nb
-  }
-  return a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' })
 }
 
 function IssuesCollectionYearsSection({
@@ -893,7 +895,7 @@ function IssuesCollectionYearsSection({
   const [editLabel, setEditLabel] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
 
-  const sorted = useMemo(() => [...years].sort(compareCollectionYearLabels), [years])
+  const sorted = useMemo(() => [...years].sort((a, b) => b.id - a.id), [years])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -904,7 +906,7 @@ function IssuesCollectionYearsSection({
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
   return (
-    <>
+    <div className="issues-catalog-page">
       <div style={{ marginBottom: 16 }}>
         <TableCard padded>
           <div className="issues-catalog-add-form">
@@ -960,6 +962,7 @@ function IssuesCollectionYearsSection({
 
       <TableCard className="issues-catalog-list-card">
         <table className="data-table issues-catalog-table">
+          <IssuesCatalogTableColgroup />
           <thead>
             <tr>
               <th>ID</th>
@@ -1058,7 +1061,7 @@ function IssuesCollectionYearsSection({
         </table>
       </TableCard>
       <PaginationBar page={page} pageSize={pageSize} totalItems={processed.length} onPageChange={setPage} />
-    </>
+    </div>
   )
 }
 
@@ -1080,13 +1083,7 @@ function IssuesCollectionGendersSection({
   const [editName, setEditName] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
 
-  const sorted = useMemo(
-    () =>
-      [...genders].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }),
-      ),
-    [genders],
-  )
+  const sorted = useMemo(() => [...genders].sort((a, b) => b.id - a.id), [genders])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -1097,7 +1094,7 @@ function IssuesCollectionGendersSection({
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
   return (
-    <>
+    <div className="issues-catalog-page">
       <div style={{ marginBottom: 16 }}>
         <TableCard padded>
           <div className="issues-catalog-add-form">
@@ -1152,6 +1149,7 @@ function IssuesCollectionGendersSection({
 
       <TableCard className="issues-catalog-list-card">
         <table className="data-table issues-catalog-table">
+          <IssuesCatalogTableColgroup />
           <thead>
             <tr>
               <th>ID</th>
@@ -1249,7 +1247,7 @@ function IssuesCollectionGendersSection({
         </table>
       </TableCard>
       <PaginationBar page={page} pageSize={pageSize} totalItems={processed.length} onPageChange={setPage} />
-    </>
+    </div>
   )
 }
 
@@ -1283,6 +1281,9 @@ function indicatorDataTypeLabel(ind: AdminIssue['indicators'][number], issue: Ad
 /** Year → gender mapping or free-text disaggregation field. */
 function indicatorDisaggregationLabel(ind: AdminIssue['indicators'][number]): string {
   if (ind.collects_by_year && (ind.collection_by_year?.length ?? 0) > 0) {
+    if (!ind.collects_by_gender) {
+      return ind.collection_by_year.map((y) => y.label).join('; ')
+    }
     return ind.collection_by_year
       .map((y) => {
         const genders = (y.genders ?? []).map((g) => g.name).filter(Boolean)
@@ -1317,6 +1318,16 @@ function CatalogInlineEditActions({
   )
 }
 
+function IssuesCatalogTableColgroup() {
+  return (
+    <colgroup>
+      <col className="issues-catalog-table__col-id" />
+      <col />
+      <col className="issues-catalog-table__col-actions" />
+    </colgroup>
+  )
+}
+
 function ActionMenu({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
@@ -1330,11 +1341,14 @@ type IndicatorYearGenderRow = {
   gender_ids: number[]
 }
 
+type IndicatorCollectionMode = 'none' | 'year' | 'year_gender'
+
 type IndicatorDraft = {
   indicator_text: string
   collects_quantitative: boolean
   collects_qualitative: boolean
-  collects_by_year: boolean
+  collection_mode: IndicatorCollectionMode
+  year_ids: number[]
   year_gender_rows: IndicatorYearGenderRow[]
 }
 
@@ -1343,7 +1357,8 @@ function emptyIndicator(): IndicatorDraft {
     indicator_text: '',
     collects_quantitative: false,
     collects_qualitative: true,
-    collects_by_year: false,
+    collection_mode: 'none',
+    year_ids: [],
     year_gender_rows: [],
   }
 }
@@ -1353,15 +1368,31 @@ function indicatorDraftFromApi(
   issue: AdminIssue,
 ): IndicatorDraft {
   const legacyRow = !ind.has_quantitative && !ind.has_qualitative
+  const collectsByYear = ind.collects_by_year ?? false
+  const collectsByGender =
+    ind.collects_by_gender ??
+    (collectsByYear &&
+      (ind.collection_by_year ?? []).some(
+        (y) => (y.gender_ids?.length ?? y.genders?.length ?? 0) > 0,
+      ))
+  let collection_mode: IndicatorCollectionMode = 'none'
+  if (collectsByYear) {
+    collection_mode = collectsByGender ? 'year_gender' : 'year'
+  }
   return {
     indicator_text: ind.indicator_text,
     collects_quantitative: legacyRow ? issue.has_quantitative : ind.has_quantitative,
     collects_qualitative: legacyRow ? issue.has_qualitative : ind.has_qualitative,
-    collects_by_year: ind.collects_by_year ?? false,
-    year_gender_rows: (ind.collection_by_year ?? []).map((y) => ({
-      year_id: y.year_id,
-      gender_ids: [...(y.gender_ids ?? [])],
-    })),
+    collection_mode,
+    year_ids: collectsByYear && !collectsByGender
+      ? (ind.collection_by_year ?? []).map((y) => y.year_id)
+      : [],
+    year_gender_rows: collectsByYear && collectsByGender
+      ? (ind.collection_by_year ?? []).map((y) => ({
+          year_id: y.year_id,
+          gender_ids: [...(y.gender_ids ?? [])],
+        }))
+      : [],
   }
 }
 
@@ -1371,8 +1402,11 @@ function validateIndicatorDataTypes(rows: IndicatorDraft[]): string | null {
     if (!x.collects_quantitative && !x.collects_qualitative) {
       return 'Each indicator must have Quantitative and/or Qualitative selected.'
     }
-    if (x.collects_by_year && x.year_gender_rows.length === 0) {
-      return 'Add at least one year and select genders for it.'
+    if (x.collection_mode === 'year' && x.year_ids.length === 0) {
+      return 'Add at least one year when collecting by year only.'
+    }
+    if (x.collection_mode === 'year_gender' && x.year_gender_rows.length === 0) {
+      return 'Add at least one year when collecting by year and gender.'
     }
     for (const yRow of x.year_gender_rows) {
       if (yRow.gender_ids.length === 0) {
@@ -1384,17 +1418,25 @@ function validateIndicatorDataTypes(rows: IndicatorDraft[]): string | null {
 }
 
 function indicatorToPayload(x: IndicatorDraft) {
+  const collectsByYear = x.collection_mode !== 'none'
+  const collectsByGender = x.collection_mode === 'year_gender'
   return {
     indicator_text: x.indicator_text.trim(),
     disaggregation: null,
     has_quantitative: x.collects_quantitative,
     has_qualitative: x.collects_qualitative,
-    collects_by_year: x.collects_by_year,
-    collection_by_year: x.collects_by_year
-      ? x.year_gender_rows.map((row) => ({
-          collection_year_id: row.year_id,
-          collection_gender_ids: row.gender_ids,
-        }))
+    collects_by_year: collectsByYear,
+    collects_by_gender: collectsByGender,
+    collection_by_year: collectsByYear
+      ? x.collection_mode === 'year'
+        ? x.year_ids.map((yearId) => ({
+            collection_year_id: yearId,
+            collection_gender_ids: [] as number[],
+          }))
+        : x.year_gender_rows.map((row) => ({
+            collection_year_id: row.year_id,
+            collection_gender_ids: row.gender_ids,
+          }))
       : [],
   }
 }
@@ -1480,6 +1522,42 @@ function IndicatorYearGenderMapper({
         )
       )}
     </div>
+  )
+}
+
+function IndicatorYearOnlyPicker({
+  yearIds,
+  onChange,
+  collectionYears,
+  disabled,
+}: {
+  yearIds: number[]
+  onChange: (ids: number[]) => void
+  collectionYears: AdminCollectionYear[]
+  disabled?: boolean
+}) {
+  const sortedYears = useMemo(
+    () => [...collectionYears].sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)),
+    [collectionYears],
+  )
+
+  if (sortedYears.length === 0) {
+    return (
+      <p className="text-muted text-compact" style={{ margin: 0 }}>
+        No years in catalog — add entries under Year list.
+      </p>
+    )
+  }
+
+  return (
+    <CatalogIdCheckboxList
+      label="Years"
+      items={sortedYears}
+      labelKey="label"
+      selectedIds={yearIds}
+      disabled={disabled}
+      onChange={onChange}
+    />
   )
 }
 
@@ -1709,33 +1787,57 @@ function IssueIndicatorsEditor({
               </div>
             </FormControl>
           </FormRow>
-          <div className="issue-indicator-year-gender-section">
-            <div className="issue-indicator-year-gender-section__head">
-              <strong className="text-compact">Year and gender breakdown</strong>
-              <p className="muted text-compact" style={{ margin: '4px 0 0' }}>
-                Enable when responses should be collected separately for each year, with genders configured per
-                year.
-              </p>
-            </div>
-            <label className="issue-indicator-year-gender-toggle">
+          <div className="issue-indicator-collection-checks">
+            <label className="checkbox-label issue-indicator-collection-checks__item">
               <input
                 type="checkbox"
-                checked={row.collects_by_year}
+                checked={row.collection_mode === 'year'}
                 disabled={disabled}
                 onChange={(e) => {
                   const next = [...rows]
                   next[idx] = {
                     ...row,
-                    collects_by_year: e.target.checked,
+                    collection_mode: e.target.checked ? 'year' : 'none',
+                    year_ids: e.target.checked ? row.year_ids : [],
+                    year_gender_rows: [],
+                  }
+                  onChange(next)
+                }}
+              />
+              Collect by year only
+            </label>
+            <label className="checkbox-label issue-indicator-collection-checks__item">
+              <input
+                type="checkbox"
+                checked={row.collection_mode === 'year_gender'}
+                disabled={disabled}
+                onChange={(e) => {
+                  const next = [...rows]
+                  next[idx] = {
+                    ...row,
+                    collection_mode: e.target.checked ? 'year_gender' : 'none',
+                    year_ids: [],
                     year_gender_rows: e.target.checked ? row.year_gender_rows : [],
                   }
                   onChange(next)
                 }}
               />
-              <span>Collect by year and gender</span>
+              Collect by year and gender
             </label>
           </div>
-          {row.collects_by_year && (
+          {row.collection_mode === 'year' ? (
+            <IndicatorYearOnlyPicker
+              yearIds={row.year_ids}
+              collectionYears={sortedYears}
+              disabled={disabled}
+              onChange={(year_ids) => {
+                const next = [...rows]
+                next[idx] = { ...row, year_ids }
+                onChange(next)
+              }}
+            />
+          ) : null}
+          {row.collection_mode === 'year_gender' ? (
             <IndicatorYearGenderMapper
               rows={row.year_gender_rows}
               collectionYears={sortedYears}
@@ -1747,7 +1849,7 @@ function IssueIndicatorsEditor({
                 onChange(next)
               }}
             />
-          )}
+          ) : null}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button variant="link" compact dangerLink disabled={disabled} onClick={() => onChange(rows.filter((_, i) => i !== idx))}>
               Remove indicator
@@ -1909,7 +2011,7 @@ function IssuesCreateForm({
             })()
           }}
         >
-          Save {entryKind === 'recommendation' ? 'recommendation' : 'issue'}
+          Save {issueEntryKindBadgeLabel(entryKind)}
         </Button>
       </div>
     </div>
@@ -1926,7 +2028,7 @@ function IssueEntryKindToggle({
   disabled?: boolean
 }) {
   return (
-    <div className="issue-entry-kind-toggle" role="radiogroup" aria-label="Issue or recommendation">
+    <div className="issue-entry-kind-toggle" role="radiogroup" aria-label={issueEntryKindToggleAriaLabel()}>
       <button
         type="button"
         className={'issue-entry-kind-toggle__btn' + (value === 'issue' ? ' issue-entry-kind-toggle__btn--active' : '')}
@@ -2235,7 +2337,11 @@ function IssuesEditPage({
 
   return (
     <PageSection
-      title={`Edit issue #${issueId}`}
+      title={
+        issue
+          ? `Edit ${issueEntryKindBadgeLabel(coerceIssueEntryKind(issue.entry_kind))} #${issueId}`
+          : `Edit entry #${issueId}`
+      }
       leading={
         <WorkflowPageBack to="/admin/issues" label={workflowBackLabel('/admin/issues')} placement="header" />
       }
@@ -2312,7 +2418,7 @@ function IssuesEditPanel({
     <div className="issue-edit-panel">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <h4 style={{ margin: 0 }}>
-          Edit {issueEntryKindBadgeLabel(entryKind).toLowerCase()} #{issue.id}
+          Edit {issueEntryKindBadgeLabel(entryKind)} #{issue.id}
         </h4>
         <Button variant="link" compact onClick={onClose}>
           Close

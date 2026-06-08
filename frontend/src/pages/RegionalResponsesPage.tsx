@@ -15,6 +15,8 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { formatAppDate } from '../lib/dateFormat'
+import { compareLatestFirst, compareStringValues } from '../lib/tableRowSort'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import {
   AWAITING_SUBMISSION_REVIEW_FILTER,
@@ -157,25 +159,26 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
     ]
 
     const key = sortKey ?? 'submission_date'
+    const valueOf = (row: RegionalResponseDisplayRow): string => {
+      if (row.kind === 'submission') return String(row.row[key] ?? '')
+      return ''
+    }
     result.sort((a, b) => {
+      const av = valueOf(a)
+      const bv = valueOf(b)
+      if (av !== bv) {
+        if (!av) return sortDir === 'desc' ? 1 : -1
+        if (!bv) return sortDir === 'desc' ? -1 : 1
+        return compareStringValues(av, bv, sortDir)
+      }
+
       const aReq = a.kind === 'submission' ? a.row.req_id : a.reqId
       const bReq = b.kind === 'submission' ? b.row.req_id : b.reqId
-      if (aReq !== bReq) return aReq.localeCompare(bReq)
+      if (aReq !== bReq) return compareLatestFirst(aReq, bReq)
 
       const aRegion = a.kind === 'submission' ? (a.row.region_name ?? '') : a.regionName
       const bRegion = b.kind === 'submission' ? (b.row.region_name ?? '') : b.regionName
-      if (aRegion !== bRegion) return aRegion.localeCompare(bRegion)
-
-      if (a.kind === 'pending' && b.kind === 'submission') return 1
-      if (a.kind === 'submission' && b.kind === 'pending') return -1
-
-      if (a.kind === 'submission' && b.kind === 'submission') {
-        const av = String(a.row[key] ?? '')
-        const bv = String(b.row[key] ?? '')
-        if (av < bv) return sortDir === 'asc' ? -1 : 1
-        if (av > bv) return sortDir === 'asc' ? 1 : -1
-      }
-      return 0
+      return aRegion.localeCompare(bRegion, undefined, { numeric: true, sensitivity: 'base' })
     })
     return result
   }, [rows, search, statusFilter, reqIdFilter, sortKey, sortDir, requests])
@@ -318,7 +321,7 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
                     <td>{entry.requestTitle}</td>
                     <td className="muted">Not yet</td>
                     <td>
-                      <StatusBadge tone="pending">Awaiting submission</StatusBadge>
+                      <StatusBadge tone="in-progress">Awaiting submission</StatusBadge>
                     </td>
                     <td className="table-actions">
                       <RowActionsMenu
@@ -346,7 +349,7 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
                   <td>{r.req_id}</td>
                   <td>{r.region_name}</td>
                   <td>{r.title}</td>
-                  <td>{r.submission_date}</td>
+                  <td>{formatAppDate(r.submission_date)}</td>
                   <td>
                     <StatusBadge tone={review.tone}>{review.label}</StatusBadge>
                   </td>

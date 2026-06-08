@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { issuesNavLabel } from '../lib/issueEntryKind'
 import {
   isDepartmentAdmin,
   isFederalAdmin,
@@ -96,7 +97,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
           <>
             <div className="nav-section-title">Super admin</div>
             <div className="nav-sub">
-              <NavItem to="/admin/issues" icon={GitBranch} label="Issues / recommendation" onPick={onPick} />
+              <NavItem to="/admin/issues" icon={GitBranch} label={issuesNavLabel()} onPick={onPick} />
               <NavItem to="/admin/regions-districts" icon={MapPin} label="Regions & districts" onPick={onPick} />
               <NavItem to="/admin/conventions" icon={Scale} label="Conventions & components" onPick={onPick} />
               <NavItem to="/admin/sdg-nodes" icon={Layers} label="SDG nodes" onPick={onPick} />

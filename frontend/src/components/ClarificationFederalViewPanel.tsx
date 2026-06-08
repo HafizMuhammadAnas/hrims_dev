@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  CLARIFICATION_STATUS_LABELS,
+  clarificationStatusPresentation,
   fetchClarification,
   respondToClarification,
   type HrRequestClarificationRow,
 } from '../api/clarifications'
 import { isApiError } from '../api/apiError'
+import { formatAppDateTime } from '../lib/dateFormat'
 import { ClarificationThreadCard } from './ClarificationThreadCard'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
 import { Alert } from './ui/Alert'
@@ -35,10 +36,10 @@ function formatClarificationMeta(row: HrRequestClarificationRow, side: 'region' 
   const parts: string[] = []
   if (side === 'region') {
     if (row.requested_by_name) parts.push(`Submitted by ${row.requested_by_name}`)
-    if (row.region_submitted_at) parts.push(new Date(row.region_submitted_at).toLocaleString())
+    if (row.region_submitted_at) parts.push(formatAppDateTime(row.region_submitted_at))
   } else {
     if (row.responded_by_name) parts.push(`Responded by ${row.responded_by_name}`)
-    if (row.federal_responded_at) parts.push(new Date(row.federal_responded_at).toLocaleString())
+    if (row.federal_responded_at) parts.push(formatAppDateTime(row.federal_responded_at))
   }
   return parts.length > 0 ? parts.join(' · ') : null
 }
@@ -134,8 +135,8 @@ export function ClarificationFederalViewPanel({ clarificationId, onClose, onResp
           <div className="clarification-federal-view__header pad-modal">
             <div className="clarification-federal-view__header-row">
               <h3 className="clarification-federal-view__heading">Clarification — {row.hr_request_id}</h3>
-              <StatusBadge tone={row.status === 'pending_federal' ? 'warning' : row.status === 'pending_region' ? 'success' : 'default'}>
-                {CLARIFICATION_STATUS_LABELS[row.status]}
+              <StatusBadge tone={clarificationStatusPresentation(row.status).tone}>
+                {clarificationStatusPresentation(row.status).label}
               </StatusBadge>
             </div>
             {row.region_name ? <p className="muted text-compact clarification-federal-view__region">{row.region_name}</p> : null}

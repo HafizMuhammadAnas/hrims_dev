@@ -1,5 +1,9 @@
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
-import { buildMatrixColumnGroups, matrixCellKey } from '../lib/indicatorMatrixColumns'
+import {
+  buildMatrixColumnGroups,
+  indicatorMatrixCellAllowed,
+  matrixCellKey,
+} from '../lib/indicatorMatrixColumns'
 import type { DepartmentQuantitativeByYearGender } from '../lib/departmentTaskResponseFormat'
 
 function genderHeaderClass(name: string): string {
@@ -15,16 +19,6 @@ function indicatorTypePills(ind: HrRequestIssueIndicator): string[] {
   if (ind.has_quantitative) parts.push('Quantitative')
   if (ind.has_qualitative) parts.push('Qualitative')
   return parts
-}
-
-function yearGenderAllowed(
-  indicator: HrRequestIssueIndicator,
-  yearId: number,
-  genderId: number,
-): boolean {
-  return (indicator.collection_by_year ?? []).some(
-    (y) => y.year_id === yearId && (y.genders ?? []).some((g) => g.id === genderId),
-  )
 }
 
 type Props = {
@@ -106,7 +100,7 @@ export function DepartmentIndicatorDataMatrix({
                 </td>
                 {columnGroups.map((group) =>
                   group.genders.map((g) => {
-                    const allowed = yearGenderAllowed(indicator, group.year_id, g.gender_id)
+                    const allowed = indicatorMatrixCellAllowed(indicator, group.year_id, g.gender_id)
                     if (!allowed) {
                       return (
                         <td

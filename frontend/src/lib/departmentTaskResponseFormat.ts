@@ -85,7 +85,11 @@ export function formatDepartmentResponseAsPlaintext(
         for (const [yearId, genders] of Object.entries(q.by_year_gender)) {
           for (const [genderId, cell] of Object.entries(genders)) {
             if (cell?.value == null || Number.isNaN(cell.value)) continue
-            lines.push(`  ${yearId}/${genderId}: ${cell.value}`)
+            lines.push(
+              genderId === '0'
+                ? `  ${yearId}: ${cell.value}`
+                : `  ${yearId}/${genderId}: ${cell.value}`,
+            )
           }
         }
       } else if (q.value != null && !Number.isNaN(q.value)) {
@@ -124,7 +128,11 @@ export function formatDepartmentResponseTextOnly(
         for (const [yearId, genders] of Object.entries(q.by_year_gender)) {
           for (const [genderId, cell] of Object.entries(genders)) {
             if (cell?.value == null || Number.isNaN(cell.value)) continue
-            lines.push(`  ${yearId}/${genderId}: ${cell.value}`)
+            lines.push(
+              genderId === '0'
+                ? `  ${yearId}: ${cell.value}`
+                : `  ${yearId}/${genderId}: ${cell.value}`,
+            )
           }
         }
       } else if (q.value != null && !Number.isNaN(q.value)) {

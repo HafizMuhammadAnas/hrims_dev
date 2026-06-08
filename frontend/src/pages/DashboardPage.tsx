@@ -40,6 +40,7 @@ import {
   isSuperAdmin,
   isViewer,
 } from '../lib/roles'
+import { formatAppDate, formatAppTodayLong } from '../lib/dateFormat'
 
 const HR_STATUS_ORDER = ['draft', 'active'] as const
 const HR_PIE_LABELS: Record<(typeof HR_STATUS_ORDER)[number], string> = {
@@ -56,8 +57,8 @@ function count(map: Record<string, number> | undefined, key: string): number {
 
 function statusBadgeClass(status: string): string {
   if (status === 'active') return 'status-badge success'
-  if (status === 'draft') return 'status-badge pending'
-  return 'status-badge pending'
+  if (status === 'draft') return 'status-badge warning'
+  return 'status-badge default'
 }
 
 function urgentRowChrome(status: string): { background: string; borderLeft: string } {
@@ -225,12 +226,7 @@ export function DashboardPage() {
               </p>
             </div>
             <div className="muted" style={{ textAlign: 'right' }}>
-              {new Date().toLocaleDateString('en-GB', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
+              {formatAppTodayLong()}
             </div>
           </div>
 
@@ -571,7 +567,7 @@ export function DashboardPage() {
                         <div style={{ minWidth: 0 }}>
                           <div className="font-semibold text-sm">{r.title}</div>
                           <div className="muted small" style={{ marginTop: 2 }}>
-                            {r.region_name ?? '—'} · Due {r.date || '—'}
+                            {r.region_name ?? '—'} · Due {formatAppDate(r.date)}
                           </div>
                         </div>
                         <span

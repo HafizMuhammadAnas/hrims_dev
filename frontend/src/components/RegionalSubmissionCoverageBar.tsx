@@ -23,7 +23,7 @@ export function RegionalSubmissionCoverageBar({ items, className }: Props) {
         <div key={item.regionId} className="regional-submission-coverage__item" role="listitem">
           <span className="regional-submission-coverage__name">{item.regionName}</span>
           {item.status === 'pending_submission' ? (
-            <StatusBadge tone="pending">Awaiting submission</StatusBadge>
+            <StatusBadge tone="in-progress">Awaiting submission</StatusBadge>
           ) : (
             <StatusBadge tone={regionalResponseReviewPresentation(item.response?.review_status ?? 'pending').tone}>
               {item.response

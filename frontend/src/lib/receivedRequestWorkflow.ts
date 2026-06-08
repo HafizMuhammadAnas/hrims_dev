@@ -6,7 +6,7 @@ export type ReceivedRequestWorkflowStatus =
   | 'In Process'
   | 'Response Delivered'
 
-export type StatusBadgeTone = 'pending' | 'success' | 'warning' | 'danger' | 'default'
+import type { StatusBadgeTone } from './statusBadgeTone'
 
 export function receivedRequestStatusPresentation(status: ReceivedRequestWorkflowStatus): {
   label: string
@@ -20,7 +20,7 @@ export function receivedRequestStatusPresentation(status: ReceivedRequestWorkflo
     case 'Clarification answered':
       return { label: 'Answered', tone: 'success' }
     case 'Distributed':
-      return { label: 'Distributed', tone: 'pending' }
+      return { label: 'Distributed', tone: 'in-progress' }
     case 'In Process':
       return { label: 'Processing', tone: 'warning' }
     case 'Response Delivered':

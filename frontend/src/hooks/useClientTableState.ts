@@ -50,7 +50,7 @@ export function useClientTableState<SortKey extends string>(
     initialPage = 1,
     initialSearch = '',
     initialSortKey,
-    initialSortDir = 'asc',
+    initialSortDir = 'desc',
     initialFilters = {},
   } = options
 
@@ -81,7 +81,7 @@ export function useClientTableState<SortKey extends string>(
         setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
         return prev
       }
-      setSortDir('asc')
+      setSortDir('desc')
       return key
     })
   }, [])

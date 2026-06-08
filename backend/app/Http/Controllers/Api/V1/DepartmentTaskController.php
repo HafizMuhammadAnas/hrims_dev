@@ -235,17 +235,28 @@ class DepartmentTaskController extends Controller
             ], 422);
         }
 
-        $indicator->loadMissing(['yearGenderCells.collectionYear', 'yearGenderCells.collectionGender']);
+        $indicator->loadMissing([
+            'yearGenderCells.collectionYear',
+            'yearGenderCells.collectionGender',
+            'collectionYearRows.collectionYear',
+        ]);
         $expected = [];
-        foreach ($indicator->yearGenderCells as $cell) {
-            $yearId = (int) $cell->collection_year_id;
-            $genderId = (int) $cell->collection_gender_id;
-            $expected[$yearId][$genderId] = true;
+        if ((bool) $indicator->collects_by_gender) {
+            foreach ($indicator->yearGenderCells as $cell) {
+                $yearId = (int) $cell->collection_year_id;
+                $genderId = (int) $cell->collection_gender_id;
+                $expected[$yearId][$genderId] = true;
+            }
+        } else {
+            foreach ($indicator->collectionYearRows as $row) {
+                $yearId = (int) $row->collection_year_id;
+                $expected[$yearId][IssueIndicator::YEAR_ONLY_GENDER_ID] = true;
+            }
         }
 
         if ($expected === []) {
             return response()->json([
-                'message' => 'Indicator '.$indicator->id.': no year/gender mapping configured on the issue.',
+                'message' => 'Indicator '.$indicator->id.': no year collection mapping configured on the issue.',
             ], 422);
         }
 
@@ -265,7 +276,7 @@ class DepartmentTaskController extends Controller
                 $valRaw = is_array($cellIn) ? ($cellIn['value'] ?? null) : $cellIn;
                 if ($valRaw === null || trim((string) $valRaw) === '') {
                     return response()->json([
-                        'message' => 'Indicator '.$indicator->id.': a number is required for each year and gender.',
+                        'message' => 'Indicator '.$indicator->id.': a number is required for each configured year'.((bool) $indicator->collects_by_gender ? ' and gender' : '').'.',
                     ], 422);
                 }
                 if (! is_numeric($valRaw)) {

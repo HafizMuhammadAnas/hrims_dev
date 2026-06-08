@@ -1,4 +1,5 @@
 import type { DepartmentTaskRow } from '../api/lists'
+import type { StatusBadgeTone } from './statusBadgeTone'
 
 export function hasDepartmentResponse(t: DepartmentTaskRow): boolean {
   return Boolean(t.submission_date) || t.status === 'submitted'
@@ -37,13 +38,13 @@ export function countDepartmentTasksByWorkflow(
 
 export function workflowPresentation(t: DepartmentTaskRow): {
   label: string
-  tone: 'pending' | 'success' | 'warning' | 'danger' | 'default'
+  tone: StatusBadgeTone
 } {
   const b = departmentTaskWorkflowBucket(t)
   if (b === 'in_process') return { label: 'Pending', tone: 'pending' }
   if (b === 'revision') return { label: 'Revision', tone: 'warning' }
   if (b === 'accepted') return { label: 'Accepted', tone: 'success' }
-  return { label: 'Review', tone: 'pending' }
+  return { label: 'Review', tone: 'in-progress' }
 }
 
 export function workflowStatsLabels(scope: 'regional' | 'federal-ict'): {

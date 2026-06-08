@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { DepartmentTaskRow } from '../api/lists'
 import { fetchHrRequest } from '../api/hrRequests'
+import { formatAppDate } from '../lib/dateFormat'
 import { buildDepartmentForwardedViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import {
   departmentTaskWorkflowBucket,
@@ -173,7 +174,7 @@ export function DepartmentTaskResponseModal({
                 <>
                   {task.submission_date ? (
                     <p className="muted small" style={{ margin: '0 0 12px' }}>
-                      Submitted {task.submission_date}
+                      Submitted {formatAppDate(task.submission_date)}
                     </p>
                   ) : null}
                   {task.regional_review_comments?.trim() ? (

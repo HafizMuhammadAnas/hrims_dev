@@ -62,6 +62,7 @@ class ApiV1AdminIssueIndicatorDimensionsTest extends TestCase
                     'has_quantitative' => true,
                     'has_qualitative' => false,
                     'collects_by_year' => true,
+                    'collects_by_gender' => true,
                     'collection_by_year' => [
                         [
                             'collection_year_id' => $y2024->id,
@@ -79,6 +80,7 @@ class ApiV1AdminIssueIndicatorDimensionsTest extends TestCase
         $res->assertCreated();
         $indicator = $res->json('data.indicators.0');
         $this->assertTrue($indicator['collects_by_year']);
+        $this->assertTrue($indicator['collects_by_gender']);
         $this->assertCount(2, $indicator['collection_by_year']);
 
         $byYear = collect($indicator['collection_by_year'])->keyBy('year_id');
@@ -90,5 +92,44 @@ class ApiV1AdminIssueIndicatorDimensionsTest extends TestCase
             [$female->id],
             $byYear[$y2025->id]['gender_ids'],
         );
+    }
+
+    public function test_indicator_stores_year_only_without_genders(): void
+    {
+        $user = $this->superAdmin();
+        $convention = Convention::query()->firstOrFail();
+        $category = IssueCategory::query()->firstOrFail();
+        $article = Article::query()->firstOrFail();
+        $y2024 = CollectionYear::query()->create(['label' => '2024', 'sort_order' => 1]);
+        $y2025 = CollectionYear::query()->create(['label' => '2025', 'sort_order' => 2]);
+
+        $res = $this->actingAs($user)->postJson('/api/v1/admin/issues', [
+            'convention_id' => $convention->id,
+            'category_id' => $category->id,
+            'issue_title' => 'Year only issue',
+            'has_quantitative' => true,
+            'has_qualitative' => false,
+            'articles' => [['article_id' => $article->id]],
+            'indicators' => [
+                [
+                    'indicator_text' => 'Indicator B',
+                    'has_quantitative' => true,
+                    'has_qualitative' => false,
+                    'collects_by_year' => true,
+                    'collects_by_gender' => false,
+                    'collection_by_year' => [
+                        ['collection_year_id' => $y2024->id, 'collection_gender_ids' => []],
+                        ['collection_year_id' => $y2025->id, 'collection_gender_ids' => []],
+                    ],
+                ],
+            ],
+        ]);
+
+        $res->assertCreated();
+        $indicator = $res->json('data.indicators.0');
+        $this->assertTrue($indicator['collects_by_year']);
+        $this->assertFalse($indicator['collects_by_gender']);
+        $this->assertCount(2, $indicator['collection_by_year']);
+        $this->assertSame([], $indicator['collection_by_year'][0]['gender_ids']);
     }
 }

@@ -28,7 +28,7 @@ class RegionalResponseController extends Controller
         $data = $request->validate([
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
             'title' => ['required', 'string', 'max:500'],
-            'content' => ['required', 'string'],
+            'content' => ['nullable', 'string'],
             'region_id' => ['sometimes', 'integer', 'exists:regions,id'],
         ]);
 
@@ -63,7 +63,7 @@ class RegionalResponseController extends Controller
             'submission_date' => now()->toDateString(),
             'review_status' => 'pending',
             'comments' => null,
-            'content' => $data['content'],
+            'content' => $data['content'] ?? '',
         ]);
 
         $model->load(['region', 'hrRequest']);

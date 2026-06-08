@@ -18,6 +18,8 @@ import { StatsCards } from '../components/ui/StatsCards'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { formatAppDate } from '../lib/dateFormat'
+import { sortRowsLatestFirst } from '../lib/tableRowSort'
 import { hrRequestListStats, hrRequestStatusPresentation } from '../lib/hrRequestListMetrics'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
 import { hrRequestEditPath, hrRequestViewPath } from '../lib/workflowNavigation'
@@ -64,7 +66,7 @@ export function HrRequestsPage() {
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
+    const filtered = rows.filter((r) => {
       if (statusFilter && r.status !== statusFilter) return false
       if (!q) return true
       const regionBlob =
@@ -76,6 +78,7 @@ export function HrRequestsPage() {
         regionBlob.toLowerCase().includes(q)
       )
     })
+    return sortRowsLatestFirst(filtered, (r) => r.id)
   }, [rows, search, statusFilter])
 
   const { pageRows } = useMemo(
@@ -178,7 +181,7 @@ export function HrRequestsPage() {
                         ? r.regions.map((x) => x.name).join(', ')
                         : (r.region_name ?? '—')}
                     </td>
-                    <td>{r.date}</td>
+                    <td>{formatAppDate(r.date)}</td>
                     <td>
                       <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                     </td>

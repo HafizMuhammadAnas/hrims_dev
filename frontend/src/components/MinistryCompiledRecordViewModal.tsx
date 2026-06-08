@@ -14,6 +14,7 @@ import {
 import { updateCompiledRecord } from '../api/workflows'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { hasDepartmentResponse } from '../lib/departmentTaskWorkflow'
+import type { StatusBadgeTone } from '../lib/statusBadgeTone'
 import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
@@ -37,9 +38,9 @@ type RegionResponseBlock = {
   tasks: DepartmentTaskRow[]
 }
 
-function compiledStatusTone(status: string): 'pending' | 'success' | 'warning' | 'danger' | 'default' {
+function compiledStatusTone(status: string): StatusBadgeTone {
   if (status === 'submitted') return 'success'
-  if (status === 'draft') return 'pending'
+  if (status === 'draft') return 'warning'
   return 'default'
 }
 
@@ -206,8 +207,8 @@ export function MinistryCompiledRecordViewModal({
     setPdfLoading(true)
     setPdfError(null)
     try {
-      const base = record.title?.trim() || record.id
-      await downloadElementAsPdf(el, base)
+      const base = [record.req_id, record.title?.trim() || record.id].filter(Boolean).join(' — ')
+      await downloadElementAsPdf(el, base, { captureClass: 'ministry-compiled-pdf-capture', marginMm: 12 })
     } catch (e: unknown) {
       setPdfError(e instanceof Error ? e.message : 'Could not generate PDF.')
     } finally {
@@ -268,8 +269,17 @@ export function MinistryCompiledRecordViewModal({
               </Alert>
             ) : null}
             {!hrLoading && !hrError && requestTemplateProps ? (
-              <div className="regional-preview-embedded-request regional-preview-embedded-request--tab">
-                <HrRequestViewTemplate {...requestTemplateProps} />
+              <div
+                className={
+                  isPage
+                    ? 'ministry-compiled-embedded-request'
+                    : 'regional-preview-embedded-request regional-preview-embedded-request--tab'
+                }
+              >
+                <HrRequestViewTemplate
+                  {...requestTemplateProps}
+                  className={isPage ? 'hr-request-view-template--ministry-document' : undefined}
+                />
               </div>
             ) : null}
             {!hrLoading && !hrError && hrDetail && !requestTemplateProps ? (
@@ -299,6 +309,9 @@ export function MinistryCompiledRecordViewModal({
                       <div className="ministry-compiled-region-card__responses">
                         {tasks.map((t) => (
                           <div key={t.id} className="ministry-compiled-dept-response-item">
+                            <p className="ministry-compiled-dept-response-item__dept">
+                              {t.department_name ?? t.department_id}
+                            </p>
                             <DepartmentResponseDisplay
                               responseData={t.response_data}
                               attachmentUrl={t.attachment_url}

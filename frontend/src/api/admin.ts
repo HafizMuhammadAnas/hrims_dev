@@ -106,6 +106,7 @@ export type AdminIssueIndicator = {
   has_quantitative: boolean
   has_qualitative: boolean
   collects_by_year: boolean
+  collects_by_gender: boolean
   collection_by_year: AdminIssueIndicatorYearRow[]
 }
 

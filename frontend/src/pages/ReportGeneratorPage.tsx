@@ -18,6 +18,7 @@ import {
   Target,
   RefreshCcw,
 } from 'lucide-react'
+import { formatAppDate } from '../lib/dateFormat'
 import {
   ResponsiveContainer,
   BarChart,
@@ -258,7 +259,7 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
           r.req_id,
           r.region_name ?? '',
           r.title,
-          r.submission_date,
+          formatAppDate(r.submission_date, ''),
           r.review_status,
         ]),
       )
@@ -274,7 +275,7 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
           c.title,
           (c.region_names ?? []).join('; '),
           c.status,
-          c.compilation_date ?? '',
+          formatAppDate(c.compilation_date, ''),
         ]),
       )
       return
@@ -282,7 +283,13 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
     downloadCsv(
       'violation-entries-report',
       ['Entry Number', 'Title', 'Region', 'Event Date', 'Monitoring Status'],
-      violations.map((v) => [v.entry_number, v.title, v.region_name ?? '', v.event_date, v.monitoring_status]),
+      violations.map((v) => [
+        v.entry_number,
+        v.title,
+        v.region_name ?? '',
+        formatAppDate(v.event_date, ''),
+        v.monitoring_status,
+      ]),
     )
   }
 
@@ -347,7 +354,7 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
                   <td>{r.req_id}</td>
                   <td>{r.region_name}</td>
                   <td>{r.title}</td>
-                  <td>{r.submission_date}</td>
+                  <td>{formatAppDate(r.submission_date)}</td>
                   <td>{r.review_status}</td>
                 </tr>
               ))}
@@ -401,7 +408,7 @@ function OperationalExportsPanel({ embedded = false }: { embedded?: boolean }) {
                   <td>{v.entry_number}</td>
                   <td>{v.title}</td>
                   <td>{v.region_name}</td>
-                  <td>{v.event_date}</td>
+                  <td>{formatAppDate(v.event_date)}</td>
                   <td>{v.monitoring_status}</td>
                 </tr>
               ))}

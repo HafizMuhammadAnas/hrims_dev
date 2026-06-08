@@ -3,6 +3,7 @@ import {
   departmentTaskWorkflowBucket,
   type DepartmentTaskWorkflowBucket,
 } from './departmentTaskWorkflow'
+import { sortRowsLatestFirst } from './tableRowSort'
 
 export const WORKFLOW_BUCKET_FILTER_OPTIONS: { value: DepartmentTaskWorkflowBucket | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
@@ -25,7 +26,7 @@ export function filterDepartmentTasks(
   options: { search: string; workflowFilter: string; reqIdFilter?: string },
 ): DepartmentTaskRow[] {
   const q = options.search.trim().toLowerCase()
-  return tasks.filter((t) => {
+  const filtered = tasks.filter((t) => {
     if (options.reqIdFilter && t.req_id !== options.reqIdFilter) return false
     if (!departmentTaskMatchesWorkflowFilter(t, options.workflowFilter)) return false
     if (!q) return true
@@ -36,4 +37,5 @@ export function filterDepartmentTasks(
       (t.region_name ?? '').toLowerCase().includes(q)
     )
   })
+  return sortRowsLatestFirst(filtered, (t) => t.submission_date ?? t.assigned_date ?? t.id)
 }

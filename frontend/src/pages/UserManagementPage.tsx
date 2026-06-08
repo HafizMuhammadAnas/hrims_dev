@@ -22,6 +22,7 @@ import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { sortRowsLatestFirst } from '../lib/tableRowSort'
 import { isSuperAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import {
@@ -186,7 +187,7 @@ export function UserManagementPage() {
   const statusFilter = filters.status ?? ''
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return scopedRows.filter((u) => {
+    const matched = scopedRows.filter((u) => {
       if (roleFilter && !u.roles.some((r) => r.slug === roleFilter)) return false
       if (statusFilter) {
         const normalized = u.is_active ? 'active' : 'inactive'
@@ -201,6 +202,7 @@ export function UserManagementPage() {
         (u.department?.name ?? '').toLowerCase().includes(q)
       )
     })
+    return sortRowsLatestFirst(matched, (u) => u.id)
   }, [scopedRows, search, roleFilter, statusFilter])
   const roleOptions = useMemo(() => {
     if (superUser) return [...ADMIN_ROLE_SLUGS]
@@ -417,7 +419,7 @@ export function UserManagementPage() {
                 <td>{u.region?.name ?? '-'}</td>
                 {!superUser ? <td>{u.department?.name ?? '-'}</td> : null}
                 <td>
-                  <StatusBadge tone={u.is_active ? 'success' : 'pending'}>
+                  <StatusBadge tone={u.is_active ? 'success' : 'default'}>
                     {u.is_active ? 'Active' : 'Inactive'}
                   </StatusBadge>
                 </td>

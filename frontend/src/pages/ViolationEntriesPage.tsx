@@ -9,6 +9,8 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { formatAppDate } from '../lib/dateFormat'
+import { sortRowsLatestFirst } from '../lib/tableRowSort'
 import {
   VIOLATION_STATUS_FILTER_OPTIONS,
   violationStatusPresentation,
@@ -29,7 +31,7 @@ export function ViolationEntriesPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((v) => {
+    const matched = rows.filter((v) => {
       if (statusFilter && v.monitoring_status !== statusFilter) return false
       if (!q) return true
       return (
@@ -39,6 +41,7 @@ export function ViolationEntriesPage() {
         v.monitoring_status.toLowerCase().includes(q)
       )
     })
+    return sortRowsLatestFirst(matched, (v) => v.event_date || v.id)
   }, [rows, search, statusFilter])
 
   const { pageRows } = useMemo(
@@ -118,7 +121,7 @@ export function ViolationEntriesPage() {
                   <td>{v.entry_number}</td>
                   <td>{v.title}</td>
                   <td>{v.region_name}</td>
-                  <td>{v.event_date}</td>
+                  <td>{formatAppDate(v.event_date)}</td>
                   <td>
                     <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                   </td>

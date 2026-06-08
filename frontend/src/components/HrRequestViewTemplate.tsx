@@ -3,7 +3,11 @@ import type { IndicatorYearGenderLine } from '../lib/indicatorCollectionDisplay'
 import { hrViewIssueDescriptionLabel, hrViewIssueTitleLabel } from '../lib/issueEntryKind'
 import type { HrRequestAttachmentRow, HrRequestIssueArticle, HrRequestStatus } from '../types/hrRequest'
 import type { IssueEntryKind } from '../lib/issueEntryKind'
+import type { StatusBadgeTone } from '../lib/statusBadgeTone'
+import { formatAppDate } from '../lib/dateFormat'
 import { StatusBadge } from './ui/StatusBadge'
+
+export { formatAppDate, formatAppDate as formatDueDisplay } from '../lib/dateFormat'
 
 export type HrRequestViewIndicatorRow = {
   id: number
@@ -47,13 +51,6 @@ type Props = {
   className?: string
 }
 
-export function formatDueDisplay(iso: string): string {
-  if (!iso?.trim()) return '—'
-  const d = new Date(`${iso.trim()}T12:00:00`)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
 export function statusDisplayLabel(status: HrRequestStatus): string {
   switch (status) {
     case 'draft':
@@ -65,10 +62,10 @@ export function statusDisplayLabel(status: HrRequestStatus): string {
   }
 }
 
-export function statusTone(status: HrRequestStatus): 'pending' | 'success' | 'warning' | 'danger' | 'default' {
+export function statusTone(status: HrRequestStatus): StatusBadgeTone {
   switch (status) {
     case 'draft':
-      return 'pending'
+      return 'warning'
     case 'active':
       return 'success'
     default:
@@ -124,7 +121,7 @@ export function HrRequestViewTemplate({
             <Calendar size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
             <span>
               <span className="hr-request-view-template__meta-chip-label">Due:</span>{' '}
-              {formatDueDisplay(dueDate)}
+              {formatAppDate(dueDate)}
             </span>
           </div>
 
@@ -184,7 +181,7 @@ export function HrRequestViewTemplate({
 
       <section className="hr-request-view-template__card" aria-labelledby="hr-vt-conv-issue">
         <h2 id="hr-vt-conv-issue" className="card-section-heading">
-          Convention &amp; {hrViewIssueTitleLabel(issueEntryKind).toLowerCase()}
+          Convention &amp; {hrViewIssueTitleLabel(issueEntryKind)}
         </h2>
         <div className="hr-request-view-template__grid2">
           <div>

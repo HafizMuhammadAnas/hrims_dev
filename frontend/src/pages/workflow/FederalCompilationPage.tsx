@@ -19,6 +19,7 @@ import {
   buildProvincialSubmissionCoverage,
   countProvincialSubmissionCoverage,
 } from '../../lib/regionalSubmissionCoverage'
+import { regionalResponseReviewPresentation } from '../../lib/regionalResponseReviewStatus'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
@@ -27,14 +28,8 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import type { HrRequestRow } from '../../types/hrRequest'
 
-function reviewStatusPresentation(status: string): {
-  label: string
-  tone: 'pending' | 'success' | 'warning' | 'danger' | 'default'
-} {
-  if (status === 'accepted') return { label: 'Accepted', tone: 'success' }
-  if (status === 'needs-modification') return { label: 'Needs modification', tone: 'warning' }
-  if (status === 'rejected') return { label: 'Rejected', tone: 'danger' }
-  return { label: 'Pending', tone: 'pending' }
+function reviewStatusPresentation(status: string) {
+  return regionalResponseReviewPresentation(status)
 }
 
 function sortTasksByDept(a: DepartmentTaskRow, b: DepartmentTaskRow): number {
@@ -237,11 +232,6 @@ export function FederalCompilationPage() {
     ictLineReadyForCompilation,
     ictRegionName,
   ])
-
-  const includedProvincialCount = useMemo(
-    () => includableAcceptedResponses.filter((item) => includedResponseSet.has(item.response!.id)).length,
-    [includableAcceptedResponses, includedResponseSet],
-  )
 
   function toggleResponseInclusion(responseId: string) {
     setIncludedResponseIds((prev) =>
@@ -453,7 +443,7 @@ export function FederalCompilationPage() {
                               {t.department_name ?? t.department_id}
                             </span>
                           </span>
-                          <StatusBadge tone={accepted ? 'success' : 'pending'}>
+                          <StatusBadge tone={accepted ? 'success' : 'in-progress'}>
                             {accepted ? 'Accepted' : 'Pending review'}
                           </StatusBadge>
                         </div>
@@ -492,13 +482,6 @@ export function FederalCompilationPage() {
               </p>
             ) : (
               <>
-                <p className="muted text-compact" style={{ margin: '0 0 8px' }}>
-                  Select which accepted provincial compilations to include in the national record. Open a row to review;
-                  provinces still awaiting submission are shown for visibility only.{' '}
-                  <strong>{includedProvincialCount}</strong> of{' '}
-                  <strong>{includableAcceptedResponses.length}</strong> accepted province
-                  {includableAcceptedResponses.length === 1 ? '' : 's'} selected.
-                </p>
                 {includableAcceptedResponses.length > 0 ? (
                   <FederalCompilationInclusionToolbar
                     onSelectAll={selectAllAcceptedProvinces}
@@ -523,7 +506,7 @@ export function FederalCompilationPage() {
                               </span>
                               <span className="compilation-dept-status-row__dept">{item.regionName}</span>
                             </span>
-                            <StatusBadge tone="pending">Awaiting submission</StatusBadge>
+                            <StatusBadge tone="in-progress">Awaiting submission</StatusBadge>
                           </div>
                         </div>
                       )

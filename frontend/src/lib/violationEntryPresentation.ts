@@ -1,6 +1,8 @@
+import type { StatusBadgeTone } from './statusBadgeTone'
+
 export function violationStatusPresentation(status: string): {
   label: string
-  tone: 'pending' | 'success' | 'warning' | 'danger' | 'default'
+  tone: StatusBadgeTone
 } {
   const s = status.trim().toLowerCase()
   if (s === 'resolved' || s === 'closed') return { label: 'Resolved', tone: 'success' }

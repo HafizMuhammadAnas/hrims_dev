@@ -109,22 +109,12 @@ export function DepartmentResponseDisplay({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {showMatrix ? (
-        <>
-          <h4 className="font-semibold text-compact" style={{ margin: 0 }}>
-            Data by year and gender
-          </h4>
-          <DepartmentIndicatorDataMatrix
-            indicators={matrixIndicators}
-            cellValues={{}}
-            readOnly
-            savedByIndicator={savedByIndicator}
-          />
-        </>
-      ) : null}
-      {cardEntries.length > 0 ? (
-        <h4 className="font-semibold text-compact" style={{ margin: showMatrix ? '8px 0 0' : 0 }}>
-          Comments, narrative responses, and attachments
-        </h4>
+        <DepartmentIndicatorDataMatrix
+          indicators={matrixIndicators}
+          cellValues={{}}
+          readOnly
+          savedByIndicator={savedByIndicator}
+        />
       ) : null}
       {cardEntries.map(([id, bundle]) => {
         const title = bundle.indicator_label?.trim() || `Indicator #${id}`

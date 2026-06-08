@@ -1,6 +1,7 @@
 import { apiJsonHeaders, apiMultipartHeaders, ensureCsrfCookie } from './client'
 import { ApiError, parseApiErrorResponse } from './apiError'
 import type { HrRequestRow } from '../types/hrRequest'
+import type { StatusBadgeTone } from '../lib/statusBadgeTone'
 
 export type ClarificationStatus = 'pending_federal' | 'pending_region' | 'closed'
 
@@ -39,7 +40,7 @@ export const CLARIFICATION_STATUS_LABELS: Record<ClarificationStatus, string> = 
 
 export function clarificationStatusPresentation(status: ClarificationStatus): {
   label: string
-  tone: 'pending' | 'success' | 'warning' | 'danger' | 'default'
+  tone: StatusBadgeTone
 } {
   if (status === 'pending_federal') {
     return { label: CLARIFICATION_STATUS_LABELS.pending_federal, tone: 'warning' }

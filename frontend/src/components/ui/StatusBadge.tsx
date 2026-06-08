@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react'
-
-type BadgeTone = 'default' | 'pending' | 'success' | 'warning' | 'danger'
+import type { StatusBadgeTone } from '../../lib/statusBadgeTone'
 
 type StatusBadgeProps = {
   children: ReactNode
-  tone?: BadgeTone
+  tone?: StatusBadgeTone
 }
 
 export function StatusBadge({ children, tone = 'default' }: StatusBadgeProps) {
