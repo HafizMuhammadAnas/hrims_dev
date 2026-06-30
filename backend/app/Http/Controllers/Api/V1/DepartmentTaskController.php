@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\DepartmentTask;
+use App\Models\CollectionReligion;
+use App\Models\District;
 use App\Models\HrRequest;
 use App\Models\HrRequestClarification;
 use App\Models\Region;
@@ -275,9 +277,7 @@ class DepartmentTaskController extends Controller
                 $cellIn = $yearIn[$genderKey] ?? $yearIn[$genderId] ?? null;
                 $valRaw = is_array($cellIn) ? ($cellIn['value'] ?? null) : $cellIn;
                 if ($valRaw === null || trim((string) $valRaw) === '') {
-                    return response()->json([
-                        'message' => 'Indicator '.$indicator->id.': a number is required for each configured year'.((bool) $indicator->collects_by_gender ? ' and gender' : '').'.',
-                    ], 422);
+                    $valRaw = '0';
                 }
                 if (! is_numeric($valRaw)) {
                     return response()->json([
@@ -289,6 +289,146 @@ class DepartmentTaskController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * @param  list<string>  $expectedKeys
+     * @return array<string, array<string, array{value: float}>>|JsonResponse
+     */
+    private function normalizeQuantitativeByYearFixedKeys(
+        IssueIndicator $indicator,
+        mixed $raw,
+        array $expectedKeys,
+        string $dimensionLabel,
+    ): array|JsonResponse {
+        $yearIds = $this->configuredCollectionYearIds($indicator);
+        if ($yearIds === []) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': no year collection mapping configured on the issue.',
+            ], 422);
+        }
+
+        if (! is_array($raw)) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': '.$dimensionLabel.' values are required.',
+            ], 422);
+        }
+
+        $out = [];
+        foreach ($yearIds as $yearId) {
+            $yearKey = (string) $yearId;
+            $yearIn = $raw[$yearKey] ?? $raw[$yearId] ?? null;
+            if (! is_array($yearIn)) {
+                return response()->json([
+                    'message' => 'Indicator '.$indicator->id.': missing '.$dimensionLabel.' values for year '.$yearId.'.',
+                ], 422);
+            }
+            $out[$yearKey] = [];
+            foreach ($expectedKeys as $cellKey) {
+                $cellIn = $yearIn[$cellKey] ?? null;
+                $valRaw = is_array($cellIn) ? ($cellIn['value'] ?? null) : $cellIn;
+                if ($valRaw === null || trim((string) $valRaw) === '') {
+                    $valRaw = '0';
+                }
+                if (! is_numeric($valRaw)) {
+                    return response()->json([
+                        'message' => 'Indicator '.$indicator->id.': all '.$dimensionLabel.' values must be numeric.',
+                    ], 422);
+                }
+                $out[$yearKey][$cellKey] = ['value' => (float) $valRaw];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, array<string, array{value: float}>>|JsonResponse
+     */
+    private function normalizeQuantitativeByYearAge(IssueIndicator $indicator, mixed $raw): array|JsonResponse
+    {
+        return $this->normalizeQuantitativeByYearFixedKeys(
+            $indicator,
+            $raw,
+            [IssueIndicator::AGE_UNDER_18, IssueIndicator::AGE_OVER_18],
+            'age',
+        );
+    }
+
+    /**
+     * @return array<string, array<string, array{value: float}>>|JsonResponse
+     */
+    private function normalizeQuantitativeByYearDisability(IssueIndicator $indicator, mixed $raw): array|JsonResponse
+    {
+        return $this->normalizeQuantitativeByYearFixedKeys(
+            $indicator,
+            $raw,
+            [IssueIndicator::DISABILITY_YES, IssueIndicator::DISABILITY_NO],
+            'disability',
+        );
+    }
+
+    /**
+     * @return array<string, array<string, array{value: float}>>|JsonResponse
+     */
+    private function normalizeQuantitativeByYearRegion(IssueIndicator $indicator, mixed $raw): array|JsonResponse
+    {
+        $regionIds = Region::query()->orderBy('name')->pluck('id')->map(fn ($id) => (string) $id)->all();
+        if ($regionIds === []) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': no regions are configured in the system.',
+            ], 422);
+        }
+
+        return $this->normalizeQuantitativeByYearFixedKeys($indicator, $raw, $regionIds, 'region');
+    }
+
+    /**
+     * @return array<string, array<string, array{value: float}>>|JsonResponse
+     */
+    private function normalizeQuantitativeByYearDistrict(IssueIndicator $indicator, mixed $raw, int $taskRegionId = 0): array|JsonResponse
+    {
+        $query = District::query()->orderBy('name');
+        if ($taskRegionId > 0) {
+            $query->where('region_id', $taskRegionId);
+        }
+        $districtIds = $query->pluck('id')->map(fn ($id) => (string) $id)->all();
+        if ($districtIds === []) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': no districts are configured in the system.',
+            ], 422);
+        }
+
+        return $this->normalizeQuantitativeByYearFixedKeys($indicator, $raw, $districtIds, 'district');
+    }
+
+    /**
+     * @return array<string, array<string, array{value: float}>>|JsonResponse
+     */
+    private function normalizeQuantitativeByYearReligion(IssueIndicator $indicator, mixed $raw): array|JsonResponse
+    {
+        $religionIds = CollectionReligion::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+        if ($religionIds === []) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': no religions are configured in the system.',
+            ], 422);
+        }
+
+        return $this->normalizeQuantitativeByYearFixedKeys($indicator, $raw, $religionIds, 'religion');
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function configuredCollectionYearIds(IssueIndicator $indicator): array
+    {
+        return $indicator->configuredCollectionYearIds();
     }
 
     private function departmentTaskUsesIndicatorBundles(?HrRequest $hrRequest): bool
@@ -445,7 +585,7 @@ class DepartmentTaskController extends Controller
                 $qIn = $entry['quantitative'] ?? null;
                 if (! is_array($qIn)) {
                     $msg = $collectsYearGender
-                        ? 'Indicator '.$indicator->id.': year/gender data is required.'
+                        ? 'Indicator '.$indicator->id.': quantitative breakdown by year (matrix tables) is required.'
                         : 'Indicator '.$indicator->id.': quantitative fields are required.';
 
                     return response()->json(['message' => $msg], 422);
@@ -474,15 +614,56 @@ class DepartmentTaskController extends Controller
                 }
 
                 if ($collectsYearGender) {
-                    $normalized = $this->normalizeQuantitativeByYearGender($indicator, $qIn['by_year_gender'] ?? null);
-                    if ($normalized instanceof JsonResponse) {
-                        return $normalized;
-                    }
-                    $row['quantitative'] = [
-                        'by_year_gender' => $normalized,
+                    $quantitative = [
                         'comment' => $comment !== '' ? $comment : null,
                         'attachment_url' => $qUrl,
                     ];
+
+                    if ($indicator->isYearOnlyCollection() || (bool) $indicator->collects_by_gender) {
+                        $normalized = $this->normalizeQuantitativeByYearGender($indicator, $qIn['by_year_gender'] ?? null);
+                        if ($normalized instanceof JsonResponse) {
+                            return $normalized;
+                        }
+                        $quantitative['by_year_gender'] = $normalized;
+                    }
+
+                    if ((bool) $indicator->collects_by_age) {
+                        $normalized = $this->normalizeQuantitativeByYearAge($indicator, $qIn['by_year_age'] ?? null);
+                        if ($normalized instanceof JsonResponse) {
+                            return $normalized;
+                        }
+                        $quantitative['by_year_age'] = $normalized;
+                    }
+
+                    if ((bool) $indicator->collects_by_disability) {
+                        $normalized = $this->normalizeQuantitativeByYearDisability($indicator, $qIn['by_year_disability'] ?? null);
+                        if ($normalized instanceof JsonResponse) {
+                            return $normalized;
+                        }
+                        $quantitative['by_year_disability'] = $normalized;
+                    }
+
+                    if ((bool) $indicator->collects_by_location) {
+                        $normalizedDistrict = $this->normalizeQuantitativeByYearDistrict(
+                            $indicator,
+                            $qIn['by_year_district'] ?? null,
+                            (int) $departmentTask->region_id,
+                        );
+                        if ($normalizedDistrict instanceof JsonResponse) {
+                            return $normalizedDistrict;
+                        }
+                        $quantitative['by_year_district'] = $normalizedDistrict;
+                    }
+
+                    if ((bool) $indicator->collects_by_religion) {
+                        $normalized = $this->normalizeQuantitativeByYearReligion($indicator, $qIn['by_year_religion'] ?? null);
+                        if ($normalized instanceof JsonResponse) {
+                            return $normalized;
+                        }
+                        $quantitative['by_year_religion'] = $normalized;
+                    }
+
+                    $row['quantitative'] = $quantitative;
                 } else {
                     $valRaw = $qIn['value'] ?? null;
                     if ($valRaw === null || trim((string) $valRaw) === '') {

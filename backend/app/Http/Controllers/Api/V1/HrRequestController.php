@@ -65,11 +65,15 @@ class HrRequestController extends Controller
 
         $issues = Issue::query()
             ->where('convention_id', $data['convention_id'])
+            ->where('is_active', true)
             ->with([
                 'category',
                 'articles',
                 'indicators.yearGenderCells.collectionYear:id,label,sort_order',
                 'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+                'indicators.yearReligionCells.collectionYear:id,label,sort_order',
+                'indicators.yearReligionCells.collectionReligion:id,name,sort_order',
+                'indicators.collectionYearRows.collectionYear:id,label,sort_order',
             ])
             ->orderBy('issue_title')
             ->get();
@@ -284,7 +288,7 @@ class HrRequestController extends Controller
                         ->first();
                     if (! $issue) {
                         throw ValidationException::withMessages([
-                            'issue_id' => ['Issue must belong to the selected convention.'],
+                            'issue_id' => ['LOI must belong to the selected convention.'],
                         ]);
                     }
                 }
@@ -495,7 +499,7 @@ class HrRequestController extends Controller
         $data = $request->validate($rules, [
             'title.required' => 'Title is required.',
             'convention_id.required' => 'Convention is required.',
-            'issue_id.required' => 'Issue is required.',
+            'issue_id.required' => 'LOI is required.',
             'date.required' => 'Due date is required.',
             'status.required' => 'Status is required.',
         ]);
@@ -505,7 +509,7 @@ class HrRequestController extends Controller
             ->where('convention_id', $data['convention_id'])
             ->first();
         if (! $issue) {
-            return response()->json(['message' => 'Issue must belong to the selected convention.'], 422);
+            return response()->json(['message' => 'LOI must belong to the selected convention.'], 422);
         }
 
         $indicatorPayload = $this->decodeIndicatorResponses($request->input('indicator_responses'));
@@ -805,6 +809,9 @@ class HrRequestController extends Controller
             'articles',
             'indicators.yearGenderCells.collectionYear:id,label,sort_order',
             'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+            'indicators.yearReligionCells.collectionYear:id,label,sort_order',
+            'indicators.yearReligionCells.collectionReligion:id,name,sort_order',
+            'indicators.collectionYearRows.collectionYear:id,label,sort_order',
         ]);
 
         return [

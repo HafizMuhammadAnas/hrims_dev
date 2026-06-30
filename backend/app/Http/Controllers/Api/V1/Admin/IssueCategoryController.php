@@ -14,10 +14,7 @@ class IssueCategoryController extends Controller
         $rows = IssueCategory::query()->orderBy('name')->get();
 
         return response()->json([
-            'data' => $rows->map(fn (IssueCategory $c) => [
-                'id' => $c->id,
-                'name' => $c->name,
-            ]),
+            'data' => $rows->map(fn (IssueCategory $c) => $this->serialize($c)),
         ]);
     }
 
@@ -26,29 +23,23 @@ class IssueCategoryController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
         ]);
-        $category = IssueCategory::query()->create($data);
+        $category = IssueCategory::query()->create([
+            'name' => $data['name'],
+            'is_active' => true,
+        ]);
 
-        return response()->json([
-            'data' => [
-                'id' => $category->id,
-                'name' => $category->name,
-            ],
-        ], 201);
+        return response()->json(['data' => $this->serialize($category)], 201);
     }
 
     public function update(Request $request, IssueCategory $issue_category): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'is_active' => ['sometimes', 'boolean'],
         ]);
         $issue_category->forceFill($data)->save();
 
-        return response()->json([
-            'data' => [
-                'id' => $issue_category->id,
-                'name' => $issue_category->name,
-            ],
-        ]);
+        return response()->json(['data' => $this->serialize($issue_category)]);
     }
 
     public function destroy(IssueCategory $issue_category): JsonResponse
@@ -59,5 +50,17 @@ class IssueCategoryController extends Controller
         $issue_category->delete();
 
         return response()->json(['message' => 'Deleted']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serialize(IssueCategory $c): array
+    {
+        return [
+            'id' => $c->id,
+            'name' => $c->name,
+            'is_active' => (bool) ($c->is_active ?? true),
+        ];
     }
 }

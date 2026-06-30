@@ -10,7 +10,15 @@ class Article extends Model
     protected $fillable = [
         'article_name',
         'description',
+        'is_active',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function issues(): BelongsToMany
     {

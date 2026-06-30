@@ -3,32 +3,33 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\CollectionGender;
+use App\Models\CollectionReligion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
-class CollectionGenderController extends Controller
+class CollectionReligionController extends Controller
 {
     public function index(): JsonResponse
     {
-        $rows = CollectionGender::query()
+        $rows = CollectionReligion::query()
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
 
         return response()->json([
-            'data' => $rows->map(fn (CollectionGender $row) => $this->serialize($row)),
+            'data' => $rows->map(fn (CollectionReligion $row) => $this->serialize($row)),
         ]);
     }
 
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:collection_genders,name'],
+            'name' => ['required', 'string', 'max:255', 'unique:collection_religions,name'],
         ]);
 
-        $sortOrder = (int) (CollectionGender::query()->max('sort_order') ?? 0) + 1;
-        $row = CollectionGender::query()->create([
+        $sortOrder = (int) (CollectionReligion::query()->max('sort_order') ?? 0) + 1;
+        $row = CollectionReligion::query()->create([
             'name' => trim($data['name']),
             'sort_order' => $sortOrder,
             'is_active' => true,
@@ -37,10 +38,10 @@ class CollectionGenderController extends Controller
         return response()->json(['data' => $this->serialize($row)], 201);
     }
 
-    public function update(Request $request, CollectionGender $collection_gender): JsonResponse
+    public function update(Request $request, CollectionReligion $collection_religion): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:255', 'unique:collection_genders,name,'.$collection_gender->id],
+            'name' => ['sometimes', 'required', 'string', 'max:255', 'unique:collection_religions,name,'.$collection_religion->id],
             'is_active' => ['sometimes', 'boolean'],
         ]);
         $updates = [];
@@ -51,23 +52,23 @@ class CollectionGenderController extends Controller
             $updates['is_active'] = (bool) $data['is_active'];
         }
         if ($updates !== []) {
-            $collection_gender->forceFill($updates)->save();
+            $collection_religion->forceFill($updates)->save();
         }
 
-        return response()->json(['data' => $this->serialize($collection_gender)]);
+        return response()->json(['data' => $this->serialize($collection_religion)]);
     }
 
-    public function destroy(CollectionGender $collection_gender): JsonResponse
+    public function destroy(CollectionReligion $collection_religion): JsonResponse
     {
-        if (\Illuminate\Support\Facades\DB::table('issue_indicator_year_gender')
-            ->where('collection_gender_id', $collection_gender->id)
+        if (DB::table('issue_indicator_year_religion')
+            ->where('collection_religion_id', $collection_religion->id)
             ->exists()) {
             return response()->json([
-                'message' => 'This gender is linked to one or more issue indicators and cannot be deleted.',
+                'message' => 'This religion is linked to one or more issue indicators and cannot be deleted.',
             ], 422);
         }
 
-        $collection_gender->delete();
+        $collection_religion->delete();
 
         return response()->json(['message' => 'Deleted']);
     }
@@ -75,7 +76,7 @@ class CollectionGenderController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function serialize(CollectionGender $row): array
+    private function serialize(CollectionReligion $row): array
     {
         return [
             'id' => $row->id,

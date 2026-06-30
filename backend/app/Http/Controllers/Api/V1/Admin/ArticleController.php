@@ -29,6 +29,7 @@ class ArticleController extends Controller
             'description' => isset($data['description']) && $data['description'] !== ''
                 ? (string) $data['description']
                 : null,
+            'is_active' => true,
         ]);
 
         return response()->json(['data' => $this->serialize($article)], 201);
@@ -39,6 +40,7 @@ class ArticleController extends Controller
         $data = $request->validate([
             'article_name' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'is_active' => ['sometimes', 'boolean'],
         ]);
         if (array_key_exists('description', $data) && ($data['description'] === '' || $data['description'] === null)) {
             $data['description'] = null;
@@ -57,6 +59,7 @@ class ArticleController extends Controller
             'id' => $a->id,
             'article_name' => $a->article_name,
             'description' => $a->description,
+            'is_active' => (bool) ($a->is_active ?? true),
         ];
     }
 

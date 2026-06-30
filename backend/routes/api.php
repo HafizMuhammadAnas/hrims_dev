@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Admin\DistrictController as AdminDistrictControl
 use App\Http\Controllers\Api\V1\Admin\KnowledgeCardController as AdminKnowledgeCardController;
 use App\Http\Controllers\Api\V1\Admin\ArticleController as AdminArticleController;
 use App\Http\Controllers\Api\V1\Admin\CollectionGenderController as AdminCollectionGenderController;
+use App\Http\Controllers\Api\V1\Admin\CollectionReligionController as AdminCollectionReligionController;
 use App\Http\Controllers\Api\V1\Admin\CollectionYearController as AdminCollectionYearController;
 use App\Http\Controllers\Api\V1\Admin\IssueCategoryController as AdminIssueCategoryController;
 use App\Http\Controllers\Api\V1\Admin\IssueController as AdminIssueController;
@@ -18,6 +19,8 @@ use App\Http\Controllers\Api\V1\CompiledRecordController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\DepartmentTaskController;
+use App\Http\Controllers\Api\V1\CollectionReligionController;
+use App\Http\Controllers\Api\V1\DistrictController;
 use App\Http\Controllers\Api\V1\HrRequestController;
 use App\Http\Controllers\Api\V1\KnowledgeHubController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -43,6 +46,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('api.v1.notifications.read-all');
 
         Route::get('/regions', [RegionController::class, 'index'])->name('api.v1.regions.index');
+        Route::get('/districts', [DistrictController::class, 'index'])->name('api.v1.districts.index');
+        Route::get('/collection-religions', [CollectionReligionController::class, 'index'])->name('api.v1.collection-religions.index');
         Route::get('/departments', [DepartmentController::class, 'index'])->name('api.v1.departments.index');
         Route::post('/departments', [DepartmentController::class, 'store'])->name('api.v1.departments.store');
         Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('api.v1.departments.update');
@@ -165,6 +170,11 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/collection-genders', [AdminCollectionGenderController::class, 'store'])->name('api.v1.admin.collection-genders.store');
             Route::patch('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'update'])->name('api.v1.admin.collection-genders.update');
             Route::delete('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'destroy'])->name('api.v1.admin.collection-genders.destroy');
+
+            Route::get('/collection-religions', [AdminCollectionReligionController::class, 'index'])->name('api.v1.admin.collection-religions.index');
+            Route::post('/collection-religions', [AdminCollectionReligionController::class, 'store'])->name('api.v1.admin.collection-religions.store');
+            Route::patch('/collection-religions/{collection_religion}', [AdminCollectionReligionController::class, 'update'])->name('api.v1.admin.collection-religions.update');
+            Route::delete('/collection-religions/{collection_religion}', [AdminCollectionReligionController::class, 'destroy'])->name('api.v1.admin.collection-religions.destroy');
 
             Route::get('/issues', [AdminIssueController::class, 'index'])->name('api.v1.admin.issues.index');
             Route::post('/issues', [AdminIssueController::class, 'store'])->name('api.v1.admin.issues.store');

@@ -130,6 +130,47 @@ class ApiV1AdminIssueIndicatorDimensionsTest extends TestCase
         $this->assertTrue($indicator['collects_by_year']);
         $this->assertFalse($indicator['collects_by_gender']);
         $this->assertCount(2, $indicator['collection_by_year']);
-        $this->assertSame([], $indicator['collection_by_year'][0]['gender_ids']);
+    public function test_indicator_stores_religion_and_age_dimensions(): void
+    {
+        $user = $this->superAdmin();
+        $convention = Convention::query()->firstOrFail();
+        $category = IssueCategory::query()->firstOrFail();
+        $article = Article::query()->firstOrFail();
+        $y2024 = CollectionYear::query()->create(['label' => '2024', 'sort_order' => 1]);
+        $female = CollectionGender::query()->create(['name' => 'Female', 'sort_order' => 1]);
+        $buddhism = \App\Models\CollectionReligion::query()->where('name', 'Buddhist')->firstOrFail();
+
+        $res = $this->actingAs($user)->postJson('/api/v1/admin/issues', [
+            'convention_id' => $convention->id,
+            'category_id' => $category->id,
+            'issue_title' => 'Disaggregated issue',
+            'has_quantitative' => true,
+            'has_qualitative' => false,
+            'articles' => [['article_id' => $article->id]],
+            'indicators' => [
+                [
+                    'indicator_text' => 'Indicator D',
+                    'has_quantitative' => true,
+                    'has_qualitative' => false,
+                    'collects_by_year' => true,
+                    'collects_by_gender' => true,
+                    'collects_by_age' => true,
+                    'collects_by_religion' => true,
+                    'collection_by_year' => [
+                        [
+                            'collection_year_id' => $y2024->id,
+                            'collection_gender_ids' => [$female->id],
+                            'collection_religion_ids' => [],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $res->assertCreated();
+        $indicator = $res->json('data.indicators.0');
+        $this->assertTrue($indicator['collects_by_age']);
+        $this->assertTrue($indicator['collects_by_religion']);
+        $this->assertSame([], $indicator['collection_by_year'][0]['religion_ids']);
     }
 }

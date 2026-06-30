@@ -10,12 +10,14 @@ class CollectionYear extends Model
     protected $fillable = [
         'label',
         'sort_order',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
             'sort_order' => 'integer',
+            'is_active' => 'boolean',
         ];
     }
 

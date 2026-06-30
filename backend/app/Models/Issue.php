@@ -17,6 +17,7 @@ class Issue extends Model
         'description',
         'has_quantitative',
         'has_qualitative',
+        'is_active',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class Issue extends Model
         return [
             'has_quantitative' => 'boolean',
             'has_qualitative' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

@@ -31,6 +31,7 @@ class CollectionYearController extends Controller
         $row = CollectionYear::query()->create([
             'label' => trim($data['label']),
             'sort_order' => $sortOrder,
+            'is_active' => true,
         ]);
 
         return response()->json(['data' => $this->serialize($row)], 201);
@@ -39,9 +40,19 @@ class CollectionYearController extends Controller
     public function update(Request $request, CollectionYear $collection_year): JsonResponse
     {
         $data = $request->validate([
-            'label' => ['required', 'string', 'max:32', 'unique:collection_years,label,'.$collection_year->id],
+            'label' => ['sometimes', 'required', 'string', 'max:32', 'unique:collection_years,label,'.$collection_year->id],
+            'is_active' => ['sometimes', 'boolean'],
         ]);
-        $collection_year->forceFill(['label' => trim($data['label'])])->save();
+        $updates = [];
+        if (array_key_exists('label', $data)) {
+            $updates['label'] = trim($data['label']);
+        }
+        if (array_key_exists('is_active', $data)) {
+            $updates['is_active'] = (bool) $data['is_active'];
+        }
+        if ($updates !== []) {
+            $collection_year->forceFill($updates)->save();
+        }
 
         return response()->json(['data' => $this->serialize($collection_year)]);
     }
@@ -70,6 +81,7 @@ class CollectionYearController extends Controller
             'id' => $row->id,
             'label' => $row->label,
             'sort_order' => $row->sort_order,
+            'is_active' => (bool) ($row->is_active ?? true),
         ];
     }
 }
