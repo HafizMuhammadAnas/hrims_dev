@@ -79,24 +79,35 @@ export type AdminKnowledgeCard = {
 export type AdminIssueCategory = {
   id: number
   name: string
+  is_active: boolean
 }
 
 export type AdminArticleRow = {
   id: number
   article_name: string
   description: string | null
+  is_active: boolean
 }
 
 export type AdminCollectionYear = {
   id: number
   label: string
   sort_order: number
+  is_active: boolean
 }
 
 export type AdminCollectionGender = {
   id: number
   name: string
   sort_order: number
+  is_active: boolean
+}
+
+export type AdminCollectionReligion = {
+  id: number
+  name: string
+  sort_order: number
+  is_active: boolean
 }
 
 export type AdminIssueIndicator = {
@@ -107,6 +118,10 @@ export type AdminIssueIndicator = {
   has_qualitative: boolean
   collects_by_year: boolean
   collects_by_gender: boolean
+  collects_by_age: boolean
+  collects_by_location: boolean
+  collects_by_disability: boolean
+  collects_by_religion: boolean
   collection_by_year: AdminIssueIndicatorYearRow[]
 }
 
@@ -115,6 +130,8 @@ export type AdminIssueIndicatorYearRow = {
   label: string
   gender_ids: number[]
   genders: { id: number; name: string }[]
+  religion_ids: number[]
+  religions: { id: number; name: string }[]
 }
 
 export type AdminIssueArticleRow = {
@@ -140,6 +157,7 @@ export type AdminIssue = {
   description: string | null
   has_quantitative: boolean
   has_qualitative: boolean
+  is_active: boolean
   convention: { id: number; code: string; name: string } | null
   category: { id: number; name: string } | null
   articles: AdminIssueArticleRow[]
@@ -466,15 +484,17 @@ export async function adminCreateIssueCategory(body: { name: string }): Promise<
   return (await res.json()).data as AdminIssueCategory
 }
 
-export async function adminUpdateIssueCategory(id: number, body: { name: string }): Promise<AdminIssueCategory> {
+export async function adminUpdateIssueCategory(
+  id: number,
+  body: { name?: string; is_active?: boolean },
+): Promise<AdminIssueCategory> {
   const res = await adminSend('PATCH', `/issue-categories/${id}`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminIssueCategory
 }
 
-export async function adminDeleteIssueCategory(id: number): Promise<void> {
-  const res = await adminSend('DELETE', `/issue-categories/${id}`)
-  await throwIfNotOk(res)
+export async function adminSetIssueCategoryActive(id: number, is_active: boolean): Promise<AdminIssueCategory> {
+  return adminUpdateIssueCategory(id, { is_active })
 }
 
 export async function adminFetchArticles(): Promise<AdminArticleRow[]> {
@@ -493,16 +513,15 @@ export async function adminCreateArticle(body: {
 
 export async function adminUpdateArticle(
   id: number,
-  body: { article_name?: string; description?: string | null },
+  body: { article_name?: string; description?: string | null; is_active?: boolean },
 ): Promise<AdminArticleRow> {
   const res = await adminSend('PATCH', `/articles/${id}`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminArticleRow
 }
 
-export async function adminDeleteArticle(id: number): Promise<void> {
-  const res = await adminSend('DELETE', `/articles/${id}`)
-  await throwIfNotOk(res)
+export async function adminSetArticleActive(id: number, is_active: boolean): Promise<AdminArticleRow> {
+  return adminUpdateArticle(id, { is_active })
 }
 
 export async function adminFetchCollectionYears(): Promise<AdminCollectionYear[]> {
@@ -518,16 +537,15 @@ export async function adminCreateCollectionYear(body: { label: string }): Promis
 
 export async function adminUpdateCollectionYear(
   id: number,
-  body: { label: string },
+  body: { label?: string; is_active?: boolean },
 ): Promise<AdminCollectionYear> {
   const res = await adminSend('PATCH', `/collection-years/${id}`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminCollectionYear
 }
 
-export async function adminDeleteCollectionYear(id: number): Promise<void> {
-  const res = await adminSend('DELETE', `/collection-years/${id}`)
-  await throwIfNotOk(res)
+export async function adminSetCollectionYearActive(id: number, is_active: boolean): Promise<AdminCollectionYear> {
+  return adminUpdateCollectionYear(id, { is_active })
 }
 
 export async function adminFetchCollectionGenders(): Promise<AdminCollectionGender[]> {
@@ -543,16 +561,42 @@ export async function adminCreateCollectionGender(body: { name: string }): Promi
 
 export async function adminUpdateCollectionGender(
   id: number,
-  body: { name: string },
+  body: { name?: string; is_active?: boolean },
 ): Promise<AdminCollectionGender> {
   const res = await adminSend('PATCH', `/collection-genders/${id}`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminCollectionGender
 }
 
-export async function adminDeleteCollectionGender(id: number): Promise<void> {
-  const res = await adminSend('DELETE', `/collection-genders/${id}`)
+export async function adminSetCollectionGenderActive(id: number, is_active: boolean): Promise<AdminCollectionGender> {
+  return adminUpdateCollectionGender(id, { is_active })
+}
+
+export async function adminFetchCollectionReligions(): Promise<AdminCollectionReligion[]> {
+  const json = await adminGet<{ data: AdminCollectionReligion[] }>('/collection-religions')
+  return json.data
+}
+
+export async function adminCreateCollectionReligion(body: { name: string }): Promise<AdminCollectionReligion> {
+  const res = await adminSend('POST', '/collection-religions', body)
   await throwIfNotOk(res)
+  return (await res.json()).data as AdminCollectionReligion
+}
+
+export async function adminUpdateCollectionReligion(
+  id: number,
+  body: { name?: string; is_active?: boolean },
+): Promise<AdminCollectionReligion> {
+  const res = await adminSend('PATCH', `/collection-religions/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminCollectionReligion
+}
+
+export async function adminSetCollectionReligionActive(
+  id: number,
+  is_active: boolean,
+): Promise<AdminCollectionReligion> {
+  return adminUpdateCollectionReligion(id, { is_active })
 }
 
 export async function adminFetchIssues(): Promise<AdminIssue[]> {
@@ -593,10 +637,17 @@ export async function adminCreateIssue(body: AdminIssuePayload): Promise<AdminIs
   return (await res.json()).data as AdminIssue
 }
 
-export async function adminUpdateIssue(id: number, body: Partial<AdminIssuePayload>): Promise<AdminIssue> {
+export async function adminUpdateIssue(
+  id: number,
+  body: Partial<AdminIssuePayload> & { is_active?: boolean },
+): Promise<AdminIssue> {
   const res = await adminSend('PATCH', `/issues/${id}`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminIssue
+}
+
+export async function adminSetIssueActive(id: number, is_active: boolean): Promise<AdminIssue> {
+  return adminUpdateIssue(id, { is_active })
 }
 
 export async function adminDeleteIssue(id: number): Promise<void> {

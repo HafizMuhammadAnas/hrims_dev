@@ -1,11 +1,12 @@
 import { Building2, Calendar, CheckCircle2, MapPin } from 'lucide-react'
-import type { IndicatorYearGenderLine } from '../lib/indicatorCollectionDisplay'
+import type { IndicatorCollectionDisaggregation } from '../lib/indicatorCollectionDisplay'
 import { hrViewIssueDescriptionLabel, hrViewIssueTitleLabel } from '../lib/issueEntryKind'
 import type { HrRequestAttachmentRow, HrRequestIssueArticle, HrRequestStatus } from '../types/hrRequest'
 import type { IssueEntryKind } from '../lib/issueEntryKind'
 import type { StatusBadgeTone } from '../lib/statusBadgeTone'
 import { formatAppDate } from '../lib/dateFormat'
 import { StatusBadge } from './ui/StatusBadge'
+import { IndicatorYearGenderHint } from './IndicatorYearGenderHint'
 
 export { formatAppDate, formatAppDate as formatDueDisplay } from '../lib/dateFormat'
 
@@ -15,7 +16,7 @@ export type HrRequestViewIndicatorRow = {
   disaggregation: string | null
   hasQuantitative: boolean
   hasQualitative: boolean
-  collectionByYear?: IndicatorYearGenderLine[]
+  collectionDisaggregation?: IndicatorCollectionDisaggregation
   quantitative_value: number | null | undefined
   qualitative_text: string | null | undefined
 }
@@ -278,21 +279,14 @@ export function HrRequestViewTemplate({
                             </span>
                           ))}
                         </div>
-                        {(ind.collectionByYear?.length ?? 0) > 0 ? (
-                          <div className="indicator-year-gender-hint muted small" style={{ margin: '6px 0 0' }}>
-                            {ind.collectionByYear!.map((line) => (
-                              <div key={line.year_id}>
-                                <span className="indicator-year-gender-hint__year">{line.label}</span>
-                                {': '}
-                                <span>{line.genders.length > 0 ? line.genders.join(', ') : '—'}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : ind.disaggregation?.trim() ? (
-                          <p className="muted small" style={{ margin: '6px 0 0' }}>
-                            {ind.disaggregation}
-                          </p>
-                        ) : null}
+                        <IndicatorYearGenderHint
+                          indicator={
+                            ind.collectionDisaggregation ?? {
+                              disaggregation: ind.disaggregation,
+                            }
+                          }
+                          style={{ margin: '6px 0 0' }}
+                        />
                         {(hasFedQuant || hasFedQual) && (
                           <div className="hr-request-view-template__federal-values muted small">
                             {hasFedQuant ? <div>Request quantitative: {ind.quantitative_value}</div> : null}

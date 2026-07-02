@@ -16,12 +16,22 @@ import type { RegionRow } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
 import { isDepartmentAdmin, isViewer } from '../lib/roles'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
-import { issueEntryTitleColumnLabel } from '../lib/issueEntryKind'
+import {
+  issueEntryTitleColumnLabel,
+  loiEmptyFilterMessage,
+  loiLoadingPlaceholder,
+  loiMappingLegendLabel,
+  loiMetadataLoadErrorMessage,
+  loiMissingDataAlertTitle,
+  loiRequiredMessage,
+  loiSearchPlaceholder,
+  selectIndicatorForLoiMessage,
+} from '../lib/issueEntryKind'
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
 import { IndicatorYearGenderHint } from './IndicatorYearGenderHint'
 import { PendingFileAttachmentListItem } from './PendingFileAttachmentRow'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
-import { indicatorYearGenderLines } from '../lib/indicatorCollectionDisplay'
+import { indicatorCollectionDisaggregationFromApi } from '../lib/indicatorCollectionDisplay'
 import {
   ictDepartmentNamesForRequest,
   regionNamesForFederalOriginalView,
@@ -606,14 +616,14 @@ export function HrRequestModal({
     const fe: Record<string, string> = {}
     if (!issueForm.title.trim()) fe.title = 'Title is required.'
     if (issueForm.convention_id === '') fe.convention_id = 'Convention is required.'
-    if (issueForm.issue_id === '') fe.issue_id = 'Issue is required.'
+    if (issueForm.issue_id === '') fe.issue_id = loiRequiredMessage()
     if (!issueForm.date) fe.date = 'Due date is required.'
     if (
       selectedIssue &&
       selectedIssue.indicators.length > 0 &&
       issueForm.selectedIndicatorIds.length === 0
     ) {
-      fe.indicator_ids = 'Select at least one indicator for this issue.'
+      fe.indicator_ids = selectIndicatorForLoiMessage()
     }
     const ictOnly =
       issueForm.region_ids.length > 0 && issueForm.region_ids.every((id) => ictRegionIdSet.has(id))
@@ -857,7 +867,7 @@ export function HrRequestModal({
                       disaggregation: ind.disaggregation,
                       hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
                       hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
-                      collectionByYear: indicatorYearGenderLines(ind),
+                      collectionDisaggregation: indicatorCollectionDisaggregationFromApi(ind),
                       quantitative_value: resp?.quantitative_value,
                       qualitative_text: resp?.qualitative_text,
                     }
@@ -865,8 +875,8 @@ export function HrRequestModal({
                   attachments={detail?.attachments}
                 />
               ) : (
-                <Alert variant="error" title="Missing issue data">
-                  <span>Issue metadata could not be loaded for this request.</span>
+                <Alert variant="error" title={loiMissingDataAlertTitle()}>
+                  <span>{loiMetadataLoadErrorMessage()}</span>
                 </Alert>
               )}
               {layout === 'page' && pageViewBelowTemplate ? (
@@ -971,10 +981,10 @@ export function HrRequestModal({
                     issueForm.convention_id === ''
                       ? 'Select a convention first'
                       : issuesLoading
-                        ? 'Loading issues…'
-                        : 'Search or select issue'
+                        ? loiLoadingPlaceholder()
+                        : loiSearchPlaceholder()
                   }
-                  emptyFilterMessage="No issues match your search"
+                  emptyFilterMessage={loiEmptyFilterMessage()}
                   aria-invalid={Boolean(fieldErrors.issue_id)}
                   aria-describedby={fieldErrors.issue_id ? 'hr-issue-err' : undefined}
                 />
@@ -1004,7 +1014,7 @@ export function HrRequestModal({
               {selectedIssue && (
                 <FormRow className="mapping-preview">
                   <fieldset>
-                    <legend>Issue mapping (read-only)</legend>
+                    <legend>{loiMappingLegendLabel()}</legend>
                     <p>
                       <strong>Category:</strong> {selectedIssue.category?.name ?? '—'}
                     </p>

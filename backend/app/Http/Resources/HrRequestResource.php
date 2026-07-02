@@ -59,7 +59,28 @@ class HrRequestResource extends JsonResource
                 'code' => $this->convention->code,
                 'name' => $this->convention->name,
             ] : null),
-            'issue' => $this->whenLoaded('issue', fn () => $this->issue instanceof Issue ? $this->serializeIssue($this->issue) : null),
+            'issue' => $this->whenLoaded('issue', function () {
+                if (! $this->issue instanceof Issue) {
+                    return null;
+                }
+                if ($this->issue->relationLoaded('indicators')) {
+                    return $this->serializeIssue($this->issue);
+                }
+
+                return [
+                    'id' => $this->issue->id,
+                    'entry_kind' => $this->issue->entry_kind === 'recommendation' ? 'recommendation' : 'issue',
+                    'issue_title' => $this->issue->issue_title,
+                    'description' => $this->issue->description,
+                    'has_quantitative' => (bool) $this->issue->has_quantitative,
+                    'has_qualitative' => (bool) $this->issue->has_qualitative,
+                    'category' => $this->issue->relationLoaded('category') && $this->issue->category
+                        ? ['id' => $this->issue->category->id, 'name' => $this->issue->category->name]
+                        : null,
+                    'articles' => [],
+                    'indicators' => [],
+                ];
+            }),
             'attachments' => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn (HrRequestAttachment $a) => [
                 'id' => $a->id,
                 'original_name' => $a->original_name,

@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\DistrictController;
 use App\Http\Controllers\Api\V1\HrRequestController;
 use App\Http\Controllers\Api\V1\KnowledgeHubController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\ReportLookupController;
 use App\Http\Controllers\Api\V1\RegionalResponseController;
 use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\UserController;
@@ -64,6 +65,9 @@ Route::prefix('v1')->group(function (): void {
         Route::patch('/users/{user}', [UserController::class, 'update'])->name('api.v1.users.update');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('api.v1.users.destroy');
         Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('api.v1.dashboard.summary');
+
+        Route::get('/report-form/conventions', [ReportLookupController::class, 'conventions'])->name('api.v1.report-form.conventions');
+        Route::get('/report-form/issue-categories', [ReportLookupController::class, 'issueCategories'])->name('api.v1.report-form.issue-categories');
 
         Route::get('/regional-responses', [RegionalResponseController::class, 'index'])->name('api.v1.regional-responses.index');
         Route::post('/regional-responses', [RegionalResponseController::class, 'store'])->name('api.v1.regional-responses.store');

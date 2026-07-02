@@ -1,16 +1,31 @@
-import { DepartmentIndicatorDataMatrix } from './DepartmentIndicatorDataMatrix'
+import { useEffect, useMemo, useState } from 'react'
+import { fetchDistricts, type DistrictRow } from '../api/districts'
+import { fetchCollectionReligions, type CollectionReligionRow } from '../api/collectionReligions'
+import { fetchRegions, type RegionRow } from '../api/regions'
+import { loadYearKeyedValuesFromBundle } from '../lib/departmentMatrixLoaders'
 import {
   parseDepartmentTaskResponseData,
   type DepartmentIndicatorBundle,
-  type DepartmentQuantitativeByYearGender,
 } from '../lib/departmentTaskResponseFormat'
 import { deptFormUsesIndicatorMatrix, indicatorUsesDataMatrix } from '../lib/indicatorMatrixColumns'
+import { scopeLocationCatalogToRegions } from '../lib/departmentLocationCatalog'
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
+import { DepartmentIndicatorDisaggregationMatrices } from './DepartmentIndicatorDisaggregationMatrices'
+
+function quantitativeHasMatrixData(bundle: DepartmentIndicatorBundle): boolean {
+  const q = bundle.quantitative
+  if (!q) return false
+  return Boolean(
+    (q.by_year_gender && Object.keys(q.by_year_gender).length > 0) ||
+      (q.by_year_age && Object.keys(q.by_year_age).length > 0) ||
+      (q.by_year_disability && Object.keys(q.by_year_disability).length > 0) ||
+      (q.by_year_district && Object.keys(q.by_year_district).length > 0) ||
+      (q.by_year_religion && Object.keys(q.by_year_religion).length > 0),
+  )
+}
 
 function bundleHasSupplementaryContent(bundle: DepartmentIndicatorBundle): boolean {
-  const hasMatrix = Boolean(
-    bundle.quantitative?.by_year_gender && Object.keys(bundle.quantitative.by_year_gender).length > 0,
-  )
+  const hasMatrix = quantitativeHasMatrixData(bundle)
   if (bundle.qualitative?.text?.trim() || bundle.qualitative?.attachment_url?.trim()) return true
   if (bundle.quantitative?.comment?.trim() || bundle.quantitative?.attachment_url?.trim()) return true
   if (
@@ -34,10 +49,10 @@ export function AttachmentViewLink({ url }: { url: string }) {
 type Props = {
   responseData: string | null | undefined
   attachmentUrl?: string | null
-  /** For structured payloads, only show these federal-scoped indicator ids (if non-empty). */
   onlyIndicatorIds?: number[]
-  /** Issue indicators (for year/gender matrix labels when viewing structured responses). */
   issueIndicators?: HrRequestIssueIndicator[]
+  /** When set, region/district matrix columns are limited to these region(s). */
+  locationRegionIds?: number[]
 }
 
 export function DepartmentResponseDisplay({
@@ -45,8 +60,39 @@ export function DepartmentResponseDisplay({
   attachmentUrl,
   onlyIndicatorIds,
   issueIndicators = [],
+  locationRegionIds = [],
 }: Props) {
+  const [regions, setRegions] = useState<RegionRow[]>([])
+  const [districts, setDistricts] = useState<DistrictRow[]>([])
+  const [religions, setReligions] = useState<CollectionReligionRow[]>([])
   const parsed = parseDepartmentTaskResponseData(responseData, attachmentUrl)
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all([fetchRegions(), fetchDistricts(), fetchCollectionReligions()])
+      .then(([regionRows, districtRows, religionRows]) => {
+        if (!cancelled) {
+          setRegions(regionRows)
+          setDistricts(districtRows)
+          setReligions(religionRows)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRegions([])
+          setDistricts([])
+          setReligions([])
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const scopedLocationCatalog = useMemo(
+    () => scopeLocationCatalogToRegions(regions, districts, locationRegionIds),
+    [regions, districts, locationRegionIds],
+  )
 
   if (parsed.kind === 'legacy') {
     const text = parsed.text?.trim() ? parsed.text : '—'
@@ -82,45 +128,57 @@ export function DepartmentResponseDisplay({
       ? issueIndicators.filter((i) => onlyIndicatorIds.includes(i.id))
       : issueIndicators
 
-  const savedByIndicator: Record<string, { by_year_gender?: DepartmentQuantitativeByYearGender | null }> = {}
-  for (const [id, bundle] of entries) {
-    if (bundle.quantitative?.by_year_gender) {
-      savedByIndicator[id] = { by_year_gender: bundle.quantitative.by_year_gender }
+  const matrixValues = useMemo(() => {
+    const gender: Record<number, Record<string, string>> = {}
+    const age: Record<number, Record<string, string>> = {}
+    const disability: Record<number, Record<string, string>> = {}
+    const district: Record<number, Record<string, string>> = {}
+    const religion: Record<number, Record<string, string>> = {}
+    for (const [id, bundle] of entries) {
+      const indicatorId = Number(id)
+      const q = bundle.quantitative
+      if (!q) continue
+      if (q.by_year_gender) gender[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_gender, true)
+      if (q.by_year_age) age[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_age, false)
+      if (q.by_year_disability) disability[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_disability, false)
+      if (q.by_year_district) district[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_district, true)
+      if (q.by_year_religion) religion[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_religion, true)
     }
-  }
+    return { gender, age, disability, district, religion }
+  }, [entries])
 
-  const matrixIndicatorIds = new Set(
-    entries
-      .filter(
-        ([, bundle]) =>
-          bundle.quantitative?.by_year_gender &&
-          Object.keys(bundle.quantitative.by_year_gender).length > 0,
-      )
-      .map(([id]) => Number(id)),
-  )
-  const matrixIndicators = scopedIndicators.filter(
-    (ind) => matrixIndicatorIds.has(ind.id) && indicatorUsesDataMatrix(ind),
-  )
-  const showMatrix =
-    matrixIndicators.length > 0 && deptFormUsesIndicatorMatrix(matrixIndicators)
+  const matrixIndicators = scopedIndicators.filter((ind) => {
+    if (!indicatorUsesDataMatrix(ind)) return false
+    const bundle = entries.find(([id]) => Number(id) === ind.id)?.[1]
+    return bundle ? quantitativeHasMatrixData(bundle) : false
+  })
+  const showMatrix = matrixIndicators.length > 0 && deptFormUsesIndicatorMatrix(matrixIndicators)
 
   const cardEntries = entries.filter(([, bundle]) => bundleHasSupplementaryContent(bundle))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {showMatrix ? (
-        <DepartmentIndicatorDataMatrix
+        <DepartmentIndicatorDisaggregationMatrices
           indicators={matrixIndicators}
-          cellValues={{}}
+          districts={scopedLocationCatalog.districts}
+          religions={religions}
+          genderValues={{}}
+          ageValues={{}}
+          disabilityValues={{}}
+          districtValues={{}}
+          religionValues={{}}
           readOnly
-          savedByIndicator={savedByIndicator}
+          savedGenderByIndicator={matrixValues.gender}
+          savedAgeByIndicator={matrixValues.age}
+          savedDisabilityByIndicator={matrixValues.disability}
+          savedDistrictByIndicator={matrixValues.district}
+          savedReligionByIndicator={matrixValues.religion}
         />
       ) : null}
       {cardEntries.map(([id, bundle]) => {
         const title = bundle.indicator_label?.trim() || `Indicator #${id}`
-        const hasMatrix = Boolean(
-          bundle.quantitative?.by_year_gender && Object.keys(bundle.quantitative.by_year_gender).length > 0,
-        )
+        const hasMatrix = quantitativeHasMatrixData(bundle)
         return (
           <div
             key={id}

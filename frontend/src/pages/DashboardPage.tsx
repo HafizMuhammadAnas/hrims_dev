@@ -699,7 +699,7 @@ export function DashboardPage() {
                   <RefreshCcw size={32} />
                 </div>
                 <h3>Universal periodic review</h3>
-                <p>UPR cycle context and recommendation tracking.</p>
+                <p>UPR cycle context and concluding observations tracking.</p>
               </button>
             </div>
           </section>

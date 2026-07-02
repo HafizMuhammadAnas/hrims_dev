@@ -13,6 +13,7 @@ import { Alert } from './ui/Alert'
 import { Button } from './ui/Button'
 import { StatusBadge } from './ui/StatusBadge'
 import { WorkflowActionFootback, type WorkflowActionFeedback } from './WorkflowActionFootback'
+import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
 import { WorkflowModalHero } from './ui/WorkflowModalHero'
 
 type Tab = 'responses' | 'request'
@@ -277,7 +278,7 @@ export function RegionalResponseFederalReviewView({
             ) : null}
             {!hrLoading && !hrError && hrDetail && !federalRequestTemplateProps ? (
               <p className="muted small" style={{ margin: 0 }}>
-                This request is not in the current issue-based format, or issue data is missing from the API.
+                {loiLegacyFormatMessage()}
               </p>
             ) : null}
           </>

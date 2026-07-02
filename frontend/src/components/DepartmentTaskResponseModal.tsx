@@ -186,6 +186,7 @@ export function DepartmentTaskResponseModal({
                     responseData={task.response_data}
                     attachmentUrl={task.attachment_url}
                     issueIndicators={reqRow?.issue?.indicators}
+                    locationRegionIds={[task.region_id]}
                   />
                 </>
               ) : (

@@ -27,19 +27,35 @@ import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../compon
 import { isFederalRequestManagementView } from '../lib/workflowNavigation'
 import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
-import { DepartmentIndicatorDataMatrix } from '../components/DepartmentIndicatorDataMatrix'
+import { DepartmentIndicatorDisaggregationMatrices } from '../components/DepartmentIndicatorDisaggregationMatrices'
 import {
   DepartmentIndicatorSupplementaryFields,
   emptyDeptIndicatorDraft,
   type DeptIndicatorDraft,
 } from '../components/DepartmentIndicatorSupplementaryFields'
 import { DepartmentResponseDisplay } from '../components/DepartmentResponseDisplay'
+import { fetchDistricts, type DistrictRow } from '../api/districts'
+import { fetchCollectionReligions, type CollectionReligionRow } from '../api/collectionReligions'
 import {
   deptFormUsesIndicatorMatrix,
   forEachIndicatorMatrixCell,
   indicatorUsesDataMatrix,
   matrixCellKey,
 } from '../lib/indicatorMatrixColumns'
+import {
+  AGE_OVER_18,
+  AGE_UNDER_18,
+  DISABILITY_NO,
+  DISABILITY_YES,
+  fixedKeyMatrixCellKey,
+  forEachCatalogMatrixCell,
+  forEachFixedKeyMatrixCell,
+  forEachReligionMatrixCell,
+  indicatorIsYearOnly,
+  indicatorRequiresQuantitativeMatrixPayload,
+} from '../lib/indicatorDisaggregation'
+import { scopeLocationCatalogToRegions } from '../lib/departmentLocationCatalog'
+import { loadYearKeyedValuesFromBundle, matrixCellInputReady, matrixCellNumericValue } from '../lib/departmentMatrixLoaders'
 import { HrRequestModal } from '../components/HrRequestModal'
 import { HrRequestViewTemplate } from '../components/HrRequestViewTemplate'
 import { Alert } from '../components/ui/Alert'
@@ -58,6 +74,7 @@ import {
   hasDepartmentResponse,
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
+import { loiMetadataLoadErrorPageMessage } from '../lib/issueEntryKind'
 import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isViewer } from '../lib/roles'
 import { indicatorsScopedToRequest } from '../lib/hrRequestIndicatorScope'
 import { reviewFeedbackLabelForTask } from '../lib/ictRegion'
@@ -89,16 +106,14 @@ function userMayReviewDepartmentTask(user: AuthUser | null, t: DepartmentTaskRow
 function loadYearGenderValuesFromBundle(
   byYearGender: Record<string, Record<string, { value?: number }>> | null | undefined,
 ): Record<string, string> {
-  const out: Record<string, string> = {}
-  if (!byYearGender) return out
-  for (const [yearKey, genders] of Object.entries(byYearGender)) {
-    for (const [genderKey, cell] of Object.entries(genders)) {
-      if (cell?.value != null && !Number.isNaN(cell.value)) {
-        out[`${yearKey}-${genderKey}`] = String(cell.value)
-      }
-    }
-  }
-  return out
+  return loadYearKeyedValuesFromBundle(
+    byYearGender as import('../lib/departmentTaskResponseFormat').DepartmentQuantitativeByYearKeyed | null | undefined,
+    true,
+  )
+}
+
+function matrixValueReady(values: Record<string, string>, key: string): boolean {
+  return matrixCellInputReady(values[key])
 }
 
 export function HrRequestViewPage() {
@@ -118,6 +133,8 @@ export function HrRequestViewPage() {
     (isDepartmentAdmin(user) || isViewer(user)) && user?.department != null
 
   const [regions, setRegions] = useState<RegionRow[]>([])
+  const [districts, setDistricts] = useState<DistrictRow[]>([])
+  const [religions, setReligions] = useState<CollectionReligionRow[]>([])
   const [detail, setDetail] = useState<HrRequestRow | null>(null)
   const [detailLoading, setDetailLoading] = useState(true)
   const [detailError, setDetailError] = useState<string | null>(null)
@@ -160,20 +177,6 @@ export function HrRequestViewPage() {
     const [deptRows, taskRows] = await Promise.all([fetchDepartments(), fetchDepartmentTasks()])
     setDepartments(deptRows)
     setTasks(taskRows)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    void fetchRegions()
-      .then((r) => {
-        if (!cancelled) setRegions(r)
-      })
-      .catch(() => {
-        if (!cancelled) setRegions([])
-      })
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   useEffect(() => {
@@ -278,6 +281,44 @@ export function HrRequestViewPage() {
     return tasks.find((t) => t.id === taskIdFromUrl && t.req_id === detail.id) ?? null
   }, [detail, taskIdFromUrl, tasks])
 
+  const deptLocationRegionIds = useMemo(() => {
+    const ids: number[] = []
+    if (activeTask?.region_id) ids.push(activeTask.region_id)
+    else if (deptUser && user?.region?.id) ids.push(user.region.id)
+    return ids
+  }, [activeTask?.region_id, deptUser, user?.region?.id])
+
+  const deptLocationCatalog = useMemo(() => {
+    return scopeLocationCatalogToRegions(regions, districts, deptLocationRegionIds)
+  }, [regions, districts, deptLocationRegionIds])
+
+  useEffect(() => {
+    let cancelled = false
+    const regionId = deptLocationRegionIds[0]
+    void Promise.all([
+      fetchRegions(),
+      regionId ? fetchDistricts(regionId) : fetchDistricts(),
+      fetchCollectionReligions(),
+    ])
+      .then(([regionRows, districtRows, religionRows]) => {
+        if (!cancelled) {
+          setRegions(regionRows)
+          setDistricts(districtRows)
+          setReligions(religionRows)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRegions([])
+          setDistricts([])
+          setReligions([])
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [deptLocationRegionIds])
+
   const deptIndicatorsForForm = useMemo(() => indicatorsScopedToRequest(detail), [detail])
 
   const deptResponseDisplayScopeIds = useMemo(() => {
@@ -312,6 +353,11 @@ export function HrRequestViewPage() {
         let comment = ''
         let qualText = ''
         let yearGenderValues: Record<string, string> = {}
+        let yearAgeValues: Record<string, string> = {}
+        let yearDisabilityValues: Record<string, string> = {}
+        let yearRegionValues: Record<string, string> = {}
+        let yearDistrictValues: Record<string, string> = {}
+        let yearReligionValues: Record<string, string> = {}
         if (parsed.kind === 'structured') {
           const b = parsed.payload.by_indicator[String(ind.id)]
           if (b?.quantitative?.by_year_gender) {
@@ -319,10 +365,36 @@ export function HrRequestViewPage() {
           } else if (b?.quantitative && b.quantitative.value != null && !Number.isNaN(b.quantitative.value)) {
             value = String(b.quantitative.value)
           }
+          if (b?.quantitative?.by_year_age) {
+            yearAgeValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_age, false)
+          }
+          if (b?.quantitative?.by_year_disability) {
+            yearDisabilityValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_disability, false)
+          }
+          if (b?.quantitative?.by_year_region) {
+            yearRegionValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_region, true)
+          }
+          if (b?.quantitative?.by_year_district) {
+            yearDistrictValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_district, true)
+          }
+          if (b?.quantitative?.by_year_religion) {
+            yearReligionValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_religion, true)
+          }
           if (b?.quantitative?.comment) comment = b.quantitative.comment
           if (b?.qualitative?.text) qualText = b.qualitative.text
         }
-        next[ind.id] = { ...emptyDeptIndicatorDraft(), value, comment, qualText, yearGenderValues }
+        next[ind.id] = {
+          ...emptyDeptIndicatorDraft(),
+          value,
+          comment,
+          qualText,
+          yearGenderValues,
+          yearAgeValues,
+          yearDisabilityValues,
+          yearRegionValues,
+          yearDistrictValues,
+          yearReligionValues,
+        }
       }
       setIndicatorDrafts(next)
       return
@@ -343,13 +415,54 @@ export function HrRequestViewPage() {
     for (const ind of deptIndicatorsForForm) {
       const d = indicatorDrafts[ind.id]
       if (!d) return false
-      if (indicatorUsesDataMatrix(ind)) {
-        let matrixReady = true
-        forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
-          const v = d.yearGenderValues[matrixCellKey(yearId, genderId)]?.trim() ?? ''
-          if (!v || !Number.isFinite(Number(v))) matrixReady = false
-        })
-        if (!matrixReady) return false
+      if (indicatorRequiresQuantitativeMatrixPayload(ind)) {
+        if (indicatorIsYearOnly(ind) || ind.collects_by_gender) {
+          let matrixReady = true
+          forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
+            if (!matrixValueReady(d.yearGenderValues, matrixCellKey(yearId, genderId))) matrixReady = false
+          })
+          if (!matrixReady) return false
+        }
+        if (ind.collects_by_age) {
+          let matrixReady = true
+          forEachFixedKeyMatrixCell(ind, (i) => Boolean(i.collects_by_age), [AGE_UNDER_18, AGE_OVER_18], (yearId, key) => {
+            if (!matrixValueReady(d.yearAgeValues, fixedKeyMatrixCellKey(yearId, key))) matrixReady = false
+          })
+          if (!matrixReady) return false
+        }
+        if (ind.collects_by_disability) {
+          let matrixReady = true
+          forEachFixedKeyMatrixCell(
+            ind,
+            (i) => Boolean(i.collects_by_disability),
+            [DISABILITY_YES, DISABILITY_NO],
+            (yearId, key) => {
+              if (!matrixValueReady(d.yearDisabilityValues, fixedKeyMatrixCellKey(yearId, key))) matrixReady = false
+            },
+          )
+          if (!matrixReady) return false
+        }
+        if (ind.collects_by_location) {
+          let matrixReady = true
+          const districtCatalog = deptLocationCatalog.districts.map((x) => ({ id: x.id, name: x.name }))
+          forEachCatalogMatrixCell(
+            ind,
+            (i) => Boolean(i.collects_by_location),
+            districtCatalog,
+            (yearId, districtId) => {
+              if (!matrixValueReady(d.yearDistrictValues, matrixCellKey(yearId, districtId))) matrixReady = false
+            },
+          )
+          if (!matrixReady) return false
+        }
+        if (ind.collects_by_religion) {
+          let matrixReady = true
+          const religionCatalog = religions.map((r) => ({ id: r.id, name: r.name }))
+          forEachReligionMatrixCell(ind, religionCatalog, (yearId, religionId) => {
+            if (!matrixValueReady(d.yearReligionValues, matrixCellKey(yearId, religionId))) matrixReady = false
+          })
+          if (!matrixReady) return false
+        }
       } else if (ind.has_quantitative) {
         const v = d.value.trim()
         if (!v || !Number.isFinite(Number(v))) return false
@@ -364,7 +477,7 @@ export function HrRequestViewPage() {
       }
     }
     return true
-  }, [deptIndicatorsForForm, indicatorDrafts, activeTask, deptParsedTaskResponse])
+  }, [deptIndicatorsForForm, indicatorDrafts, activeTask, deptParsedTaskResponse, deptLocationCatalog, religions])
 
   const deptLegacySubmitReady = useMemo(() => {
     if (!activeTask) return false
@@ -487,12 +600,7 @@ export function HrRequestViewPage() {
           string,
           {
             indicator_label: string
-            quantitative?:
-              | { value: string; comment: string }
-              | {
-                  by_year_gender: Record<string, Record<string, { value: string }>>
-                  comment: string
-                }
+            quantitative?: Record<string, unknown>
             qualitative?: { text: string }
           }
         > = {}
@@ -504,19 +612,95 @@ export function HrRequestViewPage() {
           const d = indicatorDrafts[ind.id]
           if (!d) continue
           const entry: (typeof by_indicator)[string] = { indicator_label: ind.indicator_text }
-          if (indicatorUsesDataMatrix(ind)) {
-            const by_year_gender: Record<string, Record<string, { value: string }>> = {}
-            forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
-              const yearKey = String(yearId)
-              if (!by_year_gender[yearKey]) by_year_gender[yearKey] = {}
-              by_year_gender[yearKey][String(genderId)] = {
-                value: d.yearGenderValues[matrixCellKey(yearId, genderId)]?.trim() ?? '',
-              }
-            })
-            entry.quantitative = {
-              by_year_gender,
-              comment: d.comment.trim(),
+          if (indicatorRequiresQuantitativeMatrixPayload(ind)) {
+            const quantitative: {
+              comment: string
+              by_year_gender?: Record<string, Record<string, { value: string }>>
+              by_year_age?: Record<string, Record<string, { value: string }>>
+              by_year_disability?: Record<string, Record<string, { value: string }>>
+              by_year_region?: Record<string, Record<string, { value: string }>>
+              by_year_district?: Record<string, Record<string, { value: string }>>
+              by_year_religion?: Record<string, Record<string, { value: string }>>
+            } = { comment: d.comment.trim() }
+
+            if (indicatorIsYearOnly(ind) || ind.collects_by_gender) {
+              const by_year_gender: Record<string, Record<string, { value: string }>> = {}
+              forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
+                const yearKey = String(yearId)
+                if (!by_year_gender[yearKey]) by_year_gender[yearKey] = {}
+                by_year_gender[yearKey][String(genderId)] = {
+                  value: matrixCellNumericValue(d.yearGenderValues[matrixCellKey(yearId, genderId)]),
+                }
+              })
+              quantitative.by_year_gender = by_year_gender
             }
+
+            if (ind.collects_by_age) {
+              const by_year_age: Record<string, Record<string, { value: string }>> = {}
+              forEachFixedKeyMatrixCell(
+                ind,
+                (i) => Boolean(i.collects_by_age),
+                [AGE_UNDER_18, AGE_OVER_18],
+                (yearId, key) => {
+                  const yearKey = String(yearId)
+                  if (!by_year_age[yearKey]) by_year_age[yearKey] = {}
+                  by_year_age[yearKey][key] = {
+                    value: matrixCellNumericValue(d.yearAgeValues[fixedKeyMatrixCellKey(yearId, key)]),
+                  }
+                },
+              )
+              quantitative.by_year_age = by_year_age
+            }
+
+            if (ind.collects_by_disability) {
+              const by_year_disability: Record<string, Record<string, { value: string }>> = {}
+              forEachFixedKeyMatrixCell(
+                ind,
+                (i) => Boolean(i.collects_by_disability),
+                [DISABILITY_YES, DISABILITY_NO],
+                (yearId, key) => {
+                  const yearKey = String(yearId)
+                  if (!by_year_disability[yearKey]) by_year_disability[yearKey] = {}
+                  by_year_disability[yearKey][key] = {
+                    value: matrixCellNumericValue(d.yearDisabilityValues[fixedKeyMatrixCellKey(yearId, key)]),
+                  }
+                },
+              )
+              quantitative.by_year_disability = by_year_disability
+            }
+
+            if (ind.collects_by_location) {
+              const by_year_district: Record<string, Record<string, { value: string }>> = {}
+              const districtCatalog = deptLocationCatalog.districts.map((x) => ({ id: x.id, name: x.name }))
+              forEachCatalogMatrixCell(
+                ind,
+                (i) => Boolean(i.collects_by_location),
+                districtCatalog,
+                (yearId, districtId) => {
+                  const yearKey = String(yearId)
+                  if (!by_year_district[yearKey]) by_year_district[yearKey] = {}
+                  by_year_district[yearKey][String(districtId)] = {
+                    value: matrixCellNumericValue(d.yearDistrictValues[matrixCellKey(yearId, districtId)]),
+                  }
+                },
+              )
+              quantitative.by_year_district = by_year_district
+            }
+
+            if (ind.collects_by_religion) {
+              const by_year_religion: Record<string, Record<string, { value: string }>> = {}
+              const religionCatalog = religions.map((r) => ({ id: r.id, name: r.name }))
+              forEachReligionMatrixCell(ind, religionCatalog, (yearId, religionId) => {
+                const yearKey = String(yearId)
+                if (!by_year_religion[yearKey]) by_year_religion[yearKey] = {}
+                by_year_religion[yearKey][String(religionId)] = {
+                  value: matrixCellNumericValue(d.yearReligionValues[matrixCellKey(yearId, religionId)]),
+                }
+              })
+              quantitative.by_year_religion = by_year_religion
+            }
+
+            entry.quantitative = quantitative
             if (d.quantFile) quantFiles[ind.id] = d.quantFile
             if (d.clearSavedQuantAttachment) stripQuantIndicatorIds.push(ind.id)
           } else if (ind.has_quantitative) {
@@ -948,6 +1132,7 @@ export function HrRequestViewPage() {
                         attachmentUrl={activeTask.attachment_url}
                         onlyIndicatorIds={deptResponseDisplayScopeIds}
                         issueIndicators={detail?.issue?.indicators}
+                        locationRegionIds={[activeTask.region_id]}
                       />
                       {showMonitorReviewActions ? (
                         <div style={{ marginTop: 20 }}>
@@ -1031,7 +1216,7 @@ export function HrRequestViewPage() {
                   ) : null}
                   {!detailLoading && !detailError && detail && !deptRequestTemplateProps ? (
                     <Alert variant="warning" title="Request preview unavailable">
-                      <span>Issue metadata for this request could not be loaded.</span>
+                      <span>{loiMetadataLoadErrorPageMessage()}</span>
                     </Alert>
                   ) : null}
                 </div>
@@ -1175,20 +1360,50 @@ export function HrRequestViewPage() {
             {deptIndicatorsForForm.length > 0 ? (
               <>
                 <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-                  Complete each indicator required for this request. Use the data table for year and gender
-                  breakdowns where configured; add comments, narrative responses, and attachments as needed.
+                  Complete each indicator required for this request. Use the data tables for year-based and
+                  disaggregated breakdowns where configured; add comments, narrative responses, and attachments
+                  as needed.
                 </p>
                 {deptFormUsesIndicatorMatrix(deptIndicatorsForForm) ? (
-                  <DepartmentIndicatorDataMatrix
+                  <DepartmentIndicatorDisaggregationMatrices
                     indicators={deptIndicatorsForForm}
-                    cellValues={Object.fromEntries(
+                    districts={deptLocationCatalog.districts}
+                    religions={religions}
+                    genderValues={Object.fromEntries(
                       deptIndicatorsForForm.map((ind) => [
                         ind.id,
                         indicatorDrafts[ind.id]?.yearGenderValues ?? {},
                       ]),
                     )}
-                    onCellChange={(indicatorId, yearId, genderId, value) => {
-                      const key = matrixCellKey(yearId, genderId)
+                    ageValues={Object.fromEntries(
+                      deptIndicatorsForForm.map((ind) => [
+                        ind.id,
+                        indicatorDrafts[ind.id]?.yearAgeValues ?? {},
+                      ]),
+                    )}
+                    disabilityValues={Object.fromEntries(
+                      deptIndicatorsForForm.map((ind) => [
+                        ind.id,
+                        indicatorDrafts[ind.id]?.yearDisabilityValues ?? {},
+                      ]),
+                    )}
+                    districtValues={Object.fromEntries(
+                      deptIndicatorsForForm.map((ind) => [
+                        ind.id,
+                        indicatorDrafts[ind.id]?.yearDistrictValues ?? {},
+                      ]),
+                    )}
+                    religionValues={Object.fromEntries(
+                      deptIndicatorsForForm.map((ind) => [
+                        ind.id,
+                        indicatorDrafts[ind.id]?.yearReligionValues ?? {},
+                      ]),
+                    )}
+                    onGenderChange={(indicatorId, yearId, columnId, value) => {
+                      const key =
+                        typeof columnId === 'string'
+                          ? `${yearId}-${columnId}`
+                          : matrixCellKey(yearId, columnId)
                       setIndicatorDrafts((prev) => {
                         const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
                         return {
@@ -1196,6 +1411,58 @@ export function HrRequestViewPage() {
                           [indicatorId]: {
                             ...cur,
                             yearGenderValues: { ...cur.yearGenderValues, [key]: value },
+                          },
+                        }
+                      })
+                    }}
+                    onAgeChange={(indicatorId, yearId, columnId, value) => {
+                      const key = fixedKeyMatrixCellKey(yearId, String(columnId))
+                      setIndicatorDrafts((prev) => {
+                        const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        return {
+                          ...prev,
+                          [indicatorId]: {
+                            ...cur,
+                            yearAgeValues: { ...cur.yearAgeValues, [key]: value },
+                          },
+                        }
+                      })
+                    }}
+                    onDisabilityChange={(indicatorId, yearId, columnId, value) => {
+                      const key = fixedKeyMatrixCellKey(yearId, String(columnId))
+                      setIndicatorDrafts((prev) => {
+                        const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        return {
+                          ...prev,
+                          [indicatorId]: {
+                            ...cur,
+                            yearDisabilityValues: { ...cur.yearDisabilityValues, [key]: value },
+                          },
+                        }
+                      })
+                    }}
+                    onDistrictChange={(indicatorId, yearId, columnId, value) => {
+                      const key = matrixCellKey(yearId, Number(columnId))
+                      setIndicatorDrafts((prev) => {
+                        const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        return {
+                          ...prev,
+                          [indicatorId]: {
+                            ...cur,
+                            yearDistrictValues: { ...cur.yearDistrictValues, [key]: value },
+                          },
+                        }
+                      })
+                    }}
+                    onReligionChange={(indicatorId, yearId, columnId, value) => {
+                      const key = matrixCellKey(yearId, Number(columnId))
+                      setIndicatorDrafts((prev) => {
+                        const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        return {
+                          ...prev,
+                          [indicatorId]: {
+                            ...cur,
+                            yearReligionValues: { ...cur.yearReligionValues, [key]: value },
                           },
                         }
                       })
@@ -1362,6 +1629,7 @@ export function HrRequestViewPage() {
               attachmentUrl={activeTask.attachment_url}
               onlyIndicatorIds={deptResponseDisplayScopeIds}
               issueIndicators={detail?.issue?.indicators}
+              locationRegionIds={[activeTask.region_id]}
             />
           </div>
         )}

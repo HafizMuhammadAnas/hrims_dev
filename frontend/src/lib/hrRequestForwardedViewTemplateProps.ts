@@ -3,7 +3,7 @@ import { coerceIssueEntryKind } from './issueEntryKind'
 import type { HrRequestIssueDetail } from '../types/hrRequest'
 import type { HrRequestRow } from '../types/hrRequest'
 import type { HrRequestViewIndicatorRow } from '../components/HrRequestViewTemplate'
-import { indicatorYearGenderLines } from './indicatorCollectionDisplay'
+import { indicatorCollectionDisaggregationFromApi } from './indicatorCollectionDisplay'
 
 /** Matches Super Admin → Issues & mapping label style. */
 function conventionOptionLabel(c: { code?: string | null; name?: string | null }): string {
@@ -102,7 +102,7 @@ export function buildDepartmentForwardedViewTemplateProps(
       disaggregation: ind.disaggregation,
       hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
       hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
-      collectionByYear: indicatorYearGenderLines(ind),
+      collectionDisaggregation: indicatorCollectionDisaggregationFromApi(ind),
       quantitative_value: resp?.quantitative_value,
       qualitative_text: resp?.qualitative_text,
     }
@@ -223,7 +223,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
       disaggregation: ind.disaggregation,
       hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
       hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
-      collectionByYear: indicatorYearGenderLines(ind),
+      collectionDisaggregation: indicatorCollectionDisaggregationFromApi(ind),
       quantitative_value: resp?.quantitative_value,
       qualitative_text: resp?.qualitative_text,
     }

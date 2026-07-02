@@ -40,6 +40,7 @@ import { FormField } from '../components/ui/FormField'
 import { FormGrid } from '../components/ui/FormGrid'
 import { FormRow } from '../components/ui/FormRow'
 import { isSuperAdmin } from '../lib/roles'
+import { uprConcludingObservationsLabel } from '../lib/issueEntryKind'
 
 type Tab =
   | 'departments'
@@ -70,8 +71,8 @@ const TAB_PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
     subtitle: 'Sustainable development goal, target, and indicator nodes for mapping and knowledge hub goals.',
   },
   upr: {
-    title: 'UPR recommendations',
-    subtitle: 'Universal Periodic Review recommendation rows for workflows and issue mapping.',
+    title: uprConcludingObservationsLabel(),
+    subtitle: 'Universal Periodic Review concluding observation rows for workflows and LOI mapping.',
   },
   hub: {
     title: 'Knowledge hub pages',
@@ -789,9 +790,9 @@ export function SuperAdminConsolePage() {
 
       {tab === 'upr' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>UPR recommendations</h3>
+          <h3 style={{ marginTop: 0 }}>{uprConcludingObservationsLabel()}</h3>
           <p className="text-muted">
-            Use <strong>Edit</strong> to add narrative <strong>Body</strong> text shown with each recommendation where
+            Use <strong>Edit</strong> to add narrative <strong>Body</strong> text shown with each concluding observation where
             the app links to UPR content.
           </p>
           <UprForm

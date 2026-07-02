@@ -6,25 +6,28 @@ import {
   adminCreateCollectionGender,
   adminCreateCollectionYear,
   adminCreateIssueCategory,
-  adminDeleteArticle,
-  adminDeleteCollectionGender,
-  adminDeleteCollectionYear,
-  adminDeleteIssue,
-  adminDeleteIssueCategory,
   adminFetchArticles,
   adminFetchCollectionGenders,
+  adminFetchCollectionReligions,
   adminFetchCollectionYears,
   adminFetchConventions,
   adminFetchIssue,
   adminFetchIssueCategories,
   adminFetchIssues,
+  adminSetArticleActive,
+  adminSetCollectionGenderActive,
+  adminSetCollectionReligionActive,
+  adminSetCollectionYearActive,
+  adminSetIssueActive,
+  adminSetIssueCategoryActive,
   adminUpdateArticle,
   adminUpdateCollectionGender,
+  adminUpdateCollectionReligion,
   adminUpdateCollectionYear,
-  adminUpdateIssue,
   adminUpdateIssueCategory,
   type AdminArticleRow,
   type AdminCollectionGender,
+  type AdminCollectionReligion,
   type AdminCollectionYear,
   type AdminConvention,
   type AdminIssue,
@@ -49,14 +52,22 @@ import { workflowBackLabel } from '../lib/workflowNavigation'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import {
   coerceIssueEntryKind,
+  issueEntrySaveBlocked,
+  issueEntryDescriptionFieldLabel,
+  issueEntryDescriptionPlaceholder,
+  issueEntryFormShowsTitleField,
+  issueEntryIndicatorsLinkedLabel,
   issueEntryKindBadgeLabel,
   issueEntryKindToggleAriaLabel,
   issueEntryTitleColumnLabel,
   issueEntryTitleFieldLabel,
   issueEntryViewPageTitle,
+  issuesAdminSectionsAriaLabel,
   issuesCreateTabLabel,
   issuesEmptyListHint,
   issuesListTabLabel,
+  noIndicatorsForLoiHint,
+  resolveIssueTitleForSave,
   type IssueEntryKind,
 } from '../lib/issueEntryKind'
 import { isSuperAdmin } from '../lib/roles'
@@ -64,15 +75,16 @@ import type { AuthUser } from '../types/auth'
 
 const ISSUES_PAGE_SIZE = 10
 
-type IssuesView = 'list' | 'create' | 'categories' | 'articles' | 'years' | 'genders'
+type IssuesView = 'list' | 'create' | 'categories' | 'articles' | 'years' | 'genders' | 'religions'
 
 const ISSUES_TABS: { view: IssuesView; to: string; label: string; end?: boolean }[] = [
   { view: 'list', to: '/admin/issues', label: issuesListTabLabel(), end: true },
   { view: 'create', to: '/admin/issues/create', label: issuesCreateTabLabel() },
-  { view: 'categories', to: '/admin/issues/categories', label: 'Category list' },
-  { view: 'articles', to: '/admin/issues/articles', label: 'Article list' },
-  { view: 'years', to: '/admin/issues/years', label: 'Year list' },
-  { view: 'genders', to: '/admin/issues/genders', label: 'Gender list' },
+  { view: 'categories', to: '/admin/issues/categories', label: 'Category' },
+  { view: 'articles', to: '/admin/issues/articles', label: 'Article' },
+  { view: 'years', to: '/admin/issues/years', label: 'Year' },
+  { view: 'genders', to: '/admin/issues/genders', label: 'Gender' },
+  { view: 'religions', to: '/admin/issues/religions', label: 'Religion' },
 ]
 
 function resolveIssuesView(param: string | undefined): IssuesView | null {
@@ -83,7 +95,8 @@ function resolveIssuesView(param: string | undefined): IssuesView | null {
     param === 'categories' ||
     param === 'articles' ||
     param === 'years' ||
-    param === 'genders'
+    param === 'genders' ||
+    param === 'religions'
   ) {
     return param
   }
@@ -130,19 +143,22 @@ export function IssuesMappingsAdminPage() {
   const [articles, setArticles] = useState<AdminArticleRow[]>([])
   const [collectionYears, setCollectionYears] = useState<AdminCollectionYear[]>([])
   const [collectionGenders, setCollectionGenders] = useState<AdminCollectionGender[]>([])
+  const [collectionReligions, setCollectionReligions] = useState<AdminCollectionReligion[]>([])
   const refreshLookups = useCallback(async () => {
-    const [conv, cat, art, years, genders] = await Promise.all([
+    const [conv, cat, art, years, genders, religions] = await Promise.all([
       adminFetchConventions(),
       adminFetchIssueCategories(),
       adminFetchArticles(),
       adminFetchCollectionYears(),
       adminFetchCollectionGenders(),
+      adminFetchCollectionReligions(),
     ])
     setConventions(conv)
     setCategories(cat)
     setArticles(art)
     setCollectionYears(years)
     setCollectionGenders(genders)
+    setCollectionReligions(religions)
   }, [])
 
   const refreshIssues = useCallback(async () => {
@@ -161,6 +177,11 @@ export function IssuesMappingsAdminPage() {
   useEffect(() => {
     void refreshAll()
   }, [refreshAll])
+
+  const activeCategories = useMemo(() => categories.filter(catalogIsActive), [categories])
+  const activeArticles = useMemo(() => articles.filter(catalogIsActive), [articles])
+  const activeCollectionYears = useMemo(() => collectionYears.filter(catalogIsActive), [collectionYears])
+  const activeCollectionGenders = useMemo(() => collectionGenders.filter(catalogIsActive), [collectionGenders])
 
   if (!user || !isSuperAdmin(user)) {
     return <Navigate to="/" replace />
@@ -196,23 +217,7 @@ export function IssuesMappingsAdminPage() {
   }
 
   if (editIssueId != null) {
-    return (
-      <IssuesEditPage
-        issueId={editIssueId}
-        user={user}
-        conventions={conventions}
-        categories={categories}
-        articles={articles}
-        collectionYears={collectionYears}
-        collectionGenders={collectionGenders}
-        busy={busy}
-        setBusy={setBusy}
-        setError={setError}
-        error={error}
-        onRefreshIssues={refreshIssues}
-        onRefreshLookups={refreshLookups}
-      />
-    )
+    return <Navigate to={`/admin/issues/view/${editIssueId}`} replace />
   }
 
   return (
@@ -223,7 +228,7 @@ export function IssuesMappingsAdminPage() {
         </Alert>
       )}
 
-      <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label="Issues and mappings sections">
+      <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label={issuesAdminSectionsAriaLabel()}>
         {ISSUES_TABS.map((tab) => (
           <NavLink
             key={tab.view}
@@ -246,10 +251,10 @@ export function IssuesMappingsAdminPage() {
         <TableCard padded>
           <IssuesCreateForm
             conventions={conventions}
-            categories={categories}
-            articles={articles}
-            collectionYears={collectionYears}
-            collectionGenders={collectionGenders}
+            categories={activeCategories}
+            articles={activeArticles}
+            collectionYears={activeCollectionYears}
+            collectionGenders={activeCollectionGenders}
             busy={busy}
             setBusy={setBusy}
             setError={setError}
@@ -301,8 +306,77 @@ export function IssuesMappingsAdminPage() {
           onRefresh={refreshLookups}
         />
       )}
+
+      {view === 'religions' && (
+        <IssuesCollectionReligionsSection
+          religions={collectionReligions}
+          busy={busy}
+          setBusy={setBusy}
+          setError={setError}
+          onRefresh={refreshLookups}
+        />
+      )}
     </div>
   )
+}
+
+function issueIsActive(issue: AdminIssue): boolean {
+  return issue.is_active !== false
+}
+
+async function toggleIssueActive(
+  issue: AdminIssue,
+  onRefreshIssues: () => Promise<void>,
+  setError: (s: string | null) => void,
+): Promise<void> {
+  const active = issueIsActive(issue)
+  const next = !active
+  const kind = coerceIssueEntryKind(issue.entry_kind)
+  const label = issueEntryKindBadgeLabel(kind)
+  if (!window.confirm(`${next ? 'Activate' : 'Deactivate'} this ${label}?`)) return
+  try {
+    await adminSetIssueActive(issue.id, next)
+    await onRefreshIssues()
+  } catch (e: unknown) {
+    setError(isApiError(e) ? e.message : `${next ? 'Activate' : 'Deactivate'} failed`)
+  }
+}
+
+function issueStatusLabel(issue: AdminIssue): string {
+  return issueIsActive(issue) ? 'Active' : 'Inactive'
+}
+
+type CatalogRow = { is_active?: boolean }
+
+function catalogIsActive(row: CatalogRow): boolean {
+  return row.is_active !== false
+}
+
+function catalogStatusLabel(row: CatalogRow): string {
+  return catalogIsActive(row) ? 'Active' : 'Inactive'
+}
+
+async function toggleCatalogActive(
+  itemLabel: string,
+  row: CatalogRow,
+  setActive: (is_active: boolean) => Promise<unknown>,
+  onRefresh: () => Promise<void>,
+  setError: (s: string | null) => void,
+  setBusy: (v: boolean) => void,
+): Promise<void> {
+  const active = catalogIsActive(row)
+  const next = !active
+  if (!window.confirm(`${next ? 'Activate' : 'Deactivate'} ${itemLabel}?`)) return
+  setBusy(true)
+  setError(null)
+  try {
+    await setActive(next)
+    await onRefresh()
+  } catch (e: unknown) {
+    setError(isApiError(e) ? e.message : `${next ? 'Activate' : 'Deactivate'} failed`)
+  } finally {
+    setBusy(false)
+  }
 }
 
 function IssuesListSection({
@@ -367,20 +441,21 @@ function IssuesListSection({
                   <span className="issues-mapping-table__issue-col-title">{issueEntryTitleColumnLabel()}</span>
                   <span className="issues-mapping-table__kind-legend">
                     <span className="issues-mapping-table__kind-legend-item issues-mapping-table__kind-legend-item--issue">
-                      Issue
+                      {issueEntryKindBadgeLabel('issue')}
                     </span>
                     <span className="issues-mapping-table__kind-legend-item issues-mapping-table__kind-legend-item--recommendation">
-                      Recommendation
+                      {issueEntryKindBadgeLabel('recommendation')}
                     </span>
                   </span>
                 </th>
+                <th className="issues-mapping-table__status-col">Status</th>
                 <th className="issues-mapping-table__actions-col">Actions</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
                 <EmptyStateRow
-                  colSpan={5}
+                  colSpan={6}
                   message={
                     search.trim()
                       ? 'No entries match your search.'
@@ -393,7 +468,9 @@ function IssuesListSection({
                   return (
                   <tr
                     key={i.id}
-                    className={`issues-mapping-table__row issues-mapping-table__row--${entryKind}`}
+                    className={`issues-mapping-table__row issues-mapping-table__row--${entryKind}${
+                      issueIsActive(i) ? '' : ' issues-mapping-table__row--inactive'
+                    }`}
                     title={issueEntryKindBadgeLabel(entryKind)}
                   >
                     <td className="text-compact issues-mapping-table__convention">{issueConventionLabel(i)}</td>
@@ -407,6 +484,7 @@ function IssuesListSection({
                     >
                       {i.issue_title}
                     </td>
+                    <td className="issues-mapping-table__status">{issueStatusLabel(i)}</td>
                     <td className="issues-mapping-table__actions">
                       <ActionMenu>
                         <Button
@@ -418,26 +496,12 @@ function IssuesListSection({
                         </Button>
                         <Button
                           variant="link"
-                          compact
-                          onClick={() => navigate(`/admin/issues/edit/${i.id}`)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="link"
-                          dangerLink
+                          dangerLink={issueIsActive(i)}
                           onClick={() => {
-                            void (async () => {
-                              try {
-                                await adminDeleteIssue(i.id)
-                                await onRefreshIssues()
-                              } catch (e: unknown) {
-                                setError(isApiError(e) ? e.message : 'Delete failed')
-                              }
-                            })()
+                            void toggleIssueActive(i, onRefreshIssues, setError)
                           }}
                         >
-                          Delete
+                          {issueIsActive(i) ? 'Deactivate' : 'Activate'}
                         </Button>
                       </ActionMenu>
                     </td>
@@ -545,18 +609,28 @@ function IssuesCategoriesSection({
             <tr>
               <th>ID</th>
               <th>Name</th>
+              <th>Status</th>
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.length === 0 ? (
               <EmptyStateRow
-                colSpan={3}
+                colSpan={4}
                 message={search.trim() ? 'No categories match your search.' : 'No categories yet.'}
               />
               ) : (
                 pageRows.map((c) => (
-                  <tr key={c.id} className={editingCategoryId === c.id ? 'catalog-table-row-editing' : undefined}>
+                  <tr
+                    key={c.id}
+                    className={
+                      editingCategoryId === c.id
+                        ? 'catalog-table-row-editing'
+                        : catalogIsActive(c)
+                          ? undefined
+                          : 'issues-mapping-table__row--inactive'
+                    }
+                  >
                     <td>{c.id}</td>
                     <td>
                       {editingCategoryId === c.id ? (
@@ -570,6 +644,7 @@ function IssuesCategoriesSection({
                         c.name
                       )}
                     </td>
+                    <td>{catalogStatusLabel(c)}</td>
                     <td className="table-actions">
                       {editingCategoryId === c.id ? (
                         <CatalogInlineEditActions
@@ -608,25 +683,20 @@ function IssuesCategoriesSection({
                           <Button
                             variant="link"
                             compact
-                            dangerLink
+                            dangerLink={catalogIsActive(c)}
                             disabled={busy}
                             onClick={() => {
-                              if (!window.confirm(`Delete category "${c.name}"?`)) return
-                              void (async () => {
-                                setBusy(true)
-                                setError(null)
-                                try {
-                                  await adminDeleteIssueCategory(c.id)
-                                  await onRefresh()
-                                } catch (e: unknown) {
-                                  setError(isApiError(e) ? e.message : 'Delete failed')
-                                } finally {
-                                  setBusy(false)
-                                }
-                              })()
+                              void toggleCatalogActive(
+                                `category "${c.name}"`,
+                                c,
+                                (is_active) => adminSetIssueCategoryActive(c.id, is_active),
+                                onRefresh,
+                                setError,
+                                setBusy,
+                              )
                             }}
                           >
-                            Delete
+                            {catalogIsActive(c) ? 'Deactivate' : 'Activate'}
                           </Button>
                         </ActionMenu>
                       )}
@@ -755,13 +825,14 @@ function IssuesArticlesSection({
             <tr>
               <th>ID</th>
               <th>Article name</th>
+              <th>Status</th>
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.length === 0 ? (
               <EmptyStateRow
-                colSpan={3}
+                colSpan={4}
                 message={search.trim() ? 'No articles match your search.' : 'No articles yet.'}
               />
               ) : (
@@ -769,7 +840,7 @@ function IssuesArticlesSection({
                   if (editingArticleId === a.id) {
                     return (
                       <tr key={a.id} className="catalog-table-edit-row">
-                        <td colSpan={3}>
+                        <td colSpan={4}>
                           <div className="catalog-inline-edit">
                             <p className="catalog-inline-edit__meta muted small">ID {a.id}</p>
                             <FormField label="Article name">
@@ -816,9 +887,13 @@ function IssuesArticlesSection({
                     )
                   }
                   return (
-                    <tr key={a.id}>
+                    <tr
+                      key={a.id}
+                      className={catalogIsActive(a) ? undefined : 'issues-mapping-table__row--inactive'}
+                    >
                       <td>{a.id}</td>
                       <td>{a.article_name}</td>
+                      <td>{catalogStatusLabel(a)}</td>
                       <td className="table-actions">
                         <ActionMenu>
                           <Button
@@ -843,25 +918,20 @@ function IssuesArticlesSection({
                           <Button
                             variant="link"
                             compact
-                            dangerLink
+                            dangerLink={catalogIsActive(a)}
                             disabled={busy}
                             onClick={() => {
-                              if (!window.confirm(`Delete article "${a.article_name}"?`)) return
-                              void (async () => {
-                                setBusy(true)
-                                setError(null)
-                                try {
-                                  await adminDeleteArticle(a.id)
-                                  await onRefresh()
-                                } catch (e: unknown) {
-                                  setError(isApiError(e) ? e.message : 'Delete failed')
-                                } finally {
-                                  setBusy(false)
-                                }
-                              })()
+                              void toggleCatalogActive(
+                                `article "${a.article_name}"`,
+                                a,
+                                (is_active) => adminSetArticleActive(a.id, is_active),
+                                onRefresh,
+                                setError,
+                                setBusy,
+                              )
                             }}
                           >
-                            Delete
+                            {catalogIsActive(a) ? 'Deactivate' : 'Activate'}
                           </Button>
                         </ActionMenu>
                       </td>
@@ -967,18 +1037,28 @@ function IssuesCollectionYearsSection({
             <tr>
               <th>ID</th>
               <th>Year</th>
+              <th>Status</th>
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.length === 0 ? (
               <EmptyStateRow
-                colSpan={3}
+                colSpan={4}
                 message={search.trim() ? 'No years match your search.' : 'No years yet.'}
               />
               ) : (
                 pageRows.map((y) => (
-                  <tr key={y.id} className={editingId === y.id ? 'catalog-table-row-editing' : undefined}>
+                  <tr
+                    key={y.id}
+                    className={
+                      editingId === y.id
+                        ? 'catalog-table-row-editing'
+                        : catalogIsActive(y)
+                          ? undefined
+                          : 'issues-mapping-table__row--inactive'
+                    }
+                  >
                     <td>{y.id}</td>
                     <td>
                       {editingId === y.id ? (
@@ -993,6 +1073,7 @@ function IssuesCollectionYearsSection({
                         y.label
                       )}
                     </td>
+                    <td>{catalogStatusLabel(y)}</td>
                     <td className="table-actions">
                       {editingId === y.id ? (
                         <CatalogInlineEditActions
@@ -1031,25 +1112,20 @@ function IssuesCollectionYearsSection({
                           <Button
                             variant="link"
                             compact
-                            dangerLink
+                            dangerLink={catalogIsActive(y)}
                             disabled={busy}
                             onClick={() => {
-                              if (!window.confirm(`Delete year "${y.label}"?`)) return
-                              void (async () => {
-                                setBusy(true)
-                                setError(null)
-                                try {
-                                  await adminDeleteCollectionYear(y.id)
-                                  await onRefresh()
-                                } catch (e: unknown) {
-                                  setError(isApiError(e) ? e.message : 'Delete failed')
-                                } finally {
-                                  setBusy(false)
-                                }
-                              })()
+                              void toggleCatalogActive(
+                                `year "${y.label}"`,
+                                y,
+                                (is_active) => adminSetCollectionYearActive(y.id, is_active),
+                                onRefresh,
+                                setError,
+                                setBusy,
+                              )
                             }}
                           >
-                            Delete
+                            {catalogIsActive(y) ? 'Deactivate' : 'Activate'}
                           </Button>
                         </ActionMenu>
                       )}
@@ -1154,18 +1230,28 @@ function IssuesCollectionGendersSection({
             <tr>
               <th>ID</th>
               <th>Gender</th>
+              <th>Status</th>
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.length === 0 ? (
               <EmptyStateRow
-                colSpan={3}
+                colSpan={4}
                 message={search.trim() ? 'No genders match your search.' : 'No genders yet.'}
               />
               ) : (
                 pageRows.map((g) => (
-                  <tr key={g.id} className={editingId === g.id ? 'catalog-table-row-editing' : undefined}>
+                  <tr
+                    key={g.id}
+                    className={
+                      editingId === g.id
+                        ? 'catalog-table-row-editing'
+                        : catalogIsActive(g)
+                          ? undefined
+                          : 'issues-mapping-table__row--inactive'
+                    }
+                  >
                     <td>{g.id}</td>
                     <td>
                       {editingId === g.id ? (
@@ -1179,6 +1265,7 @@ function IssuesCollectionGendersSection({
                         g.name
                       )}
                     </td>
+                    <td>{catalogStatusLabel(g)}</td>
                     <td className="table-actions">
                       {editingId === g.id ? (
                         <CatalogInlineEditActions
@@ -1217,25 +1304,20 @@ function IssuesCollectionGendersSection({
                           <Button
                             variant="link"
                             compact
-                            dangerLink
+                            dangerLink={catalogIsActive(g)}
                             disabled={busy}
                             onClick={() => {
-                              if (!window.confirm(`Delete gender "${g.name}"?`)) return
-                              void (async () => {
-                                setBusy(true)
-                                setError(null)
-                                try {
-                                  await adminDeleteCollectionGender(g.id)
-                                  await onRefresh()
-                                } catch (e: unknown) {
-                                  setError(isApiError(e) ? e.message : 'Delete failed')
-                                } finally {
-                                  setBusy(false)
-                                }
-                              })()
+                              void toggleCatalogActive(
+                                `gender "${g.name}"`,
+                                g,
+                                (is_active) => adminSetCollectionGenderActive(g.id, is_active),
+                                onRefresh,
+                                setError,
+                                setBusy,
+                              )
                             }}
                           >
-                            Delete
+                            {catalogIsActive(g) ? 'Deactivate' : 'Activate'}
                           </Button>
                         </ActionMenu>
                       )}
@@ -1243,6 +1325,170 @@ function IssuesCollectionGendersSection({
                   </tr>
                 ))
               )}
+          </tbody>
+        </table>
+      </TableCard>
+      <PaginationBar page={page} pageSize={pageSize} totalItems={processed.length} onPageChange={setPage} />
+    </div>
+  )
+}
+
+function IssuesCollectionReligionsSection({
+  religions,
+  busy,
+  setBusy,
+  setError,
+  onRefresh,
+}: {
+  religions: AdminCollectionReligion[]
+  busy: boolean
+  setBusy: (v: boolean) => void
+  setError: (s: string | null) => void
+  onRefresh: () => Promise<void>
+}) {
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editName, setEditName] = useState('')
+  const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
+
+  const sorted = useMemo(
+    () => [...religions].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    [religions],
+  )
+
+  const processed = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return sorted
+    return sorted.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q))
+  }, [sorted, search])
+
+  const { pageRows } = derivePaginatedRows(processed, page, pageSize)
+
+  return (
+    <div className="issues-catalog-page">
+      <div style={{ marginBottom: 16 }}>
+        <TableCard padded>
+          <p className="text-muted text-compact" style={{ margin: 0 }}>
+            Official religion options are stored in the database. When an indicator has Religion enabled,
+            respondents see the full list below — admins only turn the dimension on and pick collection years.
+          </p>
+        </TableCard>
+      </div>
+
+      <TableToolbar className="issues-list-toolbar">
+        <input
+          type="search"
+          placeholder="Search ID or religion..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search religions"
+        />
+        <Button variant="secondary" compact onClick={() => setSearch('')}>
+          Reset search
+        </Button>
+      </TableToolbar>
+
+      <TableCard className="issues-catalog-list-card">
+        <table className="data-table issues-catalog-table">
+          <IssuesCatalogTableColgroup />
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Religion</th>
+              <th>Status</th>
+              <th className="table-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.length === 0 ? (
+              <EmptyStateRow
+                colSpan={4}
+                message={search.trim() ? 'No religions match your search.' : 'No religions yet.'}
+              />
+            ) : (
+              pageRows.map((r) => (
+                <tr
+                  key={r.id}
+                  className={
+                    editingId === r.id
+                      ? 'catalog-table-row-editing'
+                      : catalogIsActive(r)
+                        ? undefined
+                        : 'issues-mapping-table__row--inactive'
+                  }
+                >
+                  <td>{r.id}</td>
+                  <td>
+                    {editingId === r.id ? (
+                      <input
+                        className="catalog-inline-edit-input"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        aria-label="Religion"
+                      />
+                    ) : (
+                      r.name
+                    )}
+                  </td>
+                  <td>{catalogStatusLabel(r)}</td>
+                  <td className="table-actions">
+                    {editingId === r.id ? (
+                      <CatalogInlineEditActions
+                        busy={busy}
+                        saveDisabled={!editName.trim()}
+                        onCancel={() => setEditingId(null)}
+                        onSave={() => {
+                          void (async () => {
+                            setBusy(true)
+                            setError(null)
+                            try {
+                              await adminUpdateCollectionReligion(r.id, { name: editName.trim() })
+                              setEditingId(null)
+                              await onRefresh()
+                            } catch (e: unknown) {
+                              setError(isApiError(e) ? e.message : 'Update failed')
+                            } finally {
+                              setBusy(false)
+                            }
+                          })()
+                        }}
+                      />
+                    ) : (
+                      <ActionMenu>
+                        <Button
+                          variant="link"
+                          compact
+                          disabled={busy}
+                          onClick={() => {
+                            setEditingId(r.id)
+                            setEditName(r.name)
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="link"
+                          compact
+                          dangerLink={catalogIsActive(r)}
+                          disabled={busy}
+                          onClick={() => {
+                            void toggleCatalogActive(
+                              `religion "${r.name}"`,
+                              r,
+                              (is_active) => adminSetCollectionReligionActive(r.id, is_active),
+                              onRefresh,
+                              setError,
+                              setBusy,
+                            )
+                          }}
+                        >
+                          {catalogIsActive(r) ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </ActionMenu>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </TableCard>
@@ -1278,18 +1524,20 @@ function indicatorDataTypeLabel(ind: AdminIssue['indicators'][number], issue: Ad
   return parts.length > 0 ? parts.join(' · ') : '—'
 }
 
-/** Year → gender mapping or free-text disaggregation field. */
+/** Year collection and disaggregation dimensions summary. */
 function indicatorDisaggregationLabel(ind: AdminIssue['indicators'][number]): string {
   if (ind.collects_by_year && (ind.collection_by_year?.length ?? 0) > 0) {
-    if (!ind.collects_by_gender) {
-      return ind.collection_by_year.map((y) => y.label).join('; ')
+    const years = ind.collection_by_year.map((y) => y.label).join('; ')
+    const dims: string[] = []
+    if (ind.collects_by_gender) dims.push('Gender')
+    if (ind.collects_by_age) dims.push('Age')
+    if (ind.collects_by_location) dims.push('Location')
+    if (ind.collects_by_disability) dims.push('Disability')
+    if (ind.collects_by_religion) dims.push('Religion')
+    if (dims.length === 0) {
+      return years
     }
-    return ind.collection_by_year
-      .map((y) => {
-        const genders = (y.genders ?? []).map((g) => g.name).filter(Boolean)
-        return `${y.label}: ${genders.length > 0 ? genders.join(', ') : '—'}`
-      })
-      .join('; ')
+    return `${years} (${dims.join(', ')})`
   }
   const text = ind.disaggregation?.trim()
   return text || '—'
@@ -1336,12 +1584,12 @@ function ActionMenu({ children }: { children: ReactNode }) {
     </RowActionsMenu>
   )
 }
-type IndicatorYearGenderRow = {
+type IndicatorDisaggregatedYearRow = {
   year_id: number
   gender_ids: number[]
 }
 
-type IndicatorCollectionMode = 'none' | 'year' | 'year_gender'
+type IndicatorCollectionMode = 'none' | 'year' | 'year_disaggregated'
 
 type IndicatorDraft = {
   indicator_text: string
@@ -1349,7 +1597,12 @@ type IndicatorDraft = {
   collects_qualitative: boolean
   collection_mode: IndicatorCollectionMode
   year_ids: number[]
-  year_gender_rows: IndicatorYearGenderRow[]
+  disaggregated_years: IndicatorDisaggregatedYearRow[]
+  collects_by_gender: boolean
+  collects_by_age: boolean
+  collects_by_location: boolean
+  collects_by_disability: boolean
+  collects_by_religion: boolean
 }
 
 function emptyIndicator(): IndicatorDraft {
@@ -1359,40 +1612,12 @@ function emptyIndicator(): IndicatorDraft {
     collects_qualitative: true,
     collection_mode: 'none',
     year_ids: [],
-    year_gender_rows: [],
-  }
-}
-
-function indicatorDraftFromApi(
-  ind: AdminIssue['indicators'][number],
-  issue: AdminIssue,
-): IndicatorDraft {
-  const legacyRow = !ind.has_quantitative && !ind.has_qualitative
-  const collectsByYear = ind.collects_by_year ?? false
-  const collectsByGender =
-    ind.collects_by_gender ??
-    (collectsByYear &&
-      (ind.collection_by_year ?? []).some(
-        (y) => (y.gender_ids?.length ?? y.genders?.length ?? 0) > 0,
-      ))
-  let collection_mode: IndicatorCollectionMode = 'none'
-  if (collectsByYear) {
-    collection_mode = collectsByGender ? 'year_gender' : 'year'
-  }
-  return {
-    indicator_text: ind.indicator_text,
-    collects_quantitative: legacyRow ? issue.has_quantitative : ind.has_quantitative,
-    collects_qualitative: legacyRow ? issue.has_qualitative : ind.has_qualitative,
-    collection_mode,
-    year_ids: collectsByYear && !collectsByGender
-      ? (ind.collection_by_year ?? []).map((y) => y.year_id)
-      : [],
-    year_gender_rows: collectsByYear && collectsByGender
-      ? (ind.collection_by_year ?? []).map((y) => ({
-          year_id: y.year_id,
-          gender_ids: [...(y.gender_ids ?? [])],
-        }))
-      : [],
+    disaggregated_years: [],
+    collects_by_gender: false,
+    collects_by_age: false,
+    collects_by_location: false,
+    collects_by_disability: false,
+    collects_by_religion: false,
   }
 }
 
@@ -1405,12 +1630,25 @@ function validateIndicatorDataTypes(rows: IndicatorDraft[]): string | null {
     if (x.collection_mode === 'year' && x.year_ids.length === 0) {
       return 'Add at least one year when collecting by year only.'
     }
-    if (x.collection_mode === 'year_gender' && x.year_gender_rows.length === 0) {
-      return 'Add at least one year when collecting by year and gender.'
-    }
-    for (const yRow of x.year_gender_rows) {
-      if (yRow.gender_ids.length === 0) {
-        return 'Each selected year must have at least one gender.'
+    if (x.collection_mode === 'year_disaggregated') {
+      if (x.disaggregated_years.length === 0) {
+        return 'Add at least one year when collecting by year and disaggregated data.'
+      }
+      if (
+        !x.collects_by_gender &&
+        !x.collects_by_age &&
+        !x.collects_by_location &&
+        !x.collects_by_disability &&
+        !x.collects_by_religion
+      ) {
+        return 'Select at least one disaggregation dimension.'
+      }
+      if (x.collects_by_gender) {
+        for (const yRow of x.disaggregated_years) {
+          if (yRow.gender_ids.length === 0) {
+            return 'Each selected year must have at least one gender when the gender dimension is enabled.'
+          }
+        }
       }
     }
   }
@@ -1419,37 +1657,43 @@ function validateIndicatorDataTypes(rows: IndicatorDraft[]): string | null {
 
 function indicatorToPayload(x: IndicatorDraft) {
   const collectsByYear = x.collection_mode !== 'none'
-  const collectsByGender = x.collection_mode === 'year_gender'
+  const disaggregated = x.collection_mode === 'year_disaggregated'
   return {
     indicator_text: x.indicator_text.trim(),
     disaggregation: null,
     has_quantitative: x.collects_quantitative,
     has_qualitative: x.collects_qualitative,
     collects_by_year: collectsByYear,
-    collects_by_gender: collectsByGender,
+    collects_by_gender: disaggregated && x.collects_by_gender,
+    collects_by_age: disaggregated && x.collects_by_age,
+    collects_by_location: disaggregated && x.collects_by_location,
+    collects_by_disability: disaggregated && x.collects_by_disability,
+    collects_by_religion: disaggregated && x.collects_by_religion,
     collection_by_year: collectsByYear
       ? x.collection_mode === 'year'
         ? x.year_ids.map((yearId) => ({
             collection_year_id: yearId,
             collection_gender_ids: [] as number[],
+            collection_religion_ids: [] as number[],
           }))
-        : x.year_gender_rows.map((row) => ({
+        : x.disaggregated_years.map((row) => ({
             collection_year_id: row.year_id,
-            collection_gender_ids: row.gender_ids,
+            collection_gender_ids: x.collects_by_gender ? row.gender_ids : [],
+            collection_religion_ids: [] as number[],
           }))
       : [],
   }
 }
 
-function IndicatorYearGenderMapper({
+function IndicatorGenderPerYearMapper({
   rows,
   onChange,
   collectionYears,
   collectionGenders,
   disabled,
 }: {
-  rows: IndicatorYearGenderRow[]
-  onChange: (rows: IndicatorYearGenderRow[]) => void
+  rows: IndicatorDisaggregatedYearRow[]
+  onChange: (rows: IndicatorDisaggregatedYearRow[]) => void
   collectionYears: AdminCollectionYear[]
   collectionGenders: AdminCollectionGender[]
   disabled?: boolean
@@ -1462,27 +1706,18 @@ function IndicatorYearGenderMapper({
     () => [...collectionGenders].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
     [collectionGenders],
   )
-  const usedYearIds = new Set(rows.map((r) => r.year_id))
-  const availableYears = sortedYears.filter((y) => !usedYearIds.has(y.id))
 
   const yearLabel = (yearId: number) => sortedYears.find((y) => y.id === yearId)?.label ?? `Year #${yearId}`
 
+  if (rows.length === 0) {
+    return null
+  }
+
   return (
-    <div className="issue-indicator-year-gender-map">
+    <div className="issue-indicator-year-gender-map issue-indicator-dimension-checks__nested">
       {rows.map((row) => (
         <div key={row.year_id} className="issue-indicator-year-gender-map__year">
-          <div className="issue-indicator-year-gender-map__year-head">
-            <strong className="text-compact">{yearLabel(row.year_id)}</strong>
-            <Button
-              variant="link"
-              compact
-              dangerLink
-              disabled={disabled}
-              onClick={() => onChange(rows.filter((r) => r.year_id !== row.year_id))}
-            >
-              Remove year
-            </Button>
-          </div>
+          <strong className="text-compact issue-indicator-year-gender-map__year-label">{yearLabel(row.year_id)}</strong>
           <CatalogIdCheckboxList
             label={`Genders for ${yearLabel(row.year_id)}`}
             items={sortedGenders}
@@ -1495,32 +1730,6 @@ function IndicatorYearGenderMapper({
           />
         </div>
       ))}
-      {availableYears.length > 0 ? (
-        <FormControl label="Add year">
-          <select
-            value=""
-            disabled={disabled}
-            onChange={(e) => {
-              const yearId = Number(e.target.value)
-              if (!yearId) return
-              onChange([...rows, { year_id: yearId, gender_ids: [] }])
-            }}
-          >
-            <option value="">Select a year to configure genders…</option>
-            {availableYears.map((y) => (
-              <option key={y.id} value={y.id}>
-                {y.label}
-              </option>
-            ))}
-          </select>
-        </FormControl>
-      ) : (
-        sortedYears.length === 0 && (
-          <p className="text-muted text-compact" style={{ margin: 0 }}>
-            No years in catalog — add entries under Year list.
-          </p>
-        )
-      )}
     </div>
   )
 }
@@ -1738,7 +1947,7 @@ function IssueIndicatorsEditor({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {rows.length === 0 && (
         <p className="text-muted text-compact" style={{ margin: 0 }}>
-          No indicators for this issue yet. Add one or leave empty.
+          {noIndicatorsForLoiHint()}
         </p>
       )}
       {rows.map((row, idx) => (
@@ -1799,7 +2008,7 @@ function IssueIndicatorsEditor({
                     ...row,
                     collection_mode: e.target.checked ? 'year' : 'none',
                     year_ids: e.target.checked ? row.year_ids : [],
-                    year_gender_rows: [],
+                    disaggregated_years: [],
                   }
                   onChange(next)
                 }}
@@ -1809,20 +2018,20 @@ function IssueIndicatorsEditor({
             <label className="checkbox-label issue-indicator-collection-checks__item">
               <input
                 type="checkbox"
-                checked={row.collection_mode === 'year_gender'}
+                checked={row.collection_mode === 'year_disaggregated'}
                 disabled={disabled}
                 onChange={(e) => {
                   const next = [...rows]
                   next[idx] = {
                     ...row,
-                    collection_mode: e.target.checked ? 'year_gender' : 'none',
+                    collection_mode: e.target.checked ? 'year_disaggregated' : 'none',
                     year_ids: [],
-                    year_gender_rows: e.target.checked ? row.year_gender_rows : [],
+                    disaggregated_years: e.target.checked ? row.disaggregated_years : [],
                   }
                   onChange(next)
                 }}
               />
-              Collect by year and gender
+              Collect by year and disaggregated data
             </label>
           </div>
           {row.collection_mode === 'year' ? (
@@ -1837,18 +2046,83 @@ function IssueIndicatorsEditor({
               }}
             />
           ) : null}
-          {row.collection_mode === 'year_gender' ? (
-            <IndicatorYearGenderMapper
-              rows={row.year_gender_rows}
-              collectionYears={sortedYears}
-              collectionGenders={sortedGenders}
-              disabled={disabled}
-              onChange={(year_gender_rows) => {
-                const next = [...rows]
-                next[idx] = { ...row, year_gender_rows }
-                onChange(next)
-              }}
-            />
+          {row.collection_mode === 'year_disaggregated' ? (
+            <>
+              <IndicatorYearOnlyPicker
+                yearIds={row.disaggregated_years.map((y) => y.year_id)}
+                collectionYears={sortedYears}
+                disabled={disabled}
+                onChange={(year_ids) => {
+                  const next = [...rows]
+                  const existing = new Map(row.disaggregated_years.map((y) => [y.year_id, y]))
+                  next[idx] = {
+                    ...row,
+                    disaggregated_years: year_ids.map((year_id) =>
+                      existing.get(year_id) ?? { year_id, gender_ids: [] },
+                    ),
+                  }
+                  onChange(next)
+                }}
+              />
+              {row.disaggregated_years.length > 0 ? (
+                <div className="issue-indicator-dimension-checks" role="group" aria-label="Disaggregation dimensions">
+                  <p className="text-muted text-compact" style={{ margin: '0 0 8px' }}>
+                    Choose which dimensions apply to this indicator. Religion, disability, age, and location
+                    options are shown to respondents when enabled.
+                  </p>
+                  <div className="issue-indicator-dimension-checks__block">
+                    <label className="checkbox-label issue-indicator-dimension-checks__item">
+                      <input
+                        type="checkbox"
+                        checked={row.collects_by_gender}
+                        disabled={disabled}
+                        onChange={(e) => {
+                          const next = [...rows]
+                          next[idx] = { ...row, collects_by_gender: e.target.checked }
+                          onChange(next)
+                        }}
+                      />
+                      Gender
+                    </label>
+                    {row.collects_by_gender ? (
+                      <IndicatorGenderPerYearMapper
+                        rows={row.disaggregated_years}
+                        collectionYears={sortedYears}
+                        collectionGenders={sortedGenders}
+                        disabled={disabled}
+                        onChange={(disaggregated_years) => {
+                          const next = [...rows]
+                          next[idx] = { ...row, disaggregated_years }
+                          onChange(next)
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                  {(
+                    [
+                      ['collects_by_age', 'Age (Under 18 and 18+ for respondents)'],
+                      ['collects_by_location', 'Geographic location (districts in assigned region for respondents)'],
+                      ['collects_by_disability', 'Disability status (Yes / No for respondents)'],
+                      ['collects_by_religion', 'Religion (full list for respondents)'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="checkbox-label issue-indicator-dimension-checks__item">
+                      <input
+                        type="checkbox"
+                        checked={row[key]}
+                        disabled={disabled}
+                        onChange={(e) => {
+                          const next = [...rows]
+                          next[idx] = { ...row, [key]: e.target.checked }
+                          onChange(next)
+                        }}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </>
           ) : null}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button variant="link" compact dangerLink disabled={disabled} onClick={() => onChange(rows.filter((_, i) => i !== idx))}>
@@ -1934,17 +2208,19 @@ function IssuesCreateForm({
             </select>
           </FormControl>
         </div>
-        <FormField label={issueEntryTitleFieldLabel(entryKind)}>
-          <input
-            placeholder={issueEntryTitleFieldLabel(entryKind)}
-            value={issueTitle}
-            onChange={(e) => setIssueTitle(e.target.value)}
-          />
-        </FormField>
-        <FormField label="Description">
+        {issueEntryFormShowsTitleField(entryKind) ? (
+          <FormField label={issueEntryTitleFieldLabel(entryKind)}>
+            <input
+              placeholder={issueEntryTitleFieldLabel(entryKind)}
+              value={issueTitle}
+              onChange={(e) => setIssueTitle(e.target.value)}
+            />
+          </FormField>
+        ) : null}
+        <FormField label={issueEntryDescriptionFieldLabel(entryKind)}>
           <textarea
             className="issues-description-field"
-            placeholder={`Optional longer description for this ${entryKind}...`}
+            placeholder={issueEntryDescriptionPlaceholder(entryKind)}
             value={issueDescription}
             onChange={(e) => setIssueDescription(e.target.value)}
             disabled={busy}
@@ -1953,7 +2229,7 @@ function IssuesCreateForm({
         </FormField>
       </FormGrid>
       <strong className="font-semibold text-compact" style={{ display: 'block', marginTop: 16 }}>
-        Indicators (linked to this {entryKind})
+        {issueEntryIndicatorsLinkedLabel(entryKind)}
       </strong>
       <IssueIndicatorsEditor
         rows={indicators}
@@ -1969,7 +2245,17 @@ function IssuesCreateForm({
         <Button
           variant="primary"
           compact
-          disabled={busy || !conventionId || !categoryId || !issueTitle.trim() || selectedArticleIds.length === 0}
+          disabled={
+            busy ||
+            issueEntrySaveBlocked(
+              entryKind,
+              issueTitle,
+              issueDescription,
+              conventionId,
+              categoryId,
+              selectedArticleIds,
+            )
+          }
           onClick={() => {
             void (async () => {
               setBusy(true)
@@ -1988,7 +2274,7 @@ function IssuesCreateForm({
                   convention_id: Number(conventionId),
                   category_id: Number(categoryId),
                   entry_kind: entryKind,
-                  issue_title: issueTitle.trim(),
+                  issue_title: resolveIssueTitleForSave(entryKind, issueTitle, issueDescription),
                   description: issueDescription.trim() || null,
                   has_quantitative: hasQuantitative,
                   has_qualitative: hasQualitative,
@@ -2036,7 +2322,7 @@ function IssueEntryKindToggle({
         aria-pressed={value === 'issue'}
         onClick={() => onChange('issue')}
       >
-        Issue
+        {issueEntryKindBadgeLabel('issue')}
       </button>
       <button
         type="button"
@@ -2048,7 +2334,7 @@ function IssueEntryKindToggle({
         aria-pressed={value === 'recommendation'}
         onClick={() => onChange('recommendation')}
       >
-        Recommendation
+        {issueEntryKindBadgeLabel('recommendation')}
       </button>
     </div>
   )
@@ -2122,27 +2408,15 @@ function IssuesIssueViewPage({
             <Button variant="secondary" compact onClick={() => navigate('/admin/issues')}>
               Back to list
             </Button>
-            <Button variant="primary" compact onClick={() => navigate(`/admin/issues/edit/${issue.id}`)}>
-              Edit
-            </Button>
             <Button
               variant="link"
-              dangerLink
+              dangerLink={issueIsActive(issue)}
               compact
               onClick={() => {
-                if (!window.confirm(`Delete this ${kind}?`)) return
-                void (async () => {
-                  try {
-                    await adminDeleteIssue(issue.id)
-                    await onRefreshIssues()
-                    navigate('/admin/issues')
-                  } catch (e: unknown) {
-                    setError(isApiError(e) ? e.message : 'Delete failed')
-                  }
-                })()
+                void toggleIssueActive(issue, onRefreshIssues, setError)
               }}
             >
-              Delete
+              {issueIsActive(issue) ? 'Deactivate' : 'Activate'}
             </Button>
           </div>
         </TableCard>
@@ -2161,6 +2435,10 @@ function IssueDetailReadOnlyPanel({ issue }: { issue: AdminIssue }) {
           <dd>{issueEntryKindBadgeLabel(kind)}</dd>
         </div>
         <div>
+          <dt>Status</dt>
+          <dd>{issueStatusLabel(issue)}</dd>
+        </div>
+        <div>
           <dt>Convention</dt>
           <dd>{issueConventionLabel(issue)}</dd>
         </div>
@@ -2168,12 +2446,14 @@ function IssueDetailReadOnlyPanel({ issue }: { issue: AdminIssue }) {
           <dt>Category</dt>
           <dd>{issue.category?.name ?? issue.category_id}</dd>
         </div>
+        {issueEntryFormShowsTitleField(kind) ? (
+          <div className="issue-detail-readonly__full">
+            <dt>{issueEntryTitleFieldLabel(kind)}</dt>
+            <dd>{issue.issue_title}</dd>
+          </div>
+        ) : null}
         <div className="issue-detail-readonly__full">
-          <dt>{issueEntryTitleFieldLabel(kind)}</dt>
-          <dd>{issue.issue_title}</dd>
-        </div>
-        <div className="issue-detail-readonly__full">
-          <dt>Description</dt>
+          <dt>{issueEntryDescriptionFieldLabel(kind)}</dt>
           <dd style={{ whiteSpace: 'pre-wrap' }}>{issue.description?.trim() || '—'}</dd>
         </div>
         <div className="issue-detail-readonly__full">
@@ -2277,254 +2557,5 @@ function IssuesArticleViewPage({
         </TableCard>
       )}
     </PageSection>
-  )
-}
-
-function IssuesEditPage({
-  issueId,
-  user,
-  conventions,
-  categories,
-  articles,
-  collectionYears,
-  collectionGenders,
-  busy,
-  setBusy,
-  setError,
-  error,
-  onRefreshIssues,
-  onRefreshLookups,
-}: {
-  issueId: number
-  user: AuthUser | null
-  conventions: AdminConvention[]
-  categories: AdminIssueCategory[]
-  articles: AdminArticleRow[]
-  collectionYears: AdminCollectionYear[]
-  collectionGenders: AdminCollectionGender[]
-  busy: boolean
-  setBusy: (v: boolean) => void
-  setError: (s: string | null) => void
-  error: string | null
-  onRefreshIssues: () => Promise<void>
-  onRefreshLookups: () => Promise<void>
-}) {
-  const navigate = useNavigate()
-  const [issue, setIssue] = useState<AdminIssue | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    void adminFetchIssue(issueId)
-      .then((row) => {
-        if (!cancelled) setIssue(row)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(isApiError(e) ? e.message : 'Load failed')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [issueId, setError])
-
-  if (!user || !isSuperAdmin(user)) {
-    return <Navigate to="/" replace />
-  }
-
-  return (
-    <PageSection
-      title={
-        issue
-          ? `Edit ${issueEntryKindBadgeLabel(coerceIssueEntryKind(issue.entry_kind))} #${issueId}`
-          : `Edit entry #${issueId}`
-      }
-      leading={
-        <WorkflowPageBack to="/admin/issues" label={workflowBackLabel('/admin/issues')} placement="header" />
-      }
-    >
-      {error && (
-        <Alert variant="error" title="Error" onDismiss={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-      {loading && <p className="muted">Loading issue…</p>}
-      {issue && (
-        <TableCard padded>
-          <IssuesEditPanel
-            issue={issue}
-            conventions={conventions}
-            categories={categories}
-            articles={articles}
-            collectionYears={collectionYears}
-            collectionGenders={collectionGenders}
-            busy={busy}
-            setBusy={setBusy}
-            setError={setError}
-            onClose={() => navigate('/admin/issues')}
-            onSaved={async () => {
-              await Promise.all([onRefreshIssues(), onRefreshLookups()])
-              navigate('/admin/issues')
-            }}
-          />
-        </TableCard>
-      )}
-    </PageSection>
-  )
-}
-
-function IssuesEditPanel({
-  issue,
-  conventions,
-  categories,
-  articles,
-  collectionYears,
-  collectionGenders,
-  busy,
-  setBusy,
-  setError,
-  onClose,
-  onSaved,
-}: {
-  issue: AdminIssue
-  conventions: AdminConvention[]
-  categories: AdminIssueCategory[]
-  articles: AdminArticleRow[]
-  collectionYears: AdminCollectionYear[]
-  collectionGenders: AdminCollectionGender[]
-  busy: boolean
-  setBusy: (v: boolean) => void
-  setError: (s: string | null) => void
-  onClose: () => void
-  onSaved: () => Promise<void>
-}) {
-  const sortedArticles = [...articles].sort((a, b) =>
-    a.article_name.localeCompare(b.article_name, undefined, { numeric: true, sensitivity: 'base' }),
-  )
-  const [entryKind, setEntryKind] = useState<IssueEntryKind>(coerceIssueEntryKind(issue.entry_kind))
-  const [conventionId, setConventionId] = useState(String(issue.convention_id))
-  const [categoryId, setCategoryId] = useState(String(issue.category_id))
-  const [issueTitle, setIssueTitle] = useState(issue.issue_title)
-  const [issueDescription, setIssueDescription] = useState(issue.description ?? '')
-  const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>(issue.article_ids)
-  const [indicators, setIndicators] = useState<IndicatorDraft[]>(
-    issue.indicators.map((ind) => indicatorDraftFromApi(ind, issue)),
-  )
-
-  return (
-    <div className="issue-edit-panel">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h4 style={{ margin: 0 }}>
-          Edit {issueEntryKindBadgeLabel(entryKind)} #{issue.id}
-        </h4>
-        <Button variant="link" compact onClick={onClose}>
-          Close
-        </Button>
-      </div>
-      <FormControl label="Type">
-        <IssueEntryKindToggle value={entryKind} onChange={setEntryKind} disabled={busy} />
-      </FormControl>
-      <FormGrid>
-        <div className="issues-form-top-grid">
-          <FormControl label="Convention">
-            <select value={conventionId} onChange={(e) => setConventionId(e.target.value)}>
-              {conventions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} - {c.name}
-                </option>
-              ))}
-            </select>
-          </FormControl>
-          <FormControl label="Articles">
-            <ArticleMultiSelectDropdown
-              articles={sortedArticles}
-              selectedIds={selectedArticleIds}
-              onChange={setSelectedArticleIds}
-              disabled={busy}
-            />
-          </FormControl>
-          <FormControl label="Category">
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </FormControl>
-        </div>
-        <FormField label={issueEntryTitleFieldLabel(entryKind)}>
-          <input
-            placeholder={issueEntryTitleFieldLabel(entryKind)}
-            value={issueTitle}
-            onChange={(e) => setIssueTitle(e.target.value)}
-          />
-        </FormField>
-        <FormField label="Description">
-          <textarea
-            className="issues-description-field"
-            placeholder={`Optional longer description for this ${entryKind}...`}
-            value={issueDescription}
-            onChange={(e) => setIssueDescription(e.target.value)}
-            disabled={busy}
-            rows={10}
-          />
-        </FormField>
-      </FormGrid>
-      <strong className="font-semibold text-compact" style={{ display: 'block', marginTop: 16 }}>
-        Indicators (linked to this {entryKind})
-      </strong>
-      <IssueIndicatorsEditor
-        rows={indicators}
-        onChange={setIndicators}
-        collectionYears={collectionYears}
-        collectionGenders={collectionGenders}
-        disabled={busy}
-      />
-      <Button
-        variant="primary"
-        compact
-        style={{ marginTop: 12 }}
-        disabled={busy || !conventionId || !categoryId || !issueTitle.trim() || selectedArticleIds.length === 0}
-        onClick={() => {
-          void (async () => {
-            setBusy(true)
-            setError(null)
-            try {
-              const typeErr = validateIndicatorDataTypes(indicators)
-              if (typeErr) {
-                setError(typeErr)
-                return
-              }
-              const filled = indicators.filter((x) => x.indicator_text.trim())
-              const indPayload = filled.map((x) => indicatorToPayload(x))
-              const hasQuantitative = filled.some((x) => x.collects_quantitative)
-              const hasQualitative = filled.some((x) => x.collects_qualitative)
-              await adminUpdateIssue(issue.id, {
-                convention_id: Number(conventionId),
-                category_id: Number(categoryId),
-                entry_kind: entryKind,
-                issue_title: issueTitle.trim(),
-                description: issueDescription.trim() || null,
-                has_quantitative: hasQuantitative,
-                has_qualitative: hasQualitative,
-                articles: selectedArticleIds.map((articleId) => ({ article_id: articleId })),
-                indicators: indPayload,
-              })
-              await onSaved()
-            } catch (e: unknown) {
-              setError(isApiError(e) ? e.message : 'Save failed')
-            } finally {
-              setBusy(false)
-            }
-          })()
-        }}
-      >
-        Save changes
-      </Button>
-    </div>
   )
 }

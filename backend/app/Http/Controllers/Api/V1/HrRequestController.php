@@ -109,7 +109,8 @@ class HrRequestController extends Controller
             'region',
             'regions',
             'convention:id,code,name',
-            'issue:id,issue_title',
+            'issue:id,issue_title,entry_kind,description,category_id',
+            'issue.category:id,name',
             'departments:id,code,name',
         ]);
         HrimsAccess::applyHrRequestScope($query, $request->user());

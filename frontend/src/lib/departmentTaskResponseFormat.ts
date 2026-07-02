@@ -8,12 +8,20 @@ export type DepartmentYearGenderCell = {
 /** year_id → gender_id → cell */
 export type DepartmentQuantitativeByYearGender = Record<string, Record<string, DepartmentYearGenderCell>>
 
+/** year_id → cell_key → cell (age, disability, region, district, religion) */
+export type DepartmentQuantitativeByYearKeyed = Record<string, Record<string, DepartmentYearGenderCell>>
+
 export type DepartmentIndicatorQuantitative = {
-  /** Legacy single value when indicator does not use year/gender matrix. */
+  /** Legacy single value when indicator does not use year collection matrix. */
   value?: number | null
   comment: string | null
   attachment_url: string | null
   by_year_gender?: DepartmentQuantitativeByYearGender | null
+  by_year_age?: DepartmentQuantitativeByYearKeyed | null
+  by_year_disability?: DepartmentQuantitativeByYearKeyed | null
+  by_year_region?: DepartmentQuantitativeByYearKeyed | null
+  by_year_district?: DepartmentQuantitativeByYearKeyed | null
+  by_year_religion?: DepartmentQuantitativeByYearKeyed | null
 }
 
 export type DepartmentIndicatorQualitative = {

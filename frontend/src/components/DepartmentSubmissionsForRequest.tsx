@@ -104,6 +104,7 @@ export function DepartmentSubmissionsForRequest({
               responseData={t.response_data}
               attachmentUrl={t.attachment_url}
               issueIndicators={issueIndicators}
+              locationRegionIds={[t.region_id]}
             />
             ) : (
               <p className="muted small" style={{ margin: 0 }}>

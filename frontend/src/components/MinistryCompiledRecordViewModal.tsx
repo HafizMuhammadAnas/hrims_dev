@@ -13,6 +13,7 @@ import {
 } from '../api/lists'
 import { updateCompiledRecord } from '../api/workflows'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
+import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
 import { hasDepartmentResponse } from '../lib/departmentTaskWorkflow'
 import type { StatusBadgeTone } from '../lib/statusBadgeTone'
 import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
@@ -284,7 +285,7 @@ export function MinistryCompiledRecordViewModal({
             ) : null}
             {!hrLoading && !hrError && hrDetail && !requestTemplateProps ? (
               <p className="muted small" style={{ margin: 0 }}>
-                This request is not in the current issue-based format, or issue data is missing from the API.
+                {loiLegacyFormatMessage()}
               </p>
             ) : null}
           </article>
@@ -316,6 +317,7 @@ export function MinistryCompiledRecordViewModal({
                               responseData={t.response_data}
                               attachmentUrl={t.attachment_url}
                               issueIndicators={hrDetail?.issue?.indicators}
+                              locationRegionIds={[t.region_id]}
                             />
                           </div>
                         ))}

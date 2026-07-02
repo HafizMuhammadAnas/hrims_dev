@@ -10,6 +10,11 @@ export type DeptIndicatorDraft = {
   comment: string
   qualText: string
   yearGenderValues: Record<string, string>
+  yearAgeValues: Record<string, string>
+  yearDisabilityValues: Record<string, string>
+  yearRegionValues: Record<string, string>
+  yearDistrictValues: Record<string, string>
+  yearReligionValues: Record<string, string>
   quantFile: File | null
   qualFile: File | null
   clearSavedQuantAttachment: boolean
@@ -22,6 +27,11 @@ export function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
     comment: '',
     qualText: '',
     yearGenderValues: {},
+    yearAgeValues: {},
+    yearDisabilityValues: {},
+    yearRegionValues: {},
+    yearDistrictValues: {},
+    yearReligionValues: {},
     quantFile: null,
     qualFile: null,
     clearSavedQuantAttachment: false,

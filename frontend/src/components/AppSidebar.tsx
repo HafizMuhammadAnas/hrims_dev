@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { issuesNavLabel } from '../lib/issueEntryKind'
+import { issuesNavLabel, uprConcludingObservationsLabel } from '../lib/issueEntryKind'
 import {
   isDepartmentAdmin,
   isFederalAdmin,
@@ -101,7 +101,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/admin/regions-districts" icon={MapPin} label="Regions & districts" onPick={onPick} />
               <NavItem to="/admin/conventions" icon={Scale} label="Conventions & components" onPick={onPick} />
               <NavItem to="/admin/sdg-nodes" icon={Layers} label="SDG nodes" onPick={onPick} />
-              <NavItem to="/admin/upr-recommendations" icon={ScrollText} label="UPR recommendations" onPick={onPick} />
+              <NavItem to="/admin/upr-recommendations" icon={ScrollText} label={uprConcludingObservationsLabel()} onPick={onPick} />
               <NavItem to="/admin/knowledge-hub" icon={LayoutGrid} label="Knowledge hub pages" onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label="User management" onPick={onPick} />
             </div>
