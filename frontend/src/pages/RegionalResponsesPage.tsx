@@ -14,6 +14,7 @@ import { StatsCards } from '../components/ui/StatsCards'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
+import { TableExportButton } from '../components/ui/TableExportButton'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { formatAppDate } from '../lib/dateFormat'
 import { compareLatestFirst, compareStringValues } from '../lib/tableRowSort'
@@ -28,6 +29,10 @@ import {
   type PendingRegionDisplayRow,
 } from '../lib/regionalSubmissionCoverage'
 import { hrRequestViewPath, regionalResponseFederalReviewPath } from '../lib/workflowNavigation'
+import {
+  mapRegionalResponseDisplayExportRow,
+  REGIONAL_RESPONSE_DISPLAY_EXPORT_COLUMNS,
+} from '../lib/tableExportColumns'
 import type { HrRequestRow } from '../types/hrRequest'
 
 const REVIEW_STATUSES = ['pending', 'accepted', 'needs-modification', 'rejected'] as const
@@ -187,6 +192,12 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
     () => derivePaginatedRows(displayRows, page, pageSize),
     [displayRows, page, pageSize],
   )
+
+  const exportRows = useMemo(
+    () => displayRows.map((entry) => mapRegionalResponseDisplayExportRow(entry)),
+    [displayRows],
+  )
+
   const statusCounts = useMemo(
     () =>
       REVIEW_STATUSES.map((status) => ({
@@ -282,6 +293,12 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
         >
           Reset filters
         </Button>
+        <TableExportButton
+          fileBaseName="regional-responses"
+          columns={REGIONAL_RESPONSE_DISPLAY_EXPORT_COLUMNS}
+          rows={exportRows}
+          worksheetName="Regional responses"
+        />
       </TableToolbar>
       <TableCard>
         <table className="data-table">

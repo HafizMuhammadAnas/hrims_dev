@@ -9,6 +9,10 @@ type Props = {
   onToggleSidebar: () => void
 }
 
+function headerAccountDisplayName(name: string): string {
+  return name.replace(/^Super\s+/i, '')
+}
+
 export function AppHeader({ onToggleSidebar }: Props) {
   const { user, logout } = useAuth()
   const { inbox, unreadCount, inboxLoading, markRead, markAllRead } = useNotify()
@@ -110,7 +114,7 @@ export function AppHeader({ onToggleSidebar }: Props) {
             )}
           </div>
           <div className="header-account-meta" onClick={() => navigate('/profile')}>
-            <div className="header-account-name">{user.name}</div>
+            <div className="header-account-name">{headerAccountDisplayName(user.name)}</div>
             <div className="header-account-subtitle">{subtitle}</div>
           </div>
           <button

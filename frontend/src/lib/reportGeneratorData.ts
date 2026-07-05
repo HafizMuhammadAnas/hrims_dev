@@ -1,5 +1,5 @@
 import type { CompiledRecordRow, RegionalResponseRow } from '../api/lists'
-import type { ReportLookupCategory, ReportLookupConvention } from '../api/reports'
+import type { ReportLookupArticle, ReportLookupCategory, ReportLookupConvention, ReportLookupIndicator } from '../api/reports'
 import type { RegionRow } from '../api/regions'
 import {
   CONCLUDING_OBSERVATIONS_LABEL,
@@ -18,8 +18,10 @@ export type ReportFilters = {
   dataSource: ReportDataSource
   regionId: string
   convention: string
+  articleId: string
   entryKind: ReportEntryKindFilter
   categoryId: string
+  indicatorId: string
   datePreset: DateRangePreset
   dateFrom: string
   dateTo: string
@@ -51,6 +53,61 @@ export type ReportInsightChart = {
 }
 
 export type ReportTableRow = Record<string, string | number | null>
+
+export type ReportRankRow = {
+  id: string
+  shortLabel: string
+  label: string
+  count: number
+  /** Share of total (displayed as NN%). */
+  percent: number
+  /** Width of progress bar relative to top row (0–100). */
+  barPercent: number
+}
+
+export type ReportCompiledFocusRow = {
+  id: string
+  title: string
+  status: string
+  compilationDate: string
+  submissionDate: string
+  regions: string
+  summary: string
+}
+
+export type ReportFilterSummaryPart = {
+  label: string
+  value: string
+}
+
+export type ReportingDashboardSummaryCards = {
+  articles: number
+  loiCount: number
+  loiIndicatorCount: number
+  concludingCount: number
+  concludingIndicatorCount: number
+  categoriesCount: number
+  requestCount: number
+  responseCount: number
+  requestsWithResponse: number
+  responsePercent: number
+}
+
+export type ReportingDashboardResult = {
+  filterSummary: string
+  filterSummaryParts: ReportFilterSummaryPart[]
+  indicatorFocusMode: boolean
+  focusedIndicatorId?: string
+  focusedIndicatorLabel?: string
+  indicatorFocusCompiled: CompiledRecordRow[]
+  summaryCards: ReportingDashboardSummaryCards
+  recordStatusBar: ReportChartPoint[]
+  entryKindPie: ReportChartPoint[]
+  regionBar: ReportChartPoint[]
+  topCategories: ReportRankRow[]
+  topIndicators: ReportRankRow[]
+  indicatorCompiledRows: ReportCompiledFocusRow[]
+}
 
 export type ReportBuildResult = {
   title: string
@@ -93,6 +150,60 @@ function matchesCategory(r: HrRequestRow, categoryId: string): boolean {
   return String(r.issue?.category?.id ?? '') === categoryId
 }
 
+function buildIssueArticleMap(links: Array<{ issue_id: number; article_id: number }>): Map<number, Set<number>> {
+  const map = new Map<number, Set<number>>()
+  for (const link of links) {
+    const set = map.get(link.issue_id) ?? new Set<number>()
+    set.add(link.article_id)
+    map.set(link.issue_id, set)
+  }
+  return map
+}
+
+function buildIndicatorIssueMap(indicators: ReportLookupIndicator[]): Map<number, number> {
+  const map = new Map<number, number>()
+  for (const ind of indicators) {
+    map.set(ind.id, ind.issue_id)
+  }
+  return map
+}
+
+function matchesArticle(
+  r: HrRequestRow,
+  articleId: string,
+  issueArticleMap: Map<number, Set<number>>,
+): boolean {
+  if (!articleId) return true
+  if (r.issue_id == null) return false
+  const arts = issueArticleMap.get(Number(r.issue_id))
+  return arts?.has(Number(articleId)) ?? false
+}
+
+function matchesIndicator(
+  r: HrRequestRow,
+  indicatorId: string,
+  indicatorIssueMap: Map<number, number>,
+): boolean {
+  if (!indicatorId) return true
+  const indId = Number(indicatorId)
+  const issueId = indicatorIssueMap.get(indId)
+  return issueId != null && r.issue_id != null && Number(r.issue_id) === issueId
+}
+
+function requestMatchesCatalogFilters(
+  r: HrRequestRow,
+  f: ReportFilters,
+  issueArticleMap: Map<number, Set<number>>,
+  indicatorIssueMap: Map<number, number>,
+): boolean {
+  if (!matchesConvention(r, f.convention)) return false
+  if (!matchesEntryKind(r, f.entryKind)) return false
+  if (!matchesCategory(r, f.categoryId)) return false
+  if (!matchesArticle(r, f.articleId, issueArticleMap)) return false
+  if (!matchesIndicator(r, f.indicatorId, indicatorIssueMap)) return false
+  return true
+}
+
 function matchesDateRange(date: string, dateFrom: string, dateTo: string): boolean {
   if (!date) return !dateFrom && !dateTo
   if (dateFrom && date < dateFrom) return false
@@ -105,12 +216,12 @@ function filterRequests(
   f: ReportFilters,
   dateFrom: string,
   dateTo: string,
+  issueArticleMap: Map<number, Set<number>>,
+  indicatorIssueMap: Map<number, number>,
 ): HrRequestRow[] {
   return requests.filter((r) => {
     if (!requestMatchesRegion(r, f.regionId)) return false
-    if (!matchesConvention(r, f.convention)) return false
-    if (!matchesEntryKind(r, f.entryKind)) return false
-    if (!matchesCategory(r, f.categoryId)) return false
+    if (!requestMatchesCatalogFilters(r, f, issueArticleMap, indicatorIssueMap)) return false
     if (!matchesDateRange(r.date, dateFrom, dateTo)) return false
     return true
   })
@@ -122,6 +233,8 @@ function filterResponses(
   f: ReportFilters,
   dateFrom: string,
   dateTo: string,
+  issueArticleMap: Map<number, Set<number>>,
+  indicatorIssueMap: Map<number, number>,
 ): RegionalResponseRow[] {
   const reqById = new Map(requests.map((r) => [r.id, r]))
   return responses.filter((resp) => {
@@ -129,9 +242,7 @@ function filterResponses(
     if (!matchesDateRange(resp.submission_date, dateFrom, dateTo)) return false
     const req = reqById.get(resp.req_id)
     if (!req) return false
-    if (!matchesConvention(req, f.convention)) return false
-    if (!matchesEntryKind(req, f.entryKind)) return false
-    if (!matchesCategory(req, f.categoryId)) return false
+    if (!requestMatchesCatalogFilters(req, f, issueArticleMap, indicatorIssueMap)) return false
     return true
   })
 }
@@ -143,21 +254,25 @@ function filterCompiled(
   dateFrom: string,
   dateTo: string,
   regionsById: Map<number, RegionRow>,
+  issueArticleMap: Map<number, Set<number>>,
+  indicatorIssueMap: Map<number, number>,
 ): CompiledRecordRow[] {
   const reqById = new Map(requests.map((r) => [r.id, r]))
   const regionName = f.regionId ? regionsById.get(Number(f.regionId))?.name : null
+  const hasCatalogFilter =
+    Boolean(f.convention) ||
+    Boolean(f.entryKind) ||
+    Boolean(f.categoryId) ||
+    Boolean(f.articleId) ||
+    Boolean(f.indicatorId)
   return compiled.filter((c) => {
     if (regionName && !c.region_names.some((n) => n === regionName)) return false
     const d = c.compilation_date ?? c.submission_date ?? ''
     if (!matchesDateRange(d, dateFrom, dateTo)) return false
+    if (!hasCatalogFilter) return true
     const req = c.req_id ? reqById.get(c.req_id) : undefined
-    if (f.convention || f.entryKind || f.categoryId) {
-      if (!req) return false
-      if (!matchesConvention(req, f.convention)) return false
-      if (!matchesEntryKind(req, f.entryKind)) return false
-      if (!matchesCategory(req, f.categoryId)) return false
-    }
-    return true
+    if (!req) return false
+    return requestMatchesCatalogFilters(req, f, issueArticleMap, indicatorIssueMap)
   })
 }
 
@@ -223,6 +338,312 @@ function linkedRequestFields(req: HrRequestRow | undefined): ReportTableRow {
   }
 }
 
+function buildRankRows(
+  entries: Array<{ id: string; shortLabel: string; label: string; count: number }>,
+  limit = 10,
+): ReportRankRow[] {
+  const sorted = [...entries].sort((a, b) => b.count - a.count).slice(0, limit)
+  const total = sorted.reduce((sum, row) => sum + row.count, 0)
+  const max = sorted[0]?.count ?? 1
+  return sorted.map((row) => ({
+    ...row,
+    percent: total > 0 ? Math.round((row.count / total) * 100) : 0,
+    barPercent: max > 0 ? Math.round((row.count / max) * 100) : 0,
+  }))
+}
+
+function filtersForDashboardCharts(f: ReportFilters): ReportFilters {
+  return { ...f, indicatorId: '' }
+}
+
+function buildSummaryCards(
+  chartFr: HrRequestRow[],
+  chartSr: RegionalResponseRow[],
+  chartCr: CompiledRecordRow[],
+  reqById: Map<string, HrRequestRow>,
+  issueArticleMap: Map<number, Set<number>>,
+  indicators: ReportLookupIndicator[],
+): ReportingDashboardSummaryCards {
+  const articleIds = new Set<number>()
+  const categoryIds = new Set<string>()
+  const loiIssueIds = new Set<number>()
+  const concludingIssueIds = new Set<number>()
+
+  for (const record of chartCr) {
+    const req = record.req_id ? reqById.get(record.req_id) : undefined
+    if (!req?.issue_id) continue
+
+    const issueId = Number(req.issue_id)
+    const entryKind = coerceIssueEntryKind(req.issue?.entry_kind)
+    if (entryKind === 'issue') loiIssueIds.add(issueId)
+    if (entryKind === 'recommendation') concludingIssueIds.add(issueId)
+
+    const categoryId = req.issue?.category?.id
+    if (categoryId != null) categoryIds.add(String(categoryId))
+
+    const linkedArticles = issueArticleMap.get(issueId)
+    if (linkedArticles) {
+      for (const articleId of linkedArticles) articleIds.add(articleId)
+    }
+  }
+
+  let loiIndicatorCount = 0
+  let concludingIndicatorCount = 0
+  for (const indicator of indicators) {
+    if (loiIssueIds.has(indicator.issue_id)) loiIndicatorCount += 1
+    if (concludingIssueIds.has(indicator.issue_id)) concludingIndicatorCount += 1
+  }
+
+  const requestCount = chartFr.length
+  const responseCount = chartSr.length
+  const reqIdsWithResponse = new Set(chartSr.map((response) => response.req_id))
+  const requestsWithResponse = chartFr.filter((request) => reqIdsWithResponse.has(request.id)).length
+  const responsePercent =
+    requestCount > 0 ? Math.round((requestsWithResponse / requestCount) * 100) : 0
+
+  return {
+    articles: articleIds.size,
+    loiCount: loiIssueIds.size,
+    loiIndicatorCount,
+    concludingCount: concludingIssueIds.size,
+    concludingIndicatorCount,
+    categoriesCount: categoryIds.size,
+    requestCount,
+    responseCount,
+    requestsWithResponse,
+    responsePercent,
+  }
+}
+
+function buildFilterSummaryParts(
+  f: ReportFilters,
+  lookups: {
+    conventions: ReportLookupConvention[]
+    categories: ReportLookupCategory[]
+    articles: ReportLookupArticle[]
+    indicators: ReportLookupIndicator[]
+    regions: RegionRow[]
+  },
+  dateLabel: string,
+): ReportFilterSummaryPart[] {
+  const convention = lookups.conventions.find((c) => String(c.id) === f.convention)
+  const category = lookups.categories.find((c) => String(c.id) === f.categoryId)
+  const article = lookups.articles.find((a) => String(a.id) === f.articleId)
+  const indicator = lookups.indicators.find((i) => String(i.id) === f.indicatorId)
+  const region = f.regionId ? lookups.regions.find((r) => String(r.id) === f.regionId) : null
+
+  const parts: ReportFilterSummaryPart[] = [{ label: 'Data source', value: 'Compiled data' }]
+  if (region) parts.push({ label: 'Region', value: region.name })
+  if (convention) {
+    parts.push({
+      label: 'Convention',
+      value: convention.code ? `${convention.code} — ${convention.name}` : convention.name,
+    })
+  }
+  if (article) parts.push({ label: 'Article', value: article.article_name })
+  if (f.entryKind) {
+    parts.push({
+      label: `${LOI_LABEL} / ${CONCLUDING_OBSERVATIONS_LABEL}`,
+      value: issueEntryKindBadgeLabel(f.entryKind),
+    })
+  }
+  if (category) parts.push({ label: 'Category', value: category.name })
+  if (indicator) {
+    parts.push({
+      label: 'Indicator',
+      value:
+        indicator.indicator_text.length > 80
+          ? `${indicator.indicator_text.slice(0, 80)}…`
+          : indicator.indicator_text,
+    })
+  }
+  parts.push({ label: 'Period', value: dateLabel })
+  return parts
+}
+
+export function buildReportingDashboard(
+  requests: HrRequestRow[],
+  responses: RegionalResponseRow[],
+  compiled: CompiledRecordRow[],
+  f: ReportFilters,
+  lookups: {
+    conventions: ReportLookupConvention[]
+    categories: ReportLookupCategory[]
+    regions: RegionRow[]
+    articles: ReportLookupArticle[]
+    indicators: ReportLookupIndicator[]
+    issueArticleLinks: Array<{ issue_id: number; article_id: number }>
+  },
+): ReportingDashboardResult {
+  const regionsById = new Map(lookups.regions.map((r) => [r.id, r]))
+  const issueArticleMap = buildIssueArticleMap(lookups.issueArticleLinks)
+  const indicatorIssueMap = buildIndicatorIssueMap(lookups.indicators)
+  const { dateFrom, dateTo, label: dateLabel } = resolveReportDateRange({
+    preset: f.datePreset,
+    dateFrom: f.dateFrom,
+    dateTo: f.dateTo,
+    monthYearMonth: f.monthYearMonth,
+    monthYearYear: f.monthYearYear,
+  })
+  const filterSummaryParts = buildFilterSummaryParts(f, lookups, dateLabel)
+  const filterSummary = filterSummaryParts.map((part) => `${part.label}: ${part.value}`).join(' · ')
+  const focusedIndicator = lookups.indicators.find((i) => String(i.id) === f.indicatorId)
+
+  if (f.indicatorId) {
+    const cr = filterCompiled(
+      compiled,
+      requests,
+      f,
+      dateFrom,
+      dateTo,
+      regionsById,
+      issueArticleMap,
+      indicatorIssueMap,
+    )
+    return {
+      filterSummary,
+      filterSummaryParts,
+      indicatorFocusMode: true,
+      focusedIndicatorId: f.indicatorId,
+      focusedIndicatorLabel: focusedIndicator?.indicator_text,
+      indicatorFocusCompiled: cr,
+      summaryCards: {
+        articles: 0,
+        loiCount: 0,
+        loiIndicatorCount: 0,
+        concludingCount: 0,
+        concludingIndicatorCount: 0,
+        categoriesCount: 0,
+        requestCount: 0,
+        responseCount: 0,
+        requestsWithResponse: 0,
+        responsePercent: 0,
+      },
+      recordStatusBar: [],
+      entryKindPie: [],
+      regionBar: [],
+      topCategories: [],
+      topIndicators: [],
+      indicatorCompiledRows: cr.map((c) => ({
+        id: c.id,
+        title: c.title,
+        status: formatStatusLabel(c.status),
+        compilationDate: c.compilation_date ?? '—',
+        submissionDate: c.submission_date ?? '—',
+        regions: c.region_names.join('; ') || '—',
+        summary: c.summary?.trim() || '—',
+      })),
+    }
+  }
+
+  const chartFilters = filtersForDashboardCharts(f)
+  const chartFr = filterRequests(requests, chartFilters, dateFrom, dateTo, issueArticleMap, indicatorIssueMap)
+  const chartSr = filterResponses(
+    responses,
+    requests,
+    chartFilters,
+    dateFrom,
+    dateTo,
+    issueArticleMap,
+    indicatorIssueMap,
+  )
+  const chartCr = filterCompiled(
+    compiled,
+    requests,
+    chartFilters,
+    dateFrom,
+    dateTo,
+    regionsById,
+    issueArticleMap,
+    indicatorIssueMap,
+  )
+  const reqById = new Map(requests.map((r) => [r.id, r]))
+
+  const recordStatusBar: ReportChartPoint[] = [
+    { name: 'Request data', value: chartFr.length },
+    { name: 'Response data', value: chartSr.length },
+    { name: 'Compiled data', value: chartCr.length },
+  ]
+
+  const entryKindMap = countMap(
+    chartFr.map((r) => issueEntryKindBadgeLabel(coerceIssueEntryKind(r.issue?.entry_kind))),
+  )
+  const entryKindPie = mapToChartPoints(entryKindMap, 10)
+
+  const regionMap = countMap(
+    chartCr.flatMap((c) => (c.region_names.length ? c.region_names : ['—'])),
+  )
+  const regionBar = mapToChartPoints(regionMap, 12)
+
+  const categoryCounts: Record<string, { id: string; label: string; count: number }> = {}
+  for (const c of chartCr) {
+    const req = c.req_id ? reqById.get(c.req_id) : undefined
+    const name = req?.issue?.category?.name?.trim()
+    if (!name) continue
+    const id = String(req?.issue?.category?.id ?? name)
+    if (!categoryCounts[id]) {
+      categoryCounts[id] = { id, label: name, count: 0 }
+    }
+    categoryCounts[id].count += 1
+  }
+  const topCategories = buildRankRows(
+    Object.values(categoryCounts).map((row) => ({
+      id: row.id,
+      shortLabel: row.label,
+      label: row.label,
+      count: row.count,
+    })),
+  )
+
+  const indicatorCounts: Record<number, { id: string; label: string; count: number }> = {}
+  for (const c of chartCr) {
+    const req = c.req_id ? reqById.get(c.req_id) : undefined
+    if (!req?.issue_id) continue
+    const issueId = Number(req.issue_id)
+    for (const ind of lookups.indicators) {
+      if (ind.issue_id !== issueId) continue
+      if (!indicatorCounts[ind.id]) {
+        indicatorCounts[ind.id] = {
+          id: String(ind.id),
+          label: ind.indicator_text,
+          count: 0,
+        }
+      }
+      indicatorCounts[ind.id].count += 1
+    }
+  }
+  const topIndicators = buildRankRows(
+    Object.values(indicatorCounts).map((row, index) => ({
+      id: row.id,
+      shortLabel: `Ind ${index + 1}`,
+      label: row.label,
+      count: row.count,
+    })),
+  )
+
+  return {
+    filterSummary,
+    filterSummaryParts,
+    indicatorFocusMode: false,
+    focusedIndicatorId: undefined,
+    indicatorFocusCompiled: [],
+    summaryCards: buildSummaryCards(
+      chartFr,
+      chartSr,
+      chartCr,
+      reqById,
+      issueArticleMap,
+      lookups.indicators,
+    ),
+    recordStatusBar,
+    entryKindPie,
+    regionBar,
+    topCategories,
+    topIndicators,
+    indicatorCompiledRows: [],
+  }
+}
+
 export function buildReportData(
   requests: HrRequestRow[],
   responses: RegionalResponseRow[],
@@ -232,9 +653,14 @@ export function buildReportData(
     conventions: ReportLookupConvention[]
     categories: ReportLookupCategory[]
     regions: RegionRow[]
+    articles: ReportLookupArticle[]
+    indicators: ReportLookupIndicator[]
+    issueArticleLinks: Array<{ issue_id: number; article_id: number }>
   },
 ): ReportBuildResult {
   const regionsById = new Map(lookups.regions.map((r) => [r.id, r]))
+  const issueArticleMap = buildIssueArticleMap(lookups.issueArticleLinks)
+  const indicatorIssueMap = buildIndicatorIssueMap(lookups.indicators)
   const { dateFrom, dateTo, label: dateLabel } = resolveReportDateRange({
     preset: f.datePreset,
     dateFrom: f.dateFrom,
@@ -244,28 +670,43 @@ export function buildReportData(
   })
   const convention = lookups.conventions.find((c) => String(c.id) === f.convention)
   const category = lookups.categories.find((c) => String(c.id) === f.categoryId)
+  const article = lookups.articles.find((a) => String(a.id) === f.articleId)
+  const indicator = lookups.indicators.find((i) => String(i.id) === f.indicatorId)
   const region = f.regionId ? regionsById.get(Number(f.regionId)) : null
 
   const filterSummary = [
-    f.dataSource === 'requests'
-      ? 'Request data report'
-      : f.dataSource === 'responses'
-        ? 'Response data report'
-        : 'Compiled data report',
+    'Compiled data report',
     region ? `Region: ${region.name}` : null,
     convention ? `Convention: ${convention.code} — ${convention.name}` : null,
+    article ? `Article: ${article.article_name}` : null,
     f.entryKind
       ? `${LOI_LABEL} / ${CONCLUDING_OBSERVATIONS_LABEL}: ${issueEntryKindBadgeLabel(f.entryKind)}`
       : null,
     category ? `Category: ${category.name}` : null,
+    indicator
+      ? `Indicator: ${
+          indicator.indicator_text.length > 48
+            ? `${indicator.indicator_text.slice(0, 48)}…`
+            : indicator.indicator_text
+        }`
+      : null,
     `Period: ${dateLabel}`,
   ]
     .filter(Boolean)
     .join(' · ')
 
-  const fr = filterRequests(requests, f, dateFrom, dateTo)
-  const sr = filterResponses(responses, requests, f, dateFrom, dateTo)
-  const cr = filterCompiled(compiled, requests, f, dateFrom, dateTo, regionsById)
+  const fr = filterRequests(requests, f, dateFrom, dateTo, issueArticleMap, indicatorIssueMap)
+  const sr = filterResponses(responses, requests, f, dateFrom, dateTo, issueArticleMap, indicatorIssueMap)
+  const cr = filterCompiled(
+    compiled,
+    requests,
+    f,
+    dateFrom,
+    dateTo,
+    regionsById,
+    issueArticleMap,
+    indicatorIssueMap,
+  )
   const reqById = new Map(requests.map((r) => [r.id, r]))
 
   if (f.dataSource === 'requests') {

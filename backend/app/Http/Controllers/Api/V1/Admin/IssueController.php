@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
 
 class IssueController extends Controller
 {
@@ -95,7 +96,7 @@ class IssueController extends Controller
 
     public function update(Request $request, Issue $issue): JsonResponse
     {
-        $data = $this->validatePayload($request, true);
+        $data = $this->validatePayload($request, true, $issue);
 
         DB::transaction(function () use ($issue, $data) {
             $scalar = collect($data)->only([
@@ -145,11 +146,11 @@ class IssueController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validatePayload(Request $request, bool $partial): array
+    private function validatePayload(Request $request, bool $partial, ?Issue $issue = null): array
     {
         $req = $partial ? 'sometimes' : 'required';
 
-        return $request->validate([
+        $data = $request->validate([
             'convention_id' => [$req, 'integer', 'exists:conventions,id'],
             'category_id' => [$req, 'integer', Rule::exists('issue_categories', 'id')->where('is_active', true)],
             'entry_kind' => [$partial ? 'sometimes' : 'required', 'string', 'in:issue,recommendation'],
@@ -159,7 +160,7 @@ class IssueController extends Controller
             'has_qualitative' => [$partial ? 'sometimes' : 'required', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             'articles' => [$partial ? 'sometimes' : 'required', 'array', 'min:1'],
-            'articles.*.article_id' => ['required', 'integer', Rule::exists('articles', 'id')->where('is_active', true)],
+            'articles.*.article_id' => ['required', 'integer'],
             'articles.*.relevant_paragraph' => ['nullable', 'string'],
             'indicators' => ['sometimes', 'array'],
             'indicators.*.indicator_text' => ['required_with:indicators', 'string'],
@@ -179,6 +180,32 @@ class IssueController extends Controller
             'indicators.*.collection_by_year.*.collection_religion_ids' => ['sometimes', 'array'],
             'indicators.*.collection_by_year.*.collection_religion_ids.*' => ['integer', 'exists:collection_religions,id'],
         ]);
+
+        $conventionId = (int) ($data['convention_id'] ?? $issue?->convention_id ?? $request->input('convention_id', 0));
+        if ($conventionId > 0 && array_key_exists('articles', $data)) {
+            foreach ($data['articles'] as $index => $row) {
+                $articleId = (int) ($row['article_id'] ?? 0);
+                $validator = Validator::make(
+                    ['article_id' => $articleId],
+                    [
+                        'article_id' => [
+                            'required',
+                            'integer',
+                            Rule::exists('articles', 'id')
+                                ->where('is_active', true)
+                                ->where('convention_id', $conventionId),
+                        ],
+                    ],
+                );
+                if ($validator->fails()) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'articles.'.$index.'.article_id' => ['The selected article does not belong to this convention.'],
+                    ]);
+                }
+            }
+        }
+
+        return $data;
     }
 
     /**

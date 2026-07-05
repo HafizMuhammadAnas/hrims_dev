@@ -591,13 +591,15 @@ export function DashboardPage() {
             <div className="table-card table-card-padded">
               <div className="dashboard-panel-head">
                 <h3 className="dashboard-panel-title">Performance overview</h3>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-compact"
-                  onClick={() => navigate('/analysis')}
-                >
-                  Full analysis
-                </button>
+                {(variant === 'federal' || variant === 'regional') && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-compact"
+                    onClick={() => navigate('/report-generator')}
+                  >
+                    Reporting dashboard
+                  </button>
+                )}
               </div>
               <div className="dashboard-charts-row">
                 <div className="dashboard-chart-col">

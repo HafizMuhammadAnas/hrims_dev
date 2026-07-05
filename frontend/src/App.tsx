@@ -9,7 +9,6 @@ import { DepartmentTasksPage } from './pages/DepartmentTasksPage'
 import { HrRequestEditPage } from './pages/HrRequestEditPage'
 import { HrRequestViewPage } from './pages/HrRequestViewPage'
 import { FederalRequestManagementPage } from './pages/FederalRequestManagementPage'
-import { AnalysisPage } from './pages/AnalysisPage'
 import { ConventionsInfoPage } from './pages/knowledge/ConventionsInfoPage'
 import { IndicatorsInfoPage } from './pages/knowledge/IndicatorsInfoPage'
 import { SdgsInfoPage } from './pages/knowledge/SdgsInfoPage'
@@ -141,7 +140,7 @@ function App() {
                 element={<SubmissionHistoryPage title="Submission history" />}
               />
               <Route path="report-generator" element={<ReportGeneratorPage />} />
-              <Route path="analysis" element={<AnalysisPage />} />
+              <Route path="analysis" element={<Navigate to="/report-generator" replace />} />
               <Route path="conventions" element={<ConventionsInfoPage />} />
               <Route path="indicators" element={<IndicatorsInfoPage />} />
               <Route path="sdgs" element={<SdgsInfoPage />} />

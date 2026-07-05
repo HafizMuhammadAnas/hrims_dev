@@ -14,6 +14,7 @@ import {
   adminFetchIssue,
   adminFetchIssueCategories,
   adminFetchIssues,
+  adminDeleteIssue,
   adminSetArticleActive,
   adminSetCollectionGenderActive,
   adminSetCollectionReligionActive,
@@ -64,7 +65,6 @@ import {
   issueEntryViewPageTitle,
   issuesAdminSectionsAriaLabel,
   issuesCreateTabLabel,
-  issuesEmptyListHint,
   issuesListTabLabel,
   noIndicatorsForLoiHint,
   resolveIssueTitleForSave,
@@ -209,6 +209,7 @@ export function IssuesMappingsAdminPage() {
       <IssuesArticleViewPage
         articleId={viewArticleId}
         articles={articles}
+        conventions={conventions}
         user={user}
         error={error}
         setError={setError}
@@ -280,6 +281,7 @@ export function IssuesMappingsAdminPage() {
       {view === 'articles' && (
         <IssuesArticlesSection
           articles={articles}
+          conventions={conventions}
           busy={busy}
           setBusy={setBusy}
           setError={setError}
@@ -342,6 +344,22 @@ async function toggleIssueActive(
   }
 }
 
+async function deleteIssueEntry(
+  issue: AdminIssue,
+  onRefreshIssues: () => Promise<void>,
+  setError: (s: string | null) => void,
+): Promise<void> {
+  const kind = coerceIssueEntryKind(issue.entry_kind)
+  const label = issueEntryKindBadgeLabel(kind)
+  if (!window.confirm(`Permanently delete this ${label}? This cannot be undone.`)) return
+  try {
+    await adminDeleteIssue(issue.id)
+    await onRefreshIssues()
+  } catch (e: unknown) {
+    setError(isApiError(e) ? e.message : 'Delete failed')
+  }
+}
+
 function issueStatusLabel(issue: AdminIssue): string {
   return issueIsActive(issue) ? 'Active' : 'Inactive'
 }
@@ -390,13 +408,19 @@ function IssuesListSection({
 }) {
   const navigate = useNavigate()
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
+  const [listEntryKind, setListEntryKind] = useState<IssueEntryKind>('issue')
 
   const sortedIssues = useMemo(() => [...issues].sort((a, b) => b.id - a.id), [issues])
 
+  const kindFilteredIssues = useMemo(
+    () => sortedIssues.filter((i) => coerceIssueEntryKind(i.entry_kind) === listEntryKind),
+    [sortedIssues, listEntryKind],
+  )
+
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return sortedIssues
-    return sortedIssues.filter((i) => {
+    if (!q) return kindFilteredIssues
+    return kindFilteredIssues.filter((i) => {
       const convCode = (i.convention?.code ?? '').toLowerCase()
       const convName = (i.convention?.name ?? '').toLowerCase()
       const arts = i.articles.map((a) => a.article_name).join(' ').toLowerCase()
@@ -410,14 +434,26 @@ function IssuesListSection({
         cat.includes(q)
       )
     })
-  }, [sortedIssues, search])
+  }, [kindFilteredIssues, search])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
+
+  const emptyListMessage =
+    search.trim()
+      ? 'No entries match your search.'
+      : `No ${issueEntryKindBadgeLabel(listEntryKind)} yet. Use ${issuesCreateTabLabel()} to add one.`
 
   return (
     <>
 
       <TableToolbar className="issues-list-toolbar">
+        <IssueEntryKindToggle
+          value={listEntryKind}
+          onChange={(next) => {
+            setListEntryKind(next)
+            setPage(1)
+          }}
+        />
         <input
           type="search"
           placeholder="Search ID, issue, convention, category, articles..."
@@ -454,14 +490,7 @@ function IssuesListSection({
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
-                <EmptyStateRow
-                  colSpan={6}
-                  message={
-                    search.trim()
-                      ? 'No entries match your search.'
-                      : issuesEmptyListHint()
-                  }
-                />
+                <EmptyStateRow colSpan={6} message={emptyListMessage} />
               ) : (
                 pageRows.map((i) => {
                   const entryKind = coerceIssueEntryKind(i.entry_kind ?? 'issue')
@@ -502,6 +531,15 @@ function IssuesListSection({
                           }}
                         >
                           {issueIsActive(i) ? 'Deactivate' : 'Activate'}
+                        </Button>
+                        <Button
+                          variant="link"
+                          dangerLink
+                          onClick={() => {
+                            void deleteIssueEntry(i, onRefreshIssues, setError)
+                          }}
+                        >
+                          Delete
                         </Button>
                       </ActionMenu>
                     </td>
@@ -715,37 +753,52 @@ function IssuesCategoriesSection({
 
 function IssuesArticlesSection({
   articles,
+  conventions,
   busy,
   setBusy,
   setError,
   onRefresh,
 }: {
   articles: AdminArticleRow[]
+  conventions: AdminConvention[]
   busy: boolean
   setBusy: (v: boolean) => void
   setError: (s: string | null) => void
   onRefresh: () => Promise<void>
 }) {
   const navigate = useNavigate()
+  const sortedConventions = useMemo(
+    () => [...conventions].sort((a, b) => a.code.localeCompare(b.code)),
+    [conventions],
+  )
+  const [newArticleConventionId, setNewArticleConventionId] = useState('')
   const [newArticle, setNewArticle] = useState('')
   const [newArticleDescription, setNewArticleDescription] = useState('')
+  const [listConventionFilter, setListConventionFilter] = useState('')
   const [editingArticleId, setEditingArticleId] = useState<number | null>(null)
+  const [editArticleConventionId, setEditArticleConventionId] = useState('')
   const [editArticleName, setEditArticleName] = useState('')
   const [editArticleDescription, setEditArticleDescription] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
 
   const sortedArticles = useMemo(() => [...articles].sort((a, b) => b.id - a.id), [articles])
 
+  const conventionFilteredArticles = useMemo(() => {
+    if (!listConventionFilter) return sortedArticles
+    return sortedArticles.filter((a) => String(a.convention_id) === listConventionFilter)
+  }, [sortedArticles, listConventionFilter])
+
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return sortedArticles
-    return sortedArticles.filter(
+    if (!q) return conventionFilteredArticles
+    return conventionFilteredArticles.filter(
       (a) =>
         a.article_name.toLowerCase().includes(q) ||
         (a.description ?? '').toLowerCase().includes(q) ||
+        articleConventionLabel(a, conventions).toLowerCase().includes(q) ||
         String(a.id).includes(q),
     )
-  }, [sortedArticles, search])
+  }, [conventionFilteredArticles, search, conventions])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
@@ -754,6 +807,21 @@ function IssuesArticlesSection({
       <div style={{ marginBottom: 16 }}>
       <TableCard padded>
         <div className="issues-catalog-add-form">
+          <FormField label="Convention">
+            <select
+              value={newArticleConventionId}
+              onChange={(e) => setNewArticleConventionId(e.target.value)}
+              disabled={busy}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            >
+              <option value="">Select convention</option>
+              {sortedConventions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {conventionSelectLabel(c)}
+                </option>
+              ))}
+            </select>
+          </FormField>
           <FormField label="Article name">
             <input
               value={newArticle}
@@ -777,13 +845,14 @@ function IssuesArticlesSection({
             <Button
               variant="primary"
               compact
-              disabled={busy || !newArticle.trim()}
+              disabled={busy || !newArticle.trim() || !newArticleConventionId}
               onClick={() => {
                 void (async () => {
                   setBusy(true)
                   setError(null)
                   try {
                     await adminCreateArticle({
+                      convention_id: Number(newArticleConventionId),
                       article_name: newArticle.trim(),
                       description: newArticleDescription.trim() || null,
                     })
@@ -806,9 +875,25 @@ function IssuesArticlesSection({
       </div>
 
       <TableToolbar className="issues-list-toolbar">
+        <select
+          value={listConventionFilter}
+          onChange={(e) => {
+            setListConventionFilter(e.target.value)
+            setPage(1)
+          }}
+          aria-label="Filter articles by convention"
+          disabled={busy}
+        >
+          <option value="">All conventions</option>
+          {sortedConventions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {conventionSelectLabel(c)}
+            </option>
+          ))}
+        </select>
         <input
           type="search"
-          placeholder="Search ID, name, or description..."
+          placeholder="Search ID, convention, name, or description..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search articles"
@@ -824,6 +909,7 @@ function IssuesArticlesSection({
           <thead>
             <tr>
               <th>ID</th>
+              <th>Convention</th>
               <th>Article name</th>
               <th>Status</th>
               <th className="table-actions">Actions</th>
@@ -832,7 +918,7 @@ function IssuesArticlesSection({
           <tbody>
             {pageRows.length === 0 ? (
               <EmptyStateRow
-                colSpan={4}
+                colSpan={5}
                 message={search.trim() ? 'No articles match your search.' : 'No articles yet.'}
               />
               ) : (
@@ -840,9 +926,24 @@ function IssuesArticlesSection({
                   if (editingArticleId === a.id) {
                     return (
                       <tr key={a.id} className="catalog-table-edit-row">
-                        <td colSpan={4}>
+                        <td colSpan={5}>
                           <div className="catalog-inline-edit">
                             <p className="catalog-inline-edit__meta muted small">ID {a.id}</p>
+                            <FormField label="Convention">
+                              <select
+                                className="catalog-inline-edit-input"
+                                value={editArticleConventionId}
+                                onChange={(e) => setEditArticleConventionId(e.target.value)}
+                                disabled={busy}
+                              >
+                                <option value="">Select convention</option>
+                                {sortedConventions.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {conventionSelectLabel(c)}
+                                  </option>
+                                ))}
+                              </select>
+                            </FormField>
                             <FormField label="Article name">
                               <input
                                 className="catalog-inline-edit-input"
@@ -860,7 +961,7 @@ function IssuesArticlesSection({
                             </FormField>
                             <CatalogInlineEditActions
                               busy={busy}
-                              saveDisabled={!editArticleName.trim()}
+                              saveDisabled={!editArticleName.trim() || !editArticleConventionId}
                               onCancel={() => setEditingArticleId(null)}
                               onSave={() => {
                                 void (async () => {
@@ -868,6 +969,7 @@ function IssuesArticlesSection({
                                   setError(null)
                                   try {
                                     await adminUpdateArticle(a.id, {
+                                      convention_id: Number(editArticleConventionId),
                                       article_name: editArticleName.trim(),
                                       description: editArticleDescription.trim() || null,
                                     })
@@ -892,6 +994,7 @@ function IssuesArticlesSection({
                       className={catalogIsActive(a) ? undefined : 'issues-mapping-table__row--inactive'}
                     >
                       <td>{a.id}</td>
+                      <td>{articleConventionLabel(a, conventions)}</td>
                       <td>{a.article_name}</td>
                       <td>{catalogStatusLabel(a)}</td>
                       <td className="table-actions">
@@ -909,6 +1012,7 @@ function IssuesArticlesSection({
                             disabled={busy}
                             onClick={() => {
                               setEditingArticleId(a.id)
+                              setEditArticleConventionId(String(a.convention_id))
                               setEditArticleName(a.article_name)
                               setEditArticleDescription(a.description ?? '')
                             }}
@@ -1502,6 +1606,21 @@ function issueConventionLabel(issue: AdminIssue): string {
     return issue.convention.code
   }
   return String(issue.convention_id)
+}
+
+function conventionSelectLabel(convention: AdminConvention): string {
+  return `${convention.code} - ${convention.name}`
+}
+
+function articleConventionLabel(
+  article: AdminArticleRow,
+  conventions: AdminConvention[],
+): string {
+  if (article.convention?.code) {
+    return article.convention.code
+  }
+  const match = conventions.find((c) => c.id === article.convention_id)
+  return match?.code ?? (article.convention_id ? String(article.convention_id) : '—')
 }
 
 function effectiveIndicatorQl(
@@ -2171,6 +2290,7 @@ function IssuesCreateForm({
   const [issueDescription, setIssueDescription] = useState('')
   const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>([])
   const [indicators, setIndicators] = useState<IndicatorDraft[]>([])
+  const conventionArticles = sortedArticles.filter((a) => String(a.convention_id) === conventionId)
 
   return (
     <div className="issues-create-form">
@@ -2180,7 +2300,13 @@ function IssuesCreateForm({
       <FormGrid>
         <div className="issues-form-top-grid">
           <FormControl label="Convention">
-            <select value={conventionId} onChange={(e) => setConventionId(e.target.value)}>
+            <select
+              value={conventionId}
+              onChange={(e) => {
+                setConventionId(e.target.value)
+                setSelectedArticleIds([])
+              }}
+            >
               <option value="">Select convention</option>
               {conventions.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -2191,10 +2317,10 @@ function IssuesCreateForm({
           </FormControl>
           <FormControl label="Articles">
             <ArticleMultiSelectDropdown
-              articles={sortedArticles}
+              articles={conventionArticles}
               selectedIds={selectedArticleIds}
               onChange={setSelectedArticleIds}
-              disabled={busy}
+              disabled={busy || !conventionId}
             />
           </FormControl>
           <FormControl label="Category">
@@ -2510,12 +2636,14 @@ function IssueDetailReadOnlyPanel({ issue }: { issue: AdminIssue }) {
 function IssuesArticleViewPage({
   articleId,
   articles,
+  conventions,
   user,
   error,
   setError,
 }: {
   articleId: number
   articles: AdminArticleRow[]
+  conventions: AdminConvention[]
   user: AuthUser
   error: string | null
   setError: (s: string | null) => void
@@ -2547,6 +2675,12 @@ function IssuesArticleViewPage({
       ) : (
         <TableCard padded>
           <div className="issue-detail-readonly">
+            <div className="form-row">
+              <span className="issue-detail-readonly__label">Convention</span>
+              <p style={{ margin: 0 }}>
+                {article ? articleConventionLabel(article, conventions) : '—'}
+              </p>
+            </div>
             <div className="form-row">
               <span className="issue-detail-readonly__label">Description</span>
               <p className="issue-detail-readonly__prose" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>

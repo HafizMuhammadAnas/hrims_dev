@@ -17,6 +17,9 @@ import { useAuth } from '../auth/AuthContext'
 import { isDepartmentAdmin, isViewer } from '../lib/roles'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import {
+  coerceIssueEntryKind,
+  issueEntryKindBadgeLabel,
+  issueEntryKindToggleAriaLabel,
   issueEntryTitleColumnLabel,
   loiEmptyFilterMessage,
   loiLoadingPlaceholder,
@@ -26,6 +29,7 @@ import {
   loiRequiredMessage,
   loiSearchPlaceholder,
   selectIndicatorForLoiMessage,
+  type IssueEntryKind,
 } from '../lib/issueEntryKind'
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
 import { IndicatorYearGenderHint } from './IndicatorYearGenderHint'
@@ -69,6 +73,30 @@ function conventionOptionLabel(c: { code?: string | null; name?: string | null }
   if (name) return name
   if (code) return code
   return 'Convention'
+}
+
+type EntryKindFilters = Record<IssueEntryKind, boolean>
+
+const defaultEntryKindFilters = (): EntryKindFilters => ({
+  issue: false,
+  recommendation: false,
+})
+
+function entryKindFiltersForIssue(issue: HrRequestIssueDetail | null | undefined): EntryKindFilters {
+  if (!issue) return defaultEntryKindFilters()
+  const kind = coerceIssueEntryKind(issue.entry_kind)
+  return {
+    issue: kind === 'issue',
+    recommendation: kind === 'recommendation',
+  }
+}
+
+function issueMatchesEntryKindFilters(
+  issue: HrRequestIssueDetail,
+  filters: EntryKindFilters,
+): boolean {
+  const kind = coerceIssueEntryKind(issue.entry_kind)
+  return filters[kind]
 }
 
 type IndicatorValues = Record<number, { quantitative: string; qualitative: string }>
@@ -296,6 +324,7 @@ export function HrRequestModal({
   } | null>(null)
 
   const [issueForm, setIssueForm] = useState<IssueFormState | null>(null)
+  const [entryKindFilters, setEntryKindFilters] = useState<EntryKindFilters>(defaultEntryKindFilters)
 
   const [saving, setSaving] = useState(false)
   const [formBanner, setFormBanner] = useState<string | null>(null)
@@ -377,6 +406,7 @@ export function HrRequestModal({
     if (mode === 'create') {
       setLegacyForm(null)
       setIssueForm(emptyIssueForm(lockedRegionId))
+      setEntryKindFilters(defaultEntryKindFilters())
       setIssues([])
       setConventions([])
       return
@@ -385,6 +415,7 @@ export function HrRequestModal({
       if (detail.convention_id && detail.issue_id) {
         setLegacyForm(null)
         setIssueForm(issueFormFromDetail(detail, lockedRegionId))
+        setEntryKindFilters(entryKindFiltersForIssue(detail.issue))
         if (detail.issue) {
           setIssues([detail.issue])
         } else {
@@ -521,10 +552,30 @@ export function HrRequestModal({
     return list
   }, [issues, detail?.issue, issueForm?.issue_id])
 
-  const issueSelectOptions = useMemo(
-    () => issueOptions.map((i) => ({ value: String(i.id), label: i.issue_title })),
-    [issueOptions],
+  const filteredIssueOptions = useMemo(
+    () => issueOptions.filter((i) => issueMatchesEntryKindFilters(i, entryKindFilters)),
+    [issueOptions, entryKindFilters],
   )
+
+  const issueSelectOptions = useMemo(
+    () => filteredIssueOptions.map((i) => ({ value: String(i.id), label: i.issue_title })),
+    [filteredIssueOptions],
+  )
+
+  useEffect(() => {
+    if (!issueForm || issueForm.issue_id === '') return
+    if (filteredIssueOptions.some((i) => i.id === issueForm.issue_id)) return
+    setIssueForm((f) =>
+      f
+        ? {
+            ...f,
+            issue_id: '',
+            selectedIndicatorIds: [],
+            indicatorValues: {},
+          }
+        : f,
+    )
+  }, [filteredIssueOptions, issueForm?.issue_id])
 
   const selectedIssue = useMemo(() => {
     if (!issueForm || issueForm.issue_id === '') return null
@@ -931,6 +982,7 @@ export function HrRequestModal({
                   value={issueForm.convention_id === '' ? '' : String(issueForm.convention_id)}
                   onChange={(e) => {
                     const v = e.target.value === '' ? '' : Number(e.target.value)
+                    setEntryKindFilters(defaultEntryKindFilters())
                     setIssueForm((f) =>
                       f
                         ? {
@@ -957,6 +1009,38 @@ export function HrRequestModal({
                 <FieldError id="hr-conv-err" message={fieldErrors.convention_id} />
               </FormField>
 
+              {!readOnly && (
+                <FormField label={issueEntryKindToggleAriaLabel()}>
+                  <div
+                    className="hr-request-entry-kind-filters checkbox-grid"
+                    role="group"
+                    aria-label={issueEntryKindToggleAriaLabel()}
+                  >
+                    {(['issue', 'recommendation'] as const).map((kind) => (
+                      <label key={kind} className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={entryKindFilters[kind]}
+                          disabled={
+                            entryKindFilters[kind] &&
+                            !entryKindFilters[kind === 'issue' ? 'recommendation' : 'issue']
+                          }
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            setEntryKindFilters((prev) => {
+                              const other = kind === 'issue' ? 'recommendation' : 'issue'
+                              if (!checked && !prev[other]) return prev
+                              return { ...prev, [kind]: checked }
+                            })
+                          }}
+                        />
+                        <span>{issueEntryKindBadgeLabel(kind)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </FormField>
+              )}
+
               <FormField label={issueEntryTitleColumnLabel()} htmlFor="hr-issue">
                 <SearchableSelect
                   id="hr-issue"
@@ -975,14 +1059,19 @@ export function HrRequestModal({
                   }}
                   options={issueSelectOptions}
                   disabled={
-                    readOnly || issueForm.convention_id === '' || (!readOnly && issuesLoading)
+                    readOnly ||
+                    issueForm.convention_id === '' ||
+                    (!readOnly && issuesLoading) ||
+                    (!entryKindFilters.issue && !entryKindFilters.recommendation)
                   }
                   placeholder={
                     issueForm.convention_id === ''
                       ? 'Select a convention first'
-                      : issuesLoading
-                        ? loiLoadingPlaceholder()
-                        : loiSearchPlaceholder()
+                      : !entryKindFilters.issue && !entryKindFilters.recommendation
+                        ? 'Select LOI or Concluding observations'
+                        : issuesLoading
+                          ? loiLoadingPlaceholder()
+                          : loiSearchPlaceholder()
                   }
                   emptyFilterMessage={loiEmptyFilterMessage()}
                   aria-invalid={Boolean(fieldErrors.issue_id)}

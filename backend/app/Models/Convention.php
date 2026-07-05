@@ -37,6 +37,11 @@ class Convention extends Model
         return $this->hasMany(Issue::class);
     }
 
+    public function articles(): HasMany
+    {
+        return $this->hasMany(Article::class);
+    }
+
     public function hrRequests(): HasMany
     {
         return $this->hasMany(HrRequest::class, 'convention_id');

@@ -18,7 +18,9 @@ import { TableCard } from '../components/ui/TableCard'
 import { StatsCards } from '../components/ui/StatsCards'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableToolbar } from '../components/ui/TableToolbar'
+import { TableExportButton } from '../components/ui/TableExportButton'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { HR_REQUEST_EXPORT_COLUMNS } from '../lib/tableExportColumns'
 import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
 import { sortRowsLatestFirst } from '../lib/tableRowSort'
 import { hrRequestListStats, hrRequestStatusPresentation } from '../lib/hrRequestListMetrics'
@@ -239,6 +241,12 @@ export function FederalRequestManagementPage() {
         >
           Reset filters
         </Button>
+        <TableExportButton
+          fileBaseName="hr-requests"
+          columns={HR_REQUEST_EXPORT_COLUMNS}
+          rows={filteredRows}
+          worksheetName="HR requests"
+        />
       </TableToolbar>
 
       {loading && <p>Loading…</p>}

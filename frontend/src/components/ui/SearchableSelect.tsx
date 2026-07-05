@@ -8,6 +8,7 @@ export type SearchableSelectOption = {
 
 type Props = {
   id?: string
+  className?: string
   value: string
   onChange: (value: string) => void
   options: SearchableSelectOption[]
@@ -20,6 +21,7 @@ type Props = {
 
 export function SearchableSelect({
   id: idProp,
+  className = '',
   value,
   onChange,
   options,
@@ -79,7 +81,7 @@ export function SearchableSelect({
   const displayValue = open ? query : (selected?.label ?? '')
 
   return (
-    <div className="searchable-select" ref={rootRef}>
+    <div className={`searchable-select ${className}`.trim()} ref={rootRef}>
       <div className="searchable-select__control">
         <input
           id={id}

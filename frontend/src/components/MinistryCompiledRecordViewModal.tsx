@@ -5,16 +5,14 @@ import { isApiError } from '../api/apiError'
 import { fetchHrRequest } from '../api/hrRequests'
 import {
   fetchDepartmentTasks,
-  fetchRegionalResponseDepartmentTasks,
   fetchRegionalResponses,
   type CompiledRecordRow,
   type DepartmentTaskRow,
-  type RegionalResponseRow,
 } from '../api/lists'
 import { updateCompiledRecord } from '../api/workflows'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
+import { loadDepartmentTasksForRegion } from '../lib/compiledRecordDepartmentTasks'
 import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
-import { hasDepartmentResponse } from '../lib/departmentTaskWorkflow'
 import type { StatusBadgeTone } from '../lib/statusBadgeTone'
 import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
@@ -51,37 +49,6 @@ function formatCompiledStatusLabel(status: string): string {
   const s = status.replace(/-/g, ' ')
   if (!s) return status
   return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
-function findRegionalResponseForRegion(
-  responses: RegionalResponseRow[],
-  reqId: string,
-  regionName: string,
-): RegionalResponseRow | null {
-  const want = regionName.trim().toLowerCase()
-  return (
-    responses.find(
-      (r) =>
-        r.req_id === reqId && (r.region_name ?? '').trim().toLowerCase() === want,
-    ) ?? null
-  )
-}
-
-async function loadDepartmentTasksForRegion(
-  reqId: string,
-  regionName: string,
-  responsesForReq: RegionalResponseRow[],
-  ictFallbackTasks: DepartmentTaskRow[],
-): Promise<DepartmentTaskRow[]> {
-  const regional = findRegionalResponseForRegion(responsesForReq, reqId, regionName)
-  if (regional) {
-    const tasks = await fetchRegionalResponseDepartmentTasks(regional.id)
-    return tasks.filter((t) => hasDepartmentResponse(t))
-  }
-  const key = regionName.trim()
-  return ictFallbackTasks.filter(
-    (t) => t.req_id === reqId && (t.region_name ?? '').trim() === key && hasDepartmentResponse(t),
-  )
 }
 
 export function MinistryCompiledRecordViewModal({

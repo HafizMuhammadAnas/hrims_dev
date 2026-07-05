@@ -1,7 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
-  BarChart2,
   Building2,
   BookOpen,
   ClipboardList,
@@ -104,6 +103,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/admin/upr-recommendations" icon={ScrollText} label={uprConcludingObservationsLabel()} onPick={onPick} />
               <NavItem to="/admin/knowledge-hub" icon={LayoutGrid} label="Knowledge hub pages" onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label="User management" onPick={onPick} />
+              <NavItem to="/report-generator" icon={PieChart} label="Reporting dashboard" onPick={onPick} />
             </div>
           </>
         )}
@@ -125,6 +125,8 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/federal-compilation" icon={FileText} label="Response compilation" onPick={onPick} />
               <NavItem to="/federal-history" icon={History} label="Compiled record" onPick={onPick} />
             </div>
+            <div className="nav-section-title">Reports</div>
+            <NavItem to="/report-generator" icon={PieChart} label="Reporting dashboard" onPick={onPick} />
           </>
         )}
 
@@ -139,6 +141,8 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/regional-users-mgmt" icon={Users} label="User management" onPick={onPick} />
               <NavItem to="/regional-departments-mgmt" icon={Building2} label="Manage departments" onPick={onPick} />
             </div>
+            <div className="nav-section-title">Reports</div>
+            <NavItem to="/report-generator" icon={PieChart} label="Reporting dashboard" onPick={onPick} />
           </>
         )}
 
@@ -164,10 +168,6 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             </div>
           </>
         )}
-
-        <div className="nav-section-title">Reports &amp; analysis</div>
-        <NavItem to="/report-generator" icon={PieChart} label="Report generator" onPick={onPick} />
-        <NavItem to="/analysis" icon={BarChart2} label="Data analysis" onPick={onPick} />
 
         <div className="nav-section-title">Knowledge hub</div>
         <NavItem to="/conventions" icon={BookOpen} label="Conventions info" onPick={onPick} />

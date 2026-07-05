@@ -12,7 +12,9 @@ import { StatsCards } from '../components/ui/StatsCards'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
+import { TableExportButton } from '../components/ui/TableExportButton'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { COMPILED_RECORD_EXPORT_COLUMNS } from '../lib/tableExportColumns'
 import { compiledRecordViewPath } from '../lib/workflowNavigation'
 import { formatAppDate } from '../lib/dateFormat'
 import type { StatusBadgeTone } from '../lib/statusBadgeTone'
@@ -152,6 +154,12 @@ export function CompiledRecordsPage() {
         >
           Reset filters
         </Button>
+        <TableExportButton
+          fileBaseName="compiled-records"
+          columns={COMPILED_RECORD_EXPORT_COLUMNS}
+          rows={processed}
+          worksheetName="Compiled records"
+        />
       </TableToolbar>
 
       <TableCard>

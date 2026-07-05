@@ -15,7 +15,9 @@ import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { TableToolbar } from '../../components/ui/TableToolbar'
+import { TableExportButton } from '../../components/ui/TableExportButton'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
+import { RECEIVED_REQUEST_EXPORT_COLUMNS } from '../../lib/tableExportColumns'
 import { formatAppDate } from '../../lib/dateFormat'
 import { sortRowsLatestFirst } from '../../lib/tableRowSort'
 import {
@@ -219,6 +221,12 @@ export function ReceivedRequestsPage({
         >
           Reset filters
         </Button>
+        <TableExportButton
+          fileBaseName="received-requests"
+          columns={RECEIVED_REQUEST_EXPORT_COLUMNS}
+          rows={filteredRows}
+          worksheetName="Received requests"
+        />
       </TableToolbar>
       <TableCard>
         <table className="data-table">

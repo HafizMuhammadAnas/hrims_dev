@@ -11,7 +11,9 @@ import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { TableToolbar } from '../../components/ui/TableToolbar'
+import { TableExportButton } from '../../components/ui/TableExportButton'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
+import { REGIONAL_RESPONSE_EXPORT_COLUMNS } from '../../lib/tableExportColumns'
 import { formatAppDate } from '../../lib/dateFormat'
 import { sortRowsLatestFirst } from '../../lib/tableRowSort'
 import {
@@ -286,6 +288,12 @@ export function SubmissionHistoryPage({ title }: Props) {
             >
               Reset filters
             </Button>
+            <TableExportButton
+              fileBaseName="response-history"
+              columns={REGIONAL_RESPONSE_EXPORT_COLUMNS}
+              rows={filteredResponses}
+              worksheetName="Responses"
+            />
           </TableToolbar>
 
           <TableCard>

@@ -68,6 +68,9 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/report-form/conventions', [ReportLookupController::class, 'conventions'])->name('api.v1.report-form.conventions');
         Route::get('/report-form/issue-categories', [ReportLookupController::class, 'issueCategories'])->name('api.v1.report-form.issue-categories');
+        Route::get('/report-form/articles', [ReportLookupController::class, 'articles'])->name('api.v1.report-form.articles');
+        Route::get('/report-form/indicators', [ReportLookupController::class, 'indicators'])->name('api.v1.report-form.indicators');
+        Route::get('/report-form/issue-article-links', [ReportLookupController::class, 'issueArticleLinks'])->name('api.v1.report-form.issue-article-links');
 
         Route::get('/regional-responses', [RegionalResponseController::class, 'index'])->name('api.v1.regional-responses.index');
         Route::post('/regional-responses', [RegionalResponseController::class, 'store'])->name('api.v1.regional-responses.store');

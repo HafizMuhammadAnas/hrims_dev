@@ -84,6 +84,8 @@ export type AdminIssueCategory = {
 
 export type AdminArticleRow = {
   id: number
+  convention_id: number
+  convention?: { id: number; code: string; name: string } | null
   article_name: string
   description: string | null
   is_active: boolean
@@ -497,12 +499,14 @@ export async function adminSetIssueCategoryActive(id: number, is_active: boolean
   return adminUpdateIssueCategory(id, { is_active })
 }
 
-export async function adminFetchArticles(): Promise<AdminArticleRow[]> {
-  const json = await adminGet<{ data: AdminArticleRow[] }>('/articles')
+export async function adminFetchArticles(conventionId?: number): Promise<AdminArticleRow[]> {
+  const qs = conventionId != null ? `?convention_id=${encodeURIComponent(String(conventionId))}` : ''
+  const json = await adminGet<{ data: AdminArticleRow[] }>(`/articles${qs}`)
   return json.data
 }
 
 export async function adminCreateArticle(body: {
+  convention_id: number
   article_name: string
   description?: string | null
 }): Promise<AdminArticleRow> {
@@ -513,7 +517,12 @@ export async function adminCreateArticle(body: {
 
 export async function adminUpdateArticle(
   id: number,
-  body: { article_name?: string; description?: string | null; is_active?: boolean },
+  body: {
+    convention_id?: number
+    article_name?: string
+    description?: string | null
+    is_active?: boolean
+  },
 ): Promise<AdminArticleRow> {
   const res = await adminSend('PATCH', `/articles/${id}`, body)
   await throwIfNotOk(res)

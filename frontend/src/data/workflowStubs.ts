@@ -131,10 +131,3 @@ export const STUB_REPORT_GENERATOR: WorkflowStubSpec = {
     { to: '/compiled-records', label: 'Compiled records' },
   ],
 }
-
-export const STUB_ANALYSIS: WorkflowStubSpec = {
-  title: 'Data analysis',
-  intro:
-    'The Analysis workspace charts HR requests and regional responses from `/api/v1` using your role-scoped visibility.',
-  links: [{ to: '/analysis', label: 'Open data analysis' }],
-}
