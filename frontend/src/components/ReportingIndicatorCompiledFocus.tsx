@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { fetchHrRequest } from '../api/hrRequests'
 import {
   fetchDepartmentTasks,
@@ -6,10 +6,9 @@ import {
   type CompiledRecordRow,
 } from '../api/lists'
 import { loadCompiledRecordRegionBlocks, type CompiledRecordRegionBlock } from '../lib/compiledRecordDepartmentTasks'
-import { formatAppDate } from '../lib/dateFormat'
-import type { HrRequestRow } from '../types/hrRequest'
+import { coerceIssueEntryKind, issueEntryKindBadgeLabel } from '../lib/issueEntryKind'
+import type { HrRequestIssueDetail, HrRequestRow } from '../types/hrRequest'
 import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
-import { StatusBadge } from './ui/StatusBadge'
 
 type RecordView = {
   record: CompiledRecordRow
@@ -21,23 +20,58 @@ type Props = {
   indicatorId: number
   indicatorLabel?: string
   records: CompiledRecordRow[]
+  /** When set, narrows the indicator content/table to this collection year. */
+  filterYearId?: number
+  filterYearLabel?: string
 }
 
-function formatCompiledStatusLabel(status: string): string {
-  if (status === 'submitted') return 'Submitted'
-  if (status === 'draft') return 'Draft'
-  const s = status.replace(/-/g, ' ')
-  if (!s) return status
-  return s.charAt(0).toUpperCase() + s.slice(1)
+/** A ministry submission (federal → ministry), as opposed to a national/regional compilation. */
+function isMinistryCompiledRecord(r: CompiledRecordRow): boolean {
+  return Boolean(r.submitted_to && /ministry/i.test(r.submitted_to))
 }
 
-export function ReportingIndicatorCompiledFocus({ indicatorId, indicatorLabel, records }: Props) {
+/** Prefer the most final compiled row for a request: ministry submission, then latest date. */
+function preferCompiledRecord(a: CompiledRecordRow, b: CompiledRecordRow): CompiledRecordRow {
+  const rank = (r: CompiledRecordRow) => (isMinistryCompiledRecord(r) ? 2 : r.status === 'submitted' ? 1 : 0)
+  if (rank(b) !== rank(a)) return rank(b) > rank(a) ? b : a
+  const da = a.compilation_date ?? ''
+  const db = b.compilation_date ?? ''
+  return db > da ? b : a
+}
+
+export function ReportingIndicatorCompiledFocus({
+  indicatorId,
+  records,
+  filterYearId,
+  filterYearLabel,
+}: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [recordViews, setRecordViews] = useState<RecordView[]>([])
 
+  /**
+   * A request can have multiple compiled rows (e.g. national compilation and ministry submission)
+   * that carry the same responses. Keep one per request so the focus view is not duplicated.
+   */
+  const dedupedRecords = useMemo(() => {
+    // Only ministry submissions; fall back to all rows if none are marked (avoids an empty view).
+    const ministry = records.filter(isMinistryCompiledRecord)
+    const source = ministry.length > 0 ? ministry : records
+    const byReq = new Map<string, CompiledRecordRow>()
+    const noReq: CompiledRecordRow[] = []
+    for (const r of source) {
+      if (!r.req_id) {
+        noReq.push(r)
+        continue
+      }
+      const existing = byReq.get(r.req_id)
+      byReq.set(r.req_id, existing ? preferCompiledRecord(existing, r) : r)
+    }
+    return [...byReq.values(), ...noReq]
+  }, [records])
+
   useEffect(() => {
-    if (records.length === 0) {
+    if (dedupedRecords.length === 0) {
       setRecordViews([])
       setError(null)
       setLoading(false)
@@ -54,7 +88,7 @@ export function ReportingIndicatorCompiledFocus({ indicatorId, indicatorLabel, r
           fetchRegionalResponses(),
           fetchDepartmentTasks(),
         ])
-        const reqIds = [...new Set(records.map((r) => r.req_id).filter((id): id is string => Boolean(id)))]
+        const reqIds = [...new Set(dedupedRecords.map((r) => r.req_id).filter((id): id is string => Boolean(id)))]
         const hrPairs = await Promise.all(
           reqIds.map(async (id) => {
             try {
@@ -67,7 +101,7 @@ export function ReportingIndicatorCompiledFocus({ indicatorId, indicatorLabel, r
         const hrByReq = new Map(hrPairs)
 
         const views = await Promise.all(
-          records.map(async (record) => {
+          dedupedRecords.map(async (record) => {
             const regions = await loadCompiledRecordRegionBlocks(record, regionalResponses, indexTasks)
             const hrDetail = record.req_id ? (hrByReq.get(record.req_id) ?? null) : null
             return { record, hrDetail, regions }
@@ -85,39 +119,65 @@ export function ReportingIndicatorCompiledFocus({ indicatorId, indicatorLabel, r
     return () => {
       cancelled = true
     }
-  }, [records, indicatorId])
+  }, [dedupedRecords, indicatorId])
 
-  const title = indicatorLabel?.trim() || `Indicator #${indicatorId}`
+  /** Collection years the selected indicator is configured to collect (from HR details). */
+  const indicatorYearIds = useMemo(() => {
+    const ids = new Set<number>()
+    for (const view of recordViews) {
+      const ind = view.hrDetail?.issue?.indicators?.find((i) => i.id === indicatorId)
+      for (const y of ind?.collection_by_year ?? []) ids.add(y.year_id)
+    }
+    return ids
+  }, [recordViews, indicatorId])
+
+  /** The LOI / concluding observation the selected indicator belongs to (same across records). */
+  const focusIssue = useMemo<HrRequestIssueDetail | null>(() => {
+    for (const view of recordViews) {
+      const issue = view.hrDetail?.issue
+      if (issue?.indicators?.some((i) => i.id === indicatorId)) return issue
+    }
+    return recordViews.find((v) => v.hrDetail?.issue)?.hrDetail?.issue ?? null
+  }, [recordViews, indicatorId])
+
+  const yearFilterActive = filterYearId != null
+  const yearLabelText = filterYearLabel?.trim() || (filterYearId != null ? String(filterYearId) : '')
+  const yearUnavailable =
+    yearFilterActive && !loading && !error && (records.length === 0 || !indicatorYearIds.has(filterYearId))
 
   return (
     <div className="reporting-indicator-focus">
-      <h4 className="reporting-indicator-focus__title">Compiled data — {title}</h4>
-
       {loading ? <p className="muted">Loading indicator responses…</p> : null}
       {error ? <p className="login-error">{error}</p> : null}
 
-      {!loading && !error && records.length === 0 ? (
+      {yearUnavailable ? (
+        <p className="app-alert app-alert--info reporting-indicator-focus__empty" role="status">
+          Data is not available for this indicator in {yearLabelText || 'the selected year'}.
+        </p>
+      ) : null}
+
+      {!loading && !error && !yearUnavailable && records.length === 0 ? (
         <p className="muted">No compiled records match this indicator and filters.</p>
       ) : null}
 
-      {!loading && !error && recordViews.length > 0 ? (
+      {!loading && !error && !yearUnavailable && focusIssue ? (
+        <header className="reporting-indicator-focus__issue">
+          <span className="reporting-indicator-focus__issue-kind">
+            {issueEntryKindBadgeLabel(coerceIssueEntryKind(focusIssue.entry_kind))}
+          </span>
+          <p className="reporting-indicator-focus__issue-cat">
+            <strong>Category:</strong> {focusIssue.category?.name ?? '—'}
+          </p>
+          {focusIssue.description?.trim() ? (
+            <p className="reporting-indicator-focus__issue-desc">{focusIssue.description.trim()}</p>
+          ) : null}
+        </header>
+      ) : null}
+
+      {!loading && !error && !yearUnavailable && recordViews.length > 0 ? (
         <div className="reporting-indicator-focus__list">
           {recordViews.map(({ record, hrDetail, regions }) => (
             <article key={record.id} className="reporting-indicator-focus__record">
-              <header className="reporting-indicator-focus__record-head">
-                <div>
-                  <strong className="reporting-indicator-focus__record-title">{record.title}</strong>
-                  <p className="reporting-indicator-focus__record-meta muted small">
-                    {record.id}
-                    {record.req_id ? ` · Request ${record.req_id}` : ''}
-                    {record.compilation_date ? ` · ${formatAppDate(record.compilation_date)}` : ''}
-                  </p>
-                </div>
-                <StatusBadge tone={record.status === 'submitted' ? 'success' : 'warning'}>
-                  {formatCompiledStatusLabel(record.status)}
-                </StatusBadge>
-              </header>
-
               {regions.length === 0 ? (
                 <p className="muted reporting-indicator-focus__empty">No departmental responses for this record.</p>
               ) : (
@@ -141,6 +201,7 @@ export function ReportingIndicatorCompiledFocus({ indicatorId, indicatorLabel, r
                                 onlyIndicatorIds={[indicatorId]}
                                 issueIndicators={hrDetail?.issue?.indicators ?? []}
                                 locationRegionIds={[task.region_id]}
+                                filterYearId={filterYearId}
                               />
                             </div>
                           ))}

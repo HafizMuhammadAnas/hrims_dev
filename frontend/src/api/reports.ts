@@ -17,10 +17,17 @@ export type ReportLookupArticle = {
   article_name: string
 }
 
+export type ReportCollectionYear = {
+  id: number
+  label: string
+}
+
 export type ReportLookupIndicator = {
   id: number
   issue_id: number
   indicator_text: string
+  /** Collection years configured on this indicator's disaggregated/year data. */
+  collection_years?: ReportCollectionYear[]
 }
 
 export type ReportIssueArticleLink = {
@@ -75,6 +82,34 @@ export async function fetchReportIndicators(filters: {
       article_id: filters.articleId,
       entry_kind: filters.entryKind,
       category_id: filters.categoryId,
+    })}`,
+  )
+  return json.data
+}
+
+export type ReportCatalogSummary = {
+  articles: number
+  categories: number
+  loi_count: number
+  loi_indicator_count: number
+  concluding_count: number
+  concluding_indicator_count: number
+}
+
+export async function fetchReportSummary(filters: {
+  conventionId?: string
+  articleId?: string
+  entryKind?: string
+  categoryId?: string
+  collectionYearId?: string
+}): Promise<ReportCatalogSummary> {
+  const json = await getJson<{ data: ReportCatalogSummary }>(
+    `/api/v1/report-form/summary${reportQuery({
+      convention_id: filters.conventionId,
+      article_id: filters.articleId,
+      entry_kind: filters.entryKind,
+      category_id: filters.categoryId,
+      collection_year_id: filters.collectionYearId,
     })}`,
   )
   return json.data

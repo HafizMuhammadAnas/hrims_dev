@@ -4,6 +4,10 @@ export type StatCardItem = {
   label: string
   value: ReactNode
   detail?: ReactNode
+  /** Optional leading icon (rendered in a tinted rounded square, titleTop variant). */
+  icon?: ReactNode
+  /** Hex color used for the icon glyph and its tinted background. */
+  iconTone?: string
 }
 
 type StatsCardsProps = {
@@ -23,10 +27,25 @@ export function StatsCards({ items, className, variant = 'default' }: StatsCards
         <div className="stat-card" key={item.label}>
           {titleTop ? (
             <>
-              <div className="stat-card-label">{item.label}</div>
-              <div className="stat-card-value">{item.value}</div>
-              <div className={`stat-card-detail${item.detail ? '' : ' stat-card-detail--empty'}`}>
-                {item.detail ?? '\u00a0'}
+              {item.icon ? (
+                <span
+                  className="stat-card__icon"
+                  style={
+                    item.iconTone
+                      ? { color: item.iconTone, background: `${item.iconTone}1f` }
+                      : undefined
+                  }
+                  aria-hidden
+                >
+                  {item.icon}
+                </span>
+              ) : null}
+              <div className="stat-card__body">
+                <div className="stat-card-label">{item.label}</div>
+                <div className="stat-card-value">{item.value}</div>
+                <div className={`stat-card-detail${item.detail ? '' : ' stat-card-detail--empty'}`}>
+                  {item.detail ?? '\u00a0'}
+                </div>
               </div>
             </>
           ) : (

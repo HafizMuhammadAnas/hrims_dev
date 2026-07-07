@@ -277,9 +277,6 @@ export function MinistryCompiledRecordViewModal({
                       <div className="ministry-compiled-region-card__responses">
                         {tasks.map((t) => (
                           <div key={t.id} className="ministry-compiled-dept-response-item">
-                            <p className="ministry-compiled-dept-response-item__dept">
-                              {t.department_name ?? t.department_id}
-                            </p>
                             <DepartmentResponseDisplay
                               responseData={t.response_data}
                               attachmentUrl={t.attachment_url}

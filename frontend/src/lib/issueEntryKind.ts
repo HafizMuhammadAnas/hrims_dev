@@ -74,6 +74,11 @@ export function loiMappingLegendLabel(): string {
   return `${LOI_LABEL} mapping (read-only)`
 }
 
+/** Mapping block legend for the HR request form, per entry kind (no "read-only"). */
+export function issueEntryMappingLegendLabel(kind: IssueEntryKind): string {
+  return `${issueEntryKindBadgeLabel(kind)} mapping`
+}
+
 export function loiSearchPlaceholder(): string {
   return `Search or select ${LOI_LABEL}`
 }
@@ -153,6 +158,25 @@ export function issueEntrySelectLabel(source: IssueEntryTextSource, maxLen = 120
   if (!text) return issueEntryKindBadgeLabel(coerceIssueEntryKind(source.entry_kind))
   if (text.length <= maxLen) return text
   return `${text.slice(0, maxLen - 1).trimEnd()}…`
+}
+
+/** HR request modal: label for the entry-selection field, based on checked kinds. */
+export function hrIssueSelectFieldLabel(filters: {
+  issue: boolean
+  recommendation: boolean
+}): string {
+  if (filters.issue && !filters.recommendation) return `${LOI_LABEL} title`
+  if (filters.recommendation && !filters.issue) return `${CONCLUDING_OBSERVATIONS_LABEL} category`
+  return issueEntryTitleColumnLabel()
+}
+
+/** HR request modal: placeholder for the entry-selection field, based on checked kinds. */
+export function hrIssueSelectPlaceholder(filters: {
+  issue: boolean
+  recommendation: boolean
+}): string {
+  if (filters.recommendation && !filters.issue) return `Search or select category`
+  return loiSearchPlaceholder()
 }
 
 export function issueEntryListColumnLabel(kind: IssueEntryKind): string {

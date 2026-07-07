@@ -18,18 +18,18 @@ import { isDepartmentAdmin, isViewer } from '../lib/roles'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import {
   coerceIssueEntryKind,
+  hrIssueSelectFieldLabel,
+  hrIssueSelectPlaceholder,
   issueEntryKindBadgeLabel,
   issueEntryKindToggleAriaLabel,
+  issueEntryMappingLegendLabel,
   issueEntryPrimaryText,
   issueEntrySelectLabel,
-  issueEntryTitleColumnLabel,
   loiEmptyFilterMessage,
   loiLoadingPlaceholder,
-  loiMappingLegendLabel,
   loiMetadataLoadErrorMessage,
   loiMissingDataAlertTitle,
   loiRequiredMessage,
-  loiSearchPlaceholder,
   selectIndicatorForLoiMessage,
   type IssueEntryKind,
 } from '../lib/issueEntryKind'
@@ -80,7 +80,7 @@ function conventionOptionLabel(c: { code?: string | null; name?: string | null }
 type EntryKindFilters = Record<IssueEntryKind, boolean>
 
 const defaultEntryKindFilters = (): EntryKindFilters => ({
-  issue: false,
+  issue: true,
   recommendation: false,
 })
 
@@ -560,7 +560,15 @@ export function HrRequestModal({
   )
 
   const issueSelectOptions = useMemo(
-    () => filteredIssueOptions.map((i) => ({ value: String(i.id), label: issueEntrySelectLabel(i) })),
+    () =>
+      filteredIssueOptions.map((i) => {
+        const kind = coerceIssueEntryKind(i.entry_kind)
+        const label =
+          kind === 'recommendation'
+            ? i.category?.name?.trim() || issueEntrySelectLabel(i)
+            : issueEntrySelectLabel(i)
+        return { value: String(i.id), label }
+      }),
     [filteredIssueOptions],
   )
 
@@ -1015,25 +1023,30 @@ export function HrRequestModal({
                 <FormField label={issueEntryKindToggleAriaLabel()}>
                   <div
                     className="hr-request-entry-kind-filters checkbox-grid"
-                    role="group"
+                    role="radiogroup"
                     aria-label={issueEntryKindToggleAriaLabel()}
                   >
                     {(['issue', 'recommendation'] as const).map((kind) => (
                       <label key={kind} className="checkbox-label">
                         <input
-                          type="checkbox"
+                          type="radio"
+                          name="hr-entry-kind"
                           checked={entryKindFilters[kind]}
-                          disabled={
-                            entryKindFilters[kind] &&
-                            !entryKindFilters[kind === 'issue' ? 'recommendation' : 'issue']
-                          }
-                          onChange={(e) => {
-                            const checked = e.target.checked
-                            setEntryKindFilters((prev) => {
-                              const other = kind === 'issue' ? 'recommendation' : 'issue'
-                              if (!checked && !prev[other]) return prev
-                              return { ...prev, [kind]: checked }
+                          onChange={() => {
+                            setEntryKindFilters({
+                              issue: kind === 'issue',
+                              recommendation: kind === 'recommendation',
                             })
+                            setIssueForm((f) =>
+                              f
+                                ? {
+                                    ...f,
+                                    issue_id: '',
+                                    selectedIndicatorIds: [],
+                                    indicatorValues: {},
+                                  }
+                                : f,
+                            )
                           }}
                         />
                         <span>{issueEntryKindBadgeLabel(kind)}</span>
@@ -1043,7 +1056,7 @@ export function HrRequestModal({
                 </FormField>
               )}
 
-              <FormField label={issueEntryTitleColumnLabel()} htmlFor="hr-issue">
+              <FormField label={hrIssueSelectFieldLabel(entryKindFilters)} htmlFor="hr-issue">
                 <SearchableSelect
                   id="hr-issue"
                   value={issueForm.issue_id === '' ? '' : String(issueForm.issue_id)}
@@ -1073,7 +1086,7 @@ export function HrRequestModal({
                         ? 'Select LOI or Concluding observations'
                         : issuesLoading
                           ? loiLoadingPlaceholder()
-                          : loiSearchPlaceholder()
+                          : hrIssueSelectPlaceholder(entryKindFilters)
                   }
                   emptyFilterMessage={loiEmptyFilterMessage()}
                   aria-invalid={Boolean(fieldErrors.issue_id)}
@@ -1105,36 +1118,73 @@ export function HrRequestModal({
               {selectedIssue && (
                 <FormRow className="mapping-preview">
                   <fieldset>
-                    <legend>{loiMappingLegendLabel()}</legend>
+                    <legend>
+                      {issueEntryMappingLegendLabel(coerceIssueEntryKind(selectedIssue.entry_kind))}
+                    </legend>
                     <p>
                       <strong>Category:</strong> {selectedIssue.category?.name ?? '—'}
                     </p>
+                    {selectedIssue.description?.trim() ? (
+                      <details className="mapping-article-collapse mapping-preview__description-collapse">
+                        <summary className="mapping-article-collapse__summary">
+                          <strong>
+                            {coerceIssueEntryKind(selectedIssue.entry_kind) === 'recommendation'
+                              ? 'Concluding observation'
+                              : 'LOI description'}
+                          </strong>
+                        </summary>
+                        <div className="mapping-article-collapse__body">
+                          <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+                            {selectedIssue.description.trim()}
+                          </p>
+                        </div>
+                      </details>
+                    ) : null}
                     <div>
                       {selectedIssue.articles.length === 0 ? (
                         <p className="muted">—</p>
                       ) : (
                         <div className="mapping-article-list">
-                          {selectedIssue.articles.map((a) => (
-                            <div key={a.id} className="mapping-article-list__item">
-                              <strong>{a.article_name}</strong>
-                              {a.description?.trim() ? (
-                                <p
-                                  className="muted"
-                                  style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}
-                                >
-                                  {a.description.trim()}
-                                </p>
-                              ) : null}
-                              {a.relevant_paragraph ? (
-                                <p
-                                  className="muted"
-                                  style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}
-                                >
-                                  {a.relevant_paragraph}
-                                </p>
-                              ) : null}
-                            </div>
-                          ))}
+                          {selectedIssue.articles.map((a) => {
+                            const hasDetail =
+                              Boolean(a.description?.trim()) || Boolean(a.relevant_paragraph)
+                            return (
+                              <details
+                                key={a.id}
+                                className="mapping-article-list__item mapping-article-collapse"
+                              >
+                                <summary className="mapping-article-collapse__summary">
+                                  <strong>{a.article_name}</strong>
+                                </summary>
+                                <div className="mapping-article-collapse__body">
+                                  {hasDetail ? (
+                                    <>
+                                      {a.description?.trim() ? (
+                                        <p
+                                          className="muted"
+                                          style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}
+                                        >
+                                          {a.description.trim()}
+                                        </p>
+                                      ) : null}
+                                      {a.relevant_paragraph ? (
+                                        <p
+                                          className="muted"
+                                          style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}
+                                        >
+                                          {a.relevant_paragraph}
+                                        </p>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <p className="muted" style={{ margin: '4px 0 0' }}>
+                                      No description provided.
+                                    </p>
+                                  )}
+                                </div>
+                              </details>
+                            )
+                          })}
                         </div>
                       )}
                     </div>

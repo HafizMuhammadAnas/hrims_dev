@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { BarChart2, FileText, LayoutDashboard, RotateCcw, Settings } from 'lucide-react'
+import {
+  BarChart2,
+  ClipboardCheck,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  LayoutGrid,
+  PieChart as PieChartIcon,
+  RotateCcw,
+  Settings,
+} from 'lucide-react'
 import {
   ResponsiveContainer,
   BarChart,
@@ -21,6 +31,7 @@ import {
   fetchReportIndicators,
   fetchReportIssueArticleLinks,
   fetchReportIssueCategories,
+  fetchReportSummary,
   type ReportLookupArticle,
   type ReportLookupIndicator,
 } from '../api/reports'
@@ -34,6 +45,7 @@ import {
 } from '../lib/issueEntryKind'
 import {
   buildReportingDashboard,
+  collectionYearOptionsFromIndicators,
   type ReportChartPoint,
   type ReportFilterSummaryPart,
   type ReportFilters,
@@ -42,7 +54,6 @@ import {
   type ReportingDashboardSummaryCards,
 } from '../lib/reportGeneratorData'
 import { reportColorForLabel, reportDashboardChartColor } from '../lib/reportChartTheme'
-import { DATE_RANGE_PRESET_LABELS, type DateRangePreset } from '../lib/reportDateRange'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
 import { ReportingIndicatorCompiledFocus } from '../components/ReportingIndicatorCompiledFocus'
@@ -51,25 +62,9 @@ import { PageSection } from '../components/ui/PageSection'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { StatsCards } from '../components/ui/StatsCards'
 
-const MONTH_OPTIONS = [
-  { value: '1', label: 'January' },
-  { value: '2', label: 'February' },
-  { value: '3', label: 'March' },
-  { value: '4', label: 'April' },
-  { value: '5', label: 'May' },
-  { value: '6', label: 'June' },
-  { value: '7', label: 'July' },
-  { value: '8', label: 'August' },
-  { value: '9', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
-]
-
 const COMPILED_DATA_SOURCE: ReportFilters['dataSource'] = 'consolidated'
 
 function createDefaultReportFilters(lockedRegionalId: string): ReportFilters {
-  const now = new Date()
   return {
     dataSource: COMPILED_DATA_SOURCE,
     regionId: lockedRegionalId,
@@ -78,11 +73,7 @@ function createDefaultReportFilters(lockedRegionalId: string): ReportFilters {
     entryKind: '',
     categoryId: '',
     indicatorId: '',
-    datePreset: 'this_year',
-    dateFrom: '',
-    dateTo: '',
-    monthYearMonth: String(now.getMonth() + 1),
-    monthYearYear: String(now.getFullYear()),
+    collectionYearId: '',
   }
 }
 
@@ -93,11 +84,7 @@ function reportFiltersAreApplied(current: ReportFilters, defaults: ReportFilters
     current.entryKind !== defaults.entryKind ||
     current.categoryId !== defaults.categoryId ||
     current.indicatorId !== defaults.indicatorId ||
-    current.datePreset !== defaults.datePreset ||
-    current.dateFrom !== defaults.dateFrom ||
-    current.dateTo !== defaults.dateTo ||
-    current.monthYearMonth !== defaults.monthYearMonth ||
-    current.monthYearYear !== defaults.monthYearYear ||
+    current.collectionYearId !== defaults.collectionYearId ||
     current.regionId !== defaults.regionId
   )
 }
@@ -179,13 +166,10 @@ function DonutChartPanel({
 function ReportingRankPanel({
   title,
   rows,
-  variant = 'indicators',
 }: {
   title: string
   rows: ReportRankRow[]
-  variant?: 'categories' | 'indicators'
 }) {
-  const showId = variant === 'indicators'
   return (
     <div className="reporting-rank-panel">
       <h4 className="reporting-rank-panel__title">{title}</h4>
@@ -194,11 +178,7 @@ function ReportingRankPanel({
       ) : (
         <div className="reporting-rank-panel__list">
           {rows.map((row, index) => (
-            <div
-              key={row.id}
-              className={`reporting-rank-row${showId ? '' : ' reporting-rank-row--label-only'}`}
-            >
-              {showId ? <span className="reporting-rank-row__id">{row.shortLabel}</span> : null}
+            <div key={row.id} className="reporting-rank-row reporting-rank-row--label-only">
               <span className="reporting-rank-row__label" title={row.label}>
                 {row.label}
               </span>
@@ -245,22 +225,38 @@ function ReportingSummaryCards({ cards }: { cards: ReportingDashboardSummaryCard
       variant="titleTop"
       className="reporting-dashboard__summary-row"
       items={[
-        { label: 'Articles', value: cards.articles },
+        {
+          label: 'Articles',
+          value: cards.articles,
+          icon: <FileText size={20} aria-hidden />,
+          iconTone: '#2563eb',
+        },
         {
           label: LOI_LABEL,
           value: cards.loiCount,
           detail: `${cards.loiIndicatorCount} indicator${cards.loiIndicatorCount === 1 ? '' : 's'}`,
+          icon: <ClipboardList size={20} aria-hidden />,
+          iconTone: '#16a34a',
         },
         {
           label: CONCLUDING_OBSERVATIONS_LABEL,
           value: cards.concludingCount,
           detail: `${cards.concludingIndicatorCount} indicator${cards.concludingIndicatorCount === 1 ? '' : 's'}`,
+          icon: <ClipboardCheck size={20} aria-hidden />,
+          iconTone: '#7c3aed',
         },
-        { label: 'Categories used', value: cards.categoriesCount },
+        {
+          label: 'Categories',
+          value: cards.categoriesCount,
+          icon: <LayoutGrid size={20} aria-hidden />,
+          iconTone: '#ea580c',
+        },
         {
           label: 'Response rate',
           value: `${cards.responsePercent}%`,
           detail: `${cards.requestsWithResponse} of ${cards.requestCount} request${cards.requestCount === 1 ? '' : 's'} · ${cards.responseCount} response${cards.responseCount === 1 ? '' : 's'}`,
+          icon: <PieChartIcon size={20} aria-hidden />,
+          iconTone: '#0d9488',
         },
       ]}
     />
@@ -295,7 +291,6 @@ export function ReportGeneratorPage() {
   const [compiled, setCompiled] = useState<Awaited<ReturnType<typeof fetchCompiledRecords>>>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const now = new Date()
   const defaultFilters = useMemo(
     () => createDefaultReportFilters(lockedRegionalId),
     [lockedRegionalId],
@@ -409,10 +404,18 @@ export function ReportGeneratorPage() {
     [filters, lockedRegionalId],
   )
 
-  const yearOptions = useMemo(() => {
-    const current = now.getFullYear()
-    return Array.from({ length: 12 }, (_, i) => String(current - i))
-  }, [])
+  const conventionSelected = Boolean(filters.convention)
+
+  const collectionYearOptions = useMemo(
+    () => collectionYearOptionsFromIndicators(indicators),
+    [indicators],
+  )
+
+  useEffect(() => {
+    if (!filters.collectionYearId) return
+    if (collectionYearOptions.some((y) => String(y.id) === filters.collectionYearId)) return
+    setFilters((prev) => ({ ...prev, collectionYearId: '' }))
+  }, [collectionYearOptions, filters.collectionYearId])
 
   function handleResetFilters() {
     setFilters(createDefaultReportFilters(lockedRegionalId))
@@ -422,12 +425,21 @@ export function ReportGeneratorPage() {
   async function handleGenerateDashboard() {
     setReportLoading(true)
     try {
-      const rankingIndicators = await fetchReportIndicators({
-        conventionId: reportFilters.convention || undefined,
-        articleId: reportFilters.articleId || undefined,
-        entryKind: reportFilters.entryKind || undefined,
-        categoryId: reportFilters.categoryId || undefined,
-      })
+      const [rankingIndicators, catalogSummary] = await Promise.all([
+        fetchReportIndicators({
+          conventionId: reportFilters.convention || undefined,
+          articleId: reportFilters.articleId || undefined,
+          entryKind: reportFilters.entryKind || undefined,
+          categoryId: reportFilters.categoryId || undefined,
+        }),
+        fetchReportSummary({
+          conventionId: reportFilters.convention || undefined,
+          articleId: reportFilters.articleId || undefined,
+          entryKind: reportFilters.entryKind || undefined,
+          categoryId: reportFilters.categoryId || undefined,
+          collectionYearId: reportFilters.collectionYearId || undefined,
+        }),
+      ])
       const result = buildReportingDashboard(requests, responses, compiled, reportFilters, {
         conventions,
         categories,
@@ -436,6 +448,17 @@ export function ReportGeneratorPage() {
         indicators: rankingIndicators,
         issueArticleLinks,
       })
+      if (!result.indicatorFocusMode) {
+        result.summaryCards = {
+          ...result.summaryCards,
+          articles: catalogSummary.articles,
+          categoriesCount: catalogSummary.categories,
+          loiCount: catalogSummary.loi_count,
+          loiIndicatorCount: catalogSummary.loi_indicator_count,
+          concludingCount: catalogSummary.concluding_count,
+          concludingIndicatorCount: catalogSummary.concluding_indicator_count,
+        }
+      }
       setDashboardResult(result)
     } catch (e: unknown) {
       setLoadError(e instanceof Error ? e.message : 'Failed to build dashboard')
@@ -483,11 +506,14 @@ export function ReportGeneratorPage() {
                       ...filters,
                       convention: e.target.value,
                       articleId: '',
+                      entryKind: '',
+                      categoryId: '',
                       indicatorId: '',
+                      collectionYearId: '',
                     })
                   }
                 >
-                  <option value="">All conventions</option>
+                  <option value="">Select a convention</option>
                   {conventions.map((c) => (
                     <option key={c.id} value={String(c.id)}>
                       {c.code ? `${c.code} — ${c.name}` : c.name}
@@ -501,6 +527,7 @@ export function ReportGeneratorPage() {
                 <select
                   id="rg-article"
                   value={filters.articleId}
+                  disabled={!conventionSelected}
                   onChange={(e) =>
                     setFilters({
                       ...filters,
@@ -523,6 +550,7 @@ export function ReportGeneratorPage() {
                 <select
                   id="rg-entry-kind"
                   value={filters.entryKind}
+                  disabled={!conventionSelected}
                   onChange={(e) =>
                     setFilters({
                       ...filters,
@@ -538,24 +566,12 @@ export function ReportGeneratorPage() {
               </div>
 
               <div className="report-generator__field">
-                <label htmlFor="rg-indicator">Indicator</label>
-                <SearchableSelect
-                  id="rg-indicator"
-                  className="report-generator__searchable-select"
-                  value={filters.indicatorId}
-                  onChange={(v) => setFilters({ ...filters, indicatorId: v })}
-                  options={indicatorSelectOptions}
-                  placeholder="All indicators"
-                  emptyFilterMessage="No indicators match your search"
-                />
-              </div>
-
-              <div className="report-generator__field">
                 <label htmlFor="rg-category">Categories</label>
                 <SearchableSelect
                   id="rg-category"
                   className="report-generator__searchable-select"
                   value={filters.categoryId}
+                  disabled={!conventionSelected}
                   onChange={(v) =>
                     setFilters({
                       ...filters,
@@ -569,85 +585,36 @@ export function ReportGeneratorPage() {
                 />
               </div>
 
-              <div className="report-generator__field report-generator__field--span2">
-                <label htmlFor="rg-date-preset">Date range</label>
+              <div className="report-generator__field">
+                <label htmlFor="rg-indicator">Indicator</label>
+                <SearchableSelect
+                  id="rg-indicator"
+                  className="report-generator__searchable-select"
+                  value={filters.indicatorId}
+                  disabled={!conventionSelected}
+                  onChange={(v) => setFilters({ ...filters, indicatorId: v })}
+                  options={indicatorSelectOptions}
+                  placeholder="All indicators"
+                  emptyFilterMessage="No indicators match your search"
+                />
+              </div>
+
+              <div className="report-generator__field">
+                <label htmlFor="rg-year">Year</label>
                 <select
-                  id="rg-date-preset"
-                  value={filters.datePreset}
-                  onChange={(e) =>
-                    setFilters({
-                      ...filters,
-                      datePreset: e.target.value as DateRangePreset,
-                    })
-                  }
+                  id="rg-year"
+                  value={filters.collectionYearId}
+                  onChange={(e) => setFilters({ ...filters, collectionYearId: e.target.value })}
+                  disabled={!conventionSelected || collectionYearOptions.length === 0}
                 >
-                  {(Object.keys(DATE_RANGE_PRESET_LABELS) as DateRangePreset[]).map((key) => (
-                    <option key={key} value={key}>
-                      {DATE_RANGE_PRESET_LABELS[key]}
+                  <option value="">All years</option>
+                  {collectionYearOptions.map((y) => (
+                    <option key={y.id} value={String(y.id)}>
+                      {y.label}
                     </option>
                   ))}
                 </select>
               </div>
-
-              {filters.datePreset === 'month_year' ? (
-                <div className="report-generator__field report-generator__field--span2">
-                  <div className="report-generator__field-row">
-                    <div>
-                      <label htmlFor="rg-month">Month</label>
-                      <select
-                        id="rg-month"
-                        value={filters.monthYearMonth}
-                        onChange={(e) => setFilters({ ...filters, monthYearMonth: e.target.value })}
-                      >
-                        {MONTH_OPTIONS.map((m) => (
-                          <option key={m.value} value={m.value}>
-                            {m.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="rg-year">Year</label>
-                      <select
-                        id="rg-year"
-                        value={filters.monthYearYear}
-                        onChange={(e) => setFilters({ ...filters, monthYearYear: e.target.value })}
-                      >
-                        {yearOptions.map((y) => (
-                          <option key={y} value={y}>
-                            {y}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {filters.datePreset === 'custom' ? (
-                <div className="report-generator__field report-generator__field--span2">
-                  <div className="report-generator__field-row">
-                    <div>
-                      <label htmlFor="rg-from">From</label>
-                      <input
-                        id="rg-from"
-                        type="date"
-                        value={filters.dateFrom}
-                        onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="rg-to">To</label>
-                      <input
-                        id="rg-to"
-                        type="date"
-                        value={filters.dateTo}
-                        onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : null}
             </div>
 
             <div className="report-generator__actions">
@@ -661,11 +628,22 @@ export function ReportGeneratorPage() {
                 <RotateCcw size={16} aria-hidden />
                 Reset filters
               </Button>
-              <Button variant="primary" compact onClick={() => void handleGenerateDashboard()} disabled={reportLoading}>
+              <Button
+                variant="primary"
+                compact
+                onClick={() => void handleGenerateDashboard()}
+                disabled={reportLoading || !conventionSelected}
+                title={conventionSelected ? undefined : 'Select a convention first'}
+              >
                 <BarChart2 size={16} aria-hidden />
                 {reportLoading ? 'Loading…' : 'Apply filters'}
               </Button>
             </div>
+            {!conventionSelected ? (
+              <p className="muted report-generator__hint">
+                Select a convention to enable the other filters and load its dashboard.
+              </p>
+            ) : null}
           </div>
 
           {dashboardResult ? (
@@ -685,6 +663,8 @@ export function ReportGeneratorPage() {
                   indicatorId={Number(dashboardResult.focusedIndicatorId)}
                   indicatorLabel={dashboardResult.focusedIndicatorLabel}
                   records={dashboardResult.indicatorFocusCompiled}
+                  filterYearId={dashboardResult.focusedYearId}
+                  filterYearLabel={dashboardResult.focusedYearLabel}
                 />
               ) : (
                 <>
@@ -716,7 +696,6 @@ export function ReportGeneratorPage() {
                       <ReportingRankPanel
                         title="Categories — top 10"
                         rows={dashboardResult.topCategories}
-                        variant="categories"
                       />
                     </div>
                     <div className="report-generator__chart-panel reporting-dashboard__panel reporting-dashboard__panel--rank">

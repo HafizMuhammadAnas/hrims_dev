@@ -2193,7 +2193,7 @@ function IssueIndicatorsEditor({
                   onChange(next)
                 }}
               />
-              Collect by year only
+              By year only
             </label>
             <label className="checkbox-label issue-indicator-collection-checks__item">
               <input
@@ -2211,7 +2211,7 @@ function IssueIndicatorsEditor({
                   onChange(next)
                 }}
               />
-              Collect by year and disaggregated data
+              By year, disaggregated
             </label>
           </div>
           {row.collection_mode === 'year' ? (

@@ -8,7 +8,6 @@ import {
   issueEntryKindBadgeLabel,
   issueEntryPrimaryText,
 } from './issueEntryKind'
-import { resolveReportDateRange, type DateRangePreset } from './reportDateRange'
 import type { HrRequestRow } from '../types/hrRequest'
 
 export type ReportDataSource = 'requests' | 'responses' | 'consolidated'
@@ -23,11 +22,8 @@ export type ReportFilters = {
   entryKind: ReportEntryKindFilter
   categoryId: string
   indicatorId: string
-  datePreset: DateRangePreset
-  dateFrom: string
-  dateTo: string
-  monthYearMonth: string
-  monthYearYear: string
+  /** Collection year id (from indicator disaggregated data). Empty = all years. */
+  collectionYearId: string
 }
 
 export type ReportSummaryMetric = {
@@ -100,6 +96,8 @@ export type ReportingDashboardResult = {
   indicatorFocusMode: boolean
   focusedIndicatorId?: string
   focusedIndicatorLabel?: string
+  focusedYearId?: number
+  focusedYearLabel?: string
   indicatorFocusCompiled: CompiledRecordRow[]
   summaryCards: ReportingDashboardSummaryCards
   recordStatusBar: ReportChartPoint[]
@@ -169,6 +167,44 @@ function buildIndicatorIssueMap(indicators: ReportLookupIndicator[]): Map<number
   return map
 }
 
+/** issue_id -> set of collection year ids used by that issue's indicators. */
+function buildIssueYearMap(indicators: ReportLookupIndicator[]): Map<number, Set<number>> {
+  const map = new Map<number, Set<number>>()
+  for (const ind of indicators) {
+    if (!ind.collection_years?.length) continue
+    const set = map.get(ind.issue_id) ?? new Set<number>()
+    for (const y of ind.collection_years) set.add(y.id)
+    map.set(ind.issue_id, set)
+  }
+  return map
+}
+
+/** Distinct collection years across indicators, sorted by label descending. */
+export function collectionYearOptionsFromIndicators(
+  indicators: ReportLookupIndicator[],
+): Array<{ id: number; label: string }> {
+  const byId = new Map<number, string>()
+  for (const ind of indicators) {
+    for (const y of ind.collection_years ?? []) {
+      if (!byId.has(y.id)) byId.set(y.id, y.label)
+    }
+  }
+  return [...byId.entries()]
+    .map(([id, label]) => ({ id, label }))
+    .sort((a, b) => b.label.localeCompare(a.label, undefined, { numeric: true }))
+}
+
+function matchesYear(
+  r: HrRequestRow,
+  collectionYearId: string,
+  issueYearMap: Map<number, Set<number>>,
+): boolean {
+  if (!collectionYearId) return true
+  if (r.issue_id == null) return false
+  const years = issueYearMap.get(Number(r.issue_id))
+  return years?.has(Number(collectionYearId)) ?? false
+}
+
 function matchesArticle(
   r: HrRequestRow,
   articleId: string,
@@ -205,25 +241,17 @@ function requestMatchesCatalogFilters(
   return true
 }
 
-function matchesDateRange(date: string, dateFrom: string, dateTo: string): boolean {
-  if (!date) return !dateFrom && !dateTo
-  if (dateFrom && date < dateFrom) return false
-  if (dateTo && date > dateTo) return false
-  return true
-}
-
 function filterRequests(
   requests: HrRequestRow[],
   f: ReportFilters,
-  dateFrom: string,
-  dateTo: string,
   issueArticleMap: Map<number, Set<number>>,
   indicatorIssueMap: Map<number, number>,
+  issueYearMap: Map<number, Set<number>>,
 ): HrRequestRow[] {
   return requests.filter((r) => {
     if (!requestMatchesRegion(r, f.regionId)) return false
     if (!requestMatchesCatalogFilters(r, f, issueArticleMap, indicatorIssueMap)) return false
-    if (!matchesDateRange(r.date, dateFrom, dateTo)) return false
+    if (!matchesYear(r, f.collectionYearId, issueYearMap)) return false
     return true
   })
 }
@@ -232,18 +260,17 @@ function filterResponses(
   responses: RegionalResponseRow[],
   requests: HrRequestRow[],
   f: ReportFilters,
-  dateFrom: string,
-  dateTo: string,
   issueArticleMap: Map<number, Set<number>>,
   indicatorIssueMap: Map<number, number>,
+  issueYearMap: Map<number, Set<number>>,
 ): RegionalResponseRow[] {
   const reqById = new Map(requests.map((r) => [r.id, r]))
   return responses.filter((resp) => {
     if (f.regionId && String(resp.region_id ?? '') !== f.regionId) return false
-    if (!matchesDateRange(resp.submission_date, dateFrom, dateTo)) return false
     const req = reqById.get(resp.req_id)
     if (!req) return false
     if (!requestMatchesCatalogFilters(req, f, issueArticleMap, indicatorIssueMap)) return false
+    if (!matchesYear(req, f.collectionYearId, issueYearMap)) return false
     return true
   })
 }
@@ -252,11 +279,10 @@ function filterCompiled(
   compiled: CompiledRecordRow[],
   requests: HrRequestRow[],
   f: ReportFilters,
-  dateFrom: string,
-  dateTo: string,
   regionsById: Map<number, RegionRow>,
   issueArticleMap: Map<number, Set<number>>,
   indicatorIssueMap: Map<number, number>,
+  issueYearMap: Map<number, Set<number>>,
 ): CompiledRecordRow[] {
   const reqById = new Map(requests.map((r) => [r.id, r]))
   const regionName = f.regionId ? regionsById.get(Number(f.regionId))?.name : null
@@ -265,15 +291,16 @@ function filterCompiled(
     Boolean(f.entryKind) ||
     Boolean(f.categoryId) ||
     Boolean(f.articleId) ||
-    Boolean(f.indicatorId)
+    Boolean(f.indicatorId) ||
+    Boolean(f.collectionYearId)
   return compiled.filter((c) => {
     if (regionName && !c.region_names.some((n) => n === regionName)) return false
-    const d = c.compilation_date ?? c.submission_date ?? ''
-    if (!matchesDateRange(d, dateFrom, dateTo)) return false
     if (!hasCatalogFilter) return true
     const req = c.req_id ? reqById.get(c.req_id) : undefined
     if (!req) return false
-    return requestMatchesCatalogFilters(req, f, issueArticleMap, indicatorIssueMap)
+    if (!requestMatchesCatalogFilters(req, f, issueArticleMap, indicatorIssueMap)) return false
+    if (!matchesYear(req, f.collectionYearId, issueYearMap)) return false
+    return true
   })
 }
 
@@ -416,6 +443,15 @@ function buildSummaryCards(
   }
 }
 
+function resolveYearLabel(f: ReportFilters, indicators: ReportLookupIndicator[]): string {
+  if (!f.collectionYearId) return 'All years'
+  for (const ind of indicators) {
+    const match = ind.collection_years?.find((y) => String(y.id) === f.collectionYearId)
+    if (match) return match.label
+  }
+  return 'All years'
+}
+
 function buildFilterSummaryParts(
   f: ReportFilters,
   lookups: {
@@ -425,7 +461,7 @@ function buildFilterSummaryParts(
     indicators: ReportLookupIndicator[]
     regions: RegionRow[]
   },
-  dateLabel: string,
+  yearLabel: string,
 ): ReportFilterSummaryPart[] {
   const convention = lookups.conventions.find((c) => String(c.id) === f.convention)
   const category = lookups.categories.find((c) => String(c.id) === f.categoryId)
@@ -433,13 +469,10 @@ function buildFilterSummaryParts(
   const indicator = lookups.indicators.find((i) => String(i.id) === f.indicatorId)
   const region = f.regionId ? lookups.regions.find((r) => String(r.id) === f.regionId) : null
 
-  const parts: ReportFilterSummaryPart[] = [{ label: 'Data source', value: 'Compiled data' }]
+  const parts: ReportFilterSummaryPart[] = []
   if (region) parts.push({ label: 'Region', value: region.name })
   if (convention) {
-    parts.push({
-      label: 'Convention',
-      value: convention.code ? `${convention.code} — ${convention.name}` : convention.name,
-    })
+    parts.push({ label: 'Convention', value: convention.code || convention.name })
   }
   if (article) parts.push({ label: 'Article', value: article.article_name })
   if (f.entryKind) {
@@ -458,7 +491,7 @@ function buildFilterSummaryParts(
           : indicator.indicator_text,
     })
   }
-  parts.push({ label: 'Period', value: dateLabel })
+  if (f.collectionYearId) parts.push({ label: 'Year', value: yearLabel })
   return parts
 }
 
@@ -479,14 +512,9 @@ export function buildReportingDashboard(
   const regionsById = new Map(lookups.regions.map((r) => [r.id, r]))
   const issueArticleMap = buildIssueArticleMap(lookups.issueArticleLinks)
   const indicatorIssueMap = buildIndicatorIssueMap(lookups.indicators)
-  const { dateFrom, dateTo, label: dateLabel } = resolveReportDateRange({
-    preset: f.datePreset,
-    dateFrom: f.dateFrom,
-    dateTo: f.dateTo,
-    monthYearMonth: f.monthYearMonth,
-    monthYearYear: f.monthYearYear,
-  })
-  const filterSummaryParts = buildFilterSummaryParts(f, lookups, dateLabel)
+  const issueYearMap = buildIssueYearMap(lookups.indicators)
+  const yearLabel = resolveYearLabel(f, lookups.indicators)
+  const filterSummaryParts = buildFilterSummaryParts(f, lookups, yearLabel)
   const filterSummary = filterSummaryParts.map((part) => `${part.label}: ${part.value}`).join(' · ')
   const focusedIndicator = lookups.indicators.find((i) => String(i.id) === f.indicatorId)
 
@@ -495,11 +523,10 @@ export function buildReportingDashboard(
       compiled,
       requests,
       f,
-      dateFrom,
-      dateTo,
       regionsById,
       issueArticleMap,
       indicatorIssueMap,
+      issueYearMap,
     )
     return {
       filterSummary,
@@ -507,6 +534,8 @@ export function buildReportingDashboard(
       indicatorFocusMode: true,
       focusedIndicatorId: f.indicatorId,
       focusedIndicatorLabel: focusedIndicator?.indicator_text,
+      focusedYearId: f.collectionYearId ? Number(f.collectionYearId) : undefined,
+      focusedYearLabel: f.collectionYearId ? yearLabel : undefined,
       indicatorFocusCompiled: cr,
       summaryCards: {
         articles: 0,
@@ -538,25 +567,23 @@ export function buildReportingDashboard(
   }
 
   const chartFilters = filtersForDashboardCharts(f)
-  const chartFr = filterRequests(requests, chartFilters, dateFrom, dateTo, issueArticleMap, indicatorIssueMap)
+  const chartFr = filterRequests(requests, chartFilters, issueArticleMap, indicatorIssueMap, issueYearMap)
   const chartSr = filterResponses(
     responses,
     requests,
     chartFilters,
-    dateFrom,
-    dateTo,
     issueArticleMap,
     indicatorIssueMap,
+    issueYearMap,
   )
   const chartCr = filterCompiled(
     compiled,
     requests,
     chartFilters,
-    dateFrom,
-    dateTo,
     regionsById,
     issueArticleMap,
     indicatorIssueMap,
+    issueYearMap,
   )
   const reqById = new Map(requests.map((r) => [r.id, r]))
 
@@ -662,13 +689,8 @@ export function buildReportData(
   const regionsById = new Map(lookups.regions.map((r) => [r.id, r]))
   const issueArticleMap = buildIssueArticleMap(lookups.issueArticleLinks)
   const indicatorIssueMap = buildIndicatorIssueMap(lookups.indicators)
-  const { dateFrom, dateTo, label: dateLabel } = resolveReportDateRange({
-    preset: f.datePreset,
-    dateFrom: f.dateFrom,
-    dateTo: f.dateTo,
-    monthYearMonth: f.monthYearMonth,
-    monthYearYear: f.monthYearYear,
-  })
+  const issueYearMap = buildIssueYearMap(lookups.indicators)
+  const yearLabel = resolveYearLabel(f, lookups.indicators)
   const convention = lookups.conventions.find((c) => String(c.id) === f.convention)
   const category = lookups.categories.find((c) => String(c.id) === f.categoryId)
   const article = lookups.articles.find((a) => String(a.id) === f.articleId)
@@ -691,22 +713,21 @@ export function buildReportData(
             : indicator.indicator_text
         }`
       : null,
-    `Period: ${dateLabel}`,
+    `Year: ${yearLabel}`,
   ]
     .filter(Boolean)
     .join(' · ')
 
-  const fr = filterRequests(requests, f, dateFrom, dateTo, issueArticleMap, indicatorIssueMap)
-  const sr = filterResponses(responses, requests, f, dateFrom, dateTo, issueArticleMap, indicatorIssueMap)
+  const fr = filterRequests(requests, f, issueArticleMap, indicatorIssueMap, issueYearMap)
+  const sr = filterResponses(responses, requests, f, issueArticleMap, indicatorIssueMap, issueYearMap)
   const cr = filterCompiled(
     compiled,
     requests,
     f,
-    dateFrom,
-    dateTo,
     regionsById,
     issueArticleMap,
     indicatorIssueMap,
+    issueYearMap,
   )
   const reqById = new Map(requests.map((r) => [r.id, r]))
 

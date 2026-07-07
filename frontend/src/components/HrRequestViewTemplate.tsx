@@ -1,6 +1,10 @@
 import { Building2, Calendar, CheckCircle2, MapPin } from 'lucide-react'
 import type { IndicatorCollectionDisaggregation } from '../lib/indicatorCollectionDisplay'
-import { hrViewIssueDescriptionLabel, hrViewIssueTitleLabel } from '../lib/issueEntryKind'
+import {
+  coerceIssueEntryKind,
+  hrViewIssueDescriptionLabel,
+  hrViewIssueTitleLabel,
+} from '../lib/issueEntryKind'
 import type { HrRequestAttachmentRow, HrRequestIssueArticle, HrRequestStatus } from '../types/hrRequest'
 import type { IssueEntryKind } from '../lib/issueEntryKind'
 import type { StatusBadgeTone } from '../lib/statusBadgeTone'
@@ -97,6 +101,7 @@ export function HrRequestViewTemplate({
   className,
 }: Props) {
   const metaIconSize = 18
+  const isRecommendation = coerceIssueEntryKind(issueEntryKind) === 'recommendation'
   const ictDepts = (ictDepartmentNames ?? []).filter((n) => n.trim().length > 0)
   const assignedDepts = (assignedDepartmentNames ?? []).filter((n) => n.trim().length > 0)
   const showIctDeptRow = ictDepts.length > 0 && assignedDepts.length === 0
@@ -189,14 +194,26 @@ export function HrRequestViewTemplate({
             <div className="hr-request-view-template__field-label">Convention</div>
             <p className="hr-request-view-template__field-value">{conventionLabel}</p>
           </div>
-          <div>
-            <div className="hr-request-view-template__field-label">{hrViewIssueTitleLabel(issueEntryKind)}</div>
-            <p className="hr-request-view-template__field-value">{issueTitle}</p>
-          </div>
-          <div className="hr-request-view-template__grid2-full">
-            <div className="hr-request-view-template__field-label">Category</div>
-            <p className="hr-request-view-template__field-value">{categoryName}</p>
-          </div>
+          {isRecommendation ? (
+            /* Concluding observations have no title — category is the identifying field. */
+            <div>
+              <div className="hr-request-view-template__field-label">Category</div>
+              <p className="hr-request-view-template__field-value">{categoryName}</p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <div className="hr-request-view-template__field-label">
+                  {hrViewIssueTitleLabel(issueEntryKind)}
+                </div>
+                <p className="hr-request-view-template__field-value">{issueTitle}</p>
+              </div>
+              <div className="hr-request-view-template__grid2-full">
+                <div className="hr-request-view-template__field-label">Category</div>
+                <p className="hr-request-view-template__field-value">{categoryName}</p>
+              </div>
+            </>
+          )}
           <div className="hr-request-view-template__grid2-full">
             <div className="hr-request-view-template__field-label">
               {hrViewIssueDescriptionLabel(issueEntryKind)}

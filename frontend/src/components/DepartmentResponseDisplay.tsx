@@ -53,6 +53,8 @@ type Props = {
   issueIndicators?: HrRequestIssueIndicator[]
   /** When set, region/district matrix columns are limited to these region(s). */
   locationRegionIds?: number[]
+  /** When set, matrix columns are limited to this collection year. */
+  filterYearId?: number
 }
 
 export function DepartmentResponseDisplay({
@@ -61,6 +63,7 @@ export function DepartmentResponseDisplay({
   onlyIndicatorIds,
   issueIndicators = [],
   locationRegionIds = [],
+  filterYearId,
 }: Props) {
   const [regions, setRegions] = useState<RegionRow[]>([])
   const [districts, setDistricts] = useState<DistrictRow[]>([])
@@ -123,10 +126,20 @@ export function DepartmentResponseDisplay({
     return <p className="muted">—</p>
   }
 
-  const scopedIndicators =
+  const scopedIndicatorsBase =
     onlyIndicatorIds && onlyIndicatorIds.length > 0
       ? issueIndicators.filter((i) => onlyIndicatorIds.includes(i.id))
       : issueIndicators
+
+  const scopedIndicators =
+    filterYearId != null
+      ? scopedIndicatorsBase.map((ind) => ({
+          ...ind,
+          collection_by_year: (ind.collection_by_year ?? []).filter(
+            (y) => y.year_id === filterYearId,
+          ),
+        }))
+      : scopedIndicatorsBase
 
   const matrixValues = useMemo(() => {
     const gender: Record<number, Record<string, string>> = {}

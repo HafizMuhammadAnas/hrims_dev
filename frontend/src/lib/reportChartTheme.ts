@@ -7,7 +7,7 @@ export const REPORT_DASHBOARD_CHART_COLORS = [
   '#3E5896', // dark blue
   '#126B6B', // dark teal
   '#5D8DF1', // medium blue
-  '#F24841', // coral red
+  '#F5A623', // amber
   '#A23CF0', // purple
   '#00BCD4', // cyan
 ] as const
