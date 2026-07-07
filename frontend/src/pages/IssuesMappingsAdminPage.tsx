@@ -25,6 +25,7 @@ import {
   adminUpdateCollectionGender,
   adminUpdateCollectionReligion,
   adminUpdateCollectionYear,
+  adminUpdateIssue,
   adminUpdateIssueCategory,
   type AdminArticleRow,
   type AdminCollectionGender,
@@ -33,6 +34,7 @@ import {
   type AdminConvention,
   type AdminIssue,
   type AdminIssueCategory,
+  type AdminIssueIndicator,
 } from '../api/admin'
 import { isApiError } from '../api/apiError'
 import { useAuth } from '../auth/AuthContext'
@@ -218,7 +220,25 @@ export function IssuesMappingsAdminPage() {
   }
 
   if (editIssueId != null) {
-    return <Navigate to={`/admin/issues/view/${editIssueId}`} replace />
+    return (
+      <IssuesIssueEditPage
+        issueId={editIssueId}
+        user={user}
+        conventions={conventions}
+        categories={activeCategories}
+        articles={activeArticles}
+        collectionYears={activeCollectionYears}
+        collectionGenders={activeCollectionGenders}
+        busy={busy}
+        setBusy={setBusy}
+        error={error}
+        setError={setError}
+        onDone={async () => {
+          await refreshIssues()
+          navigate('/admin/issues')
+        }}
+      />
+    )
   }
 
   return (
@@ -522,6 +542,13 @@ function IssuesListSection({
                           onClick={() => navigate(`/admin/issues/view/${i.id}`)}
                         >
                           View
+                        </Button>
+                        <Button
+                          variant="link"
+                          compact
+                          onClick={() => navigate(`/admin/issues/edit/${i.id}`)}
+                        >
+                          Edit
                         </Button>
                         <Button
                           variant="link"
@@ -1774,6 +1801,38 @@ function validateIndicatorDataTypes(rows: IndicatorDraft[]): string | null {
   return null
 }
 
+function indicatorFromAdmin(ind: AdminIssueIndicator): IndicatorDraft {
+  const hasDisaggregation =
+    ind.collects_by_gender ||
+    ind.collects_by_age ||
+    ind.collects_by_location ||
+    ind.collects_by_disability ||
+    ind.collects_by_religion
+  let collection_mode: IndicatorCollectionMode = 'none'
+  if (ind.collects_by_year) {
+    collection_mode = hasDisaggregation ? 'year_disaggregated' : 'year'
+  }
+  return {
+    indicator_text: ind.indicator_text,
+    collects_quantitative: ind.has_quantitative,
+    collects_qualitative: ind.has_qualitative,
+    collection_mode,
+    year_ids: collection_mode === 'year' ? ind.collection_by_year.map((y) => y.year_id) : [],
+    disaggregated_years:
+      collection_mode === 'year_disaggregated'
+        ? ind.collection_by_year.map((y) => ({
+            year_id: y.year_id,
+            gender_ids: y.gender_ids ?? [],
+          }))
+        : [],
+    collects_by_gender: ind.collects_by_gender,
+    collects_by_age: ind.collects_by_age,
+    collects_by_location: ind.collects_by_location,
+    collects_by_disability: ind.collects_by_disability,
+    collects_by_religion: ind.collects_by_religion,
+  }
+}
+
 function indicatorToPayload(x: IndicatorDraft) {
   const collectsByYear = x.collection_mode !== 'none'
   const disaggregated = x.collection_mode === 'year_disaggregated'
@@ -2268,6 +2327,7 @@ function IssuesCreateForm({
   setError,
   onDone,
   onCancel,
+  editIssue,
 }: {
   conventions: AdminConvention[]
   categories: AdminIssueCategory[]
@@ -2279,6 +2339,7 @@ function IssuesCreateForm({
   setError: (s: string | null) => void
   onDone: () => Promise<void>
   onCancel: () => void
+  editIssue?: AdminIssue | null
 }) {
   const sortedArticles = [...articles].sort((a, b) =>
     a.article_name.localeCompare(b.article_name, undefined, { numeric: true, sensitivity: 'base' }),
@@ -2291,6 +2352,23 @@ function IssuesCreateForm({
   const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>([])
   const [indicators, setIndicators] = useState<IndicatorDraft[]>([])
   const conventionArticles = sortedArticles.filter((a) => String(a.convention_id) === conventionId)
+  const isEditing = editIssue != null
+
+  useEffect(() => {
+    if (!editIssue) return
+    const kind = coerceIssueEntryKind(editIssue.entry_kind)
+    setEntryKind(kind)
+    setConventionId(String(editIssue.convention_id))
+    setCategoryId(String(editIssue.category_id))
+    setIssueTitle(editIssue.issue_title)
+    setIssueDescription(editIssue.description ?? '')
+    setSelectedArticleIds(
+      editIssue.article_ids.length
+        ? editIssue.article_ids
+        : editIssue.articles.map((a) => a.id),
+    )
+    setIndicators(editIssue.indicators.map(indicatorFromAdmin))
+  }, [editIssue])
 
   return (
     <div className="issues-create-form">
@@ -2396,7 +2474,7 @@ function IssuesCreateForm({
                 const indPayload = filled.map((x) => indicatorToPayload(x))
                 const hasQuantitative = filled.some((x) => x.collects_quantitative)
                 const hasQualitative = filled.some((x) => x.collects_qualitative)
-                await adminCreateIssue({
+                const payload = {
                   convention_id: Number(conventionId),
                   category_id: Number(categoryId),
                   entry_kind: entryKind,
@@ -2406,14 +2484,19 @@ function IssuesCreateForm({
                   has_qualitative: hasQualitative,
                   articles: selectedArticleIds.map((articleId) => ({ article_id: articleId })),
                   indicators: indPayload.length ? indPayload : undefined,
-                })
-                setEntryKind('issue')
-                setConventionId('')
-                setCategoryId('')
-                setIssueTitle('')
-                setIssueDescription('')
-                setSelectedArticleIds([])
-                setIndicators([])
+                }
+                if (isEditing && editIssue) {
+                  await adminUpdateIssue(editIssue.id, payload)
+                } else {
+                  await adminCreateIssue(payload)
+                  setEntryKind('issue')
+                  setConventionId('')
+                  setCategoryId('')
+                  setIssueTitle('')
+                  setIssueDescription('')
+                  setSelectedArticleIds([])
+                  setIndicators([])
+                }
                 await onDone()
               } catch (e: unknown) {
                 setError(isApiError(e) ? e.message : 'Save failed')
@@ -2423,10 +2506,99 @@ function IssuesCreateForm({
             })()
           }}
         >
-          Save {issueEntryKindBadgeLabel(entryKind)}
+          {isEditing ? 'Save changes' : `Save ${issueEntryKindBadgeLabel(entryKind)}`}
         </Button>
       </div>
     </div>
+  )
+}
+
+function IssuesIssueEditPage({
+  issueId,
+  user,
+  conventions,
+  categories,
+  articles,
+  collectionYears,
+  collectionGenders,
+  busy,
+  setBusy,
+  error,
+  setError,
+  onDone,
+}: {
+  issueId: number
+  user: AuthUser
+  conventions: AdminConvention[]
+  categories: AdminIssueCategory[]
+  articles: AdminArticleRow[]
+  collectionYears: AdminCollectionYear[]
+  collectionGenders: AdminCollectionGender[]
+  busy: boolean
+  setBusy: (v: boolean) => void
+  error: string | null
+  setError: (s: string | null) => void
+  onDone: () => Promise<void>
+}) {
+  const navigate = useNavigate()
+  const [issue, setIssue] = useState<AdminIssue | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void adminFetchIssue(issueId)
+      .then((row) => {
+        if (!cancelled) setIssue(row)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(isApiError(e) ? e.message : 'Load failed')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [issueId, setError])
+
+  if (!user || !isSuperAdmin(user)) {
+    return <Navigate to="/" replace />
+  }
+
+  const kind = issue ? coerceIssueEntryKind(issue.entry_kind) : 'issue'
+
+  return (
+    <PageSection
+      title={issue ? `Edit ${issueEntryViewPageTitle(kind, issue.id)}` : 'Edit entry'}
+      leading={
+        <WorkflowPageBack to="/admin/issues" label={workflowBackLabel('/admin/issues')} placement="header" />
+      }
+    >
+      {error && (
+        <Alert variant="error" title="Error" onDismiss={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {loading && <p className="muted">Loading…</p>}
+      {!loading && !issue && <p className="login-error">Entry not found.</p>}
+      {issue && (
+        <TableCard padded>
+          <IssuesCreateForm
+            conventions={conventions}
+            categories={categories}
+            articles={articles}
+            collectionYears={collectionYears}
+            collectionGenders={collectionGenders}
+            busy={busy}
+            setBusy={setBusy}
+            setError={setError}
+            editIssue={issue}
+            onDone={onDone}
+            onCancel={() => navigate('/admin/issues')}
+          />
+        </TableCard>
+      )}
+    </PageSection>
   )
 }
 
