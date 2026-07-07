@@ -48,7 +48,7 @@ export type HrRequestIssueArticle = {
 export type HrRequestIssueDetail = {
   id: number
   entry_kind?: 'issue' | 'recommendation'
-  issue_title: string
+  issue_title: string | null
   description?: string | null
   has_quantitative: boolean
   has_qualitative: boolean

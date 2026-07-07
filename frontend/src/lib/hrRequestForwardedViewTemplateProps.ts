@@ -1,5 +1,5 @@
 import type { DepartmentTaskRow } from '../api/lists'
-import { coerceIssueEntryKind } from './issueEntryKind'
+import { coerceIssueEntryKind, issueEntryPrimaryText } from './issueEntryKind'
 import type { HrRequestIssueDetail } from '../types/hrRequest'
 import type { HrRequestRow } from '../types/hrRequest'
 import type { HrRequestViewIndicatorRow } from '../components/HrRequestViewTemplate'
@@ -123,7 +123,7 @@ export function buildDepartmentForwardedViewTemplateProps(
     ictDepartmentNames: null,
     assignedDepartmentNames: assignedDepartmentNames?.length ? assignedDepartmentNames : null,
     conventionLabel,
-    issueTitle: selectedIssue.issue_title,
+    issueTitle: issueEntryPrimaryText(selectedIssue),
     issueEntryKind: coerceIssueEntryKind(selectedIssue.entry_kind),
     categoryName: selectedIssue.category?.name ?? '—',
     issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,
@@ -239,7 +239,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
     ictDepartmentNames: ictDepartmentNamesForRequest(detail),
     assignedDepartmentNames: null,
     conventionLabel,
-    issueTitle: selectedIssue.issue_title,
+    issueTitle: issueEntryPrimaryText(selectedIssue),
     issueEntryKind: coerceIssueEntryKind(selectedIssue.entry_kind),
     categoryName: selectedIssue.category?.name ?? '—',
     issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,

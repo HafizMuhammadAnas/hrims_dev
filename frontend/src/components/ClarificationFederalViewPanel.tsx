@@ -19,6 +19,7 @@ import {
   regionNamesForFederalOriginalView,
 } from '../lib/hrRequestForwardedViewTemplateProps'
 import { indicatorsScopedToRequest } from '../lib/hrRequestIndicatorScope'
+import { issueEntryPrimaryText } from '../lib/issueEntryKind'
 import type { HrRequestRow } from '../types/hrRequest'
 
 type Props = {
@@ -92,7 +93,7 @@ export function ClarificationFederalViewPanel({ clarificationId, onClose, onResp
       regionNames,
       ictDepartmentNames: hrRequest ? ictDepartmentNamesForRequest(hrRequest) : null,
       conventionLabel: conventionLabel(hrRequest),
-      issueTitle: issue.issue_title,
+      issueTitle: issueEntryPrimaryText(issue),
       issueEntryKind:
         issue.entry_kind === 'recommendation' ? ('recommendation' as const) : ('issue' as const),
       categoryName: issue.category?.name ?? '—',

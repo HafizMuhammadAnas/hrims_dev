@@ -127,6 +127,74 @@ export function issueEntryFormShowsTitleField(kind: IssueEntryKind): boolean {
   return kind === 'issue'
 }
 
+export type IssueEntryTextSource = {
+  entry_kind?: IssueEntryKind | string | null
+  issue_title?: string | null
+  description?: string | null
+}
+
+/** Primary text for an entry: LOI title or concluding observation description. */
+export function issueEntryPrimaryText(source: IssueEntryTextSource): string {
+  const kind = coerceIssueEntryKind(source.entry_kind)
+  if (kind === 'recommendation') {
+    return source.description?.trim() || source.issue_title?.trim() || ''
+  }
+  return source.issue_title?.trim() || ''
+}
+
+export function issueEntryListPreview(source: IssueEntryTextSource, maxLen = 200): string {
+  const text = issueEntryPrimaryText(source)
+  if (text.length <= maxLen) return text
+  return `${text.slice(0, maxLen - 1).trimEnd()}…`
+}
+
+export function issueEntrySelectLabel(source: IssueEntryTextSource, maxLen = 120): string {
+  const text = issueEntryPrimaryText(source)
+  if (!text) return issueEntryKindBadgeLabel(coerceIssueEntryKind(source.entry_kind))
+  if (text.length <= maxLen) return text
+  return `${text.slice(0, maxLen - 1).trimEnd()}…`
+}
+
+export function issueEntryListColumnLabel(kind: IssueEntryKind): string {
+  return kind === 'recommendation'
+    ? issueEntryDescriptionFieldLabel(kind)
+    : issueEntryLoiTableTitleLabel()
+}
+
+/** List table header when the LOI filter is active. */
+export function issueEntryLoiTableTitleLabel(): string {
+  return `${LOI_LABEL} title`
+}
+
+/** List table cell for LOI rows — title only, never description. */
+export function issueEntryLoiTableCellText(source: IssueEntryTextSource, maxLen = 200): string {
+  const title = source.issue_title?.trim() || ''
+  if (!title) return '—'
+  if (title.length <= maxLen) return title
+  return `${title.slice(0, maxLen - 1).trimEnd()}…`
+}
+
+export function issueEntryListShowsTitleColumn(kind: IssueEntryKind): boolean {
+  return kind === 'issue'
+}
+
+export function issueEntryPayloadFields(
+  kind: IssueEntryKind,
+  issueTitle: string,
+  issueDescription: string,
+): { issue_title: string | null; description: string | null } {
+  if (kind === 'recommendation') {
+    const description = issueDescription.trim()
+    return { issue_title: null, description: description || null }
+  }
+  const title = issueTitle.trim()
+  const description = issueDescription.trim()
+  return {
+    issue_title: title || null,
+    description: description || null,
+  }
+}
+
 export function resolveIssueTitleForSave(
   kind: IssueEntryKind,
   issueTitle: string,
@@ -135,8 +203,7 @@ export function resolveIssueTitleForSave(
   if (kind === 'issue') {
     return issueTitle.trim()
   }
-  const fromDescription = issueDescription.trim().split(/\r?\n/)[0]?.trim() ?? ''
-  return fromDescription
+  return issueDescription.trim()
 }
 
 export function issueEntrySaveBlocked(

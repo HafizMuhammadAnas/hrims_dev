@@ -130,6 +130,31 @@ class ApiV1AdminIssueIndicatorDimensionsTest extends TestCase
         $this->assertTrue($indicator['collects_by_year']);
         $this->assertFalse($indicator['collects_by_gender']);
         $this->assertCount(2, $indicator['collection_by_year']);
+    }
+
+    public function test_issue_accepts_long_title_and_description(): void
+    {
+        $user = $this->superAdmin();
+        $convention = Convention::query()->firstOrFail();
+        $category = IssueCategory::query()->firstOrFail();
+        $article = Article::query()->firstOrFail();
+        $longText = str_repeat('A', 1200);
+
+        $res = $this->actingAs($user)->postJson('/api/v1/admin/issues', [
+            'convention_id' => $convention->id,
+            'category_id' => $category->id,
+            'entry_kind' => 'recommendation',
+            'description' => $longText,
+            'has_quantitative' => false,
+            'has_qualitative' => true,
+            'articles' => [['article_id' => $article->id]],
+        ]);
+
+        $res->assertCreated();
+        $res->assertJsonPath('data.issue_title', null);
+        $res->assertJsonPath('data.description', $longText);
+    }
+
     public function test_indicator_stores_religion_and_age_dimensions(): void
     {
         $user = $this->superAdmin();

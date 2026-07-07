@@ -20,6 +20,8 @@ import {
   coerceIssueEntryKind,
   issueEntryKindBadgeLabel,
   issueEntryKindToggleAriaLabel,
+  issueEntryPrimaryText,
+  issueEntrySelectLabel,
   issueEntryTitleColumnLabel,
   loiEmptyFilterMessage,
   loiLoadingPlaceholder,
@@ -558,7 +560,7 @@ export function HrRequestModal({
   )
 
   const issueSelectOptions = useMemo(
-    () => filteredIssueOptions.map((i) => ({ value: String(i.id), label: i.issue_title })),
+    () => filteredIssueOptions.map((i) => ({ value: String(i.id), label: issueEntrySelectLabel(i) })),
     [filteredIssueOptions],
   )
 
@@ -898,7 +900,7 @@ export function HrRequestModal({
                   ictDepartmentNames={viewTemplateIctDepartmentNames}
                   assignedDepartmentNames={viewTemplateAssignedDepartmentNames}
                   conventionLabel={conventionDisplayLabel}
-                  issueTitle={selectedIssue.issue_title}
+                  issueTitle={issueEntryPrimaryText(selectedIssue)}
                   issueEntryKind={selectedIssue.entry_kind === 'recommendation' ? 'recommendation' : 'issue'}
                   categoryName={selectedIssue.category?.name ?? '—'}
                   issueDescription={selectedIssue.description ?? null}

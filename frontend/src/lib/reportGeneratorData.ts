@@ -6,6 +6,7 @@ import {
   LOI_LABEL,
   coerceIssueEntryKind,
   issueEntryKindBadgeLabel,
+  issueEntryPrimaryText,
 } from './issueEntryKind'
 import { resolveReportDateRange, type DateRangePreset } from './reportDateRange'
 import type { HrRequestRow } from '../types/hrRequest'
@@ -332,7 +333,7 @@ function linkedRequestFields(req: HrRequestRow | undefined): ReportTableRow {
     'Convention name': req.convention?.name ?? '—',
     Type: issueEntryKindBadgeLabel(coerceIssueEntryKind(req.issue?.entry_kind)),
     Category: req.issue?.category?.name ?? '—',
-    'LOI / observation title': req.issue?.issue_title ?? '—',
+    'LOI / observation title': req.issue ? issueEntryPrimaryText(req.issue) || '—' : '—',
     'Request status': formatStatusLabel(req.status),
     'Request due date': req.date || '—',
   }
@@ -767,7 +768,7 @@ export function buildReportData(
         'Convention name': r.convention?.name ?? '—',
         Type: issueEntryKindBadgeLabel(coerceIssueEntryKind(r.issue?.entry_kind)),
         Category: r.issue?.category?.name ?? '—',
-        'LOI / observation title': r.issue?.issue_title ?? '—',
+        'LOI / observation title': r.issue ? issueEntryPrimaryText(r.issue) || '—' : '—',
         Description: r.issue?.description?.trim() || r.details?.trim() || '—',
         Regions: regionNamesOfRequest(r) || '—',
         Departments: departmentNamesOfRequest(r) || '—',
@@ -893,7 +894,7 @@ export function buildReportData(
         'Convention name': req?.convention?.name ?? '—',
         Type: issueEntryKindBadgeLabel(coerceIssueEntryKind(req?.issue?.entry_kind)),
         Category: req?.issue?.category?.name ?? '—',
-        'LOI / observation title': req?.issue?.issue_title ?? '—',
+        'LOI / observation title': req?.issue ? issueEntryPrimaryText(req.issue) || '—' : '—',
       }
     }),
   }

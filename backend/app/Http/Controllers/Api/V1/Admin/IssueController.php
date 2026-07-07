@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class IssueController extends Controller
 {
@@ -154,7 +155,7 @@ class IssueController extends Controller
             'convention_id' => [$req, 'integer', 'exists:conventions,id'],
             'category_id' => [$req, 'integer', Rule::exists('issue_categories', 'id')->where('is_active', true)],
             'entry_kind' => [$partial ? 'sometimes' : 'required', 'string', 'in:issue,recommendation'],
-            'issue_title' => [$req, 'string', 'max:500'],
+            'issue_title' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
             'has_quantitative' => [$partial ? 'sometimes' : 'required', 'boolean'],
             'has_qualitative' => [$partial ? 'sometimes' : 'required', 'boolean'],
@@ -202,6 +203,54 @@ class IssueController extends Controller
                         'articles.'.$index.'.article_id' => ['The selected article does not belong to this convention.'],
                     ]);
                 }
+            }
+        }
+
+        return $this->normalizeEntryFields($data, $partial, $issue);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizeEntryFields(array $data, bool $partial, ?Issue $issue = null): array
+    {
+        $entryKind = $data['entry_kind'] ?? $issue?->entry_kind ?? ($partial ? null : 'issue');
+        if ($entryKind === null) {
+            $entryKind = $issue?->entry_kind ?? 'issue';
+        }
+
+        if ($entryKind === 'recommendation') {
+            if (! $partial || array_key_exists('description', $data)) {
+                $description = trim((string) ($data['description'] ?? ''));
+                if ($description === '') {
+                    throw ValidationException::withMessages([
+                        'description' => ['The concluding observations description is required.'],
+                    ]);
+                }
+                $data['description'] = $description;
+            }
+            if (
+                ! $partial
+                || array_key_exists('issue_title', $data)
+                || array_key_exists('description', $data)
+                || array_key_exists('entry_kind', $data)
+            ) {
+                $data['issue_title'] = null;
+            }
+        } else {
+            if (! $partial || array_key_exists('issue_title', $data)) {
+                $title = trim((string) ($data['issue_title'] ?? ''));
+                if ($title === '') {
+                    throw ValidationException::withMessages([
+                        'issue_title' => ['The LOI title is required.'],
+                    ]);
+                }
+                $data['issue_title'] = $title;
+            }
+            if (array_key_exists('description', $data)) {
+                $description = trim((string) ($data['description'] ?? ''));
+                $data['description'] = $description !== '' ? $description : null;
             }
         }
 

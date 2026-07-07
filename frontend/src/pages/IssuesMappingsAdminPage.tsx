@@ -62,14 +62,16 @@ import {
   issueEntryIndicatorsLinkedLabel,
   issueEntryKindBadgeLabel,
   issueEntryKindToggleAriaLabel,
-  issueEntryTitleColumnLabel,
+  issueEntryListShowsTitleColumn,
+  issueEntryLoiTableCellText,
+  issueEntryLoiTableTitleLabel,
+  issueEntryPayloadFields,
   issueEntryTitleFieldLabel,
   issueEntryViewPageTitle,
   issuesAdminSectionsAriaLabel,
   issuesCreateTabLabel,
   issuesListTabLabel,
   noIndicatorsForLoiHint,
-  resolveIssueTitleForSave,
   type IssueEntryKind,
 } from '../lib/issueEntryKind'
 import { isSuperAdmin } from '../lib/roles'
@@ -447,7 +449,8 @@ function IssuesListSection({
       const cat = (i.category?.name ?? String(i.category_id)).toLowerCase()
       return (
         String(i.id).includes(q) ||
-        i.issue_title.toLowerCase().includes(q) ||
+        (i.issue_title ?? '').toLowerCase().includes(q) ||
+        (i.description ?? '').toLowerCase().includes(q) ||
         convCode.includes(q) ||
         convName.includes(q) ||
         arts.includes(q) ||
@@ -457,6 +460,8 @@ function IssuesListSection({
   }, [kindFilteredIssues, search])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
+  const showLoiTitleColumn = issueEntryListShowsTitleColumn(listEntryKind)
+  const tableColSpan = showLoiTitleColumn ? 6 : 5
 
   const emptyListMessage =
     search.trim()
@@ -493,24 +498,20 @@ function IssuesListSection({
                 <th>Convention</th>
                 <th>Articles</th>
                 <th>Category</th>
-                <th className="issues-mapping-table__issue-col">
-                  <span className="issues-mapping-table__issue-col-title">{issueEntryTitleColumnLabel()}</span>
-                  <span className="issues-mapping-table__kind-legend">
-                    <span className="issues-mapping-table__kind-legend-item issues-mapping-table__kind-legend-item--issue">
-                      {issueEntryKindBadgeLabel('issue')}
+                {showLoiTitleColumn ? (
+                  <th className="issues-mapping-table__issue-col">
+                    <span className="issues-mapping-table__issue-col-title">
+                      {issueEntryLoiTableTitleLabel()}
                     </span>
-                    <span className="issues-mapping-table__kind-legend-item issues-mapping-table__kind-legend-item--recommendation">
-                      {issueEntryKindBadgeLabel('recommendation')}
-                    </span>
-                  </span>
-                </th>
+                  </th>
+                ) : null}
                 <th className="issues-mapping-table__status-col">Status</th>
                 <th className="issues-mapping-table__actions-col">Actions</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
-                <EmptyStateRow colSpan={6} message={emptyListMessage} />
+                <EmptyStateRow colSpan={tableColSpan} message={emptyListMessage} />
               ) : (
                 pageRows.map((i) => {
                   const entryKind = coerceIssueEntryKind(i.entry_kind ?? 'issue')
@@ -520,19 +521,20 @@ function IssuesListSection({
                     className={`issues-mapping-table__row issues-mapping-table__row--${entryKind}${
                       issueIsActive(i) ? '' : ' issues-mapping-table__row--inactive'
                     }`}
-                    title={issueEntryKindBadgeLabel(entryKind)}
                   >
                     <td className="text-compact issues-mapping-table__convention">{issueConventionLabel(i)}</td>
                     <td className="text-compact issues-mapping-table__articles">
                       {i.articles.map((a) => a.article_name).join(', ') || 'None'}
                     </td>
                     <td className="issues-mapping-table__category">{i.category?.name ?? i.category_id}</td>
-                    <td
-                      className="issues-mapping-table__issue"
-                      aria-label={`${issueEntryKindBadgeLabel(entryKind)}: ${i.issue_title}`}
-                    >
-                      {i.issue_title}
-                    </td>
+                    {showLoiTitleColumn ? (
+                      <td
+                        className="issues-mapping-table__issue"
+                        aria-label={`${issueEntryKindBadgeLabel(entryKind)}: ${issueEntryLoiTableCellText(i)}`}
+                      >
+                        {issueEntryLoiTableCellText(i)}
+                      </td>
+                    ) : null}
                     <td className="issues-mapping-table__status">{issueStatusLabel(i)}</td>
                     <td className="issues-mapping-table__actions">
                       <ActionMenu>
@@ -2353,6 +2355,8 @@ function IssuesCreateForm({
   const [indicators, setIndicators] = useState<IndicatorDraft[]>([])
   const conventionArticles = sortedArticles.filter((a) => String(a.convention_id) === conventionId)
   const isEditing = editIssue != null
+  const activeEntryKind =
+    isEditing && editIssue ? coerceIssueEntryKind(editIssue.entry_kind) : entryKind
 
   useEffect(() => {
     if (!editIssue) return
@@ -2360,8 +2364,8 @@ function IssuesCreateForm({
     setEntryKind(kind)
     setConventionId(String(editIssue.convention_id))
     setCategoryId(String(editIssue.category_id))
-    setIssueTitle(editIssue.issue_title)
-    setIssueDescription(editIssue.description ?? '')
+    setIssueTitle(kind === 'issue' ? editIssue.issue_title ?? '' : '')
+    setIssueDescription(editIssue.description?.trim() || '')
     setSelectedArticleIds(
       editIssue.article_ids.length
         ? editIssue.article_ids
@@ -2372,9 +2376,15 @@ function IssuesCreateForm({
 
   return (
     <div className="issues-create-form">
-      <div className="issues-create-form__kind">
-        <IssueEntryKindToggle value={entryKind} onChange={setEntryKind} disabled={busy} />
-      </div>
+      {!isEditing ? (
+        <div className="issues-create-form__kind">
+          <IssueEntryKindToggle value={entryKind} onChange={setEntryKind} disabled={busy} />
+        </div>
+      ) : (
+        <p className="issues-create-form__kind-label muted text-compact">
+          {issueEntryKindBadgeLabel(activeEntryKind)}
+        </p>
+      )}
       <FormGrid>
         <div className="issues-form-top-grid">
           <FormControl label="Convention">
@@ -2412,19 +2422,19 @@ function IssuesCreateForm({
             </select>
           </FormControl>
         </div>
-        {issueEntryFormShowsTitleField(entryKind) ? (
-          <FormField label={issueEntryTitleFieldLabel(entryKind)}>
+        {issueEntryFormShowsTitleField(activeEntryKind) ? (
+          <FormField label={issueEntryTitleFieldLabel(activeEntryKind)}>
             <input
-              placeholder={issueEntryTitleFieldLabel(entryKind)}
+              placeholder={issueEntryTitleFieldLabel(activeEntryKind)}
               value={issueTitle}
               onChange={(e) => setIssueTitle(e.target.value)}
             />
           </FormField>
         ) : null}
-        <FormField label={issueEntryDescriptionFieldLabel(entryKind)}>
+        <FormField label={issueEntryDescriptionFieldLabel(activeEntryKind)}>
           <textarea
             className="issues-description-field"
-            placeholder={issueEntryDescriptionPlaceholder(entryKind)}
+            placeholder={issueEntryDescriptionPlaceholder(activeEntryKind)}
             value={issueDescription}
             onChange={(e) => setIssueDescription(e.target.value)}
             disabled={busy}
@@ -2433,7 +2443,7 @@ function IssuesCreateForm({
         </FormField>
       </FormGrid>
       <strong className="font-semibold text-compact" style={{ display: 'block', marginTop: 16 }}>
-        {issueEntryIndicatorsLinkedLabel(entryKind)}
+        {issueEntryIndicatorsLinkedLabel(activeEntryKind)}
       </strong>
       <IssueIndicatorsEditor
         rows={indicators}
@@ -2452,7 +2462,7 @@ function IssuesCreateForm({
           disabled={
             busy ||
             issueEntrySaveBlocked(
-              entryKind,
+              activeEntryKind,
               issueTitle,
               issueDescription,
               conventionId,
@@ -2474,12 +2484,13 @@ function IssuesCreateForm({
                 const indPayload = filled.map((x) => indicatorToPayload(x))
                 const hasQuantitative = filled.some((x) => x.collects_quantitative)
                 const hasQualitative = filled.some((x) => x.collects_qualitative)
+                const textFields = issueEntryPayloadFields(activeEntryKind, issueTitle, issueDescription)
                 const payload = {
                   convention_id: Number(conventionId),
                   category_id: Number(categoryId),
-                  entry_kind: entryKind,
-                  issue_title: resolveIssueTitleForSave(entryKind, issueTitle, issueDescription),
-                  description: issueDescription.trim() || null,
+                  entry_kind: activeEntryKind,
+                  issue_title: textFields.issue_title,
+                  description: textFields.description,
                   has_quantitative: hasQuantitative,
                   has_qualitative: hasQualitative,
                   articles: selectedArticleIds.map((articleId) => ({ article_id: articleId })),
@@ -2506,7 +2517,7 @@ function IssuesCreateForm({
             })()
           }}
         >
-          {isEditing ? 'Save changes' : `Save ${issueEntryKindBadgeLabel(entryKind)}`}
+          {isEditing ? 'Save changes' : `Save ${issueEntryKindBadgeLabel(activeEntryKind)}`}
         </Button>
       </div>
     </div>

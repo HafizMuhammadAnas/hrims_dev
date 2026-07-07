@@ -3216,38 +3216,6 @@ textarea.hr-request-readonly-prose {
 
 .issues-mapping-table__issue-col-title {
   display: block;
-  margin-bottom: 6px;
-}
-
-.issues-mapping-table__kind-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--text-muted, #5a6478);
-}
-
-.issues-mapping-table__kind-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.issues-mapping-table__kind-legend-item::before {
-  content: '';
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.issues-mapping-table__kind-legend-item--issue::before {
-  background: #1e4fd6;
-}
-
-.issues-mapping-table__kind-legend-item--recommendation::before {
-  background: #7c3aed;
 }
 
 .issues-mapping-table__issue {

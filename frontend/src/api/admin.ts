@@ -155,7 +155,7 @@ export type AdminIssue = {
   convention_id: number
   category_id: number
   entry_kind: IssueEntryKind
-  issue_title: string
+  issue_title: string | null
   description: string | null
   has_quantitative: boolean
   has_qualitative: boolean
@@ -622,7 +622,7 @@ export type AdminIssuePayload = {
   convention_id: number
   category_id: number
   entry_kind: IssueEntryKind
-  issue_title: string
+  issue_title: string | null
   description?: string | null
   has_quantitative: boolean
   has_qualitative: boolean
