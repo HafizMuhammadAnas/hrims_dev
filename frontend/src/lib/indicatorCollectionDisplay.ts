@@ -1,5 +1,11 @@
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
-import { AGE_LABELS, AGE_UNDER_18, AGE_OVER_18, DISABILITY_LABELS, DISABILITY_YES, DISABILITY_NO } from './indicatorDisaggregation'
+import { isSelectableCollectionGender } from './collectionGenderOptions'
+import {
+  AGE_KEYS,
+  AGE_LABELS,
+  DISABILITY_KEYS,
+  DISABILITY_LABELS,
+} from './indicatorDisaggregation'
 
 export type IndicatorCollectionLine = {
   year_id: number
@@ -56,7 +62,9 @@ export function indicatorCollectionLines(
   return ind.collection_by_year.map((y) => ({
     year_id: y.year_id,
     label: y.label,
-    genders: ind.collects_by_gender ? (y.genders ?? []).map((g) => g.name).filter(Boolean) : [],
+    genders: ind.collects_by_gender
+      ? (y.genders ?? []).map((g) => g.name).filter((name) => Boolean(name) && isSelectableCollectionGender(name))
+      : [],
     religions: ind.collects_by_religion ? [] : [],
   }))
 }
@@ -133,13 +141,13 @@ export function indicatorDimensionLabelNames(
 export function indicatorDimensionHints(ind: HrRequestIssueIndicator): string[] {
   const hints: string[] = []
   if (ind.collects_by_age) {
-    hints.push(`Age: ${AGE_LABELS[AGE_UNDER_18]}, ${AGE_LABELS[AGE_OVER_18]}`)
+    hints.push(`Age: ${AGE_KEYS.map((key) => AGE_LABELS[key]).join(', ')}`)
   }
   if (ind.collects_by_location) {
     hints.push('Location: all regions and districts')
   }
   if (ind.collects_by_disability) {
-    hints.push(`Disability: ${DISABILITY_LABELS[DISABILITY_YES]}, ${DISABILITY_LABELS[DISABILITY_NO]}`)
+    hints.push(`Disability: ${DISABILITY_LABELS[DISABILITY_KEYS[0]]}`)
   }
   if (ind.collects_by_religion) {
     hints.push('Religion: full catalog (all options)')

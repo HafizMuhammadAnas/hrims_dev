@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Article;
 use App\Models\Convention;
+use App\Models\Issue;
+use App\Models\IssueIndicator;
 use App\Models\KnowledgeCard;
 use App\Models\SdgNode;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class KnowledgeHubController extends Controller
 {
@@ -45,6 +49,73 @@ class KnowledgeHubController extends Controller
                 ])->all(),
             ],
         ]);
+    }
+
+    public function conventionArticles(Convention $convention): JsonResponse
+    {
+        if (! $convention->is_active) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $rows = Article::query()
+            ->where('convention_id', $convention->id)
+            ->where('is_active', true)
+            ->orderBy('article_name')
+            ->orderBy('id')
+            ->get(['id', 'convention_id', 'article_name', 'description']);
+
+        return response()->json([
+            'data' => $rows->map(fn (Article $a) => [
+                'id' => $a->id,
+                'convention_id' => (int) $a->convention_id,
+                'article_name' => $a->article_name,
+                'description' => $a->description,
+            ])->all(),
+        ]);
+    }
+
+    public function conventionIssues(Request $request, Convention $convention): JsonResponse
+    {
+        if (! $convention->is_active) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $entryKind = $request->query('entry_kind') === 'recommendation' ? 'recommendation' : 'issue';
+
+        $rows = Issue::query()
+            ->where('convention_id', $convention->id)
+            ->where('entry_kind', $entryKind)
+            ->where('is_active', true)
+            ->with([
+                'category:id,name',
+                'articles:id,article_name,description',
+            ])
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json([
+            'data' => $rows->map(fn (Issue $i) => $this->serializeIssueListRow($i))->all(),
+        ]);
+    }
+
+    public function showIssue(Issue $issue): JsonResponse
+    {
+        if (! $issue->is_active) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $issue->load([
+            'convention:id,code,name',
+            'category:id,name',
+            'articles:id,article_name,description',
+            'indicators.yearGenderCells.collectionYear:id,label,sort_order',
+            'indicators.yearGenderCells.collectionGender:id,name,sort_order',
+            'indicators.yearReligionCells.collectionYear:id,label,sort_order',
+            'indicators.yearReligionCells.collectionReligion:id,name,sort_order',
+            'indicators.collectionYearRows.collectionYear:id,label,sort_order',
+        ]);
+
+        return response()->json(['data' => $this->serializeIssueDetail($issue)]);
     }
 
     public function sdgGoals(): JsonResponse
@@ -138,5 +209,55 @@ class KnowledgeHubController extends Controller
             'body' => $k->body,
             'sort_order' => $k->sort_order,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeIssueListRow(Issue $i): array
+    {
+        $articlesOut = [];
+        if ($i->relationLoaded('articles')) {
+            foreach ($i->articles->sortBy('id')->values() as $a) {
+                $articlesOut[] = [
+                    'id' => $a->id,
+                    'article_name' => $a->article_name,
+                    'description' => $a->description,
+                    'relevant_paragraph' => $a->pivot->relevant_paragraph ?? null,
+                ];
+            }
+        }
+
+        return [
+            'id' => $i->id,
+            'convention_id' => $i->convention_id,
+            'category_id' => $i->category_id,
+            'entry_kind' => $i->entry_kind === 'recommendation' ? 'recommendation' : 'issue',
+            'issue_title' => $i->issue_title,
+            'description' => $i->description,
+            'is_active' => (bool) ($i->is_active ?? true),
+            'category' => $i->relationLoaded('category') && $i->category
+                ? ['id' => $i->category->id, 'name' => $i->category->name]
+                : null,
+            'articles' => $articlesOut,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeIssueDetail(Issue $i): array
+    {
+        $base = $this->serializeIssueListRow($i);
+        $base['has_quantitative'] = (bool) $i->has_quantitative;
+        $base['has_qualitative'] = (bool) $i->has_qualitative;
+        $base['convention'] = $i->relationLoaded('convention') && $i->convention
+            ? ['id' => $i->convention->id, 'code' => $i->convention->code, 'name' => $i->convention->name]
+            : null;
+        $base['indicators'] = $i->relationLoaded('indicators')
+            ? $i->indicators->map(fn (IssueIndicator $ind) => $ind->toAdminApiArray())->values()->all()
+            : [];
+
+        return $base;
     }
 }

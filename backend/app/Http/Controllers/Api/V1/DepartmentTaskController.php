@@ -350,7 +350,7 @@ class DepartmentTaskController extends Controller
         return $this->normalizeQuantitativeByYearFixedKeys(
             $indicator,
             $raw,
-            [IssueIndicator::AGE_UNDER_18, IssueIndicator::AGE_OVER_18],
+            [IssueIndicator::AGE_UNDER_18, IssueIndicator::AGE_18_60, IssueIndicator::AGE_ABOVE_60],
             'age',
         );
     }
@@ -363,7 +363,7 @@ class DepartmentTaskController extends Controller
         return $this->normalizeQuantitativeByYearFixedKeys(
             $indicator,
             $raw,
-            [IssueIndicator::DISABILITY_YES, IssueIndicator::DISABILITY_NO],
+            [IssueIndicator::DISABILITY_PERSONS_WITH_DISABILITY],
             'disability',
         );
     }

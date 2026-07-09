@@ -77,7 +77,10 @@ class DashboardController extends Controller
         }
 
         if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
-            $data['compiled_records_total'] = CompiledRecord::query()->count();
+            $compiledTotal = CompiledRecord::query()->count();
+            $activeCount = (int) ($byStatus['active'] ?? 0);
+            $data['compiled_records_total'] = $compiledTotal;
+            $data['hr_requests_pending_federal'] = max(0, $activeCount - $compiledTotal);
             $data['clarifications_pending_federal'] = HrRequestClarification::query()
                 ->where('status', 'pending_federal')
                 ->count();

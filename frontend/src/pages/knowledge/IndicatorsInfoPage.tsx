@@ -1,19 +1,102 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchKnowledgeIndicators, type KnowledgeStatCard } from '../../api/knowledgeHub'
-import { KnowledgeHubIcon } from '../../components/KnowledgeHubIcon'
+import {
+  KnowledgeHubCardsGrid,
+  KnowledgeHubCard,
+  KnowledgeHubDetailHeader,
+  KnowledgeHubListSection,
+  KnowledgeHubMutedProse,
+  KnowledgeHubPage,
+  KnowledgeHubPanel,
+  KnowledgeHubProse,
+  KnowledgeHubRecList,
+  KnowledgeHubStateMessage,
+  KnowledgeHubTabs,
+} from '../../components/knowledge/KnowledgeHubUi'
+
+const INDICATOR_TABS = ['Overview', 'Provincial context', 'Policies'] as const
+type IndicatorTab = (typeof INDICATOR_TABS)[number]
+
+function IndicatorDetail({ data, onBack }: { data: KnowledgeStatCard; onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<IndicatorTab>('Overview')
+
+  return (
+    <KnowledgeHubPage>
+      <KnowledgeHubDetailHeader
+        title={data.title}
+        subtitle={data.summary}
+        icon={data.icon}
+        fallback="📊"
+        onBack={onBack}
+      />
+
+      <KnowledgeHubTabs
+        tabs={[...INDICATOR_TABS]}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as IndicatorTab)}
+      />
+
+      {activeTab === 'Overview' && (
+        <KnowledgeHubPanel title="About this indicator">
+          <KnowledgeHubProse>{data.summary?.trim() || data.title}</KnowledgeHubProse>
+          {data.body?.trim() ? (
+            <KnowledgeHubProse>{data.body.trim()}</KnowledgeHubProse>
+          ) : (
+            <KnowledgeHubMutedProse>
+              Time series, benchmarks, and comparative figures will appear here only when linked to approved official
+              sources in HRIMS.
+            </KnowledgeHubMutedProse>
+          )}
+        </KnowledgeHubPanel>
+      )}
+
+      {activeTab === 'Provincial context' && (
+        <KnowledgeHubPanel title="Provincial context">
+          <KnowledgeHubMutedProse>
+            Province-level breakdowns for this indicator are not shown until verified subnational data is provided and
+            configured for the knowledge hub.
+          </KnowledgeHubMutedProse>
+        </KnowledgeHubPanel>
+      )}
+
+      {activeTab === 'Policies' && (
+        <KnowledgeHubPanel title="Related Policies & Acts">
+          <KnowledgeHubRecList
+            items={[
+              {
+                key: 'policy-1',
+                title: 'National Policy 2021',
+                details: `Framework for improving ${data.title.toLowerCase()} standards across all provinces.`,
+              },
+              {
+                key: 'policy-2',
+                title: 'Provincial Implementation Acts',
+                details: 'Specific legislative measures adopted by provincial assemblies.',
+              },
+            ]}
+          />
+        </KnowledgeHubPanel>
+      )}
+    </KnowledgeHubPage>
+  )
+}
 
 export function IndicatorsInfoPage() {
   const [cards, setCards] = useState<KnowledgeStatCard[]>([])
+  const [selected, setSelected] = useState<KnowledgeStatCard | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoadError(null)
+    setLoading(true)
     try {
-      const data = await fetchKnowledgeIndicators()
-      setCards(data)
+      setCards(await fetchKnowledgeIndicators())
     } catch {
       setCards([])
       setLoadError('Could not load indicators from the server.')
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -21,40 +104,33 @@ export function IndicatorsInfoPage() {
     void load()
   }, [load])
 
+  if (selected) {
+    return <IndicatorDetail data={selected} onBack={() => setSelected(null)} />
+  }
+
   return (
-    <div>
-      <h2>Human rights indicators</h2>
-      <p className="muted">
-        Indicator tiles are loaded from the database (Super admin → knowledge catalog). No offline reference content is
-        shown here.
-      </p>
-      {loadError && <p className="login-error">{loadError}</p>}
-      {cards.length === 0 && !loadError ? (
-        <p className="empty-state">No indicator cards are published yet.</p>
-      ) : (
-        <div className="knowledge-grid">
-          {cards.map((k) => (
-            <div key={k.id} className="knowledge-card knowledge-card-static">
-              <KnowledgeHubIcon value={k.icon} fallback="📊" />
-              <h3>{k.title}</h3>
-              <p>{k.summary ?? '—'}</p>
-              {k.body?.trim() ? (
-                <p className="text-muted" style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>
-                  {k.body.trim()}
-                </p>
-              ) : null}
-              <div className="knowledge-stat-pair">
-                <span>
-                  <strong>{k.stat_1_value ?? '—'}</strong> {k.stat_1_label ?? ''}
-                </span>
-                <span>
-                  <strong>{k.stat_2_value ?? '—'}</strong> {k.stat_2_label ?? ''}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <KnowledgeHubPage>
+      <KnowledgeHubListSection title="Human Rights Indicators">
+        <KnowledgeHubStateMessage error={loadError} loading={loading} empty={!loading && cards.length === 0} />
+        {!loading && cards.length > 0 ? (
+          <KnowledgeHubCardsGrid>
+            {cards.map((item) => (
+              <KnowledgeHubCard
+                key={item.id}
+                icon={item.icon}
+                fallback="📊"
+                title={item.title}
+                description={item.summary}
+                stat1Value={item.stat_1_value}
+                stat1Label={item.stat_1_label}
+                stat2Value={item.stat_2_value}
+                stat2Label={item.stat_2_label}
+                onClick={() => setSelected(item)}
+              />
+            ))}
+          </KnowledgeHubCardsGrid>
+        ) : null}
+      </KnowledgeHubListSection>
+    </KnowledgeHubPage>
   )
 }

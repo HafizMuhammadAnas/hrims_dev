@@ -1,4 +1,3 @@
-import { ArrowLeft } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import {
   fetchKnowledgeConvention,
@@ -7,7 +6,24 @@ import {
   type KnowledgeConventionListItem,
 } from '../../api/knowledgeHub'
 import { isApiError } from '../../api/apiError'
-import { KnowledgeHubIcon } from '../../components/KnowledgeHubIcon'
+import {
+  KnowledgeHubArticleGrid,
+  KnowledgeHubCardsGrid,
+  KnowledgeHubCard,
+  KnowledgeHubDetailHeader,
+  KnowledgeHubListSection,
+  KnowledgeHubMutedProse,
+  KnowledgeHubPage,
+  KnowledgeHubPanel,
+  KnowledgeHubProse,
+  KnowledgeHubRecList,
+  KnowledgeHubStateMessage,
+  KnowledgeHubTabs,
+} from '../../components/knowledge/KnowledgeHubUi'
+import { KnowledgeConventionCatDetail } from '../../components/knowledge/KnowledgeConventionCatDetail'
+
+const CONVENTION_TABS = ['Overview', 'Recommendations', 'Implementation', 'Challenges', 'Resources'] as const
+type ConventionTab = (typeof CONVENTION_TABS)[number]
 
 function ConventionDetail({
   data,
@@ -16,58 +32,137 @@ function ConventionDetail({
   data: KnowledgeConventionDetail
   onBack: () => void
 }) {
+  const [activeTab, setActiveTab] = useState<ConventionTab>('Overview')
   const adopted = data.knowledge_adopted?.trim() || '—'
   const ratified = data.knowledge_ratified?.trim() || '—'
-  const articles = data.knowledge_articles?.trim() || '—'
-  const impl = data.knowledge_implementation?.trim() || '—'
+  const articles = data.components.map((c) => ({
+    key: c.id,
+    num: `${c.type} ${c.code}`.trim(),
+    title: c.title,
+    desc: c.body?.trim() || 'No description provided.',
+  }))
 
   return (
-    <div>
-      <button type="button" className="btn btn-secondary btn-compact knowledge-back" onClick={onBack}>
-        <ArrowLeft size={16} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-        All conventions
-      </button>
-      <div className="knowledge-hero">
-        <KnowledgeHubIcon value={data.knowledge_icon} fallback="📜" variant="hero" />
-        <div>
-          <h2 className="knowledge-hero-title">{data.code}</h2>
-          <p className="muted">{data.name}</p>
-          <p className="knowledge-meta">
-            Adopted {adopted} · Ratified {ratified} · Articles tracked: {articles} · Implementation (reference): {impl}
-          </p>
+    <KnowledgeHubPage>
+      <KnowledgeHubDetailHeader
+        title={data.code}
+        subtitle={data.name}
+        icon={data.knowledge_icon}
+        fallback="📜"
+        metaLines={[`Adopted: ${adopted}`, `Ratified: ${ratified}`]}
+        onBack={onBack}
+      />
+
+      <KnowledgeHubTabs
+        tabs={[...CONVENTION_TABS]}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as ConventionTab)}
+      />
+
+      {activeTab === 'Overview' && (
+        <KnowledgeHubPanel title="Convention Overview">
+          {data.description?.trim() ? (
+            <KnowledgeHubProse>{data.description.trim()}</KnowledgeHubProse>
+          ) : (
+            <KnowledgeHubMutedProse>
+              No narrative has been added yet. A super administrator can publish overview text from Super admin →
+              Conventions & components.
+            </KnowledgeHubMutedProse>
+          )}
+          {articles.length > 0 ? (
+            <>
+              <h3 style={{ marginTop: '30px', marginBottom: '20px', color: 'var(--pk-green)', fontWeight: 600, fontSize: '18px' }}>
+                Key Articles
+              </h3>
+              <KnowledgeHubArticleGrid items={articles} />
+            </>
+          ) : null}
+        </KnowledgeHubPanel>
+      )}
+
+      {activeTab === 'Recommendations' && (
+        <KnowledgeHubPanel title="Pakistan-Specific Recommendations">
+          {data.components.some((c) => c.body?.trim()) ? (
+            <KnowledgeHubRecList
+              items={data.components
+                .filter((c) => c.body?.trim())
+                .map((c) => ({
+                  key: c.id,
+                  title: `${c.type} ${c.code}: ${c.title}`,
+                  details: c.body?.trim() ?? '',
+                }))}
+            />
+          ) : (
+            <KnowledgeHubMutedProse>
+              Recommendations for this convention will appear here once published in the knowledge catalog.
+            </KnowledgeHubMutedProse>
+          )}
+        </KnowledgeHubPanel>
+      )}
+
+      {activeTab === 'Implementation' && (
+        <div className="impl-status">
+          <h2 className="section-title">Implementation Status</h2>
+          <KnowledgeHubProse>
+            {data.knowledge_implementation?.trim() ||
+              'Quantitative implementation tracking for this convention will be shown here once verified national data and reporting cycles are integrated into HRIMS.'}
+          </KnowledgeHubProse>
         </div>
-      </div>
-      <div className="knowledge-body">
-        {data.description?.trim() ? (
-          <p style={{ whiteSpace: 'pre-wrap' }}>{data.description.trim()}</p>
-        ) : (
-          <p className="muted">
-            No narrative has been added yet. A super administrator can publish overview text from Super admin →
-            Conventions & components.
-          </p>
-        )}
-        {data.components.length > 0 && (
-          <div style={{ marginTop: 20 }}>
-            <h4>Treaty structure</h4>
-            <ul style={{ margin: '12px 0 0', paddingLeft: '1.25rem' }}>
-              {data.components.map((c) => (
-                <li key={c.id}>
-                  <strong>
-                    {c.type} {c.code}
-                  </strong>
-                  : {c.title}
-                  {c.body?.trim() ? (
-                    <div className="text-muted" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>
-                      {c.body.trim()}
-                    </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+      )}
+
+      {activeTab === 'Challenges' && (
+        <KnowledgeHubPanel title="Key Challenges">
+          <div className="challenge-grid">
+            <div className="challenge-item">
+              <div className="challenge-icon">⚠️</div>
+              <div className="challenge-content">
+                <div className="challenge-title">Legislative Gaps</div>
+                <div className="challenge-desc">
+                  Absence of comprehensive legislation addressing all aspects of the convention.
+                </div>
+              </div>
+            </div>
+            <div className="challenge-item">
+              <div className="challenge-icon">⚠️</div>
+              <div className="challenge-content">
+                <div className="challenge-title">Resource Constraints</div>
+                <div className="challenge-desc">
+                  Insufficient allocation of resources for implementation and monitoring.
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+        </KnowledgeHubPanel>
+      )}
+
+      {activeTab === 'Resources' && (
+        <KnowledgeHubPanel title="Resources & Documents">
+          <div className="resources-grid">
+            <a href="#" className="resource-link" onClick={(e) => e.preventDefault()}>
+              <span className="resource-icon">📄</span>
+              <div className="resource-text">
+                <div className="resource-title">{data.code} Full Text</div>
+                <div className="resource-type">Official Document</div>
+              </div>
+            </a>
+            <a href="#" className="resource-link" onClick={(e) => e.preventDefault()}>
+              <span className="resource-icon">📊</span>
+              <div className="resource-text">
+                <div className="resource-title">Pakistan&apos;s State Report</div>
+                <div className="resource-type">PDF Report</div>
+              </div>
+            </a>
+            <a href="#" className="resource-link" onClick={(e) => e.preventDefault()}>
+              <span className="resource-icon">📑</span>
+              <div className="resource-text">
+                <div className="resource-title">Committee Observations</div>
+                <div className="resource-type">UN Document</div>
+              </div>
+            </a>
+          </div>
+        </KnowledgeHubPanel>
+      )}
+    </KnowledgeHubPage>
   )
 }
 
@@ -104,34 +199,33 @@ export function ConventionsInfoPage() {
   }
 
   if (selected) {
+    if (selected.code.trim().toUpperCase() === 'CAT') {
+      return <KnowledgeConventionCatDetail data={selected} onBack={() => setSelected(null)} />
+    }
     return <ConventionDetail data={selected} onBack={() => setSelected(null)} />
   }
 
   return (
-    <div>
-      <h2>Conventions</h2>
-      <p className="muted">Core UN human rights conventions configured for HRIMS. Content is maintained by super administrators.</p>
-      {loadError && <p className="text-error">{loadError}</p>}
-      {loading && <p className="muted">Loading…</p>}
-      {!loading && rows.length === 0 && !loadError && (
-        <p className="muted">No active conventions are published yet.</p>
-      )}
-      <div className="knowledge-grid">
-        {rows.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className="knowledge-card"
-            onClick={() => {
-              void openDetail(c.id)
-            }}
-          >
-            <KnowledgeHubIcon value={c.knowledge_icon} fallback="📜" />
-            <h3>{c.code}</h3>
-            <p>{c.name}</p>
-          </button>
-        ))}
-      </div>
-    </div>
+    <KnowledgeHubPage>
+      <KnowledgeHubListSection title="Seven Core Human Rights Conventions">
+        <KnowledgeHubStateMessage error={loadError} loading={loading} empty={!loading && rows.length === 0} />
+        {!loading && rows.length > 0 ? (
+          <KnowledgeHubCardsGrid>
+            {rows.map((c) => (
+              <KnowledgeHubCard
+                key={c.id}
+                icon={c.knowledge_icon}
+                fallback="📜"
+                title={c.code}
+                description={c.name}
+                onClick={() => {
+                  void openDetail(c.id)
+                }}
+              />
+            ))}
+          </KnowledgeHubCardsGrid>
+        ) : null}
+      </KnowledgeHubListSection>
+    </KnowledgeHubPage>
   )
 }

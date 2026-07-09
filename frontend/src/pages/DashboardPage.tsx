@@ -189,6 +189,8 @@ export function DashboardPage() {
   const urgentDeptTasks = summary?.urgent_department_tasks ?? []
   const urgentRequestCount = urgentList.length
   const compiledReportsTotal = summary?.compiled_records_total ?? 0
+  const pendingRequests =
+    summary?.hr_requests_pending_federal ?? Math.max(0, active - compiledReportsTotal)
   const clarificationsPending = summary?.clarifications_pending_federal ?? 0
   const federalNotifications = useMemo(() => inbox.slice(0, 8), [inbox])
 
@@ -315,11 +317,13 @@ export function DashboardPage() {
                 </div>
                 <div className="dashboard-card blue">
                   <div className="dashboard-card-icon">
-                    <TrendingUp size={22} strokeWidth={2.2} />
+                    <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Active requests</div>
-                  <div className="dashboard-card-value">{active}</div>
-                  <div className="dashboard-card-subtitle">Requests marked active (circulated to regions)</div>
+                  <div className="dashboard-card-title">Pending requests</div>
+                  <div className="dashboard-card-value">{pendingRequests}</div>
+                  <div className="dashboard-card-subtitle">
+                    {active} active · {pendingRequests} pending · {compiledReportsTotal} compiled
+                  </div>
                 </div>
                 <div className="dashboard-card teal">
                   <div className="dashboard-card-icon">
@@ -666,43 +670,45 @@ export function DashboardPage() {
             <div className="dashboard-panel-head" style={{ marginBottom: 12 }}>
               <h3 className="dashboard-panel-title">Knowledge & frameworks</h3>
             </div>
-            <div className="knowledge-grid">
+            <div className="knowledge-hub">
+              <div className="cards-grid">
               <button
                 type="button"
-                className="knowledge-card"
+                className="card"
                 onClick={() => navigate('/conventions')}
               >
-                <div className="knowledge-card-icon" style={{ color: '#2e4fa3' }}>
-                  <BookOpen size={32} />
+                <div className="card-icon" style={{ color: '#fff' }}>
+                  <BookOpen size={28} />
                 </div>
-                <h3>Core conventions</h3>
-                <p>Human rights treaties ratified by Pakistan and how they map into HRIMS.</p>
+                <h3 className="card-title">Core conventions</h3>
+                <p className="card-desc">Human rights treaties ratified by Pakistan and how they map into HRIMS.</p>
               </button>
               <button
                 type="button"
-                className="knowledge-card"
+                className="card"
                 onClick={() => navigate('/indicators')}
               >
-                <div className="knowledge-card-icon" style={{ color: '#8b7345' }}>
-                  <Target size={32} />
+                <div className="card-icon" style={{ color: '#fff' }}>
+                  <Target size={28} />
                 </div>
-                <h3>Indicators</h3>
-                <p>Key performance indicators across sectors and monitoring themes.</p>
+                <h3 className="card-title">Indicators</h3>
+                <p className="card-desc">Key performance indicators across sectors and monitoring themes.</p>
               </button>
-              <button type="button" className="knowledge-card" onClick={() => navigate('/sdgs')}>
-                <div className="knowledge-card-icon" style={{ color: '#0f766e' }}>
-                  <Globe size={32} />
+              <button type="button" className="card" onClick={() => navigate('/sdgs')}>
+                <div className="card-icon" style={{ color: '#fff' }}>
+                  <Globe size={28} />
                 </div>
-                <h3>Sustainable development goals</h3>
-                <p>SDG links and progress framing for national reporting.</p>
+                <h3 className="card-title">Sustainable development goals</h3>
+                <p className="card-desc">SDG links and progress framing for national reporting.</p>
               </button>
-              <button type="button" className="knowledge-card" onClick={() => navigate('/upr')}>
-                <div className="knowledge-card-icon" style={{ color: '#26488a' }}>
-                  <RefreshCcw size={32} />
+              <button type="button" className="card" onClick={() => navigate('/upr')}>
+                <div className="card-icon" style={{ color: '#fff' }}>
+                  <RefreshCcw size={28} />
                 </div>
-                <h3>Universal periodic review</h3>
-                <p>UPR cycle context and concluding observations tracking.</p>
+                <h3 className="card-title">Universal periodic review</h3>
+                <p className="card-desc">UPR cycle context and concluding observations tracking.</p>
               </button>
+              </div>
             </div>
           </section>
         </>

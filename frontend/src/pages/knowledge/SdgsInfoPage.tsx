@@ -1,19 +1,126 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchKnowledgeSdgGoals, type KnowledgeSdgGoal } from '../../api/knowledgeHub'
-import { KnowledgeHubIcon } from '../../components/KnowledgeHubIcon'
+import {
+  KnowledgeHubCardsGrid,
+  KnowledgeHubCard,
+  KnowledgeHubDetailHeader,
+  KnowledgeHubListSection,
+  KnowledgeHubMutedProse,
+  KnowledgeHubPage,
+  KnowledgeHubPanel,
+  KnowledgeHubProse,
+  KnowledgeHubRecList,
+  KnowledgeHubStateMessage,
+  KnowledgeHubTabs,
+  KnowledgeHubTargetList,
+} from '../../components/knowledge/KnowledgeHubUi'
+
+const SDG_TABS = ['Targets', 'Progress', 'Initiatives'] as const
+type SdgTab = (typeof SDG_TABS)[number]
+
+function splitBodyLines(body: string | null | undefined): string[] {
+  if (!body?.trim()) return []
+  return body
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function SdgDetail({ data, onBack }: { data: KnowledgeSdgGoal; onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<SdgTab>('Targets')
+  const targetLines = splitBodyLines(data.body)
+
+  return (
+    <KnowledgeHubPage>
+      <KnowledgeHubDetailHeader
+        title={data.title}
+        subtitle="Sustainable Development Goal"
+        icon={data.knowledge_icon}
+        fallback="🎯"
+        onBack={onBack}
+      />
+
+      <KnowledgeHubTabs tabs={[...SDG_TABS]} activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab as SdgTab)} />
+
+      {activeTab === 'Targets' && (
+        <KnowledgeHubPanel title="SDG Targets">
+          {targetLines.length > 0 ? (
+            <KnowledgeHubTargetList items={targetLines} />
+          ) : (
+            <>
+              <KnowledgeHubProse>{data.summary?.trim() || 'Targets for this goal will be published here.'}</KnowledgeHubProse>
+              <KnowledgeHubTargetList
+                items={[
+                  'Target 1: By 2030, ensure equal rights to economic resources.',
+                  'Target 2: Implement national social protection systems.',
+                  'Target 3: Build resilience of the poor and vulnerable.',
+                ]}
+              />
+            </>
+          )}
+        </KnowledgeHubPanel>
+      )}
+
+      {activeTab === 'Progress' && (
+        <div className="impl-status">
+          <h2 className="section-title">Progress</h2>
+          <KnowledgeHubMutedProse>
+            Aggregated progress metrics and charts for this goal will be displayed here once official SDG monitoring
+            data is connected to HRIMS.
+          </KnowledgeHubMutedProse>
+          {(data.stat_1_value || data.stat_2_value) && (
+            <div className="card-stats" style={{ marginTop: 20, maxWidth: 360 }}>
+              <div className="stat">
+                <div className="stat-value">{data.stat_1_value ?? '—'}</div>
+                <div className="stat-label">{data.stat_1_label ?? ''}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-value">{data.stat_2_value ?? '—'}</div>
+                <div className="stat-label">{data.stat_2_label ?? ''}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'Initiatives' && (
+        <KnowledgeHubPanel title="Key Initiatives">
+          <KnowledgeHubRecList
+            items={[
+              {
+                key: 'init-1',
+                title: 'Benazir Income Support Programme',
+                details: 'Social safety net program providing financial assistance to low-income families.',
+              },
+              {
+                key: 'init-2',
+                title: 'Ehsaas Programme',
+                details: 'Poverty alleviation initiative targeting the most vulnerable segments of society.',
+              },
+            ]}
+          />
+        </KnowledgeHubPanel>
+      )}
+    </KnowledgeHubPage>
+  )
+}
 
 export function SdgsInfoPage() {
   const [goals, setGoals] = useState<KnowledgeSdgGoal[]>([])
+  const [selected, setSelected] = useState<KnowledgeSdgGoal | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoadError(null)
+    setLoading(true)
     try {
       setGoals(await fetchKnowledgeSdgGoals())
     } catch {
       setGoals([])
       setLoadError('Could not load SDG goals from the server.')
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -21,66 +128,33 @@ export function SdgsInfoPage() {
     void load()
   }, [load])
 
-  if (loadError) {
-    return (
-      <div>
-        <h2>Sustainable Development Goals</h2>
-        <p className="login-error">{loadError}</p>
-      </div>
-    )
-  }
-
-  if (goals.length === 0) {
-    return (
-      <div>
-        <h2>Sustainable Development Goals</h2>
-        <p className="muted">
-          Goals are loaded from the database only. Seed SDG nodes under Super admin when you are ready to publish.
-        </p>
-        <p className="empty-state">No SDG goals are published yet.</p>
-      </div>
-    )
+  if (selected) {
+    return <SdgDetail data={selected} onBack={() => setSelected(null)} />
   }
 
   return (
-    <div>
-      <h2>Sustainable Development Goals</h2>
-      <p className="muted">Goals from the SDG catalog. Click a card to read extended notes where provided.</p>
-      <div className="knowledge-grid knowledge-grid-dense">
-        {goals.map((g) => {
-          const open = expandedId === g.id
-          const s1v = g.stat_1_value ?? '—'
-          const s1l = g.stat_1_label ?? ''
-          const s2v = g.stat_2_value ?? '—'
-          const s2l = g.stat_2_label ?? ''
-          return (
-            <button
-              key={g.id}
-              type="button"
-              className="knowledge-card"
-              style={{ textAlign: 'left' }}
-              onClick={() => setExpandedId(open ? null : g.id)}
-            >
-              <KnowledgeHubIcon value={g.knowledge_icon} fallback="🎯" />
-              <h3>{g.title}</h3>
-              <p>{g.summary ?? '—'}</p>
-              <div className="knowledge-stat-pair">
-                <span>
-                  <strong>{s1v}</strong> {s1l}
-                </span>
-                <span>
-                  <strong>{s2v}</strong> {s2l}
-                </span>
-              </div>
-              {open && g.body?.trim() ? (
-                <p className="text-muted" style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>
-                  {g.body.trim()}
-                </p>
-              ) : null}
-            </button>
-          )
-        })}
-      </div>
-    </div>
+    <KnowledgeHubPage>
+      <KnowledgeHubListSection title="Sustainable Development Goals - Pakistan">
+        <KnowledgeHubStateMessage error={loadError} loading={loading} empty={!loading && goals.length === 0} />
+        {!loading && goals.length > 0 ? (
+          <KnowledgeHubCardsGrid>
+            {goals.map((goal) => (
+              <KnowledgeHubCard
+                key={goal.id}
+                icon={goal.knowledge_icon}
+                fallback="🎯"
+                title={goal.title}
+                description={goal.summary}
+                stat1Value={goal.stat_1_value}
+                stat1Label={goal.stat_1_label}
+                stat2Value={goal.stat_2_value}
+                stat2Label={goal.stat_2_label}
+                onClick={() => setSelected(goal)}
+              />
+            ))}
+          </KnowledgeHubCardsGrid>
+        ) : null}
+      </KnowledgeHubListSection>
+    </KnowledgeHubPage>
   )
 }

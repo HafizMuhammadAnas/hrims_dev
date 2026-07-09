@@ -3,12 +3,10 @@ import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import type { DistrictRow } from '../api/districts'
 import type { CollectionReligionRow } from '../api/collectionReligions'
 import {
+  AGE_KEYS,
   AGE_LABELS,
-  AGE_OVER_18,
-  AGE_UNDER_18,
+  DISABILITY_KEYS,
   DISABILITY_LABELS,
-  DISABILITY_NO,
-  DISABILITY_YES,
   buildCatalogMatrixGroups,
   buildFixedKeyMatrixGroups,
   buildGenderMatrixGroups,
@@ -112,7 +110,7 @@ export function DepartmentIndicatorDisaggregationMatrices({
         ageIndicators,
         'age',
         (ind) => Boolean(ind.collects_by_age),
-        [AGE_UNDER_18, AGE_OVER_18],
+        AGE_KEYS,
         AGE_LABELS,
       ),
     [ageIndicators],
@@ -123,7 +121,7 @@ export function DepartmentIndicatorDisaggregationMatrices({
         disabilityIndicators,
         'disability',
         (ind) => Boolean(ind.collects_by_disability),
-        [DISABILITY_YES, DISABILITY_NO],
+        DISABILITY_KEYS,
         DISABILITY_LABELS,
       ),
     [disabilityIndicators],
@@ -175,14 +173,14 @@ export function DepartmentIndicatorDisaggregationMatrices({
             ind,
             yearId,
             (i) => Boolean(i.collects_by_age),
-            [AGE_UNDER_18, AGE_OVER_18],
+            AGE_KEYS,
             String(columnId),
           )
         }
-        hint="Enter a number for Under 18 and 18+ for each configured year."
+        hint="Enter a number for Under 18, 18 - 60, and Above 60 for each configured year."
       />
       <DepartmentDisaggregationMatrixTable
-        title="Disability status"
+        title="Persons with disability"
         indicators={disabilityIndicators}
         columnGroups={disabilityGroups}
         cellValues={disabilityValues}
@@ -194,11 +192,11 @@ export function DepartmentIndicatorDisaggregationMatrices({
             ind,
             yearId,
             (i) => Boolean(i.collects_by_disability),
-            [DISABILITY_YES, DISABILITY_NO],
+            DISABILITY_KEYS,
             String(columnId),
           )
         }
-        hint="Enter a number for Yes and No disability status for each configured year."
+        hint="Enter the count of persons with disability for each configured year."
       />
       <DepartmentDisaggregationMatrixTable
         title="District"

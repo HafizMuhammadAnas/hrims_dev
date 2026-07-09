@@ -56,6 +56,8 @@ class ApiV1DashboardSummaryTest extends TestCase
                 'requests_created_by_month',
                 'regional_responses_total',
                 'regional_responses_by_review',
+                'compiled_records_total',
+                'hr_requests_pending_federal',
             ],
         ]);
 

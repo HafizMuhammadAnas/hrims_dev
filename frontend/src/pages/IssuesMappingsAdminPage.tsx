@@ -53,6 +53,7 @@ import { TableToolbar } from '../components/ui/TableToolbar'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { filterSelectableCollectionGenders } from '../lib/collectionGenderOptions'
 import {
   coerceIssueEntryKind,
   issueEntrySaveBlocked,
@@ -1883,7 +1884,10 @@ function IndicatorGenderPerYearMapper({
     [collectionYears],
   )
   const sortedGenders = useMemo(
-    () => [...collectionGenders].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    () =>
+      filterSelectableCollectionGenders([...collectionGenders]).sort(
+        (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
+      ),
     [collectionGenders],
   )
 
@@ -2119,7 +2123,10 @@ function IssueIndicatorsEditor({
     [collectionYears],
   )
   const sortedGenders = useMemo(
-    () => [...collectionGenders].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    () =>
+      filterSelectableCollectionGenders([...collectionGenders]).sort(
+        (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
+      ),
     [collectionGenders],
   )
 
@@ -2247,8 +2254,8 @@ function IssueIndicatorsEditor({
               {row.disaggregated_years.length > 0 ? (
                 <div className="issue-indicator-dimension-checks" role="group" aria-label="Disaggregation dimensions">
                   <p className="text-muted text-compact" style={{ margin: '0 0 8px' }}>
-                    Choose which dimensions apply to this indicator. Religion, disability, age, and location
-                    options are shown to respondents when enabled.
+                    Choose which dimensions apply to this indicator. Religion, disability, and age options are shown to
+                    respondents when enabled.
                   </p>
                   <div className="issue-indicator-dimension-checks__block">
                     <label className="checkbox-label issue-indicator-dimension-checks__item">
@@ -2280,9 +2287,8 @@ function IssueIndicatorsEditor({
                   </div>
                   {(
                     [
-                      ['collects_by_age', 'Age (Under 18 and 18+ for respondents)'],
-                      ['collects_by_location', 'Geographic location (districts in assigned region for respondents)'],
-                      ['collects_by_disability', 'Disability status (Yes / No for respondents)'],
+                      ['collects_by_age', 'Age (Under 18, 18 - 60, Above 60 for respondents)'],
+                      ['collects_by_disability', 'Disability (Persons with disability count for respondents)'],
                       ['collects_by_religion', 'Religion (full list for respondents)'],
                     ] as const
                   ).map(([key, label]) => (

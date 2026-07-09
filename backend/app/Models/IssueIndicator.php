@@ -14,11 +14,11 @@ class IssueIndicator extends Model
 
     public const AGE_UNDER_18 = 'under_18';
 
-    public const AGE_OVER_18 = 'over_18';
+    public const AGE_18_60 = 'age_18_60';
 
-    public const DISABILITY_YES = 'yes';
+    public const AGE_ABOVE_60 = 'above_60';
 
-    public const DISABILITY_NO = 'no';
+    public const DISABILITY_PERSONS_WITH_DISABILITY = 'persons_with_disability';
 
     protected $fillable = [
         'issue_id',

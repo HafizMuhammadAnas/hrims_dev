@@ -30,6 +30,7 @@ export interface DashboardSummary {
   regional_responses_total?: number
   regional_responses_by_review?: Record<string, number>
   compiled_records_total?: number
+  hr_requests_pending_federal?: number
   clarifications_pending_federal?: number
   department_tasks_total?: number
   department_tasks_by_status?: Record<string, number>

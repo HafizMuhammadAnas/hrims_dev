@@ -56,6 +56,9 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/knowledge/conventions', [KnowledgeHubController::class, 'conventions'])->name('api.v1.knowledge.conventions.index');
         Route::get('/knowledge/conventions/{convention}', [KnowledgeHubController::class, 'showConvention'])->name('api.v1.knowledge.conventions.show');
+        Route::get('/knowledge/conventions/{convention}/articles', [KnowledgeHubController::class, 'conventionArticles'])->name('api.v1.knowledge.conventions.articles');
+        Route::get('/knowledge/conventions/{convention}/issues', [KnowledgeHubController::class, 'conventionIssues'])->name('api.v1.knowledge.conventions.issues');
+        Route::get('/knowledge/issues/{issue}', [KnowledgeHubController::class, 'showIssue'])->name('api.v1.knowledge.issues.show');
         Route::get('/knowledge/sdg-goals', [KnowledgeHubController::class, 'sdgGoals'])->name('api.v1.knowledge.sdg-goals');
         Route::get('/knowledge/indicators', [KnowledgeHubController::class, 'indicators'])->name('api.v1.knowledge.indicators');
         Route::get('/knowledge/upr-highlights', [KnowledgeHubController::class, 'uprHighlights'])->name('api.v1.knowledge.upr-highlights');

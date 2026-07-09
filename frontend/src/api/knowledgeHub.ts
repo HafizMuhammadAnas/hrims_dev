@@ -30,6 +30,50 @@ export type KnowledgeConventionDetail = KnowledgeConventionListItem & {
   components: KnowledgeConventionComponent[]
 }
 
+export type KnowledgeConventionArticle = {
+  id: number
+  convention_id: number
+  article_name: string
+  description: string | null
+}
+
+export type KnowledgeConventionIssueRow = {
+  id: number
+  convention_id: number
+  category_id: number
+  entry_kind: 'issue' | 'recommendation'
+  issue_title: string | null
+  description: string | null
+  is_active: boolean
+  category: { id: number; name: string } | null
+  articles: Array<{
+    id: number
+    article_name: string
+    description?: string | null
+    relevant_paragraph: string | null
+  }>
+}
+
+export type KnowledgeConventionIssueDetail = KnowledgeConventionIssueRow & {
+  has_quantitative: boolean
+  has_qualitative: boolean
+  convention: { id: number; code: string; name: string } | null
+  indicators: Array<{
+    id: number
+    indicator_text: string
+    has_quantitative?: boolean
+    has_qualitative?: boolean
+    collects_by_year?: boolean
+    collects_by_gender?: boolean
+    collects_by_age?: boolean
+    collects_by_location?: boolean
+    collects_by_disability?: boolean
+    collects_by_religion?: boolean
+    disaggregation?: string | null
+    collection_by_year?: Array<{ year_id: number; label: string }>
+  }>
+}
+
 export type KnowledgeSdgGoal = {
   id: number
   code: string
@@ -75,6 +119,39 @@ export async function fetchKnowledgeConvention(id: number): Promise<KnowledgeCon
   })
   await throwIfNotOk(res)
   return ((await res.json()) as { data: KnowledgeConventionDetail }).data
+}
+
+export async function fetchKnowledgeConventionArticles(
+  conventionId: number,
+): Promise<KnowledgeConventionArticle[]> {
+  const res = await fetch(`/api/v1/knowledge/conventions/${conventionId}/articles`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  await throwIfNotOk(res)
+  return ((await res.json()) as { data: KnowledgeConventionArticle[] }).data
+}
+
+export async function fetchKnowledgeConventionIssues(
+  conventionId: number,
+  entryKind: 'issue' | 'recommendation',
+): Promise<KnowledgeConventionIssueRow[]> {
+  const q = new URLSearchParams({ entry_kind: entryKind })
+  const res = await fetch(`/api/v1/knowledge/conventions/${conventionId}/issues?${q}`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  await throwIfNotOk(res)
+  return ((await res.json()) as { data: KnowledgeConventionIssueRow[] }).data
+}
+
+export async function fetchKnowledgeIssue(id: number): Promise<KnowledgeConventionIssueDetail> {
+  const res = await fetch(`/api/v1/knowledge/issues/${id}`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  await throwIfNotOk(res)
+  return ((await res.json()) as { data: KnowledgeConventionIssueDetail }).data
 }
 
 export async function fetchKnowledgeSdgGoals(): Promise<KnowledgeSdgGoal[]> {

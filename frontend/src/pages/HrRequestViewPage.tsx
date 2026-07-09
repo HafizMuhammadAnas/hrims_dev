@@ -43,10 +43,8 @@ import {
   matrixCellKey,
 } from '../lib/indicatorMatrixColumns'
 import {
-  AGE_OVER_18,
-  AGE_UNDER_18,
-  DISABILITY_NO,
-  DISABILITY_YES,
+  AGE_KEYS,
+  DISABILITY_KEYS,
   fixedKeyMatrixCellKey,
   forEachCatalogMatrixCell,
   forEachFixedKeyMatrixCell,
@@ -425,7 +423,7 @@ export function HrRequestViewPage() {
         }
         if (ind.collects_by_age) {
           let matrixReady = true
-          forEachFixedKeyMatrixCell(ind, (i) => Boolean(i.collects_by_age), [AGE_UNDER_18, AGE_OVER_18], (yearId, key) => {
+          forEachFixedKeyMatrixCell(ind, (i) => Boolean(i.collects_by_age), AGE_KEYS, (yearId, key) => {
             if (!matrixValueReady(d.yearAgeValues, fixedKeyMatrixCellKey(yearId, key))) matrixReady = false
           })
           if (!matrixReady) return false
@@ -435,7 +433,7 @@ export function HrRequestViewPage() {
           forEachFixedKeyMatrixCell(
             ind,
             (i) => Boolean(i.collects_by_disability),
-            [DISABILITY_YES, DISABILITY_NO],
+            DISABILITY_KEYS,
             (yearId, key) => {
               if (!matrixValueReady(d.yearDisabilityValues, fixedKeyMatrixCellKey(yearId, key))) matrixReady = false
             },
@@ -640,7 +638,7 @@ export function HrRequestViewPage() {
               forEachFixedKeyMatrixCell(
                 ind,
                 (i) => Boolean(i.collects_by_age),
-                [AGE_UNDER_18, AGE_OVER_18],
+                AGE_KEYS,
                 (yearId, key) => {
                   const yearKey = String(yearId)
                   if (!by_year_age[yearKey]) by_year_age[yearKey] = {}
@@ -657,7 +655,7 @@ export function HrRequestViewPage() {
               forEachFixedKeyMatrixCell(
                 ind,
                 (i) => Boolean(i.collects_by_disability),
-                [DISABILITY_YES, DISABILITY_NO],
+                DISABILITY_KEYS,
                 (yearId, key) => {
                   const yearKey = String(yearId)
                   if (!by_year_disability[yearKey]) by_year_disability[yearKey] = {}

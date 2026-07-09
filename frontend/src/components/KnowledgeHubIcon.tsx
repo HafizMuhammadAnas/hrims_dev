@@ -25,7 +25,8 @@ type Props = {
 
 export function KnowledgeHubIcon({ value, fallback, variant = 'card' }: Props) {
   const trimmed = value?.trim() ?? ''
-  const className = variant === 'hero' ? 'knowledge-hero-icon' : 'knowledge-card-icon'
+  const className =
+    variant === 'hero' ? 'conv-icon-lg' : variant === 'card' ? 'card-icon' : 'knowledge-card-icon'
 
   if (trimmed && shouldRenderAsImage(trimmed)) {
     return (
