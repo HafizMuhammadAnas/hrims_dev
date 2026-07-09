@@ -1,3 +1,5 @@
+import { LABEL_USERS_LIST } from './uiLabels'
+
 const USER_EDIT_PATH = /\/(\d+)\/edit\/?$/
 
 export type UsersMgmtView = 'list' | 'new' | 'edit'
@@ -26,7 +28,7 @@ export function usersMgmtEditPath(
 
 export function usersMgmtTabs(basePath: '/federal-users-mgmt' | '/regional-users-mgmt', createLabel: string) {
   return [
-    { view: 'list' as const, to: basePath, label: 'Users list', end: true },
+    { view: 'list' as const, to: basePath, label: LABEL_USERS_LIST, end: true },
     { view: 'new' as const, to: `${basePath}/new`, label: createLabel },
   ]
 }

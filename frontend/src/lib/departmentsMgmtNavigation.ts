@@ -1,3 +1,5 @@
+import { LABEL_CREATE_DEPARTMENT, LABEL_DEPARTMENTS_LIST } from './uiLabels'
+
 const DEPT_EDIT_PATH = /\/(\d+)\/edit\/?$/
 
 export type DepartmentsMgmtView = 'list' | 'new' | 'edit'
@@ -32,7 +34,7 @@ export function departmentsMgmtTabs(
   basePath: '/federal-departments-mgmt' | '/regional-departments-mgmt',
 ) {
   return [
-    { view: 'list' as const, to: basePath, label: 'Departments list', end: true },
-    { view: 'new' as const, to: `${basePath}/new`, label: 'Create department' },
+    { view: 'list' as const, to: basePath, label: LABEL_DEPARTMENTS_LIST, end: true },
+    { view: 'new' as const, to: `${basePath}/new`, label: LABEL_CREATE_DEPARTMENT },
   ]
 }

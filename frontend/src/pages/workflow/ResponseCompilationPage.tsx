@@ -19,6 +19,7 @@ import {
 } from '../../lib/departmentTaskWorkflow'
 import { isIctLineTask, isIctRegionalResponseRow, isIctRegionSlug } from '../../lib/ictRegion'
 import { isFederalAdmin, isRegionalAdmin } from '../../lib/roles'
+import { LABEL_DEPARTMENTAL_RESPONSES, LABEL_REQUEST_DISTRIBUTION } from '../../lib/uiLabels'
 import type { HrRequestIssueIndicator, HrRequestRow } from '../../types/hrRequest'
 
 function taskListSignature(tasks: DepartmentTaskRow[]): string {
@@ -183,7 +184,7 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
     }
   }
 
-  const distributionLabel = ictScope ? 'Departmental responses' : 'Request distribution'
+  const distributionLabel = ictScope ? LABEL_DEPARTMENTAL_RESPONSES : LABEL_REQUEST_DISTRIBUTION
   const distributionPath = ictScope ? '/federal-department-requests' : '/region-distribution'
   const alreadyCompiledLabel = ictScope ? 'Already compiled (ICT)' : 'Already compiled (this region)'
 
@@ -204,11 +205,11 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
           </p>
           <StatsCards
             items={[
-              { label: 'Departments distributed', value: selectedTasks.length },
-              { label: 'Pending submission', value: workflowCounts.in_process },
-              { label: 'Pending regional review', value: workflowCounts.responded },
-              { label: 'Resubmission requested', value: workflowCounts.revision },
-              { label: 'Accepted by region', value: workflowCounts.accepted },
+              { label: 'Departments Distributed', value: selectedTasks.length },
+              { label: 'Pending Submission', value: workflowCounts.in_process },
+              { label: 'Pending Regional Review', value: workflowCounts.responded },
+              { label: 'Resubmission Requested', value: workflowCounts.revision },
+              { label: 'Accepted by Region', value: workflowCounts.accepted },
             ]}
           />
         </div>
@@ -272,7 +273,7 @@ function CompilationSummaryStats({
     <div style={{ marginTop: 16 }}>
       <StatsCards
         items={[
-          { label: 'Open for compilation', value: openCount },
+          { label: 'Open for Compilation', value: openCount },
           ...(compiledCount > 0 ? [{ label: alreadyCompiledLabel, value: compiledCount }] : []),
         ]}
       />

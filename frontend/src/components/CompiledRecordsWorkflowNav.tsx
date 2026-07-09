@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { LABEL_COMPILATION_CENTER, LABEL_OPEN_HR_REQUEST, LABEL_REGIONAL_RESPONSES } from '../lib/uiLabels'
 
 /** Path passed as `from` when drilling in from the compilation records list / modal. */
 export const COMPILED_RECORDS_FROM_PATH = '/compiled-records'
@@ -61,13 +62,13 @@ export function CompiledRecordsWorkflowNav({ reqId, activeTab = null, className 
       aria-label="Compilation workflow navigation"
     >
       <TabItem isCurrent={onRequest} to={requestTo}>
-        Open HR request
+        {LABEL_OPEN_HR_REQUEST}
       </TabItem>
       <TabItem isCurrent={onResponses} to={responsesTo}>
-        Regional responses
+        {LABEL_REGIONAL_RESPONSES}
       </TabItem>
       <TabItem isCurrent={onCompilation} to={compilationTo}>
-        Compilation center
+        {LABEL_COMPILATION_CENTER}
       </TabItem>
     </nav>
   )

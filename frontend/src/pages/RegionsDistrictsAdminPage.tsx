@@ -33,10 +33,10 @@ const GEO_PAGE_SIZE = 10
 type GeoView = 'regions' | 'create-region' | 'districts' | 'create-district'
 
 const GEO_TABS: { view: GeoView; to: string; label: string; end?: boolean }[] = [
-  { view: 'regions', to: '/admin/regions-districts', label: 'Regions list', end: true },
-  { view: 'create-region', to: '/admin/regions-districts/create-region', label: 'Create region' },
-  { view: 'districts', to: '/admin/regions-districts/districts', label: 'District list' },
-  { view: 'create-district', to: '/admin/regions-districts/create-district', label: 'Create district' },
+  { view: 'regions', to: '/admin/regions-districts', label: 'Regions List', end: true },
+  { view: 'create-region', to: '/admin/regions-districts/create-region', label: 'Create Region' },
+  { view: 'districts', to: '/admin/regions-districts/districts', label: 'District List' },
+  { view: 'create-district', to: '/admin/regions-districts/create-district', label: 'Create District' },
 ]
 
 function resolveGeoView(param: string | undefined): GeoView | null {
@@ -206,8 +206,8 @@ function RegionsListSection({
         <StatsCards
           items={[
             
-            { label: 'Total regions', value: regions.length },
-            { label: 'Matching search', value: processed.length },
+            { label: 'Total Regions', value: regions.length },
+            { label: 'Matching Search', value: processed.length },
           ]}
         />
       </div>
@@ -381,8 +381,8 @@ function DistrictsListSection({
         <StatsCards
           items={[
             
-            { label: 'Total districts', value: districts.length },
-            { label: 'Matching filters', value: processed.length },
+            { label: 'Total Districts', value: districts.length },
+            { label: 'Matching Filters', value: processed.length },
           ]}
         />
       </div>

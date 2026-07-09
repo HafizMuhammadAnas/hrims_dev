@@ -40,6 +40,7 @@ import { FormField } from '../components/ui/FormField'
 import { FormGrid } from '../components/ui/FormGrid'
 import { FormRow } from '../components/ui/FormRow'
 import { isSuperAdmin } from '../lib/roles'
+import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_HUMAN_RIGHTS_INDICATORS, LABEL_KNOWLEDGE_HUB } from '../lib/uiLabels'
 import { uprConcludingObservationsLabel } from '../lib/issueEntryKind'
 
 type Tab =
@@ -63,20 +64,20 @@ const TAB_PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
       'Define departments and link each to one or more regions (for filtering and access). Federal and regional admins assign users to these slots.',
   },
   conventions: {
-    title: 'Conventions & components',
+    title: LABEL_CONVENTIONS_AND_COMPONENTS,
     subtitle: 'Treaty catalog and structured components; content can feed the public Conventions knowledge page.',
   },
   sdg: {
-    title: 'SDG nodes',
-    subtitle: 'Sustainable development goal, target, and indicator nodes for mapping and knowledge hub goals.',
+    title: 'SDG Nodes',
+    subtitle: 'Sustainable Development Goal, target, and indicator nodes for mapping and knowledge hub goals.',
   },
   upr: {
     title: uprConcludingObservationsLabel(),
-    subtitle: 'Universal Periodic Review concluding observation rows for workflows and LOI mapping.',
+    subtitle: 'Universal Periodic Review Concluding Observation rows for workflows and LOI mapping.',
   },
   hub: {
-    title: 'Knowledge hub pages',
-    subtitle: 'Indicator and UPR highlight tiles shown on the Human rights indicators and UPR knowledge pages.',
+    title: `${LABEL_KNOWLEDGE_HUB} Pages`,
+    subtitle: `Indicator and UPR highlight tiles shown on the ${LABEL_HUMAN_RIGHTS_INDICATORS} and UPR knowledge pages.`,
   },
 }
 
@@ -792,7 +793,7 @@ export function SuperAdminConsolePage() {
         <TableCard padded>
           <h3 style={{ marginTop: 0 }}>{uprConcludingObservationsLabel()}</h3>
           <p className="text-muted">
-            Use <strong>Edit</strong> to add narrative <strong>Body</strong> text shown with each concluding observation where
+            Use <strong>Edit</strong> to add narrative <strong>Body</strong> text shown with each Concluding Observation where
             the app links to UPR content.
           </p>
           <UprForm
@@ -913,9 +914,9 @@ export function SuperAdminConsolePage() {
 
       {tab === 'hub' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>Knowledge hub — Indicators &amp; UPR tiles</h3>
+          <h3 style={{ marginTop: 0 }}>{LABEL_KNOWLEDGE_HUB} — Indicators &amp; UPR Tiles</h3>
           <p className="text-muted">
-            These cards populate the <strong>Human rights indicators</strong> and <strong>UPR</strong> knowledge pages
+            These cards populate the <strong>{LABEL_HUMAN_RIGHTS_INDICATORS}</strong> and <strong>UPR</strong> knowledge pages
             (summary tiles). Convention and SDG pages use the Conventions and SDG tabs above.
           </p>
           <div className="chip-list" style={{ marginBottom: 16 }}>

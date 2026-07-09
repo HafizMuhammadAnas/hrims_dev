@@ -55,8 +55,10 @@ import {
 } from '../lib/reportGeneratorData'
 import { reportColorForLabel, reportDashboardChartColor } from '../lib/reportChartTheme'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
+import { LABEL_REPORTING_DASHBOARD } from '../lib/uiLabels'
 import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
 import { ReportingIndicatorCompiledFocus } from '../components/ReportingIndicatorCompiledFocus'
+import { CatStaticTrendDashboard } from '../components/reporting/CatStaticTrendDashboard'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
@@ -252,7 +254,7 @@ function ReportingSummaryCards({ cards }: { cards: ReportingDashboardSummaryCard
           iconTone: '#ea580c',
         },
         {
-          label: 'Response rate',
+          label: 'Response Rate',
           value: `${cards.responsePercent}%`,
           detail: `${cards.requestsWithResponse} of ${cards.requestCount} request${cards.requestCount === 1 ? '' : 's'} · ${cards.responseCount} response${cards.responseCount === 1 ? '' : 's'}`,
           icon: <PieChartIcon size={20} aria-hidden />,
@@ -405,6 +407,11 @@ export function ReportGeneratorPage() {
   )
 
   const conventionSelected = Boolean(filters.convention)
+  const selectedConvention = useMemo(
+    () => conventions.find((c) => String(c.id) === filters.convention) ?? null,
+    [conventions, filters.convention],
+  )
+  const showCatStaticTrendCharts = selectedConvention?.code.trim().toUpperCase() === 'CAT'
 
   const collectionYearOptions = useMemo(
     () => collectionYearOptionsFromIndicators(indicators),
@@ -485,7 +492,7 @@ export function ReportGeneratorPage() {
   return (
     <PageSection
       titleIcon={<LayoutDashboard size={26} color="var(--solid-blue)" aria-hidden />}
-      title="Reporting dashboard"
+      title={LABEL_REPORTING_DASHBOARD}
     >
       <div className="report-generator-page">
         {loadError && <p className="login-error">{loadError}</p>}
@@ -672,7 +679,7 @@ export function ReportGeneratorPage() {
 
                   <div className="reporting-dashboard__row reporting-dashboard__row--top">
                     <div className="report-generator__chart-panel reporting-dashboard__panel">
-                      <h4 className="chart-caption">Records status</h4>
+                      <h4 className="chart-caption">Records Status</h4>
                       <MultiColorBarChart
                         data={dashboardResult.recordStatusBar}
                         emptyMessage="No records for the current filters."
@@ -702,6 +709,8 @@ export function ReportGeneratorPage() {
                       <ReportingRankPanel title="Indicators — top 10" rows={dashboardResult.topIndicators} />
                     </div>
                   </div>
+
+                  {showCatStaticTrendCharts ? <CatStaticTrendDashboard /> : null}
                 </>
               )}
             </div>

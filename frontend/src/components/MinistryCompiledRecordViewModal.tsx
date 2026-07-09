@@ -11,6 +11,7 @@ import {
 } from '../api/lists'
 import { updateCompiledRecord } from '../api/workflows'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
+import { LABEL_COMPILATION_CENTER } from '../lib/uiLabels'
 import { loadDepartmentTasksForRegion } from '../lib/compiledRecordDepartmentTasks'
 import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
 import type { StatusBadgeTone } from '../lib/statusBadgeTone'
@@ -219,7 +220,7 @@ export function MinistryCompiledRecordViewModal({
                       to={`/compilation?from=${fromPath}&reqId=${encodeURIComponent(record.req_id)}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      Compilation center
+                      {LABEL_COMPILATION_CENTER}
                     </Link>{' '}
                     to revise the summary.
                   </>

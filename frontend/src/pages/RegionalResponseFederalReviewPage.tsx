@@ -78,7 +78,7 @@ export function RegionalResponseFederalReviewPage() {
   const backTo = from.startsWith('/') ? from : `/${from}`
 
   return (
-    <PageSection title="Regional response">
+    <PageSection title="Regional Response">
       <div className="hr-request-view-stack hr-request-view-stack--request-page">
         {loading ? <p className="muted">Loading…</p> : null}
         {error ? <p className="login-error">{error}</p> : null}

@@ -20,6 +20,7 @@ import {
   filterDepartmentTasks,
   WORKFLOW_BUCKET_FILTER_OPTIONS,
 } from '../../lib/departmentTaskTableFilters'
+import { LABEL_TOTAL_TASKS } from '../../lib/uiLabels'
 type Props = {
   title: string
 }
@@ -69,7 +70,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'Total tasks', value: filtered.length },
+            { label: LABEL_TOTAL_TASKS, value: filtered.length },
             { label: 'Pending', value: workflowCounts.in_process },
             { label: 'Review', value: workflowCounts.responded },
             { label: 'Revision', value: workflowCounts.revision },

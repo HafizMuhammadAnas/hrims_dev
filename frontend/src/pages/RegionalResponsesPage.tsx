@@ -6,8 +6,9 @@ import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../compon
 import { Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
-import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { PageSection } from '../components/ui/PageSection'
+import { RowActionsMenu } from '../components/ui/RowActionsMenu'
+import { LABEL_REGIONAL_RESPONSES } from '../lib/uiLabels'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { SortColumnHeader } from '../components/ui/SortColumnHeader'
 import { StatsCards } from '../components/ui/StatsCards'
@@ -227,14 +228,14 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
           items={
             reqIdFilter && coverageForFilter.length > 0
               ? [
-                  { label: 'Provinces assigned', value: coverageCounts.assigned },
+                  { label: 'Provinces Assigned', value: coverageCounts.assigned },
                   { label: 'Submitted', value: coverageCounts.submitted },
-                  { label: 'Awaiting submission', value: coverageCounts.pending },
+                  { label: 'Awaiting Submission', value: coverageCounts.pending },
                   { label: 'Accepted', value: coverageCounts.accepted },
                 ]
               : [
                   { label: 'Total', value: rows.length },
-                  { label: 'Awaiting submission', value: awaitingSubmissionCount },
+                  { label: 'Awaiting Submission', value: awaitingSubmissionCount },
                   ...statusCounts.map((s) => ({ label: s.label, value: s.count })),
                 ]
           }
@@ -297,7 +298,7 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
           fileBaseName="regional-responses"
           columns={REGIONAL_RESPONSE_DISPLAY_EXPORT_COLUMNS}
           rows={exportRows}
-          worksheetName="Regional responses"
+          worksheetName={LABEL_REGIONAL_RESPONSES}
         />
       </TableToolbar>
       <TableCard>
@@ -405,7 +406,7 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
   }
 
   return (
-    <PageSection title="Regional responses">
+    <PageSection title={LABEL_REGIONAL_RESPONSES}>
       {body}
     </PageSection>
   )

@@ -3,14 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useNotify } from '../context/NotificationsContext'
-import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isSuperAdmin, isViewer, primaryRoleSlug } from '../lib/roles'
+import { accountPortalSubtitle, formatAccountDisplayName } from '../lib/userDisplayLabels'
 
 type Props = {
   onToggleSidebar: () => void
-}
-
-function headerAccountDisplayName(name: string): string {
-  return name.replace(/^Super\s+/i, '')
 }
 
 export function AppHeader({ onToggleSidebar }: Props) {
@@ -22,16 +18,7 @@ export function AppHeader({ onToggleSidebar }: Props) {
 
   if (!user) return null
 
-  const role = primaryRoleSlug(user)
-  const roleLabel = role?.replace(/_/g, ' ') ?? 'user'
-  const subtitle = (() => {
-    if (isSuperAdmin(user)) return 'System-wide access'
-    if (isFederalAdmin(user)) return 'Federal workspace'
-    if (isRegionalAdmin(user)) return user.region?.name ? `${user.region.name} region` : 'Regional workspace'
-    if (isDepartmentAdmin(user)) return user.department?.name ?? 'Department workspace'
-    if (isViewer(user)) return user.department?.name ?? user.region?.name ?? 'Read-only access'
-    return roleLabel
-  })()
+  const subtitle = accountPortalSubtitle(user)
   const visibleItems = useMemo(() => inbox.slice(0, 8), [inbox])
 
   useEffect(() => {
@@ -114,7 +101,7 @@ export function AppHeader({ onToggleSidebar }: Props) {
             )}
           </div>
           <div className="header-account-meta" onClick={() => navigate('/profile')}>
-            <div className="header-account-name">{headerAccountDisplayName(user.name)}</div>
+            <div className="header-account-name">{formatAccountDisplayName(user.name)}</div>
             <div className="header-account-subtitle">{subtitle}</div>
           </div>
           <button

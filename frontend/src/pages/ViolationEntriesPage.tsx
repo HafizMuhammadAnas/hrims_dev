@@ -63,7 +63,7 @@ export function ViolationEntriesPage() {
   }, [rows, filtered.length])
 
   return (
-    <PageSection title="Violation entries">
+    <PageSection title="Violation Entries">
       {error && <p className="login-error">{error}</p>}
 
       <div style={{ marginTop: 16 }}>

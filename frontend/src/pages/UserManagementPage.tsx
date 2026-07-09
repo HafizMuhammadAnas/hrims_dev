@@ -23,6 +23,7 @@ import { TableToolbar } from '../components/ui/TableToolbar'
 import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { sortRowsLatestFirst } from '../lib/tableRowSort'
+import { LABEL_CREATE_ADMIN, LABEL_CREATE_USER, LABEL_EDIT_USER, LABEL_USER_MANAGEMENT } from '../lib/uiLabels'
 import { isSuperAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import {
@@ -47,7 +48,7 @@ export function UserManagementPage() {
   const basePath = usersMgmtBasePath(location.pathname)
   const view = resolveUsersMgmtView(location.pathname)
   const editUserId = usersMgmtEditUserId(location.pathname)
-  const createTabLabel = superUser ? 'Create admin' : 'Create user'
+  const createTabLabel = superUser ? LABEL_CREATE_ADMIN : LABEL_CREATE_USER
   const tabs = usersMgmtTabs(basePath, createTabLabel)
   const [rows, setRows] = useState<AuthUser[]>([])
   const [regions, setRegions] = useState<Awaited<ReturnType<typeof fetchRegions>>>([])
@@ -266,7 +267,7 @@ export function UserManagementPage() {
 
   return (
     <PageSection
-      title={view === 'edit' ? 'Edit user' : 'User management'}
+      title={view === 'edit' ? LABEL_EDIT_USER : LABEL_USER_MANAGEMENT}
       leading={editBack}
     >
       {error && (
@@ -276,7 +277,7 @@ export function UserManagementPage() {
       )}
 
       {view !== 'edit' && (
-      <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label="User management sections">
+      <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label={`${LABEL_USER_MANAGEMENT} sections`}>
         {tabs.map((tab) => (
           <NavLink
             key={tab.view}

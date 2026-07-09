@@ -25,6 +25,20 @@ import { useAuth } from '../auth/AuthContext'
 import { canManageHrRequests, hrRequestLockedRegionId } from '../auth/rbac'
 import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../components/CompiledRecordsWorkflowNav'
 import { isFederalRequestManagementView } from '../lib/workflowNavigation'
+import {
+  LABEL_ASSIGNED_TASK,
+  LABEL_ASSIGNED_TASKS,
+  LABEL_COMPILED_RECORDS,
+  LABEL_DEPARTMENTAL_RESPONSE,
+  LABEL_DEPARTMENTAL_RESPONSES,
+  LABEL_OPEN_SUBMISSION_HISTORY,
+  LABEL_RECEIVED_REQUEST,
+  LABEL_RECEIVED_REQUESTS,
+  LABEL_REQUESTS_LIST,
+  LABEL_RESPONSE_COMPILATION,
+  LABEL_SUBMISSION_HISTORY,
+  LABEL_BACK_TO_SUBMISSION_HISTORY,
+} from '../lib/uiLabels'
 import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import { DepartmentIndicatorDisaggregationMatrices } from '../components/DepartmentIndicatorDisaggregationMatrices'
@@ -65,6 +79,12 @@ import { PageSection } from '../components/ui/PageSection'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { WorkflowActionFootback, type WorkflowActionFeedback } from '../components/WorkflowActionFootback'
 import { WorkflowModalHero } from '../components/ui/WorkflowModalHero'
+import {
+  isMatrixRowEnabled,
+  parseMatrixRowEnabled,
+  serializeMatrixRowEnabled,
+  type MatrixDimensionKey,
+} from '../lib/deptMatrixRowEnabled'
 import { parseDepartmentTaskResponseData } from '../lib/departmentTaskResponseFormat'
 import {
   canDepartmentSubmitResponse,
@@ -81,17 +101,17 @@ import type { HrRequestRow } from '../types/hrRequest'
 import type { RegionRow } from '../api/regions'
 
 function pageBackLabel(from: string): string {
-  if (from === '/' || from === '') return 'Back to dashboard'
-  if (from.includes('region-received')) return 'Back to received requests'
-  if (from.includes('federal-department-requests')) return 'Back to departmental responses'
-  if (from.includes('region-monitoring')) return 'Back to departmental responses'
+  if (from === '/' || from === '') return 'Back to Dashboard'
+  if (from.includes('region-received')) return `Back to ${LABEL_RECEIVED_REQUESTS}`
+  if (from.includes('federal-department-requests')) return `Back to ${LABEL_DEPARTMENTAL_RESPONSES}`
+  if (from.includes('region-monitoring')) return `Back to ${LABEL_DEPARTMENTAL_RESPONSES}`
   if (from.includes('federal-compilation') || from.includes('region-compilation')) {
-    return 'Back to response compilation'
+    return `Back to ${LABEL_RESPONSE_COMPILATION}`
   }
-  if (from.includes('department-tasks')) return 'Back to assigned tasks'
-  if (from.includes('department-history')) return 'Back to submission history'
-  if (from.includes('compiled-records')) return 'Back to compiled records'
-  return 'Back to requests list'
+  if (from.includes('department-tasks')) return `Back to ${LABEL_ASSIGNED_TASKS}`
+  if (from.includes('department-history')) return LABEL_BACK_TO_SUBMISSION_HISTORY
+  if (from.includes('compiled-records')) return `Back to ${LABEL_COMPILED_RECORDS}`
+  return `Back to ${LABEL_REQUESTS_LIST}`
 }
 
 function userMayReviewDepartmentTask(user: AuthUser | null, t: DepartmentTaskRow): boolean {
@@ -112,6 +132,26 @@ function loadYearGenderValuesFromBundle(
 
 function matrixValueReady(values: Record<string, string>, key: string): boolean {
   return matrixCellInputReady(values[key])
+}
+
+function clearDraftDimensionValues(
+  draft: DeptIndicatorDraft,
+  dimension: MatrixDimensionKey,
+): DeptIndicatorDraft {
+  switch (dimension) {
+    case 'gender':
+      return { ...draft, yearGenderValues: {} }
+    case 'age':
+      return { ...draft, yearAgeValues: {} }
+    case 'disability':
+      return { ...draft, yearDisabilityValues: {} }
+    case 'district':
+      return { ...draft, yearDistrictValues: {} }
+    case 'religion':
+      return { ...draft, yearReligionValues: {} }
+    default:
+      return draft
+  }
 }
 
 export function HrRequestViewPage() {
@@ -356,6 +396,7 @@ export function HrRequestViewPage() {
         let yearRegionValues: Record<string, string> = {}
         let yearDistrictValues: Record<string, string> = {}
         let yearReligionValues: Record<string, string> = {}
+        let matrixRowEnabled = {}
         if (parsed.kind === 'structured') {
           const b = parsed.payload.by_indicator[String(ind.id)]
           if (b?.quantitative?.by_year_gender) {
@@ -380,6 +421,7 @@ export function HrRequestViewPage() {
           }
           if (b?.quantitative?.comment) comment = b.quantitative.comment
           if (b?.qualitative?.text) qualText = b.qualitative.text
+          matrixRowEnabled = parseMatrixRowEnabled(b?.quantitative?.matrix_row_enabled ?? undefined)
         }
         next[ind.id] = {
           ...emptyDeptIndicatorDraft(),
@@ -392,6 +434,7 @@ export function HrRequestViewPage() {
           yearRegionValues,
           yearDistrictValues,
           yearReligionValues,
+          matrixRowEnabled,
         }
       }
       setIndicatorDrafts(next)
@@ -414,21 +457,24 @@ export function HrRequestViewPage() {
       const d = indicatorDrafts[ind.id]
       if (!d) return false
       if (indicatorRequiresQuantitativeMatrixPayload(ind)) {
-        if (indicatorIsYearOnly(ind) || ind.collects_by_gender) {
+        if (
+          (indicatorIsYearOnly(ind) || ind.collects_by_gender) &&
+          isMatrixRowEnabled(d.matrixRowEnabled, 'gender')
+        ) {
           let matrixReady = true
           forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
             if (!matrixValueReady(d.yearGenderValues, matrixCellKey(yearId, genderId))) matrixReady = false
           })
           if (!matrixReady) return false
         }
-        if (ind.collects_by_age) {
+        if (ind.collects_by_age && isMatrixRowEnabled(d.matrixRowEnabled, 'age')) {
           let matrixReady = true
           forEachFixedKeyMatrixCell(ind, (i) => Boolean(i.collects_by_age), AGE_KEYS, (yearId, key) => {
             if (!matrixValueReady(d.yearAgeValues, fixedKeyMatrixCellKey(yearId, key))) matrixReady = false
           })
           if (!matrixReady) return false
         }
-        if (ind.collects_by_disability) {
+        if (ind.collects_by_disability && isMatrixRowEnabled(d.matrixRowEnabled, 'disability')) {
           let matrixReady = true
           forEachFixedKeyMatrixCell(
             ind,
@@ -440,7 +486,7 @@ export function HrRequestViewPage() {
           )
           if (!matrixReady) return false
         }
-        if (ind.collects_by_location) {
+        if (ind.collects_by_location && isMatrixRowEnabled(d.matrixRowEnabled, 'district')) {
           let matrixReady = true
           const districtCatalog = deptLocationCatalog.districts.map((x) => ({ id: x.id, name: x.name }))
           forEachCatalogMatrixCell(
@@ -453,7 +499,7 @@ export function HrRequestViewPage() {
           )
           if (!matrixReady) return false
         }
-        if (ind.collects_by_religion) {
+        if (ind.collects_by_religion && isMatrixRowEnabled(d.matrixRowEnabled, 'religion')) {
           let matrixReady = true
           const religionCatalog = religions.map((r) => ({ id: r.id, name: r.name }))
           forEachReligionMatrixCell(ind, religionCatalog, (yearId, religionId) => {
@@ -613,6 +659,9 @@ export function HrRequestViewPage() {
           if (indicatorRequiresQuantitativeMatrixPayload(ind)) {
             const quantitative: {
               comment: string
+              matrix_row_enabled?: Partial<
+                Record<'gender' | 'age' | 'disability' | 'district' | 'religion', boolean>
+              >
               by_year_gender?: Record<string, Record<string, { value: string }>>
               by_year_age?: Record<string, Record<string, { value: string }>>
               by_year_disability?: Record<string, Record<string, { value: string }>>
@@ -620,8 +669,15 @@ export function HrRequestViewPage() {
               by_year_district?: Record<string, Record<string, { value: string }>>
               by_year_religion?: Record<string, Record<string, { value: string }>>
             } = { comment: d.comment.trim() }
+            const matrixRowEnabled = serializeMatrixRowEnabled(d.matrixRowEnabled)
+            if (matrixRowEnabled) {
+              quantitative.matrix_row_enabled = matrixRowEnabled
+            }
 
-            if (indicatorIsYearOnly(ind) || ind.collects_by_gender) {
+            if (
+              (indicatorIsYearOnly(ind) || ind.collects_by_gender) &&
+              isMatrixRowEnabled(d.matrixRowEnabled, 'gender')
+            ) {
               const by_year_gender: Record<string, Record<string, { value: string }>> = {}
               forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
                 const yearKey = String(yearId)
@@ -633,7 +689,7 @@ export function HrRequestViewPage() {
               quantitative.by_year_gender = by_year_gender
             }
 
-            if (ind.collects_by_age) {
+            if (ind.collects_by_age && isMatrixRowEnabled(d.matrixRowEnabled, 'age')) {
               const by_year_age: Record<string, Record<string, { value: string }>> = {}
               forEachFixedKeyMatrixCell(
                 ind,
@@ -650,7 +706,7 @@ export function HrRequestViewPage() {
               quantitative.by_year_age = by_year_age
             }
 
-            if (ind.collects_by_disability) {
+            if (ind.collects_by_disability && isMatrixRowEnabled(d.matrixRowEnabled, 'disability')) {
               const by_year_disability: Record<string, Record<string, { value: string }>> = {}
               forEachFixedKeyMatrixCell(
                 ind,
@@ -667,7 +723,7 @@ export function HrRequestViewPage() {
               quantitative.by_year_disability = by_year_disability
             }
 
-            if (ind.collects_by_location) {
+            if (ind.collects_by_location && isMatrixRowEnabled(d.matrixRowEnabled, 'district')) {
               const by_year_district: Record<string, Record<string, { value: string }>> = {}
               const districtCatalog = deptLocationCatalog.districts.map((x) => ({ id: x.id, name: x.name }))
               forEachCatalogMatrixCell(
@@ -685,7 +741,7 @@ export function HrRequestViewPage() {
               quantitative.by_year_district = by_year_district
             }
 
-            if (ind.collects_by_religion) {
+            if (ind.collects_by_religion && isMatrixRowEnabled(d.matrixRowEnabled, 'religion')) {
               const by_year_religion: Record<string, Record<string, { value: string }>> = {}
               const religionCatalog = religions.map((r) => ({ id: r.id, name: r.name }))
               forEachReligionMatrixCell(ind, religionCatalog, (yearId, religionId) => {
@@ -808,15 +864,15 @@ export function HrRequestViewPage() {
   }, [deptUser, activeTask?.department_name, user?.department?.name])
 
   const pageTitle = fromRegionReceived
-    ? 'Received request'
+    ? LABEL_RECEIVED_REQUEST
     : (fromFederalDeptResponses || fromResponseCompilation) && activeTask
-      ? 'Departmental response'
+      ? LABEL_DEPARTMENTAL_RESPONSE
     : fromRegionalMonitoring && activeTask
-      ? 'Departmental response'
+      ? LABEL_DEPARTMENTAL_RESPONSE
     : fromDepartmentHistory && deptUser
-      ? 'Submission history'
-      : fromDepartmentTasks && deptUser
-        ? 'Assigned task'
+      ? LABEL_SUBMISSION_HISTORY
+    : fromDepartmentTasks && deptUser
+        ? LABEL_ASSIGNED_TASK
         : 'Request'
 
   const monitorReviewBucket = activeTask ? departmentTaskWorkflowBucket(activeTask) : null
@@ -1465,6 +1521,29 @@ export function HrRequestViewPage() {
                         }
                       })
                     }}
+                    rowEnabledByIndicator={Object.fromEntries(
+                      deptIndicatorsForForm.map((ind) => [
+                        ind.id,
+                        indicatorDrafts[ind.id]?.matrixRowEnabled ?? {},
+                      ]),
+                    )}
+                    onRowEnabledChange={(indicatorId, dimension, enabled) => {
+                      setIndicatorDrafts((prev) => {
+                        const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        const nextEnabled = {
+                          ...cur.matrixRowEnabled,
+                          [dimension]: enabled,
+                        }
+                        const nextDraft = {
+                          ...cur,
+                          matrixRowEnabled: nextEnabled,
+                        }
+                        return {
+                          ...prev,
+                          [indicatorId]: enabled ? nextDraft : clearDraftDimensionValues(nextDraft, dimension),
+                        }
+                      })
+                    }}
                   />
                 ) : null}
                 <h4 className="font-semibold text-compact" style={{ margin: '16px 0 10px' }}>
@@ -1715,7 +1794,7 @@ export function HrRequestViewPage() {
           <div className="hr-request-view-footback hr-request-view-footback--actions">
             {fromDepartmentTasks && !fromDepartmentHistory && (
               <Button variant="secondary" compact type="button" onClick={() => navigate('/department-history')}>
-                Open submission history
+                {LABEL_OPEN_SUBMISSION_HISTORY}
               </Button>
             )}
             <Button variant="secondary" compact type="button" onClick={() => navigate(from)}>

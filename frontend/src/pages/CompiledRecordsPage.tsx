@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { PageSection } from '../components/ui/PageSection'
+import { LABEL_COMPILED_RECORDS, LABEL_TOTAL_RECORDS } from '../lib/uiLabels'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { SortColumnHeader } from '../components/ui/SortColumnHeader'
 import { StatsCards } from '../components/ui/StatsCards'
@@ -110,7 +111,7 @@ export function CompiledRecordsPage() {
 
   const statsItems = useMemo(
     () => [
-      { label: 'Total records', value: rows.length },
+      { label: LABEL_TOTAL_RECORDS, value: rows.length },
       { label: 'Submitted', value: rows.filter((r) => r.status === 'submitted').length },
       { label: 'Draft', value: rows.filter((r) => r.status === 'draft').length },
     ],
@@ -120,7 +121,7 @@ export function CompiledRecordsPage() {
   const fromPath = encodeURIComponent(location.pathname)
 
   return (
-    <PageSection title="Compiled records">
+    <PageSection title={LABEL_COMPILED_RECORDS}>
       {error && (
         <Alert variant="error" title="Something went wrong" onDismiss={() => setError(null)}>
           {error}

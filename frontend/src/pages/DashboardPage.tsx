@@ -40,7 +40,34 @@ import {
   isSuperAdmin,
   isViewer,
 } from '../lib/roles'
+import { formatAccountDisplayName } from '../lib/userDisplayLabels'
 import { formatAppDate, formatAppTodayLong } from '../lib/dateFormat'
+import {
+  LABEL_ACCEPTED_RATE,
+  LABEL_ACTIVE_REQUESTS,
+  LABEL_ACTIVE_SHARE,
+  LABEL_COMPILED_REPORTS,
+  LABEL_HUMAN_RIGHTS_INDICATORS,
+  LABEL_LINKED_REQUEST_ATTENTION,
+  LABEL_NEEDS_ATTENTION,
+  LABEL_NEW_REQUESTS_SCOPE_6MO,
+  LABEL_OPEN_TASKS,
+  LABEL_PENDING_REQUESTS,
+  LABEL_PERFORMANCE_OVERVIEW,
+  LABEL_REGIONAL_RESPONSE_PIPELINE,
+  LABEL_REGIONAL_RESPONSES,
+  LABEL_REPORTING_DASHBOARD,
+  LABEL_REQUEST_MANAGEMENT,
+  LABEL_REQUEST_STATUS_DISTRIBUTION,
+  LABEL_SUBMITTED_RATE,
+  LABEL_SUSTAINABLE_DEVELOPMENT_GOALS,
+  LABEL_TASK_STATUS_MIX,
+  LABEL_TASKS_ASSIGNED_6MO,
+  LABEL_TOTAL_REQUESTS,
+  LABEL_UNIVERSAL_PERIODIC_REVIEW,
+  LABEL_URGENT_QUEUE,
+  LABEL_VIEW_ALL,
+} from '../lib/uiLabels'
 
 const HR_STATUS_ORDER = ['draft', 'active'] as const
 const HR_PIE_LABELS: Record<(typeof HR_STATUS_ORDER)[number], string> = {
@@ -72,8 +99,19 @@ function urgentRowChrome(status: string): { background: string; borderLeft: stri
 }
 
 function formatStatus(s: string): string {
-  if (s === 'needs-revision') return 'Needs revision'
-  return s.replace(/-/g, ' ')
+  if (s === 'needs-revision') return 'Needs Revision'
+  if (s === 'needs-modification') return 'Needs Modification'
+  if (s === 'pending') return 'Pending'
+  if (s === 'accepted') return 'Accepted'
+  if (s === 'rejected') return 'Rejected'
+  if (s === 'assigned') return 'Assigned'
+  if (s === 'submitted') return 'Submitted'
+  if (s === 'draft') return 'Draft'
+  if (s === 'active') return 'Active'
+  return s
+    .split('-')
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ')
 }
 
 type DashboardVariant = 'federal' | 'regional' | 'department' | 'viewer' | 'minimal'
@@ -177,7 +215,7 @@ export function DashboardPage() {
         : 'Federal control center — national requests, reviews, and reporting.'
     }
     if (variant === 'regional') {
-      return `Regional overview — ${user.region?.name ?? 'your region'}`
+      return `${user.region?.name ?? 'Province'} overview — manage requests and responses for your province`
     }
     if (variant === 'department' || variant === 'viewer') {
       return `Department workspace — ${user.department?.name ?? user.region?.name ?? 'your assignments'}`
@@ -203,12 +241,12 @@ export function DashboardPage() {
 
   const pieTitle =
     variant === 'department' || variant === 'viewer'
-      ? 'Task status mix'
-      : 'Request status distribution'
+      ? LABEL_TASK_STATUS_MIX
+      : LABEL_REQUEST_STATUS_DISTRIBUTION
   const trendTitle =
     variant === 'department' || variant === 'viewer'
-      ? 'Tasks assigned (6 months)'
-      : 'New requests in scope (6 months)'
+      ? LABEL_TASKS_ASSIGNED_6MO
+      : LABEL_NEW_REQUESTS_SCOPE_6MO
 
   return (
     <div className="page-shell">
@@ -222,7 +260,7 @@ export function DashboardPage() {
         <>
           <div className="dashboard-welcome-banner">
             <div>
-              <h2>Welcome, {user.name}</h2>
+              <h2>Welcome, {formatAccountDisplayName(user.name)}</h2>
               <p className="muted" style={{ margin: 0 }}>
                 {welcomeTagline}
               </p>
@@ -235,7 +273,7 @@ export function DashboardPage() {
           {variant === 'minimal' && (
             <div className="dashboard-shortcuts">
               <Link to="/requests" className="btn btn-secondary btn-compact">
-                HR requests
+                {LABEL_REQUEST_MANAGEMENT}
               </Link>
             </div>
           )}
@@ -247,7 +285,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Open tasks</div>
+                  <div className="dashboard-card-title">{LABEL_OPEN_TASKS}</div>
                   <div className="dashboard-card-value">{taskAssigned}</div>
                   <div className="dashboard-card-subtitle">Assigned and awaiting your submission</div>
                 </div>
@@ -255,7 +293,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <TrendingUp size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Submitted rate</div>
+                  <div className="dashboard-card-title">{LABEL_SUBMITTED_RATE}</div>
                   <div className="dashboard-card-value">
                     {taskTotal ? `${taskDonePct}%` : '—'}
                   </div>
@@ -265,7 +303,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Linked request attention</div>
+                  <div className="dashboard-card-title">{LABEL_LINKED_REQUEST_ATTENTION}</div>
                   <div className="dashboard-card-value">{draft}</div>
                   <div className="dashboard-card-subtitle">
                     {draft} draft · {urgentRequestCount} in urgent queue (HR requests in your scope)
@@ -278,7 +316,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Active requests</div>
+                  <div className="dashboard-card-title">{LABEL_ACTIVE_REQUESTS}</div>
                   <div className="dashboard-card-value">{active}</div>
                   <div className="dashboard-card-subtitle">HR requests marked active (circulated)</div>
                 </div>
@@ -286,7 +324,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <TrendingUp size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Accepted rate</div>
+                  <div className="dashboard-card-title">{LABEL_ACCEPTED_RATE}</div>
                   <div className="dashboard-card-value">
                     {acceptedRatePct !== null ? `${acceptedRatePct}%` : '—'}
                   </div>
@@ -296,7 +334,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Needs attention</div>
+                  <div className="dashboard-card-title">{LABEL_NEEDS_ATTENTION}</div>
                   <div className="dashboard-card-value">{draft + needsMod}</div>
                   <div className="dashboard-card-subtitle">
                     {draft} draft requests · {needsMod} responses need modification
@@ -309,7 +347,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Total requests</div>
+                  <div className="dashboard-card-title">{LABEL_TOTAL_REQUESTS}</div>
                   <div className="dashboard-card-value">{summary.hr_requests_total}</div>
                   <div className="dashboard-card-subtitle">
                     {draft} draft · {active} active in your scope
@@ -319,7 +357,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Pending requests</div>
+                  <div className="dashboard-card-title">{LABEL_PENDING_REQUESTS}</div>
                   <div className="dashboard-card-value">{pendingRequests}</div>
                   <div className="dashboard-card-subtitle">
                     {active} active · {pendingRequests} pending · {compiledReportsTotal} compiled
@@ -329,7 +367,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <FileText size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Compiled reports</div>
+                  <div className="dashboard-card-title">{LABEL_COMPILED_REPORTS}</div>
                   <div className="dashboard-card-value">{compiledReportsTotal}</div>
                   <div className="dashboard-card-subtitle">National records saved from federal compilation</div>
                 </div>
@@ -340,7 +378,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Active requests</div>
+                  <div className="dashboard-card-title">{LABEL_ACTIVE_REQUESTS}</div>
                   <div className="dashboard-card-value">{active}</div>
                   <div className="dashboard-card-subtitle">Requests marked active (circulated)</div>
                 </div>
@@ -348,7 +386,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <TrendingUp size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Active share</div>
+                  <div className="dashboard-card-title">{LABEL_ACTIVE_SHARE}</div>
                   <div className="dashboard-card-value">{summary.hr_requests_total ? `${resolvedRatePct}%` : '—'}</div>
                   <div className="dashboard-card-subtitle">Active / total requests in scope</div>
                 </div>
@@ -356,7 +394,7 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">Urgent queue</div>
+                  <div className="dashboard-card-title">{LABEL_URGENT_QUEUE}</div>
                   <div className="dashboard-card-value">{urgentRequestCount}</div>
                   <div className="dashboard-card-subtitle">
                     {draft} draft total · draft or past-due active requests listed below
@@ -463,7 +501,7 @@ export function DashboardPage() {
           {(variant === 'federal' || variant === 'regional') && respTotal > 0 && (
             <div className="table-card table-card-padded" style={{ marginBottom: 24 }}>
               <h3 className="dashboard-panel-title" style={{ marginBottom: 12 }}>
-                {variant === 'federal' ? 'Regional responses' : 'Regional response pipeline'}
+                {variant === 'federal' ? LABEL_REGIONAL_RESPONSES : LABEL_REGIONAL_RESPONSE_PIPELINE}
               </h3>
               <div className="summary-metric-grid">
                 {['pending', 'accepted', 'needs-modification', 'rejected'].map((k) => (
@@ -497,7 +535,7 @@ export function DashboardPage() {
                     variant === 'federal' ? navigate('/requests/clarifications') : navigate('/requests')
                   }
                 >
-                  View all
+                  {LABEL_VIEW_ALL}
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -594,14 +632,14 @@ export function DashboardPage() {
 
             <div className="table-card table-card-padded">
               <div className="dashboard-panel-head">
-                <h3 className="dashboard-panel-title">Performance overview</h3>
+                <h3 className="dashboard-panel-title">{LABEL_PERFORMANCE_OVERVIEW}</h3>
                 {(variant === 'federal' || variant === 'regional') && (
                   <button
                     type="button"
                     className="btn btn-secondary btn-compact"
                     onClick={() => navigate('/report-generator')}
                   >
-                    Reporting dashboard
+                    {LABEL_REPORTING_DASHBOARD}
                   </button>
                 )}
               </div>
@@ -668,7 +706,7 @@ export function DashboardPage() {
 
           <section>
             <div className="dashboard-panel-head" style={{ marginBottom: 12 }}>
-              <h3 className="dashboard-panel-title">Knowledge & frameworks</h3>
+              <h3 className="dashboard-panel-title">Knowledge & Frameworks</h3>
             </div>
             <div className="knowledge-hub">
               <div className="cards-grid">
@@ -680,7 +718,7 @@ export function DashboardPage() {
                 <div className="card-icon" style={{ color: '#fff' }}>
                   <BookOpen size={28} />
                 </div>
-                <h3 className="card-title">Core conventions</h3>
+                <h3 className="card-title">Core Conventions</h3>
                 <p className="card-desc">Human rights treaties ratified by Pakistan and how they map into HRIMS.</p>
               </button>
               <button
@@ -691,22 +729,22 @@ export function DashboardPage() {
                 <div className="card-icon" style={{ color: '#fff' }}>
                   <Target size={28} />
                 </div>
-                <h3 className="card-title">Indicators</h3>
+                <h3 className="card-title">{LABEL_HUMAN_RIGHTS_INDICATORS}</h3>
                 <p className="card-desc">Key performance indicators across sectors and monitoring themes.</p>
               </button>
               <button type="button" className="card" onClick={() => navigate('/sdgs')}>
                 <div className="card-icon" style={{ color: '#fff' }}>
                   <Globe size={28} />
                 </div>
-                <h3 className="card-title">Sustainable development goals</h3>
+                <h3 className="card-title">{LABEL_SUSTAINABLE_DEVELOPMENT_GOALS}</h3>
                 <p className="card-desc">SDG links and progress framing for national reporting.</p>
               </button>
               <button type="button" className="card" onClick={() => navigate('/upr')}>
                 <div className="card-icon" style={{ color: '#fff' }}>
                   <RefreshCcw size={28} />
                 </div>
-                <h3 className="card-title">Universal periodic review</h3>
-                <p className="card-desc">UPR cycle context and concluding observations tracking.</p>
+                <h3 className="card-title">{LABEL_UNIVERSAL_PERIODIC_REVIEW}</h3>
+                <p className="card-desc">UPR cycle context and Concluding Observations tracking.</p>
               </button>
               </div>
             </div>

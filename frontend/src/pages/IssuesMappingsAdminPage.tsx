@@ -38,6 +38,7 @@ import {
 } from '../api/admin'
 import { isApiError } from '../api/apiError'
 import { useAuth } from '../auth/AuthContext'
+import { DragHandle } from '../components/ui/DragHandle'
 import { Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
@@ -48,11 +49,14 @@ import { FormRow } from '../components/ui/FormRow'
 import { PageSection } from '../components/ui/PageSection'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
+import { SortColumnHeader } from '../components/ui/SortColumnHeader'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { workflowBackLabel } from '../lib/workflowNavigation'
-import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import { reorderList } from '../lib/reorderList'
+import { derivePaginatedRows, useClientTableState, type SortDirection } from '../hooks/useClientTableState'
+import { compareNumberValues, compareStringValues } from '../lib/tableRowSort'
 import { filterSelectableCollectionGenders } from '../lib/collectionGenderOptions'
 import {
   coerceIssueEntryKind,
@@ -397,6 +401,83 @@ function catalogStatusLabel(row: CatalogRow): string {
   return catalogIsActive(row) ? 'Active' : 'Inactive'
 }
 
+type CatalogIdNameSortKey = 'id' | 'name' | 'status'
+type ArticleCatalogSortKey = 'id' | 'convention' | 'article_name' | 'status'
+type YearCatalogSortKey = 'id' | 'label' | 'status'
+type IssuesListSortKey = 'convention' | 'articles' | 'category' | 'issue_title' | 'status'
+
+function sortCatalogIdNameRows<T extends { id: number; name: string } & CatalogRow>(
+  rows: T[],
+  sortKey: CatalogIdNameSortKey | undefined,
+  sortDir: SortDirection,
+): T[] {
+  const key = sortKey ?? 'id'
+  return [...rows].sort((a, b) => {
+    switch (key) {
+      case 'id':
+        return compareNumberValues(a.id, b.id, sortDir)
+      case 'name':
+        return compareStringValues(a.name, b.name, sortDir)
+      case 'status':
+        return compareStringValues(catalogStatusLabel(a), catalogStatusLabel(b), sortDir)
+      default:
+        return 0
+    }
+  })
+}
+
+function sortYearCatalogRows(
+  rows: AdminCollectionYear[],
+  sortKey: YearCatalogSortKey | undefined,
+  sortDir: SortDirection,
+): AdminCollectionYear[] {
+  const key = sortKey ?? 'id'
+  return [...rows].sort((a, b) => {
+    switch (key) {
+      case 'id':
+        return compareNumberValues(a.id, b.id, sortDir)
+      case 'label':
+        return compareStringValues(a.label, b.label, sortDir)
+      case 'status':
+        return compareStringValues(catalogStatusLabel(a), catalogStatusLabel(b), sortDir)
+      default:
+        return 0
+    }
+  })
+}
+
+function issueArticlesLabel(issue: AdminIssue): string {
+  return issue.articles.map((a) => a.article_name).join(', ') || 'None'
+}
+
+function sortIssueListRows(
+  rows: AdminIssue[],
+  sortKey: IssuesListSortKey | undefined,
+  sortDir: SortDirection,
+): AdminIssue[] {
+  const key = sortKey ?? 'convention'
+  return [...rows].sort((a, b) => {
+    switch (key) {
+      case 'convention':
+        return compareStringValues(issueConventionLabel(a), issueConventionLabel(b), sortDir)
+      case 'articles':
+        return compareStringValues(issueArticlesLabel(a), issueArticlesLabel(b), sortDir)
+      case 'category':
+        return compareStringValues(
+          a.category?.name ?? String(a.category_id),
+          b.category?.name ?? String(b.category_id),
+          sortDir,
+        )
+      case 'issue_title':
+        return compareStringValues(issueEntryLoiTableCellText(a), issueEntryLoiTableCellText(b), sortDir)
+      case 'status':
+        return compareStringValues(issueStatusLabel(a), issueStatusLabel(b), sortDir)
+      default:
+        return 0
+    }
+  })
+}
+
 async function toggleCatalogActive(
   itemLabel: string,
   row: CatalogRow,
@@ -430,35 +511,36 @@ function IssuesListSection({
   onRefreshIssues: () => Promise<void>
 }) {
   const navigate = useNavigate()
-  const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
+  const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
+    useClientTableState<IssuesListSortKey>({ pageSize: ISSUES_PAGE_SIZE })
   const [listEntryKind, setListEntryKind] = useState<IssueEntryKind>('issue')
 
-  const sortedIssues = useMemo(() => [...issues].sort((a, b) => b.id - a.id), [issues])
-
   const kindFilteredIssues = useMemo(
-    () => sortedIssues.filter((i) => coerceIssueEntryKind(i.entry_kind) === listEntryKind),
-    [sortedIssues, listEntryKind],
+    () => issues.filter((i) => coerceIssueEntryKind(i.entry_kind) === listEntryKind),
+    [issues, listEntryKind],
   )
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return kindFilteredIssues
-    return kindFilteredIssues.filter((i) => {
-      const convCode = (i.convention?.code ?? '').toLowerCase()
-      const convName = (i.convention?.name ?? '').toLowerCase()
-      const arts = i.articles.map((a) => a.article_name).join(' ').toLowerCase()
-      const cat = (i.category?.name ?? String(i.category_id)).toLowerCase()
-      return (
-        String(i.id).includes(q) ||
-        (i.issue_title ?? '').toLowerCase().includes(q) ||
-        (i.description ?? '').toLowerCase().includes(q) ||
-        convCode.includes(q) ||
-        convName.includes(q) ||
-        arts.includes(q) ||
-        cat.includes(q)
-      )
-    })
-  }, [kindFilteredIssues, search])
+    const filtered = !q
+      ? kindFilteredIssues
+      : kindFilteredIssues.filter((i) => {
+          const convCode = (i.convention?.code ?? '').toLowerCase()
+          const convName = (i.convention?.name ?? '').toLowerCase()
+          const arts = i.articles.map((a) => a.article_name).join(' ').toLowerCase()
+          const cat = (i.category?.name ?? String(i.category_id)).toLowerCase()
+          return (
+            String(i.id).includes(q) ||
+            (i.issue_title ?? '').toLowerCase().includes(q) ||
+            (i.description ?? '').toLowerCase().includes(q) ||
+            convCode.includes(q) ||
+            convName.includes(q) ||
+            arts.includes(q) ||
+            cat.includes(q)
+          )
+        })
+    return sortIssueListRows(filtered, sortKey, sortDir)
+  }, [kindFilteredIssues, search, sortKey, sortDir])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
   const showLoiTitleColumn = issueEntryListShowsTitleColumn(listEntryKind)
@@ -496,17 +578,38 @@ function IssuesListSection({
           <table className="data-table issues-mapping-table">
             <thead>
               <tr>
-                <th>Convention</th>
-                <th>Articles</th>
-                <th>Category</th>
+                <SortColumnHeader
+                  label="Convention"
+                  active={sortKey === 'convention'}
+                  direction={sortDir}
+                  onSort={() => toggleSort('convention')}
+                />
+                <SortColumnHeader
+                  label="Articles"
+                  active={sortKey === 'articles'}
+                  direction={sortDir}
+                  onSort={() => toggleSort('articles')}
+                />
+                <SortColumnHeader
+                  label="Category"
+                  active={sortKey === 'category'}
+                  direction={sortDir}
+                  onSort={() => toggleSort('category')}
+                />
                 {showLoiTitleColumn ? (
-                  <th className="issues-mapping-table__issue-col">
-                    <span className="issues-mapping-table__issue-col-title">
-                      {issueEntryLoiTableTitleLabel()}
-                    </span>
-                  </th>
+                  <SortColumnHeader
+                    label={issueEntryLoiTableTitleLabel()}
+                    active={sortKey === 'issue_title'}
+                    direction={sortDir}
+                    onSort={() => toggleSort('issue_title')}
+                  />
                 ) : null}
-                <th className="issues-mapping-table__status-col">Status</th>
+                <SortColumnHeader
+                  label="Status"
+                  active={sortKey === 'status'}
+                  direction={sortDir}
+                  onSort={() => toggleSort('status')}
+                />
                 <th className="issues-mapping-table__actions-col">Actions</th>
               </tr>
             </thead>
@@ -602,17 +705,22 @@ function IssuesCategoriesSection({
   const [newCategory, setNewCategory] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null)
   const [editCategoryName, setEditCategoryName] = useState('')
-  const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
-
-  const sortedCategories = useMemo(() => [...categories].sort((a, b) => b.id - a.id), [categories])
+  const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
+    useClientTableState<CatalogIdNameSortKey>({
+      pageSize: ISSUES_PAGE_SIZE,
+      initialSortKey: 'id',
+      initialSortDir: 'desc',
+    })
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return sortedCategories
-    return sortedCategories.filter(
-      (c) => c.name.toLowerCase().includes(q) || String(c.id).includes(q),
-    )
-  }, [sortedCategories, search])
+    const filtered = !q
+      ? categories
+      : categories.filter(
+          (c) => c.name.toLowerCase().includes(q) || String(c.id).includes(q),
+        )
+    return sortCatalogIdNameRows(filtered, sortKey, sortDir)
+  }, [categories, search, sortKey, sortDir])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
@@ -675,9 +783,24 @@ function IssuesCategoriesSection({
           <IssuesCatalogTableColgroup />
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Status</th>
+              <SortColumnHeader
+                label="ID"
+                active={sortKey === 'id'}
+                direction={sortDir}
+                onSort={() => toggleSort('id')}
+              />
+              <SortColumnHeader
+                label="Name"
+                active={sortKey === 'name'}
+                direction={sortDir}
+                onSort={() => toggleSort('name')}
+              />
+              <SortColumnHeader
+                label="Status"
+                active={sortKey === 'status'}
+                direction={sortDir}
+                onSort={() => toggleSort('status')}
+              />
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
@@ -809,26 +932,31 @@ function IssuesArticlesSection({
   const [editArticleConventionId, setEditArticleConventionId] = useState('')
   const [editArticleName, setEditArticleName] = useState('')
   const [editArticleDescription, setEditArticleDescription] = useState('')
-  const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
-
-  const sortedArticles = useMemo(() => [...articles].sort((a, b) => b.id - a.id), [articles])
+  const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
+    useClientTableState<ArticleCatalogSortKey>({
+      pageSize: ISSUES_PAGE_SIZE,
+      initialSortKey: 'id',
+      initialSortDir: 'desc',
+    })
 
   const conventionFilteredArticles = useMemo(() => {
-    if (!listConventionFilter) return sortedArticles
-    return sortedArticles.filter((a) => String(a.convention_id) === listConventionFilter)
-  }, [sortedArticles, listConventionFilter])
+    if (!listConventionFilter) return articles
+    return articles.filter((a) => String(a.convention_id) === listConventionFilter)
+  }, [articles, listConventionFilter])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return conventionFilteredArticles
-    return conventionFilteredArticles.filter(
-      (a) =>
-        a.article_name.toLowerCase().includes(q) ||
-        (a.description ?? '').toLowerCase().includes(q) ||
-        articleConventionLabel(a, conventions).toLowerCase().includes(q) ||
-        String(a.id).includes(q),
-    )
-  }, [conventionFilteredArticles, search, conventions])
+    const filtered = !q
+      ? conventionFilteredArticles
+      : conventionFilteredArticles.filter(
+          (a) =>
+            a.article_name.toLowerCase().includes(q) ||
+            (a.description ?? '').toLowerCase().includes(q) ||
+            articleConventionLabel(a, conventions).toLowerCase().includes(q) ||
+            String(a.id).includes(q),
+        )
+    return sortArticleCatalogRows(filtered, conventions, sortKey, sortDir)
+  }, [conventionFilteredArticles, search, conventions, sortKey, sortDir])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
@@ -935,13 +1063,33 @@ function IssuesArticlesSection({
 
       <TableCard className="issues-catalog-list-card">
         <table className="data-table issues-catalog-table">
-          <IssuesCatalogTableColgroup />
+          <IssuesCatalogTableColgroup variant="articles" />
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Convention</th>
-              <th>Article name</th>
-              <th>Status</th>
+              <SortColumnHeader
+                label="ID"
+                active={sortKey === 'id'}
+                direction={sortDir}
+                onSort={() => toggleSort('id')}
+              />
+              <SortColumnHeader
+                label="Convention"
+                active={sortKey === 'convention'}
+                direction={sortDir}
+                onSort={() => toggleSort('convention')}
+              />
+              <SortColumnHeader
+                label="Article name"
+                active={sortKey === 'article_name'}
+                direction={sortDir}
+                onSort={() => toggleSort('article_name')}
+              />
+              <SortColumnHeader
+                label="Status"
+                active={sortKey === 'status'}
+                direction={sortDir}
+                onSort={() => toggleSort('status')}
+              />
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
@@ -1097,15 +1245,20 @@ function IssuesCollectionYearsSection({
   const [newLabel, setNewLabel] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editLabel, setEditLabel] = useState('')
-  const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
-
-  const sorted = useMemo(() => [...years].sort((a, b) => b.id - a.id), [years])
+  const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
+    useClientTableState<YearCatalogSortKey>({
+      pageSize: ISSUES_PAGE_SIZE,
+      initialSortKey: 'id',
+      initialSortDir: 'desc',
+    })
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return sorted
-    return sorted.filter((y) => y.label.toLowerCase().includes(q) || String(y.id).includes(q))
-  }, [sorted, search])
+    const filtered = !q
+      ? years
+      : years.filter((y) => y.label.toLowerCase().includes(q) || String(y.id).includes(q))
+    return sortYearCatalogRows(filtered, sortKey, sortDir)
+  }, [years, search, sortKey, sortDir])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
@@ -1169,9 +1322,24 @@ function IssuesCollectionYearsSection({
           <IssuesCatalogTableColgroup />
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Year</th>
-              <th>Status</th>
+              <SortColumnHeader
+                label="ID"
+                active={sortKey === 'id'}
+                direction={sortDir}
+                onSort={() => toggleSort('id')}
+              />
+              <SortColumnHeader
+                label="Year"
+                active={sortKey === 'label'}
+                direction={sortDir}
+                onSort={() => toggleSort('label')}
+              />
+              <SortColumnHeader
+                label="Status"
+                active={sortKey === 'status'}
+                direction={sortDir}
+                onSort={() => toggleSort('status')}
+              />
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
@@ -1291,15 +1459,20 @@ function IssuesCollectionGendersSection({
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
-  const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
-
-  const sorted = useMemo(() => [...genders].sort((a, b) => b.id - a.id), [genders])
+  const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
+    useClientTableState<CatalogIdNameSortKey>({
+      pageSize: ISSUES_PAGE_SIZE,
+      initialSortKey: 'id',
+      initialSortDir: 'desc',
+    })
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return sorted
-    return sorted.filter((g) => g.name.toLowerCase().includes(q) || String(g.id).includes(q))
-  }, [sorted, search])
+    const filtered = !q
+      ? genders
+      : genders.filter((g) => g.name.toLowerCase().includes(q) || String(g.id).includes(q))
+    return sortCatalogIdNameRows(filtered, sortKey, sortDir)
+  }, [genders, search, sortKey, sortDir])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
@@ -1362,9 +1535,24 @@ function IssuesCollectionGendersSection({
           <IssuesCatalogTableColgroup />
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Gender</th>
-              <th>Status</th>
+              <SortColumnHeader
+                label="ID"
+                active={sortKey === 'id'}
+                direction={sortDir}
+                onSort={() => toggleSort('id')}
+              />
+              <SortColumnHeader
+                label="Gender"
+                active={sortKey === 'name'}
+                direction={sortDir}
+                onSort={() => toggleSort('name')}
+              />
+              <SortColumnHeader
+                label="Status"
+                active={sortKey === 'status'}
+                direction={sortDir}
+                onSort={() => toggleSort('status')}
+              />
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
@@ -1482,18 +1670,20 @@ function IssuesCollectionReligionsSection({
 }) {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
-  const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: ISSUES_PAGE_SIZE })
-
-  const sorted = useMemo(
-    () => [...religions].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
-    [religions],
-  )
+  const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
+    useClientTableState<CatalogIdNameSortKey>({
+      pageSize: ISSUES_PAGE_SIZE,
+      initialSortKey: 'id',
+      initialSortDir: 'desc',
+    })
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return sorted
-    return sorted.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q))
-  }, [sorted, search])
+    const filtered = !q
+      ? religions
+      : religions.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q))
+    return sortCatalogIdNameRows(filtered, sortKey, sortDir)
+  }, [religions, search, sortKey, sortDir])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
@@ -1526,9 +1716,24 @@ function IssuesCollectionReligionsSection({
           <IssuesCatalogTableColgroup />
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Religion</th>
-              <th>Status</th>
+              <SortColumnHeader
+                label="ID"
+                active={sortKey === 'id'}
+                direction={sortDir}
+                onSort={() => toggleSort('id')}
+              />
+              <SortColumnHeader
+                label="Religion"
+                active={sortKey === 'name'}
+                direction={sortDir}
+                onSort={() => toggleSort('name')}
+              />
+              <SortColumnHeader
+                label="Status"
+                active={sortKey === 'status'}
+                direction={sortDir}
+                onSort={() => toggleSort('status')}
+              />
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
@@ -1653,6 +1858,33 @@ function articleConventionLabel(
   return match?.code ?? (article.convention_id ? String(article.convention_id) : '—')
 }
 
+function sortArticleCatalogRows(
+  rows: AdminArticleRow[],
+  conventions: AdminConvention[],
+  sortKey: ArticleCatalogSortKey | undefined,
+  sortDir: SortDirection,
+): AdminArticleRow[] {
+  const key = sortKey ?? 'id'
+  return [...rows].sort((a, b) => {
+    switch (key) {
+      case 'id':
+        return compareNumberValues(a.id, b.id, sortDir)
+      case 'convention':
+        return compareStringValues(
+          articleConventionLabel(a, conventions),
+          articleConventionLabel(b, conventions),
+          sortDir,
+        )
+      case 'article_name':
+        return compareStringValues(a.article_name, b.article_name, sortDir)
+      case 'status':
+        return compareStringValues(catalogStatusLabel(a), catalogStatusLabel(b), sortDir)
+      default:
+        return 0
+    }
+  })
+}
+
 function effectiveIndicatorQl(
   ind: AdminIssue['indicators'][number],
   issue: AdminIssue,
@@ -1715,11 +1947,24 @@ function CatalogInlineEditActions({
   )
 }
 
-function IssuesCatalogTableColgroup() {
+function IssuesCatalogTableColgroup({ variant = 'standard' }: { variant?: 'standard' | 'articles' }) {
+  if (variant === 'articles') {
+    return (
+      <colgroup>
+        <col className="issues-catalog-table__col-id" />
+        <col className="issues-catalog-table__col-convention" />
+        <col className="issues-catalog-table__col-name" />
+        <col className="issues-catalog-table__col-status" />
+        <col className="issues-catalog-table__col-actions" />
+      </colgroup>
+    )
+  }
+
   return (
     <colgroup>
       <col className="issues-catalog-table__col-id" />
-      <col />
+      <col className="issues-catalog-table__col-name" />
+      <col className="issues-catalog-table__col-status" />
       <col className="issues-catalog-table__col-actions" />
     </colgroup>
   )
@@ -1741,6 +1986,7 @@ type IndicatorDisaggregatedYearRow = {
 type IndicatorCollectionMode = 'none' | 'year' | 'year_disaggregated'
 
 type IndicatorDraft = {
+  client_key: string
   indicator_text: string
   collects_quantitative: boolean
   collects_qualitative: boolean
@@ -1754,8 +2000,17 @@ type IndicatorDraft = {
   collects_by_religion: boolean
 }
 
+let indicatorClientKeyCounter = 0
+
+function nextIndicatorClientKey(existingId?: number): string {
+  if (existingId != null) return `ind-${existingId}`
+  indicatorClientKeyCounter += 1
+  return `new-${indicatorClientKeyCounter}`
+}
+
 function emptyIndicator(): IndicatorDraft {
   return {
+    client_key: nextIndicatorClientKey(),
     indicator_text: '',
     collects_quantitative: false,
     collects_qualitative: true,
@@ -1816,6 +2071,7 @@ function indicatorFromAdmin(ind: AdminIssueIndicator): IndicatorDraft {
     collection_mode = hasDisaggregation ? 'year_disaggregated' : 'year'
   }
   return {
+    client_key: nextIndicatorClientKey(ind.id),
     indicator_text: ind.indicator_text,
     collects_quantitative: ind.has_quantitative,
     collects_qualitative: ind.has_qualitative,
@@ -1834,6 +2090,10 @@ function indicatorFromAdmin(ind: AdminIssueIndicator): IndicatorDraft {
     collects_by_disability: ind.collects_by_disability,
     collects_by_religion: ind.collects_by_religion,
   }
+}
+
+function indicatorAdminToPayload(ind: AdminIssueIndicator) {
+  return indicatorToPayload(indicatorFromAdmin(ind))
 }
 
 function indicatorToPayload(x: IndicatorDraft) {
@@ -2118,6 +2378,8 @@ function IssueIndicatorsEditor({
   collectionGenders: AdminCollectionGender[]
   disabled?: boolean
 }) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
   const sortedYears = useMemo(
     () => [...collectionYears].sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)),
     [collectionYears],
@@ -2130,15 +2392,60 @@ function IssueIndicatorsEditor({
     [collectionGenders],
   )
 
+  function finishDrag() {
+    setDragIndex(null)
+    setDropIndex(null)
+  }
+
+  function handleDrop(toIndex: number) {
+    if (dragIndex == null || disabled) {
+      finishDrag()
+      return
+    }
+    onChange(reorderList(rows, dragIndex, toIndex))
+    finishDrag()
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {rows.length > 1 && !disabled ? (
+        <p className="text-muted text-compact" style={{ margin: 0 }}>
+          Drag indicators to set the list order shown to departments and in reports.
+        </p>
+      ) : null}
       {rows.length === 0 && (
         <p className="text-muted text-compact" style={{ margin: 0 }}>
           {noIndicatorsForLoiHint()}
         </p>
       )}
       {rows.map((row, idx) => (
-        <div key={idx} className="issue-indicator-card">
+        <div
+          key={row.client_key}
+          className={
+            'issue-indicator-card' +
+            (dropIndex === idx ? ' issue-indicator-card--drop-target' : '') +
+            (dragIndex === idx ? ' issue-indicator-card--dragging' : '')
+          }
+          draggable={!disabled}
+          onDragStart={() => {
+            if (disabled) return
+            setDragIndex(idx)
+          }}
+          onDragEnd={finishDrag}
+          onDragOver={(e) => {
+            if (disabled || dragIndex == null) return
+            e.preventDefault()
+            setDropIndex(idx)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            handleDrop(idx)
+          }}
+        >
+          <div className="issue-indicator-card__head">
+            <DragHandle disabled={disabled} className="issue-indicator-card__drag" />
+            <span className="issue-indicator-card__position text-muted text-compact">#{idx + 1}</span>
+          </div>
           <FormRow twoCol>
             <FormControl label="Indicator text">
               <input
@@ -2673,6 +2980,24 @@ function IssuesIssueViewPage({
   const navigate = useNavigate()
   const [issue, setIssue] = useState<AdminIssue | null>(null)
   const [loading, setLoading] = useState(true)
+  const [reorderBusy, setReorderBusy] = useState(false)
+
+  async function saveIndicatorOrder(next: AdminIssueIndicator[]) {
+    if (!issue) return
+    setReorderBusy(true)
+    setError(null)
+    try {
+      const updated = await adminUpdateIssue(issue.id, {
+        indicators: next.map((ind) => indicatorAdminToPayload(ind)),
+      })
+      setIssue(updated)
+      await onRefreshIssues()
+    } catch (e: unknown) {
+      setError(isApiError(e) ? e.message : e instanceof Error ? e.message : 'Could not save indicator order')
+    } finally {
+      setReorderBusy(false)
+    }
+  }
 
   useEffect(() => {
     const cached = issues.find((i) => i.id === issueId)
@@ -2718,7 +3043,12 @@ function IssuesIssueViewPage({
       {!loading && !issue && <p className="login-error">Entry not found.</p>}
       {issue && (
         <TableCard padded>
-          <IssueDetailReadOnlyPanel issue={issue} />
+          <IssueDetailReadOnlyPanel
+            issue={issue}
+            reorderIndicators
+            onReorderIndicators={(next) => void saveIndicatorOrder(next)}
+            reorderBusy={reorderBusy}
+          />
           <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button variant="secondary" compact onClick={() => navigate('/admin/issues')}>
               Back to list
@@ -2740,7 +3070,96 @@ function IssuesIssueViewPage({
   )
 }
 
-function IssueDetailReadOnlyPanel({ issue }: { issue: AdminIssue }) {
+function IssueIndicatorsDisplayTable({
+  issue,
+  indicators,
+  reorderable,
+  onReorder,
+  reorderBusy,
+}: {
+  issue: AdminIssue
+  indicators: AdminIssueIndicator[]
+  reorderable?: boolean
+  onReorder?: (next: AdminIssueIndicator[]) => void
+  reorderBusy?: boolean
+}) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
+
+  function finishDrag() {
+    setDragIndex(null)
+    setDropIndex(null)
+  }
+
+  function handleDrop(toIndex: number) {
+    if (dragIndex == null || !reorderable || !onReorder || reorderBusy) {
+      finishDrag()
+      return
+    }
+    onReorder(reorderList(indicators, dragIndex, toIndex))
+    finishDrag()
+  }
+
+  return (
+    <table className="data-table issue-detail-indicators-table">
+      <thead>
+        <tr>
+          {reorderable ? <th className="issue-indicator-order-col" aria-label="Reorder" /> : null}
+          <th>Indicator</th>
+          <th>Data types</th>
+          <th>Disaggregation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {indicators.map((ind, idx) => (
+          <tr
+            key={ind.id}
+            className={
+              (dropIndex === idx ? ' issue-indicator-row--drop-target' : '') +
+              (dragIndex === idx ? ' issue-indicator-row--dragging' : '')
+            }
+            draggable={Boolean(reorderable && !reorderBusy)}
+            onDragStart={() => {
+              if (!reorderable || reorderBusy) return
+              setDragIndex(idx)
+            }}
+            onDragEnd={finishDrag}
+            onDragOver={(e) => {
+              if (!reorderable || reorderBusy || dragIndex == null) return
+              e.preventDefault()
+              setDropIndex(idx)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              handleDrop(idx)
+            }}
+          >
+            {reorderable ? (
+              <td className="issue-indicator-order-col">
+                <DragHandle disabled={reorderBusy} />
+              </td>
+            ) : null}
+            <td>{ind.indicator_text}</td>
+            <td>{indicatorDataTypeLabel(ind, issue)}</td>
+            <td>{indicatorDisaggregationLabel(ind)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function IssueDetailReadOnlyPanel({
+  issue,
+  reorderIndicators,
+  onReorderIndicators,
+  reorderBusy,
+}: {
+  issue: AdminIssue
+  reorderIndicators?: boolean
+  onReorderIndicators?: (next: AdminIssueIndicator[]) => void
+  reorderBusy?: boolean
+}) {
   const kind = coerceIssueEntryKind(issue.entry_kind)
   return (
     <div className="issue-detail-readonly">
@@ -2796,27 +3215,21 @@ function IssueDetailReadOnlyPanel({ issue }: { issue: AdminIssue }) {
       <h4 className="font-semibold text-compact" style={{ margin: '20px 0 10px' }}>
         Indicators
       </h4>
+      {reorderIndicators && issue.indicators.length > 1 ? (
+        <p className="text-muted text-compact" style={{ margin: '0 0 10px' }}>
+          Drag rows to set indicator order.{reorderBusy ? ' Saving…' : ''}
+        </p>
+      ) : null}
       {issue.indicators.length === 0 ? (
         <p className="muted text-compact">None</p>
       ) : (
-        <table className="data-table issue-detail-indicators-table">
-          <thead>
-            <tr>
-              <th>Indicator</th>
-              <th>Data types</th>
-              <th>Disaggregation</th>
-            </tr>
-          </thead>
-          <tbody>
-            {issue.indicators.map((ind) => (
-              <tr key={ind.id}>
-                <td>{ind.indicator_text}</td>
-                <td>{indicatorDataTypeLabel(ind, issue)}</td>
-                <td>{indicatorDisaggregationLabel(ind)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <IssueIndicatorsDisplayTable
+          issue={issue}
+          indicators={issue.indicators}
+          reorderable={reorderIndicators}
+          onReorder={onReorderIndicators}
+          reorderBusy={reorderBusy}
+        />
       )}
     </div>
   )

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { MinistryCompiledRecordViewModal } from '../components/MinistryCompiledRecordViewModal'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { PageSection } from '../components/ui/PageSection'
+import { LABEL_COMPILED_RECORD } from '../lib/uiLabels'
 import { isFederalAdmin, isSuperAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 
@@ -43,7 +44,7 @@ export function CompiledRecordViewPage() {
   const fromPath = encodeURIComponent(backTo)
 
   return (
-    <PageSection title="Compiled record">
+    <PageSection title={LABEL_COMPILED_RECORD}>
       <div className="hr-request-view-stack hr-request-view-stack--request-page">
         {loading ? <p className="muted">Loading…</p> : null}
         {error ? <p className="login-error">{error}</p> : null}

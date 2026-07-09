@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { LABEL_TOTAL_COMPILATIONS } from '../../lib/uiLabels'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../../api/lists'
 import { useAuth } from '../../auth/AuthContext'
 import { Button } from '../../components/ui/Button'
@@ -129,7 +130,7 @@ export function SubmissionHistoryPage({ title }: Props) {
   )
 
   return (
-    <PageSection title={deptHistoryUser ? 'Submission history' : title}>
+    <PageSection title={title}>
       {error && <p className="login-error">{error}</p>}
 
       {deptHistoryUser && (
@@ -248,7 +249,7 @@ export function SubmissionHistoryPage({ title }: Props) {
           <div style={{ marginTop: 16 }}>
             <StatsCards
               items={[
-                { label: 'Total compilations', value: rows.length },
+                { label: LABEL_TOTAL_COMPILATIONS, value: rows.length },
                 ...reviewStats.map((s) => ({ label: s.label, value: s.count })),
               ]}
             />

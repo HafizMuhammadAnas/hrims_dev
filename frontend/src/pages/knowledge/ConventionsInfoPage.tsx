@@ -21,6 +21,7 @@ import {
   KnowledgeHubTabs,
 } from '../../components/knowledge/KnowledgeHubUi'
 import { KnowledgeConventionCatDetail } from '../../components/knowledge/KnowledgeConventionCatDetail'
+import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_SEVEN_CORE_CONVENTIONS } from '../../lib/uiLabels'
 
 const CONVENTION_TABS = ['Overview', 'Recommendations', 'Implementation', 'Challenges', 'Resources'] as const
 type ConventionTab = (typeof CONVENTION_TABS)[number]
@@ -65,8 +66,8 @@ function ConventionDetail({
             <KnowledgeHubProse>{data.description.trim()}</KnowledgeHubProse>
           ) : (
             <KnowledgeHubMutedProse>
-              No narrative has been added yet. A super administrator can publish overview text from Super admin →
-              Conventions & components.
+              No narrative has been added yet. A super administrator can publish overview text from Super Admin →
+              {LABEL_CONVENTIONS_AND_COMPONENTS}.
             </KnowledgeHubMutedProse>
           )}
           {articles.length > 0 ? (
@@ -207,7 +208,7 @@ export function ConventionsInfoPage() {
 
   return (
     <KnowledgeHubPage>
-      <KnowledgeHubListSection title="Seven Core Human Rights Conventions">
+      <KnowledgeHubListSection title={LABEL_SEVEN_CORE_CONVENTIONS}>
         <KnowledgeHubStateMessage error={loadError} loading={loading} empty={!loading && rows.length === 0} />
         {!loading && rows.length > 0 ? (
           <KnowledgeHubCardsGrid>

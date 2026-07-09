@@ -8,6 +8,7 @@ import {
   issueEntryKindBadgeLabel,
   issueEntryPrimaryText,
 } from './issueEntryKind'
+import { LABEL_LOI_OBSERVATION_TITLE, LABEL_TOTAL_RECORDS } from './uiLabels'
 import type { HrRequestRow } from '../types/hrRequest'
 
 export type ReportDataSource = 'requests' | 'responses' | 'consolidated'
@@ -350,7 +351,7 @@ function linkedRequestFields(req: HrRequestRow | undefined): ReportTableRow {
       'Convention name': '—',
       Type: '—',
       Category: '—',
-      'LOI / observation title': '—',
+      LABEL_LOI_OBSERVATION_TITLE: '—',
       'Request status': '—',
       'Request due date': '—',
     }
@@ -360,7 +361,7 @@ function linkedRequestFields(req: HrRequestRow | undefined): ReportTableRow {
     'Convention name': req.convention?.name ?? '—',
     Type: issueEntryKindBadgeLabel(coerceIssueEntryKind(req.issue?.entry_kind)),
     Category: req.issue?.category?.name ?? '—',
-    'LOI / observation title': req.issue ? issueEntryPrimaryText(req.issue) || '—' : '—',
+    LABEL_LOI_OBSERVATION_TITLE: req.issue ? issueEntryPrimaryText(req.issue) || '—' : '—',
     'Request status': formatStatusLabel(req.status),
     'Request due date': req.date || '—',
   }
@@ -749,11 +750,11 @@ export function buildReportData(
       title: `Request data report (${fr.length} records)`,
       filterSummary,
       metrics: [
-        { label: 'Total requests', value: fr.length },
+        { label: 'Total Requests', value: fr.length },
         { label: 'Active', value: fr.filter((r) => r.status === 'active').length },
         { label: 'Draft', value: fr.filter((r) => r.status === 'draft').length },
         {
-          label: 'With regional response',
+          label: 'With Regional Response',
           value: fr.length ? `${Math.round((withResponse / fr.length) * 100)}%` : '0%',
         },
       ],
@@ -774,7 +775,7 @@ export function buildReportData(
         'Convention name',
         'Type',
         'Category',
-        'LOI / observation title',
+        LABEL_LOI_OBSERVATION_TITLE,
         'Description',
         'Regions',
         'Departments',
@@ -789,7 +790,7 @@ export function buildReportData(
         'Convention name': r.convention?.name ?? '—',
         Type: issueEntryKindBadgeLabel(coerceIssueEntryKind(r.issue?.entry_kind)),
         Category: r.issue?.category?.name ?? '—',
-        'LOI / observation title': r.issue ? issueEntryPrimaryText(r.issue) || '—' : '—',
+        LABEL_LOI_OBSERVATION_TITLE: r.issue ? issueEntryPrimaryText(r.issue) || '—' : '—',
         Description: r.issue?.description?.trim() || r.details?.trim() || '—',
         Regions: regionNamesOfRequest(r) || '—',
         Departments: departmentNamesOfRequest(r) || '—',
@@ -813,7 +814,7 @@ export function buildReportData(
       title: `Response data report (${sr.length} records)`,
       filterSummary,
       metrics: [
-        { label: 'Total responses', value: sr.length },
+        { label: 'Total Responses', value: sr.length },
         { label: 'Regions', value: Object.keys(regionMap).filter((k) => k !== '—').length },
         { label: 'Accepted', value: sr.filter((r) => r.review_status === 'accepted').length },
       ],
@@ -837,7 +838,7 @@ export function buildReportData(
         'Convention name',
         'Type',
         'Category',
-        'LOI / observation title',
+        LABEL_LOI_OBSERVATION_TITLE,
         'Request status',
         'Request due date',
       ],
@@ -871,7 +872,7 @@ export function buildReportData(
     title: `Compiled data report (${cr.length} records)`,
     filterSummary,
     metrics: [
-      { label: 'Total records', value: cr.length },
+      { label: LABEL_TOTAL_RECORDS, value: cr.length },
       { label: 'Submitted', value: cr.filter((c) => c.status === 'submitted').length },
       { label: 'Draft', value: cr.filter((c) => c.status === 'draft').length },
     ],
@@ -897,7 +898,7 @@ export function buildReportData(
       'Convention name',
       'Type',
       'Category',
-      'LOI / observation title',
+      LABEL_LOI_OBSERVATION_TITLE,
     ],
     tableRows: cr.map((c) => {
       const req = c.req_id ? reqById.get(c.req_id) : undefined
@@ -915,7 +916,7 @@ export function buildReportData(
         'Convention name': req?.convention?.name ?? '—',
         Type: issueEntryKindBadgeLabel(coerceIssueEntryKind(req?.issue?.entry_kind)),
         Category: req?.issue?.category?.name ?? '—',
-        'LOI / observation title': req?.issue ? issueEntryPrimaryText(req.issue) || '—' : '—',
+        LABEL_LOI_OBSERVATION_TITLE: req?.issue ? issueEntryPrimaryText(req.issue) || '—' : '—',
       }
     }),
   }

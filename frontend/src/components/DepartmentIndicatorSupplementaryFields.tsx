@@ -5,6 +5,8 @@ import { IndicatorYearGenderHint } from './IndicatorYearGenderHint'
 import { PendingFileAttachmentRow } from './PendingFileAttachmentRow'
 import { Button } from './ui/Button'
 
+import type { MatrixRowEnabledMap } from '../lib/deptMatrixRowEnabled'
+
 export type DeptIndicatorDraft = {
   value: string
   comment: string
@@ -15,6 +17,7 @@ export type DeptIndicatorDraft = {
   yearRegionValues: Record<string, string>
   yearDistrictValues: Record<string, string>
   yearReligionValues: Record<string, string>
+  matrixRowEnabled: MatrixRowEnabledMap
   quantFile: File | null
   qualFile: File | null
   clearSavedQuantAttachment: boolean
@@ -32,6 +35,7 @@ export function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
     yearRegionValues: {},
     yearDistrictValues: {},
     yearReligionValues: {},
+    matrixRowEnabled: {},
     quantFile: null,
     qualFile: null,
     clearSavedQuantAttachment: false,

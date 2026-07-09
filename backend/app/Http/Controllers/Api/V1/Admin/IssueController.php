@@ -280,7 +280,7 @@ class IssueController extends Controller
     private function replaceIndicators(Issue $issue, array $rows): void
     {
         $issue->indicators()->delete();
-        foreach ($rows as $row) {
+        foreach ($rows as $sortOrder => $row) {
             $text = trim((string) ($row['indicator_text'] ?? ''));
             if ($text === '') {
                 continue;
@@ -318,7 +318,7 @@ class IssueController extends Controller
                 }
             }
 
-            $indicator = IssueIndicator::query()->create([
+            $indicatorAttributes = [
                 'issue_id' => $issue->id,
                 'indicator_text' => $text,
                 'disaggregation' => isset($row['disaggregation']) && $row['disaggregation'] !== ''
@@ -332,7 +332,12 @@ class IssueController extends Controller
                 'collects_by_location' => $collectsByYear && $collectsByLocation,
                 'collects_by_disability' => $collectsByYear && $collectsByDisability,
                 'collects_by_religion' => $collectsByYear && $collectsByReligion,
-            ]);
+            ];
+            if (IssueIndicator::hasSortOrderColumn()) {
+                $indicatorAttributes['sort_order'] = (int) $sortOrder;
+            }
+
+            $indicator = IssueIndicator::query()->create($indicatorAttributes);
 
             if ($collectsByYear) {
                 $indicator->syncCollectionByYear($collectionByYear, $collectsByGender);

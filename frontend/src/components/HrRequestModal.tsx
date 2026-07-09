@@ -33,6 +33,11 @@ import {
   selectIndicatorForLoiMessage,
   type IssueEntryKind,
 } from '../lib/issueEntryKind'
+import {
+  LABEL_EDIT_HR_REQUEST,
+  LABEL_NEW_REQUEST,
+  LABEL_REQUEST_DETAILS,
+} from '../lib/uiLabels'
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
 import { IndicatorYearGenderHint } from './IndicatorYearGenderHint'
 import { PendingFileAttachmentListItem } from './PendingFileAttachmentRow'
@@ -866,12 +871,12 @@ export function HrRequestModal({
           <ModalHeader
             title={
               mode === 'create'
-                ? 'New request'
+                ? LABEL_NEW_REQUEST
                 : mode === 'edit'
-                  ? 'Edit HR request'
+                  ? LABEL_EDIT_HR_REQUEST
                   : mode === 'view' && detail?.id
                     ? `Request — ${detail.id}`
-                    : 'Request details'
+                    : LABEL_REQUEST_DETAILS
             }
             onClose={onClose}
           />
@@ -1083,7 +1088,7 @@ export function HrRequestModal({
                     issueForm.convention_id === ''
                       ? 'Select a convention first'
                       : !entryKindFilters.issue && !entryKindFilters.recommendation
-                        ? 'Select LOI or Concluding observations'
+                        ? 'Select LOI or Concluding Observations'
                         : issuesLoading
                           ? loiLoadingPlaceholder()
                           : hrIssueSelectPlaceholder(entryKindFilters)
@@ -1129,7 +1134,7 @@ export function HrRequestModal({
                         <summary className="mapping-article-collapse__summary">
                           <strong>
                             {coerceIssueEntryKind(selectedIssue.entry_kind) === 'recommendation'
-                              ? 'Concluding observation'
+                              ? 'Concluding Observation'
                               : 'LOI description'}
                           </strong>
                         </summary>

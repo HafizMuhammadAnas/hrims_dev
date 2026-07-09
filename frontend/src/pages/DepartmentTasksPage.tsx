@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { PageSection } from '../components/ui/PageSection'
+import { LABEL_ASSIGNED_TASKS, LABEL_DEPARTMENT_TASKS, LABEL_TOTAL_TASKS } from '../lib/uiLabels'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { StatsCards } from '../components/ui/StatsCards'
@@ -59,13 +60,13 @@ export function DepartmentTasksPage() {
   const fromParam = encodeURIComponent('/department-tasks')
 
   return (
-    <PageSection title={ictDeptPortal ? 'Assigned tasks' : 'Department tasks'}>
+    <PageSection title={ictDeptPortal ? LABEL_ASSIGNED_TASKS : LABEL_DEPARTMENT_TASKS}>
       {error && <p className="login-error">{error}</p>}
 
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'Total tasks', value: filtered.length },
+            { label: LABEL_TOTAL_TASKS, value: filtered.length },
             { label: 'Pending', value: workflowCounts.in_process },
             { label: 'Review', value: workflowCounts.responded },
             { label: 'Revision', value: workflowCounts.revision },

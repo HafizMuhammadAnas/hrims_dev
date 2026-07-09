@@ -11,6 +11,7 @@ import { FormRow } from '../components/ui/FormRow'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { ModalActions } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
+import { LABEL_CREATE_DEPARTMENT, LABEL_EDIT_DEPARTMENT, LABEL_MANAGE_DEPARTMENTS } from '../lib/uiLabels'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { StatsCards } from '../components/ui/StatsCards'
@@ -164,7 +165,7 @@ export function ManageDepartmentsPage() {
 
   return (
     <PageSection
-      title={view === 'edit' ? 'Edit department' : 'Manage departments'}
+      title={view === 'edit' ? LABEL_EDIT_DEPARTMENT : LABEL_MANAGE_DEPARTMENTS}
       leading={editBack}
     >
       {error && (
@@ -226,8 +227,8 @@ export function ManageDepartmentsPage() {
           <div style={{ marginTop: 16 }}>
             <StatsCards
               items={[
-                { label: 'Total departments', value: filteredRows.length },
-                { label: 'Regions represented', value: regionCount },
+                { label: 'Total Departments', value: filteredRows.length },
+                { label: 'Regions Represented', value: regionCount },
               ]}
             />
           </div>
@@ -328,7 +329,7 @@ export function ManageDepartmentsPage() {
                 Cancel
               </Button>
               <Button variant="primary" compact disabled={saving} onClick={() => void handleCreate()}>
-                {saving ? 'Saving...' : 'Create department'}
+                {saving ? 'Saving...' : LABEL_CREATE_DEPARTMENT}
               </Button>
             </ModalActions>
           </FormGrid>

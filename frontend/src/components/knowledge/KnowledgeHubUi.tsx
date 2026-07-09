@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { KnowledgeHubIcon } from '../KnowledgeHubIcon'
+import { formatKnowledgeHubTitle } from '../../lib/displayTitleCase'
 
 export function KnowledgeHubPage({ children }: { children: ReactNode }) {
   return (
@@ -56,6 +57,8 @@ export function KnowledgeHubCard({
     Boolean(stat1Value?.trim() || stat1Label?.trim()) ||
     Boolean(stat2Value?.trim() || stat2Label?.trim())
 
+  const displayTitle = formatKnowledgeHubTitle(title)
+
   const Tag = onClick ? 'button' : 'div'
   return (
     <Tag
@@ -64,7 +67,7 @@ export function KnowledgeHubCard({
       onClick={onClick}
     >
       <KnowledgeHubIcon value={icon} fallback={fallback} variant="card" />
-      <h3 className="card-title">{title}</h3>
+      <h3 className="card-title">{displayTitle}</h3>
       <p className="card-desc">{description?.trim() || '—'}</p>
       {hasStats ? (
         <div className="card-stats">
@@ -106,7 +109,7 @@ export function KnowledgeHubDetailHeader({
       <div className="conv-header">
         <KnowledgeHubIcon value={icon} fallback={fallback} variant="hero" />
         <div className="conv-title-section">
-          <h1 className="conv-title">{title}</h1>
+          <h1 className="conv-title">{formatKnowledgeHubTitle(title)}</h1>
           {subtitle?.trim() ? <p className="conv-subtitle">{subtitle.trim()}</p> : null}
           {metaLines && metaLines.length > 0 ? (
             <p className="text-lt" style={{ marginTop: '12px', fontSize: '14px', lineHeight: 1.6 }}>

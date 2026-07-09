@@ -34,6 +34,15 @@ import { ReceivedRequestsPage } from './pages/workflow/ReceivedRequestsPage'
 import { RequestDistributionPage } from './pages/workflow/RequestDistributionPage'
 import { ResponseCompilationPage } from './pages/workflow/ResponseCompilationPage'
 import { SubmissionHistoryPage } from './pages/workflow/SubmissionHistoryPage'
+import {
+  LABEL_COMPILED_AND_SUBMITTED,
+  LABEL_COMPILED_RESPONSES,
+  LABEL_DEPARTMENTAL_RESPONSES,
+  LABEL_RECEIVED_REQUESTS,
+  LABEL_REGIONAL_REQUEST_DISTRIBUTION,
+  LABEL_RESPONSE_COMPILATION,
+  LABEL_SUBMISSION_HISTORY,
+} from './lib/uiLabels'
 
 function App() {
   return (
@@ -67,7 +76,7 @@ function App() {
               <Route path="federal-departments-mgmt" element={<ManageDepartmentsPage />} />
               <Route
                 path="federal-department-requests"
-                element={<DepartmentMonitoringPage title="Departmental responses" />}
+                element={<DepartmentMonitoringPage title={LABEL_DEPARTMENTAL_RESPONSES} />}
               />
               <Route path="federal-distribution" element={<Navigate to="/federal-department-requests" replace />} />
               <Route
@@ -80,7 +89,7 @@ function App() {
                 path="federal-compilation"
                 element={
                   <ResponseCompilationPage
-                    title="Response compilation"
+                    title={LABEL_RESPONSE_COMPILATION}
                     nextPath="/federal-history"
                     scope="ict"
                   />
@@ -88,13 +97,13 @@ function App() {
               />
               <Route
                 path="federal-history"
-                element={<SubmissionHistoryPage title="Compiled responses" />}
+                element={<SubmissionHistoryPage title={LABEL_COMPILED_RESPONSES} />}
               />
               <Route
                 path="region-received"
                 element={
                   <ReceivedRequestsPage
-                    title="Received Requests"
+                    title={LABEL_RECEIVED_REQUESTS}
                     distributionPath="/region-distribution"
                     monitoringPath="/region-monitoring"
                     historyPath="/region-history"
@@ -105,20 +114,20 @@ function App() {
                 path="region-distribution"
                 element={
                   <RequestDistributionPage
-                    title="Regional — request distribution"
+                    title={LABEL_REGIONAL_REQUEST_DISTRIBUTION}
                     nextPath="/region-monitoring"
                   />
                 }
               />
               <Route
                 path="region-monitoring"
-                element={<DepartmentMonitoringPage title="Departmental responses" />}
+                element={<DepartmentMonitoringPage title={LABEL_DEPARTMENTAL_RESPONSES} />}
               />
               <Route
                 path="region-compilation"
                 element={
                   <ResponseCompilationPage
-                    title="Response compilation"
+                    title={LABEL_RESPONSE_COMPILATION}
                     nextPath="/region-history"
                     scope="regional"
                   />
@@ -129,7 +138,7 @@ function App() {
               <Route path="regional-users-mgmt" element={<UserManagementPage />} />
               <Route
                 path="region-history"
-                element={<SubmissionHistoryPage title="Compiled and submitted" />}
+                element={<SubmissionHistoryPage title={LABEL_COMPILED_AND_SUBMITTED} />}
               />
               <Route path="department-tasks" element={<DepartmentTasksPage />} />
               <Route path="regional-departments-mgmt/new" element={<ManageDepartmentsPage />} />
@@ -137,7 +146,7 @@ function App() {
               <Route path="regional-departments-mgmt" element={<ManageDepartmentsPage />} />
               <Route
                 path="department-history"
-                element={<SubmissionHistoryPage title="Submission history" />}
+                element={<SubmissionHistoryPage title={LABEL_SUBMISSION_HISTORY} />}
               />
               <Route path="report-generator" element={<ReportGeneratorPage />} />
               <Route path="analysis" element={<Navigate to="/report-generator" replace />} />

@@ -48,7 +48,13 @@ class Issue extends Model
 
     public function indicators(): HasMany
     {
-        return $this->hasMany(IssueIndicator::class);
+        $relation = $this->hasMany(IssueIndicator::class);
+
+        if (IssueIndicator::hasSortOrderColumn()) {
+            return $relation->orderBy('sort_order')->orderBy('id');
+        }
+
+        return $relation->orderBy('id');
     }
 
     public function hrRequests(): HasMany

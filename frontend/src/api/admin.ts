@@ -114,6 +114,7 @@ export type AdminCollectionReligion = {
 
 export type AdminIssueIndicator = {
   id: number
+  sort_order?: number
   indicator_text: string
   disaggregation: string | null
   has_quantitative: boolean

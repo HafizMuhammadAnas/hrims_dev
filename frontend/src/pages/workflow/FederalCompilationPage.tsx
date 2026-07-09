@@ -23,6 +23,7 @@ import { regionalResponseReviewPresentation } from '../../lib/regionalResponseRe
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
+import { LABEL_COMPILATION_CENTER, LABEL_DEPARTMENTAL_RESPONSES, LABEL_REGIONAL_RESPONSES } from '../../lib/uiLabels'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
@@ -284,7 +285,7 @@ export function FederalCompilationPage() {
   const fromCompiledRecords = isFromCompiledRecordsPath(searchParams.get('from'))
 
   return (
-    <PageSection title="Compilation center">
+    <PageSection title={LABEL_COMPILATION_CENTER}>
       {fromCompiledRecords && selectedReqId ? (
         <CompiledRecordsWorkflowNav reqId={selectedReqId} activeTab="compilation" />
       ) : null}
@@ -292,7 +293,7 @@ export function FederalCompilationPage() {
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'Available for compilation', value: requestsForSelect.length },
+            { label: 'Available for Compilation', value: requestsForSelect.length },
             { label: 'Compiled', value: reqIdsNationallySubmitted.size },
           ]}
         />
@@ -303,7 +304,7 @@ export function FederalCompilationPage() {
           <p className="muted" style={{ margin: '8px 0 12px' }}>
             No data yet for national compilation: provinces submit from <Link to="/region-compilation">Response compilation</Link>,
             and national-line departments submit under ICT assignments from{' '}
-            <Link to="/federal-department-requests">Departmental responses</Link>.
+            <Link to="/federal-department-requests">{LABEL_DEPARTMENTAL_RESPONSES}</Link>.
           </p>
         ) : null}
         {requestsForSelect.length === 0 && reqIdsForPicker.length > 0 ? (
@@ -357,7 +358,7 @@ export function FederalCompilationPage() {
               <p style={{ margin: 0 }}>
                 This request has regional compilations, but none are <strong>accepted</strong> yet. Draft and submitted
                 national records only include <strong>accepted</strong> provinces. Go to{' '}
-                <Link to="/responses">Regional responses</Link>, open each row, set review status to{' '}
+                <Link to="/responses">{LABEL_REGIONAL_RESPONSES}</Link>, open each row, set review status to{' '}
                 <strong>accepted</strong>, and save—then return here and select provinces to include.
               </p>
             </Alert>
@@ -371,7 +372,7 @@ export function FederalCompilationPage() {
               <p style={{ margin: 0 }}>
                 This request uses national-line (ICT) departments. The national preview includes ICT only after{' '}
                 <strong>every</strong> submitted departmental response is accepted. Open{' '}
-                <Link to="/federal-department-requests">Departmental responses</Link>, review each task, and accept—then
+                <Link to="/federal-department-requests">{LABEL_DEPARTMENTAL_RESPONSES}</Link>, review each task, and accept—then
                 refresh this page if the preview is still empty.
               </p>
             </Alert>
@@ -390,14 +391,14 @@ export function FederalCompilationPage() {
             </p>
             <StatsCards
               items={[
-                { label: 'Provinces assigned', value: provinceCounts.assigned },
+                { label: 'Provinces Assigned', value: provinceCounts.assigned },
                 { label: 'Submitted', value: provinceCounts.submitted },
-                { label: 'Awaiting submission', value: provinceCounts.pending },
-                { label: 'Accepted (review)', value: provinceCounts.accepted },
+                { label: 'Awaiting Submission', value: provinceCounts.pending },
+                { label: 'Accepted (Review)', value: provinceCounts.accepted },
                 ...(selectedResponses.length > 0
                   ? [
-                      { label: 'Pending review', value: responseCounts.pending },
-                      { label: 'Needs modification', value: responseCounts.needs_modification },
+                      { label: 'Pending Review', value: responseCounts.pending },
+                      { label: 'Needs Modification', value: responseCounts.needs_modification },
                       { label: 'Rejected', value: responseCounts.rejected },
                     ]
                   : []),

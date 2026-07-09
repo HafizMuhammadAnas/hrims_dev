@@ -6,11 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class IssueIndicator extends Model
 {
     /** Synthetic gender key for year-only collection (no gender breakdown). */
     public const YEAR_ONLY_GENDER_ID = 0;
+
+    private static ?bool $hasSortOrderColumn = null;
+
+    public static function hasSortOrderColumn(): bool
+    {
+        if (self::$hasSortOrderColumn === null) {
+            self::$hasSortOrderColumn = Schema::hasColumn((new self)->getTable(), 'sort_order');
+        }
+
+        return self::$hasSortOrderColumn;
+    }
 
     public const AGE_UNDER_18 = 'under_18';
 
@@ -32,6 +44,7 @@ class IssueIndicator extends Model
         'collects_by_location',
         'collects_by_disability',
         'collects_by_religion',
+        'sort_order',
     ];
 
     protected function casts(): array
@@ -169,6 +182,7 @@ class IssueIndicator extends Model
     {
         return [
             'id' => $this->id,
+            'sort_order' => (int) ($this->sort_order ?? 0),
             'indicator_text' => $this->indicator_text,
             'disaggregation' => $this->disaggregation,
             'has_quantitative' => (bool) $this->has_quantitative,

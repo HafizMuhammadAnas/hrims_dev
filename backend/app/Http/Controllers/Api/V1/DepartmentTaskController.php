@@ -226,6 +226,40 @@ class DepartmentTaskController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>  $qIn
+     */
+    private function isMatrixDimensionEnabled(array $qIn, string $dimension): bool
+    {
+        $enabled = $qIn['matrix_row_enabled'] ?? null;
+        if (! is_array($enabled) || ! array_key_exists($dimension, $enabled)) {
+            return true;
+        }
+
+        return (bool) $enabled[$dimension];
+    }
+
+    /**
+     * @param  array<string, mixed>  $qIn
+     * @return array<string, bool>|null
+     */
+    private function extractMatrixRowEnabled(array $qIn): ?array
+    {
+        $enabled = $qIn['matrix_row_enabled'] ?? null;
+        if (! is_array($enabled)) {
+            return null;
+        }
+
+        $out = [];
+        foreach (['gender', 'age', 'disability', 'district', 'religion'] as $dimension) {
+            if (array_key_exists($dimension, $enabled) && $enabled[$dimension] === false) {
+                $out[$dimension] = false;
+            }
+        }
+
+        return $out === [] ? null : $out;
+    }
+
+    /**
      * @param  mixed  $raw
      * @return array<string, array<string, array{value: float}>>|JsonResponse
      */
@@ -618,8 +652,15 @@ class DepartmentTaskController extends Controller
                         'comment' => $comment !== '' ? $comment : null,
                         'attachment_url' => $qUrl,
                     ];
+                    $matrixRowEnabled = $this->extractMatrixRowEnabled($qIn);
+                    if ($matrixRowEnabled !== null) {
+                        $quantitative['matrix_row_enabled'] = $matrixRowEnabled;
+                    }
 
-                    if ($indicator->isYearOnlyCollection() || (bool) $indicator->collects_by_gender) {
+                    if (
+                        ($indicator->isYearOnlyCollection() || (bool) $indicator->collects_by_gender)
+                        && $this->isMatrixDimensionEnabled($qIn, 'gender')
+                    ) {
                         $normalized = $this->normalizeQuantitativeByYearGender($indicator, $qIn['by_year_gender'] ?? null);
                         if ($normalized instanceof JsonResponse) {
                             return $normalized;
@@ -627,7 +668,7 @@ class DepartmentTaskController extends Controller
                         $quantitative['by_year_gender'] = $normalized;
                     }
 
-                    if ((bool) $indicator->collects_by_age) {
+                    if ((bool) $indicator->collects_by_age && $this->isMatrixDimensionEnabled($qIn, 'age')) {
                         $normalized = $this->normalizeQuantitativeByYearAge($indicator, $qIn['by_year_age'] ?? null);
                         if ($normalized instanceof JsonResponse) {
                             return $normalized;
@@ -635,7 +676,7 @@ class DepartmentTaskController extends Controller
                         $quantitative['by_year_age'] = $normalized;
                     }
 
-                    if ((bool) $indicator->collects_by_disability) {
+                    if ((bool) $indicator->collects_by_disability && $this->isMatrixDimensionEnabled($qIn, 'disability')) {
                         $normalized = $this->normalizeQuantitativeByYearDisability($indicator, $qIn['by_year_disability'] ?? null);
                         if ($normalized instanceof JsonResponse) {
                             return $normalized;
@@ -643,7 +684,7 @@ class DepartmentTaskController extends Controller
                         $quantitative['by_year_disability'] = $normalized;
                     }
 
-                    if ((bool) $indicator->collects_by_location) {
+                    if ((bool) $indicator->collects_by_location && $this->isMatrixDimensionEnabled($qIn, 'district')) {
                         $normalizedDistrict = $this->normalizeQuantitativeByYearDistrict(
                             $indicator,
                             $qIn['by_year_district'] ?? null,
@@ -655,7 +696,7 @@ class DepartmentTaskController extends Controller
                         $quantitative['by_year_district'] = $normalizedDistrict;
                     }
 
-                    if ((bool) $indicator->collects_by_religion) {
+                    if ((bool) $indicator->collects_by_religion && $this->isMatrixDimensionEnabled($qIn, 'religion')) {
                         $normalized = $this->normalizeQuantitativeByYearReligion($indicator, $qIn['by_year_religion'] ?? null);
                         if ($normalized instanceof JsonResponse) {
                             return $normalized;

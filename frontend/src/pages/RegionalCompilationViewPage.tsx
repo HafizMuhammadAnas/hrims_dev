@@ -9,6 +9,7 @@ import { DepartmentSubmissionsForRequest } from '../components/DepartmentSubmiss
 import { RegionalFederalReviewFeedback } from '../components/RegionalFederalReviewFeedback'
 import { RegionalResponsePreviewView } from '../components/RegionalResponsePreviewModal'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
+import { LABEL_EDIT_COMPILATION } from '../lib/uiLabels'
 import { Button } from '../components/ui/Button'
 import { ModalActions } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
@@ -137,7 +138,7 @@ export function RegionalCompilationViewPage() {
     ) : null
 
   return (
-    <PageSection title={editing ? 'Edit compilation' : 'Regional compilation'}>
+    <PageSection title={editing ? 'Edit Compilation' : 'Regional Compilation'}>
       <div className="hr-request-view-stack hr-request-view-stack--request-page">
         {loading ? <p className="muted">Loading...</p> : null}
         {error ? <p className="login-error">{error}</p> : null}
@@ -156,7 +157,7 @@ export function RegionalCompilationViewPage() {
           <div className="modal-card modal-card-wide regional-response-detail-modal workflow-tabbed-card">
             <WorkflowModalHero
               eyebrow="Regional compilation"
-              title="Edit compilation"
+              title={LABEL_EDIT_COMPILATION}
               embedded
             >
               <span className="workflow-modal-hero__chip">{row.req_id}</span>

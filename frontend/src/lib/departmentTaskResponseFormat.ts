@@ -16,6 +16,10 @@ export type DepartmentIndicatorQuantitative = {
   value?: number | null
   comment: string | null
   attachment_url: string | null
+  /** Per-dimension row inclusion toggles (false = department excluded this metric row). */
+  matrix_row_enabled?: Partial<
+    Record<'gender' | 'age' | 'disability' | 'district' | 'religion', boolean>
+  > | null
   by_year_gender?: DepartmentQuantitativeByYearGender | null
   by_year_age?: DepartmentQuantitativeByYearKeyed | null
   by_year_disability?: DepartmentQuantitativeByYearKeyed | null

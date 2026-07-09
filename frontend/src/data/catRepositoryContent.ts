@@ -76,7 +76,7 @@ export const CAT_REPOSITORY_CYCLES: CatRepositoryCycle[] = [
       },
       {
         id: 'sc-concluding-observation',
-        title: 'Concluding observation (2026)',
+        title: 'Concluding Observation (2026)',
         fileName: '2c-concluding-observation-2026.pdf',
         href: `${BASE}/second-cycle/2c-concluding-observation-2026.pdf`,
         typeLabel: 'PDF document',

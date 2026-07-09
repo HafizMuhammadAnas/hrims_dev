@@ -27,6 +27,35 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { issuesNavLabel } from '../lib/issueEntryKind'
 import {
+  LABEL_ASSIGNED_TASKS,
+  LABEL_COMPILED_AND_SUBMITTED,
+  LABEL_COMPILATION_CENTER,
+  LABEL_COMPILED_RECORD,
+  LABEL_COMPILED_RECORDS,
+  LABEL_CONVENTION_INFO,
+  LABEL_CONVENTIONS_AND_COMPONENTS,
+  LABEL_DEPARTMENT_ACTIONS,
+  LABEL_DEPARTMENTAL_RESPONSES,
+  LABEL_FEDERAL_ACTIONS,
+  LABEL_FEDERAL_DEPARTMENT_ACTIONS,
+  LABEL_HUMAN_RIGHTS_INDICATORS,
+  LABEL_KNOWLEDGE_HUB,
+  LABEL_MANAGE_DEPARTMENTS,
+  LABEL_PROVINCE_ACTIONS,
+  LABEL_READ_ONLY_ACCESS,
+  LABEL_RECEIVED_REQUESTS,
+  LABEL_REGIONAL_RESPONSES,
+  LABEL_REGIONS_AND_DISTRICTS,
+  LABEL_REPORTING_DASHBOARD,
+  LABEL_REQUEST_MANAGEMENT,
+  LABEL_RESPONSE_COMPILATION,
+  LABEL_SUBMISSION_HISTORY,
+  LABEL_SUPER_ADMIN,
+  LABEL_SUSTAINABLE_DEVELOPMENT_GOALS,
+  LABEL_UNIVERSAL_PERIODIC_REVIEW,
+  LABEL_USER_MANAGEMENT,
+} from '../lib/uiLabels'
+import {
   isDepartmentAdmin,
   isFederalAdmin,
   isRegionalAdmin,
@@ -93,70 +122,70 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
 
         {superAdmin && (
           <>
-            <div className="nav-section-title">Super admin</div>
+            <div className="nav-section-title">{LABEL_SUPER_ADMIN}</div>
             <div className="nav-sub">
               <NavItem to="/admin/issues" icon={GitBranch} label={issuesNavLabel()} onPick={onPick} />
-              <NavItem to="/admin/regions-districts" icon={MapPin} label="Regions & districts" onPick={onPick} />
-              <NavItem to="/admin/conventions" icon={Scale} label="Conventions & components" onPick={onPick} />
+              <NavItem to="/admin/regions-districts" icon={MapPin} label={LABEL_REGIONS_AND_DISTRICTS} onPick={onPick} />
+              <NavItem to="/admin/conventions" icon={Scale} label={LABEL_CONVENTIONS_AND_COMPONENTS} onPick={onPick} />
               <NavItem to="/admin/sdg-nodes" icon={Layers} label="SDGs" onPick={onPick} />
               <NavItem to="/admin/upr-recommendations" icon={ScrollText} label="UPR Recommendations" onPick={onPick} />
-              <NavItem to="/federal-users-mgmt" icon={UserCog} label="User management" onPick={onPick} />
-              <NavItem to="/report-generator" icon={PieChart} label="Reporting dashboard" onPick={onPick} />
+              <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
+              <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
             </div>
           </>
         )}
 
         {federal && (
           <>
-            <div className="nav-section-title">Federal actions</div>
+            <div className="nav-section-title">{LABEL_FEDERAL_ACTIONS}</div>
             <div className="nav-sub">
-              <NavItem to="/requests" icon={Send} label="Request management" onPick={onPick} />
-              <NavItem to="/responses" icon={Inbox} label="Regional responses" onPick={onPick} />
-              <NavItem to="/compilation" icon={Layers} label="Compilation center" onPick={onPick} />
-              <NavItem to="/compiled-records" icon={FileCheck} label="Compiled records" onPick={onPick} />
-              <NavItem to="/federal-users-mgmt" icon={UserCog} label="User management" onPick={onPick} />
-              <NavItem to="/federal-departments-mgmt" icon={Building2} label="Manage departments" onPick={onPick} />
+              <NavItem to="/requests" icon={Send} label={LABEL_REQUEST_MANAGEMENT} onPick={onPick} />
+              <NavItem to="/responses" icon={Inbox} label={LABEL_REGIONAL_RESPONSES} onPick={onPick} />
+              <NavItem to="/compilation" icon={Layers} label={LABEL_COMPILATION_CENTER} onPick={onPick} />
+              <NavItem to="/compiled-records" icon={FileCheck} label={LABEL_COMPILED_RECORDS} onPick={onPick} />
+              <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
+              <NavItem to="/federal-departments-mgmt" icon={Building2} label={LABEL_MANAGE_DEPARTMENTS} onPick={onPick} />
             </div>
-            <div className="nav-section-title">Federal department actions</div>
+            <div className="nav-section-title">{LABEL_FEDERAL_DEPARTMENT_ACTIONS}</div>
             <div className="nav-sub">
-              <NavItem to="/federal-department-requests" icon={Activity} label="Departmental responses" onPick={onPick} />
-              <NavItem to="/federal-compilation" icon={FileText} label="Response compilation" onPick={onPick} />
-              <NavItem to="/federal-history" icon={History} label="Compiled record" onPick={onPick} />
+              <NavItem to="/federal-department-requests" icon={Activity} label={LABEL_DEPARTMENTAL_RESPONSES} onPick={onPick} />
+              <NavItem to="/federal-compilation" icon={FileText} label={LABEL_RESPONSE_COMPILATION} onPick={onPick} />
+              <NavItem to="/federal-history" icon={History} label={LABEL_COMPILED_RECORD} onPick={onPick} />
             </div>
             <div className="nav-section-title">Reports</div>
-            <NavItem to="/report-generator" icon={PieChart} label="Reporting dashboard" onPick={onPick} />
+            <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
           </>
         )}
 
         {regional && (
           <>
-            <div className="nav-section-title">Province actions</div>
+            <div className="nav-section-title">{LABEL_PROVINCE_ACTIONS}</div>
             <div className="nav-sub">
-              <NavItem to="/region-received" icon={List} label="Received requests" onPick={onPick} />
-              <NavItem to="/region-monitoring" icon={Activity} label="Departmental responses" onPick={onPick} />
-              <NavItem to="/region-compilation" icon={FileText} label="Response compilation" onPick={onPick} />
-              <NavItem to="/region-history" icon={History} label="Compiled and submitted" onPick={onPick} />
-              <NavItem to="/regional-users-mgmt" icon={Users} label="User management" onPick={onPick} />
-              <NavItem to="/regional-departments-mgmt" icon={Building2} label="Manage departments" onPick={onPick} />
+              <NavItem to="/region-received" icon={List} label={LABEL_RECEIVED_REQUESTS} onPick={onPick} />
+              <NavItem to="/region-monitoring" icon={Activity} label={LABEL_DEPARTMENTAL_RESPONSES} onPick={onPick} />
+              <NavItem to="/region-compilation" icon={FileText} label={LABEL_RESPONSE_COMPILATION} onPick={onPick} />
+              <NavItem to="/region-history" icon={History} label={LABEL_COMPILED_AND_SUBMITTED} onPick={onPick} />
+              <NavItem to="/regional-users-mgmt" icon={Users} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
+              <NavItem to="/regional-departments-mgmt" icon={Building2} label={LABEL_MANAGE_DEPARTMENTS} onPick={onPick} />
             </div>
             <div className="nav-section-title">Reports</div>
-            <NavItem to="/report-generator" icon={PieChart} label="Reporting dashboard" onPick={onPick} />
+            <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
           </>
         )}
 
         {dept && (
           <>
-            <div className="nav-section-title">Department actions</div>
+            <div className="nav-section-title">{LABEL_DEPARTMENT_ACTIONS}</div>
             <div className="nav-sub">
-              <NavItem to="/department-tasks" icon={ClipboardList} label="Assigned tasks" onPick={onPick} />
-              <NavItem to="/department-history" icon={History} label="Submission history" onPick={onPick} />
+              <NavItem to="/department-tasks" icon={ClipboardList} label={LABEL_ASSIGNED_TASKS} onPick={onPick} />
+              <NavItem to="/department-history" icon={History} label={LABEL_SUBMISSION_HISTORY} onPick={onPick} />
             </div>
           </>
         )}
 
         {viewer && (
           <>
-            <div className="nav-section-title">Read-only access</div>
+            <div className="nav-section-title">{LABEL_READ_ONLY_ACCESS}</div>
             <div className="nav-sub">
               {user.region?.slug === 'ict' || user.region?.slug === 'federal' ? (
                 <NavItem to="/federal-history" icon={History} label="History" onPick={onPick} />
@@ -167,11 +196,11 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
           </>
         )}
 
-        <div className="nav-section-title">Knowledge hub</div>
-        <NavItem to="/conventions" icon={BookOpen} label="Conventions info" onPick={onPick} />
-        <NavItem to="/indicators" icon={Target} label="Human rights indicators" onPick={onPick} />
-        <NavItem to="/sdgs" icon={Globe} label="Sustainable development goals" onPick={onPick} />
-        <NavItem to="/upr" icon={RefreshCcw} label="Universal periodic review" onPick={onPick} />
+        <div className="nav-section-title">{LABEL_KNOWLEDGE_HUB}</div>
+        <NavItem to="/conventions" icon={BookOpen} label={LABEL_CONVENTION_INFO} onPick={onPick} />
+        <NavItem to="/indicators" icon={Target} label={LABEL_HUMAN_RIGHTS_INDICATORS} onPick={onPick} />
+        <NavItem to="/sdgs" icon={Globe} label={LABEL_SUSTAINABLE_DEVELOPMENT_GOALS} onPick={onPick} />
+        <NavItem to="/upr" icon={RefreshCcw} label={LABEL_UNIVERSAL_PERIODIC_REVIEW} onPick={onPick} />
       </nav>
     </aside>
   )

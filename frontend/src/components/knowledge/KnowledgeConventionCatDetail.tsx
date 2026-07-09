@@ -21,6 +21,11 @@ import {
   issueEntryListShowsTitleColumn,
   issueEntryTitleFieldLabel,
 } from '../../lib/issueEntryKind'
+import {
+  LABEL_CONVENTION_ARTICLES,
+  LABEL_OPTIONAL_PROTOCOL,
+} from '../../lib/uiLabels'
+import { CatTrackerTab } from './CatTrackerTab'
 import { Button } from '../ui/Button'
 import { TableCard } from '../ui/TableCard'
 import {
@@ -36,9 +41,10 @@ const CAT_TABS = [
   'Overview',
   'Articles',
   'LOI',
-  'Concluding observations',
+  'Concluding Observations',
   'Repositories',
-  'Optional protocol',
+  'CAT Tracker',
+  'Optional Protocol',
 ] as const
 
 type CatTab = (typeof CAT_TABS)[number]
@@ -181,7 +187,7 @@ function ConventionArticlesTab({ conventionId }: { conventionId: number }) {
   if (articles.length === 0) return <p className="muted">No articles are published for this convention.</p>
 
   return (
-    <KnowledgeHubPanel title="Convention articles">
+    <KnowledgeHubPanel title={LABEL_CONVENTION_ARTICLES}>
       <div className="knowledge-hub-articles-list">
         {articles.map((article, idx) => (
           <details
@@ -452,14 +458,16 @@ export function KnowledgeConventionCatDetail({
 
       {activeTab === 'LOI' && <ConventionIssuesTab conventionId={data.id} entryKind="issue" />}
 
-      {activeTab === 'Concluding observations' && (
+      {activeTab === 'Concluding Observations' && (
         <ConventionIssuesTab conventionId={data.id} entryKind="recommendation" />
       )}
 
       {activeTab === 'Repositories' && <ConventionRepositoriesTab />}
 
-      {activeTab === 'Optional protocol' && (
-        <KnowledgeHubPanel title="Optional protocol">
+      {activeTab === 'CAT Tracker' && <CatTrackerTab />}
+
+      {activeTab === LABEL_OPTIONAL_PROTOCOL && (
+        <KnowledgeHubPanel title={LABEL_OPTIONAL_PROTOCOL}>
           <KnowledgeHubMutedProse>No optional protocol content is available yet.</KnowledgeHubMutedProse>
         </KnowledgeHubPanel>
       )}

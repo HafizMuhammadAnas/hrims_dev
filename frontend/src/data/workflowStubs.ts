@@ -1,4 +1,5 @@
 import type { WorkflowLink } from '../pages/WorkflowStubPage'
+import { LABEL_ASSIGNED_TASKS, LABEL_SUBMISSION_HISTORY } from '../lib/uiLabels'
 
 export type WorkflowStubSpec = {
   title: string
@@ -116,9 +117,9 @@ export const STUB_REGION_HISTORY: WorkflowStubSpec = {
 }
 
 export const STUB_DEPARTMENT_HISTORY: WorkflowStubSpec = {
-  title: 'Submission history',
-  intro: 'Department-level submission log. Use Assigned tasks for current work.',
-  links: [{ to: '/department-tasks', label: 'Assigned tasks' }],
+  title: LABEL_SUBMISSION_HISTORY,
+  intro: 'Department-level submission log. Use Assigned Tasks for current work.',
+  links: [{ to: '/department-tasks', label: LABEL_ASSIGNED_TASKS }],
 }
 
 export const STUB_REPORT_GENERATOR: WorkflowStubSpec = {

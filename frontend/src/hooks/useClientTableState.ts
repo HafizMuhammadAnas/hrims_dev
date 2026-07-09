@@ -56,9 +56,14 @@ export function useClientTableState<SortKey extends string>(
 
   const [search, setSearchState] = useState(initialSearch)
   const [filters, setFiltersState] = useState<Record<string, string>>(initialFilters)
-  const [sortKey, setSortKey] = useState<SortKey | undefined>(initialSortKey)
-  const [sortDir, setSortDir] = useState<SortDirection>(initialSortDir)
+  const [sortState, setSortState] = useState<{ key?: SortKey; dir: SortDirection }>({
+    key: initialSortKey,
+    dir: initialSortDir,
+  })
   const [page, setPage] = useState(initialPage)
+
+  const sortKey = sortState.key
+  const sortDir = sortState.dir
 
   const setSearch = useCallback((value: string) => {
     setSearchState(value)
@@ -76,14 +81,20 @@ export function useClientTableState<SortKey extends string>(
   }, [])
 
   const toggleSort = useCallback((key: SortKey) => {
-    setSortKey((prev) => {
-      if (prev === key) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-        return prev
-      }
-      setSortDir('desc')
-      return key
-    })
+    setPage(1)
+    setSortState((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'desc' },
+    )
+  }, [])
+
+  const setSortKey = useCallback((key: SortKey | undefined) => {
+    setSortState((prev) => ({ ...prev, key }))
+  }, [])
+
+  const setSortDir = useCallback((dir: SortDirection) => {
+    setSortState((prev) => ({ ...prev, dir }))
   }, [])
 
   return {

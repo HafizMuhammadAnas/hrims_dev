@@ -1,6 +1,8 @@
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
+import type { MatrixDimensionKey } from '../lib/deptMatrixRowEnabled'
 import type { MatrixYearColumnGroup } from '../lib/indicatorMatrixColumns'
 import { matrixCellKey } from '../lib/indicatorMatrixColumns'
+import { MatrixRowEnableToggle } from './ui/MatrixRowEnableToggle'
 
 type MatrixRowFilter = (
   indicator: HrRequestIssueIndicator,
@@ -17,6 +19,9 @@ type Props = {
   readOnly?: boolean
   savedByIndicator?: Record<number, Record<string, string>>
   cellAllowed: MatrixRowFilter
+  dimensionKey?: MatrixDimensionKey
+  rowEnabledByIndicator?: Record<number, boolean>
+  onRowEnabledChange?: (indicatorId: number, enabled: boolean) => void
   columnHeaderClass?: (name: string) => string
   hint?: string
 }
@@ -41,9 +46,32 @@ export function DepartmentDisaggregationMatrixTable({
   readOnly = false,
   savedByIndicator,
   cellAllowed,
+  dimensionKey,
+  rowEnabledByIndicator,
+  onRowEnabledChange,
   columnHeaderClass = defaultColumnHeaderClass,
   hint,
 }: Props) {
+  const showRowToggle = !readOnly && dimensionKey != null && onRowEnabledChange != null
+
+  function rowIncluded(indicatorId: number): boolean {
+    return rowEnabledByIndicator?.[indicatorId] !== false
+  }
+
+  function rowExcludedByDepartment(indicatorId: number): boolean {
+    return rowEnabledByIndicator != null && rowEnabledByIndicator[indicatorId] === false
+  }
+
+  function unavailableCellLabel(indicatorId: number): string {
+    if (rowExcludedByDepartment(indicatorId)) {
+      return 'N/A'
+    }
+    return '—'
+  }
+
+  const hasDepartmentExcludedRows =
+    readOnly &&
+    indicators.some((indicator) => rowExcludedByDepartment(indicator.id))
   if (indicators.length === 0 || columnGroups.length === 0) {
     return null
   }
@@ -74,6 +102,11 @@ export function DepartmentDisaggregationMatrixTable({
         <table className="dept-data-matrix">
           <thead>
             <tr>
+              {showRowToggle ? (
+                <th className="dept-data-matrix__include-col" rowSpan={2}>
+                  Include
+                </th>
+              ) : null}
               <th className="dept-data-matrix__metric-col" rowSpan={2}>
                 Metric
               </th>
@@ -99,10 +132,26 @@ export function DepartmentDisaggregationMatrixTable({
           <tbody>
             {indicators.map((indicator) => {
               const typeBits = indicatorTypePills(indicator)
+              const included = rowIncluded(indicator.id)
               return (
-                <tr key={indicator.id}>
+                <tr
+                  key={indicator.id}
+                  className={included ? undefined : 'dept-data-matrix__row--excluded'}
+                >
+                  {showRowToggle ? (
+                    <td className="dept-data-matrix__include-col">
+                      <MatrixRowEnableToggle
+                        enabled={included}
+                        label={`Include ${indicator.indicator_text} in ${dimensionKey}`}
+                        onChange={(enabled) => onRowEnabledChange?.(indicator.id, enabled)}
+                      />
+                    </td>
+                  ) : null}
                   <td className="dept-data-matrix__metric-cell">
                     <div className="dept-data-matrix__metric-title">{indicator.indicator_text}</div>
+                    {readOnly && rowExcludedByDepartment(indicator.id) ? (
+                      <span className="dept-data-matrix__metric-na-badge">N/A — not required</span>
+                    ) : null}
                     {typeBits.length > 0 ? (
                       <div className="dept-data-matrix__metric-pills">
                         {typeBits.map((t) => (
@@ -117,14 +166,20 @@ export function DepartmentDisaggregationMatrixTable({
                     group.genders.map((g) => {
                       const colId =
                         typeof g.gender_id === 'number' ? g.gender_id : String(g.gender_id)
-                      const allowed = cellAllowed(indicator, group.year_id, colId)
+                      const allowed = included && cellAllowed(indicator, group.year_id, colId)
                       if (!allowed) {
+                        const excluded = rowExcludedByDepartment(indicator.id)
                         return (
                           <td
                             key={`${indicator.id}-${resolveCellKey(group.year_id, colId)}`}
-                            className="dept-data-matrix__cell dept-data-matrix__cell--na"
+                            className={
+                              'dept-data-matrix__cell dept-data-matrix__cell--na' +
+                              (excluded ? ' dept-data-matrix__cell--dept-na' : '')
+                            }
                           >
-                            <span className="text-muted">—</span>
+                            <span className={excluded ? 'dept-data-matrix__na-label' : 'text-muted'}>
+                              {unavailableCellLabel(indicator.id)}
+                            </span>
                           </td>
                         )
                       }
@@ -157,6 +212,12 @@ export function DepartmentDisaggregationMatrixTable({
           </tbody>
         </table>
         {!readOnly && hint ? <p className="muted small dept-data-matrix__hint">{hint}</p> : null}
+        {hasDepartmentExcludedRows ? (
+          <p className="muted small dept-data-matrix__hint">
+            <strong>N/A</strong> — the department marked this metric as not required for {title.toLowerCase()}{' '}
+            (no data requested for this row in this dimension).
+          </p>
+        ) : null}
       </div>
     </div>
   )

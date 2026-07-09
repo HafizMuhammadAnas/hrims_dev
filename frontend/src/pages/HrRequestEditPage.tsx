@@ -8,6 +8,7 @@ import { HrRequestModal } from '../components/HrRequestModal'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { Alert } from '../components/ui/Alert'
 import { PageSection } from '../components/ui/PageSection'
+import { LABEL_EDIT_REQUEST } from '../lib/uiLabels'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
 import type { RegionRow } from '../api/regions'
@@ -72,7 +73,7 @@ export function HrRequestEditPage() {
 
   return (
     <PageSection
-      title="Edit request"
+      title={LABEL_EDIT_REQUEST}
       leading={<WorkflowPageBack to={backTo} label={workflowBackLabel(backTo)} placement="header" />}
     >
       {detailError && (

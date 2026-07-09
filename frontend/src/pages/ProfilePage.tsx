@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { PageSection } from '../components/ui/PageSection'
 import { TableCard } from '../components/ui/TableCard'
-import { primaryRoleSlug } from '../lib/roles'
+import { formatAccountDisplayName, formatPrimaryRoleLabel } from '../lib/userDisplayLabels'
 
 const PROFILE_PHOTO_KEY = 'hrims_profile_photo'
 
@@ -13,7 +13,8 @@ export function ProfilePage() {
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
   if (!user) return null
 
-  const primaryRole = primaryRoleSlug(user)?.replace(/_/g, ' ') ?? 'user'
+  const primaryRole = formatPrimaryRoleLabel(user)
+  const displayName = formatAccountDisplayName(user.name)
 
   useEffect(() => {
     const savedPhoto = window.localStorage.getItem(PROFILE_PHOTO_KEY)
@@ -55,7 +56,7 @@ export function ProfilePage() {
           )}
         </div>
         <div className="profile-hero-copy">
-          <h3>{user.name}</h3>
+          <h3>{displayName}</h3>
           <p>@{user.username}</p>
           <div className="profile-chip-list">
             <span className="profile-chip">{primaryRole}</span>
@@ -143,9 +144,7 @@ export function ProfilePage() {
               </span>
               <div>
                 <div className="profile-info-label">Primary role</div>
-                <div className="profile-info-value" style={{ textTransform: 'capitalize' }}>
-                  {primaryRole}
-                </div>
+                <div className="profile-info-value">{formatPrimaryRoleLabel(user)}</div>
               </div>
             </div>
             <div className="profile-info-row">

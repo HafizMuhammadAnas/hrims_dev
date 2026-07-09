@@ -1,7 +1,9 @@
 export type IssueEntryKind = 'issue' | 'recommendation'
 
 export const LOI_LABEL = 'LOI'
-export const CONCLUDING_OBSERVATIONS_LABEL = 'Concluding observations'
+export const CONCLUDING_OBSERVATIONS_LABEL = 'Concluding Observations'
+/** Singular label for mapping blocks and short UI headings. */
+export const CONCLUDING_OBSERVATION_LABEL = 'Concluding Observation'
 
 export function coerceIssueEntryKind(raw: string | undefined | null): IssueEntryKind {
   return raw === 'recommendation' ? 'recommendation' : 'issue'
@@ -33,7 +35,7 @@ export function issuesCreateTabLabel(): string {
 }
 
 export function issuesEmptyListHint(): string {
-  return `No ${LOI_LABEL} or concluding observations yet. Use Create ${LOI_LABEL} / ${CONCLUDING_OBSERVATIONS_LABEL} to add one.`
+  return `No ${LOI_LABEL} or ${CONCLUDING_OBSERVATIONS_LABEL} yet. Use Create ${LOI_LABEL} / ${CONCLUDING_OBSERVATIONS_LABEL} to add one.`
 }
 
 export function issueEntryKindToggleAriaLabel(): string {
@@ -76,7 +78,8 @@ export function loiMappingLegendLabel(): string {
 
 /** Mapping block legend for the HR request form, per entry kind (no "read-only"). */
 export function issueEntryMappingLegendLabel(kind: IssueEntryKind): string {
-  return `${issueEntryKindBadgeLabel(kind)} mapping`
+  if (kind === 'recommendation') return CONCLUDING_OBSERVATION_LABEL
+  return `${LOI_LABEL} mapping`
 }
 
 export function loiSearchPlaceholder(): string {
@@ -96,7 +99,7 @@ export function loiCategoryLabel(): string {
 }
 
 export function uprConcludingObservationsLabel(): string {
-  return `UPR ${CONCLUDING_OBSERVATIONS_LABEL.toLowerCase()}`
+  return `UPR ${CONCLUDING_OBSERVATIONS_LABEL}`
 }
 
 export function loiMissingDataAlertTitle(): string {

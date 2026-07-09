@@ -34,16 +34,23 @@ import {
   type HrRequestClarificationRow,
 } from '../api/clarifications'
 import { ClarificationFederalViewPanel } from '../components/ClarificationFederalViewPanel'
-import { hrRequestEditPath, hrRequestViewPath } from '../lib/workflowNavigation'
 import { RegionalResponsesPage } from './RegionalResponsesPage'
+import { hrRequestEditPath, hrRequestViewPath } from '../lib/workflowNavigation'
+import {
+  LABEL_DELETE_REQUEST,
+  LABEL_NEW_REQUEST,
+  LABEL_REGIONAL_RESPONSES,
+  LABEL_REQUEST_MANAGEMENT,
+  LABEL_REQUESTS_LIST,
+} from '../lib/uiLabels'
 
 type RequestsTab = 'list' | 'new' | 'clarifications' | 'regional-responses'
 
 const REQUESTS_TABS: { view: RequestsTab; to: string; label: string; end?: boolean }[] = [
-  { view: 'list', to: '/requests', label: 'Requests list', end: true },
-  { view: 'new', to: '/requests/new', label: 'New request' },
+  { view: 'list', to: '/requests', label: LABEL_REQUESTS_LIST, end: true },
+  { view: 'new', to: '/requests/new', label: LABEL_NEW_REQUEST },
   { view: 'clarifications', to: '/requests/clarifications', label: 'Clarifications' },
-  { view: 'regional-responses', to: '/requests/regional-responses', label: 'Regional responses' },
+  { view: 'regional-responses', to: '/requests/regional-responses', label: LABEL_REGIONAL_RESPONSES },
 ]
 
 function resolveRequestsTab(pathname: string): RequestsTab {
@@ -184,7 +191,7 @@ export function FederalRequestManagementPage() {
         </Alert>
       )}
 
-      <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label="Request management sections">
+      <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label={`${LABEL_REQUEST_MANAGEMENT} sections`}>
         {REQUESTS_TABS.map((tab) => (
           <NavLink
             key={tab.view}
@@ -497,7 +504,7 @@ export function FederalRequestManagementPage() {
       {deleteTarget && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteTarget(null)}>
           <div className="modal-card modal-card-narrow" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader title="Delete request" onClose={() => setDeleteTarget(null)} />
+            <ModalHeader title={LABEL_DELETE_REQUEST} onClose={() => setDeleteTarget(null)} />
             <div className="pad-modal">
               <p style={{ margin: '0 0 12px', lineHeight: 1.5 }}>
                 Delete <strong>{deleteTarget.id}</strong> — {deleteTarget.title}? This cannot be undone.

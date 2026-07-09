@@ -7,8 +7,10 @@ import {
   parseDepartmentTaskResponseData,
   type DepartmentIndicatorBundle,
 } from '../lib/departmentTaskResponseFormat'
-import { deptFormUsesIndicatorMatrix, indicatorUsesDataMatrix } from '../lib/indicatorMatrixColumns'
+import { parseMatrixRowEnabled } from '../lib/deptMatrixRowEnabled'
+import type { MatrixDimensionKey } from '../lib/deptMatrixRowEnabled'
 import { scopeLocationCatalogToRegions } from '../lib/departmentLocationCatalog'
+import { deptFormUsesIndicatorMatrix, indicatorUsesDataMatrix } from '../lib/indicatorMatrixColumns'
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import { DepartmentIndicatorDisaggregationMatrices } from './DepartmentIndicatorDisaggregationMatrices'
 
@@ -160,10 +162,22 @@ export function DepartmentResponseDisplay({
     return { gender, age, disability, district, religion }
   }, [entries])
 
+  const rowEnabledByIndicator = useMemo(() => {
+    const out: Record<number, Partial<Record<MatrixDimensionKey, boolean>>> = {}
+    for (const [id, bundle] of entries) {
+      const enabled = parseMatrixRowEnabled(bundle.quantitative?.matrix_row_enabled ?? undefined)
+      if (Object.keys(enabled).length > 0) {
+        out[Number(id)] = enabled
+      }
+    }
+    return out
+  }, [entries])
+
   const matrixIndicators = scopedIndicators.filter((ind) => {
     if (!indicatorUsesDataMatrix(ind)) return false
     const bundle = entries.find(([id]) => Number(id) === ind.id)?.[1]
-    return bundle ? quantitativeHasMatrixData(bundle) : false
+    if (!bundle) return false
+    return quantitativeHasMatrixData(bundle) || rowEnabledByIndicator[ind.id] != null
   })
   const showMatrix = matrixIndicators.length > 0 && deptFormUsesIndicatorMatrix(matrixIndicators)
 
@@ -187,6 +201,7 @@ export function DepartmentResponseDisplay({
           savedDisabilityByIndicator={matrixValues.disability}
           savedDistrictByIndicator={matrixValues.district}
           savedReligionByIndicator={matrixValues.religion}
+          rowEnabledByIndicator={rowEnabledByIndicator}
         />
       ) : null}
       {cardEntries.map(([id, bundle]) => {

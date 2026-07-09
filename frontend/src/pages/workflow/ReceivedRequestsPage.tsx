@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { LABEL_DELETE_REQUEST, LABEL_RECEIVED_REQUESTS } from '../../lib/uiLabels'
 import { deleteHrRequest, fetchHrRequests } from '../../api/hrRequests'
 import { fetchClarifications, type HrRequestClarificationRow } from '../../api/clarifications'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../../api/lists'
@@ -225,7 +226,7 @@ export function ReceivedRequestsPage({
           fileBaseName="received-requests"
           columns={RECEIVED_REQUEST_EXPORT_COLUMNS}
           rows={filteredRows}
-          worksheetName="Received requests"
+          worksheetName={LABEL_RECEIVED_REQUESTS}
         />
       </TableToolbar>
       <TableCard>
@@ -321,7 +322,7 @@ export function ReceivedRequestsPage({
       {deleteTarget && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteTarget(null)}>
           <div className="modal-card modal-card-narrow" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader title="Delete request" onClose={() => setDeleteTarget(null)} />
+            <ModalHeader title={LABEL_DELETE_REQUEST} onClose={() => setDeleteTarget(null)} />
             <div className="pad-modal">
               <p style={{ margin: '0 0 12px', lineHeight: 1.5 }}>
                 Delete <strong>{deleteTarget.id}</strong> — {deleteTarget.title}? This cannot be undone.

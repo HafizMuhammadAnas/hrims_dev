@@ -22,6 +22,7 @@ import { formatAppDate } from '../lib/dateFormat'
 import { sortRowsLatestFirst } from '../lib/tableRowSort'
 import { hrRequestListStats, hrRequestStatusPresentation } from '../lib/hrRequestListMetrics'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
+import { LABEL_DELETE_REQUEST, LABEL_NEW_REQUEST, LABEL_REQUEST_MANAGEMENT } from '../lib/uiLabels'
 import { hrRequestEditPath, hrRequestViewPath } from '../lib/workflowNavigation'
 
 export function HrRequestsPage() {
@@ -103,7 +104,7 @@ export function HrRequestsPage() {
 
   return (
     <PageSection
-      title="Request management"
+      title={LABEL_REQUEST_MANAGEMENT}
       subtitle="Search and filter requests. Federal and regional administrators can create, edit, and delete; regional users only see and manage their own region."
     >
       {error && (
@@ -147,7 +148,7 @@ export function HrRequestsPage() {
         </Button>
         {canManage && (
           <Button variant="primary" compact onClick={() => navigate('/requests/new')}>
-            New request
+            {LABEL_NEW_REQUEST}
           </Button>
         )}
       </TableToolbar>
@@ -243,7 +244,7 @@ export function HrRequestsPage() {
       {deleteTarget && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteTarget(null)}>
           <div className="modal-card modal-card-narrow" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader title="Delete request" onClose={() => setDeleteTarget(null)} />
+            <ModalHeader title={LABEL_DELETE_REQUEST} onClose={() => setDeleteTarget(null)} />
             <div className="pad-modal">
               <p style={{ margin: '0 0 12px', lineHeight: 1.5 }}>
                 Delete <strong>{deleteTarget.id}</strong> — {deleteTarget.title}? This cannot be undone.
