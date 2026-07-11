@@ -46,6 +46,8 @@ import {
   LABEL_RECEIVED_REQUESTS,
   LABEL_REGIONAL_RESPONSES,
   LABEL_REGIONS_AND_DISTRICTS,
+  LABEL_DASHBOARDS,
+  LABEL_GOVERNANCE_DASHBOARD,
   LABEL_REPORTING_DASHBOARD,
   LABEL_REQUEST_MANAGEMENT,
   LABEL_RESPONSE_COMPILATION,
@@ -118,7 +120,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
       }}
     >
       <nav className="nav-menu">
-        <NavItem to="/" icon={LayoutDashboard} label="Dashboard" onPick={onPick} />
+        <NavItem to="/" icon={LayoutDashboard} label="Home" onPick={onPick} />
 
         {superAdmin && (
           <>
@@ -130,7 +132,11 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/admin/sdg-nodes" icon={Layers} label="SDGs" onPick={onPick} />
               <NavItem to="/admin/upr-recommendations" icon={ScrollText} label="UPR Recommendations" onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
+            </div>
+            <div className="nav-section-title">{LABEL_DASHBOARDS}</div>
+            <div className="nav-sub">
               <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
+              <NavItem to="/governance-dashboard" icon={LayoutDashboard} label={LABEL_GOVERNANCE_DASHBOARD} onPick={onPick} />
             </div>
           </>
         )}
@@ -152,8 +158,11 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/federal-compilation" icon={FileText} label={LABEL_RESPONSE_COMPILATION} onPick={onPick} />
               <NavItem to="/federal-history" icon={History} label={LABEL_COMPILED_RECORD} onPick={onPick} />
             </div>
-            <div className="nav-section-title">Reports</div>
-            <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
+            <div className="nav-section-title">{LABEL_DASHBOARDS}</div>
+            <div className="nav-sub">
+              <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
+              <NavItem to="/governance-dashboard" icon={LayoutDashboard} label={LABEL_GOVERNANCE_DASHBOARD} onPick={onPick} />
+            </div>
           </>
         )}
 
@@ -168,8 +177,11 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/regional-users-mgmt" icon={Users} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
               <NavItem to="/regional-departments-mgmt" icon={Building2} label={LABEL_MANAGE_DEPARTMENTS} onPick={onPick} />
             </div>
-            <div className="nav-section-title">Reports</div>
-            <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
+            <div className="nav-section-title">{LABEL_DASHBOARDS}</div>
+            <div className="nav-sub">
+              <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
+              <NavItem to="/governance-dashboard" icon={LayoutDashboard} label={LABEL_GOVERNANCE_DASHBOARD} onPick={onPick} />
+            </div>
           </>
         )}
 

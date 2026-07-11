@@ -722,75 +722,82 @@ export function HrRequestModal({
     return true
   }
 
+  async function persistIssueRequest(status: HrRequestStatus) {
+    if (readOnly || !issueForm || !usesIssueFlow) return
+    setFormBanner(null)
+    setFieldErrors({})
+    if (!runIssueValidation() || !selectedIssue) return
+    const ictInPayload = issueForm.region_ids.some((id) => ictRegionIdSet.has(id))
+    setSaving(true)
+    try {
+      if (mode === 'create') {
+        if (issueForm.convention_id === '' || issueForm.issue_id === '') return
+        await createHrRequestFromIssueForm({
+          title: issueForm.title.trim(),
+          convention_id: issueForm.convention_id,
+          issue_id: issueForm.issue_id,
+          date: issueForm.date,
+          status,
+          details: issueForm.details.trim() || null,
+          region_ids: issueForm.region_ids,
+          department_ids: ictInPayload ? issueForm.department_ids : [],
+          indicator_responses: buildIndicatorPayload(
+            selectedIssue,
+            issueForm.indicatorValues,
+            issueForm.selectedIndicatorIds,
+          ),
+          attachments: issueForm.attachmentFiles,
+        })
+      } else if (mode === 'edit' && detail) {
+        await updateHrRequestFromIssueForm(detail.id, {
+          title: issueForm.title.trim(),
+          convention_id: issueForm.convention_id as number,
+          issue_id: issueForm.issue_id as number,
+          region_ids: issueForm.region_ids,
+          department_ids: ictInPayload ? issueForm.department_ids : [],
+          date: issueForm.date,
+          status,
+          details: issueForm.details.trim() || null,
+          indicator_responses: buildIndicatorPayload(
+            selectedIssue,
+            issueForm.indicatorValues,
+            issueForm.selectedIndicatorIds,
+          ),
+          attachments: issueForm.attachmentFiles,
+        })
+      }
+      onSaved()
+      onClose()
+    } catch (err) {
+      if (isApiError(err)) {
+        const fe: Record<string, string> = {}
+        for (const [k, arr] of Object.entries(err.fieldErrors)) {
+          if (arr[0]) fe[k] = arr[0]
+        }
+        setFieldErrors(fe)
+        setFormBanner(
+          Object.keys(fe).length > 0 ? 'Please correct the fields below.' : err.message,
+        )
+        return
+      }
+      setFormBanner(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (readOnly) return
-    setFormBanner(null)
-    setFieldErrors({})
 
     if (issueForm && usesIssueFlow) {
-      if (!runIssueValidation() || !selectedIssue) return
-      const ictInPayload = issueForm.region_ids.some((id) => ictRegionIdSet.has(id))
-      setSaving(true)
-      try {
-        if (mode === 'create') {
-          if (issueForm.convention_id === '' || issueForm.issue_id === '') return
-          await createHrRequestFromIssueForm({
-            title: issueForm.title.trim(),
-            convention_id: issueForm.convention_id,
-            issue_id: issueForm.issue_id,
-            date: issueForm.date,
-            status: issueForm.status,
-            details: issueForm.details.trim() || null,
-            region_ids: issueForm.region_ids,
-            department_ids: ictInPayload ? issueForm.department_ids : [],
-            indicator_responses: buildIndicatorPayload(
-              selectedIssue,
-              issueForm.indicatorValues,
-              issueForm.selectedIndicatorIds,
-            ),
-            attachments: issueForm.attachmentFiles,
-          })
-        } else if (mode === 'edit' && detail) {
-          await updateHrRequestFromIssueForm(detail.id, {
-            title: issueForm.title.trim(),
-            convention_id: issueForm.convention_id as number,
-            issue_id: issueForm.issue_id as number,
-            region_ids: issueForm.region_ids,
-            department_ids: ictInPayload ? issueForm.department_ids : [],
-            date: issueForm.date,
-            status: issueForm.status,
-            details: issueForm.details.trim() || null,
-            indicator_responses: buildIndicatorPayload(
-              selectedIssue,
-              issueForm.indicatorValues,
-              issueForm.selectedIndicatorIds,
-            ),
-            attachments: issueForm.attachmentFiles,
-          })
-        }
-        onSaved()
-        onClose()
-      } catch (err) {
-        if (isApiError(err)) {
-          const fe: Record<string, string> = {}
-          for (const [k, arr] of Object.entries(err.fieldErrors)) {
-            if (arr[0]) fe[k] = arr[0]
-          }
-          setFieldErrors(fe)
-          setFormBanner(
-            Object.keys(fe).length > 0 ? 'Please correct the fields below.' : err.message,
-          )
-          return
-        }
-        setFormBanner(err instanceof Error ? err.message : 'Save failed')
-      } finally {
-        setSaving(false)
-      }
+      await persistIssueRequest(mode === 'create' ? 'active' : issueForm.status)
       return
     }
 
     if (legacyForm) {
+      setFormBanner(null)
+      setFieldErrors({})
       if (!runLegacyValidation()) return
       setSaving(true)
       try {
@@ -823,6 +830,11 @@ export function HrRequestModal({
         setSaving(false)
       }
     }
+  }
+
+  async function handleSaveDraft() {
+    if (readOnly || !issueForm || !usesIssueFlow) return
+    await persistIssueRequest('draft')
   }
 
   const showLoading = mode !== 'create' && detailLoading
@@ -1437,7 +1449,7 @@ export function HrRequestModal({
                 </FormField>
               )}
 
-              <FormRow twoCol>
+              <FormRow twoCol={mode !== 'create'}>
                 <FormControl label="Due date" htmlFor="hr-date">
                   <input
                     id="hr-date"
@@ -1452,24 +1464,26 @@ export function HrRequestModal({
                   />
                   <FieldError id="hr-date-err" message={fieldErrors.date} />
                 </FormControl>
-                <FormControl label="Request status" htmlFor="hr-status">
-                  <select
-                    id="hr-status"
-                    value={issueForm.status}
-                    onChange={(e) =>
-                      setIssueForm((f) =>
-                        f ? { ...f, status: e.target.value as HrRequestStatus } : f,
-                      )
-                    }
-                    disabled={readOnly}
-                  >
-                    {HR_REQUEST_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {HR_REQUEST_STATUS_LABELS[s]}
-                      </option>
-                    ))}
-                  </select>
-                </FormControl>
+                {mode !== 'create' ? (
+                  <FormControl label="Request status" htmlFor="hr-status">
+                    <select
+                      id="hr-status"
+                      value={issueForm.status}
+                      onChange={(e) =>
+                        setIssueForm((f) =>
+                          f ? { ...f, status: e.target.value as HrRequestStatus } : f,
+                        )
+                      }
+                      disabled={readOnly}
+                    >
+                      {HR_REQUEST_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {HR_REQUEST_STATUS_LABELS[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </FormControl>
+                ) : null}
               </FormRow>
 
               {(mode === 'create' || mode === 'edit') && !readOnly && (
@@ -1582,6 +1596,17 @@ export function HrRequestModal({
               <Button variant="secondary" compact type="button" onClick={onClose}>
                 {readOnlyCloseLabel}
               </Button>
+              {!readOnly && mode === 'create' ? (
+                <Button
+                  variant="secondary"
+                  compact
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void handleSaveDraft()}
+                >
+                  {saving ? 'Saving…' : 'Save as Draft'}
+                </Button>
+              ) : null}
               {!readOnly && (
                 <Button variant="primary" compact type="submit" disabled={saving}>
                   {saving ? 'Submitting…' : 'Submit'}

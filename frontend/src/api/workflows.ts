@@ -140,12 +140,18 @@ export async function submitDepartmentTaskResponse(
 export async function createDepartmentTask(
   hr_request_id: string,
   department_id: number,
-  options?: { assignment_instructions?: string | null },
+  options?: {
+    assignment_instructions?: string | null
+    issue_indicator_ids?: number[]
+  },
 ): Promise<DepartmentTaskRow> {
   await ensureCsrfCookie()
   const body: Record<string, unknown> = { hr_request_id, department_id }
   const notes = options?.assignment_instructions?.trim()
   if (notes) body.assignment_instructions = notes
+  if (options?.issue_indicator_ids && options.issue_indicator_ids.length > 0) {
+    body.issue_indicator_ids = options.issue_indicator_ids
+  }
   const res = await fetch('/api/v1/department-tasks', {
     method: 'POST',
     credentials: 'include',

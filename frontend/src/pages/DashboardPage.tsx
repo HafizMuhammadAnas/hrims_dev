@@ -30,9 +30,14 @@ import type {
   UrgentDepartmentTaskRow,
   UrgentRequestRow,
 } from '../api/dashboard'
+import {
+  clarificationStatusPresentation,
+  fetchClarifications,
+  type HrRequestClarificationRow,
+} from '../api/clarifications'
 import { useAuth } from '../auth/AuthContext'
-import { useNotify } from '../context/NotificationsContext'
 import { Alert } from '../components/ui/Alert'
+import { StatsCards } from '../components/ui/StatsCards'
 import {
   isDepartmentAdmin,
   isFederalAdmin,
@@ -54,8 +59,6 @@ import {
   LABEL_OPEN_TASKS,
   LABEL_PENDING_REQUESTS,
   LABEL_PERFORMANCE_OVERVIEW,
-  LABEL_REGIONAL_RESPONSE_PIPELINE,
-  LABEL_REGIONAL_RESPONSES,
   LABEL_REPORTING_DASHBOARD,
   LABEL_REQUEST_MANAGEMENT,
   LABEL_REQUEST_STATUS_DISTRIBUTION,
@@ -145,10 +148,11 @@ function taskPieData(byStatus: Record<string, number>) {
 export function DashboardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { inbox, inboxLoading, markRead } = useNotify()
   const variant = dashboardVariant(user)
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [recentClarifications, setRecentClarifications] = useState<HrRequestClarificationRow[]>([])
+  const [clarificationsLoading, setClarificationsLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -164,25 +168,62 @@ export function DashboardPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (variant !== 'federal') {
+      setRecentClarifications([])
+      return
+    }
+    let cancelled = false
+    setClarificationsLoading(true)
+    void fetchClarifications()
+      .then((rows) => {
+        if (cancelled) return
+        const statusRank: Record<string, number> = {
+          pending_federal: 0,
+          pending_region: 1,
+          closed: 2,
+        }
+        const sorted = [...rows].sort((a, b) => {
+          const rankDiff = (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
+          if (rankDiff !== 0) return rankDiff
+          const aTime = Date.parse(a.region_submitted_at ?? a.updated_at ?? a.created_at ?? '') || 0
+          const bTime = Date.parse(b.region_submitted_at ?? b.updated_at ?? b.created_at ?? '') || 0
+          return bTime - aTime
+        })
+        setRecentClarifications(sorted.slice(0, 8))
+      })
+      .catch(() => {
+        if (!cancelled) setRecentClarifications([])
+      })
+      .finally(() => {
+        if (!cancelled) setClarificationsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [variant])
+
   const by = summary?.by_status ?? {}
   const draft = count(by, 'draft')
   const active = count(by, 'active')
 
   const review = summary?.regional_responses_by_review
-  const respTotal = summary?.regional_responses_total ?? 0
-  const acceptedResp = count(review, 'accepted')
-  const needsMod = count(review, 'needs-modification')
+  const taskWorkflow = summary?.department_tasks_by_workflow
   const taskBy = summary?.department_tasks_by_status
   const taskTotal = summary?.department_tasks_total ?? 0
   const taskAssigned = count(taskBy, 'assigned')
   const taskSubmitted = count(taskBy, 'submitted')
+  const workflowPending = taskWorkflow?.in_process ?? 0
+  const workflowReview = taskWorkflow?.responded ?? 0
+  const workflowRevision = taskWorkflow?.revision ?? 0
+  const workflowAccepted = taskWorkflow?.accepted ?? 0
 
   const resolvedRatePct =
     summary && summary.hr_requests_total > 0
       ? Math.round((active / summary.hr_requests_total) * 100)
       : 0
-  const acceptedRatePct =
-    respTotal > 0 ? Math.round((acceptedResp / respTotal) * 100) : null
+  const deptAcceptedRatePct =
+    taskTotal > 0 ? Math.round((workflowAccepted / taskTotal) * 100) : null
   const taskDonePct =
     taskTotal > 0 ? Math.round((taskSubmitted / taskTotal) * 100) : null
 
@@ -229,8 +270,6 @@ export function DashboardPage() {
   const compiledReportsTotal = summary?.compiled_records_total ?? 0
   const pendingRequests =
     summary?.hr_requests_pending_federal ?? Math.max(0, active - compiledReportsTotal)
-  const clarificationsPending = summary?.clarifications_pending_federal ?? 0
-  const federalNotifications = useMemo(() => inbox.slice(0, 8), [inbox])
 
   const requestsPanelRows: (UrgentRequestRow | (UrgentDepartmentTaskRow & { task_id: string }))[] =
     variant === 'department' || variant === 'viewer'
@@ -326,18 +365,18 @@ export function DashboardPage() {
                   </div>
                   <div className="dashboard-card-title">{LABEL_ACCEPTED_RATE}</div>
                   <div className="dashboard-card-value">
-                    {acceptedRatePct !== null ? `${acceptedRatePct}%` : '—'}
+                    {deptAcceptedRatePct !== null ? `${deptAcceptedRatePct}%` : '—'}
                   </div>
-                  <div className="dashboard-card-subtitle">Accepted responses / total submitted</div>
+                  <div className="dashboard-card-subtitle">Accepted department responses / total tasks</div>
                 </div>
                 <div className="dashboard-card teal">
                   <div className="dashboard-card-icon">
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
                   <div className="dashboard-card-title">{LABEL_NEEDS_ATTENTION}</div>
-                  <div className="dashboard-card-value">{draft + needsMod}</div>
+                  <div className="dashboard-card-value">{draft + workflowRevision}</div>
                   <div className="dashboard-card-subtitle">
-                    {draft} draft requests · {needsMod} responses need modification
+                    {draft} draft requests · {workflowRevision} department responses need revision
                   </div>
                 </div>
               </>
@@ -404,114 +443,43 @@ export function DashboardPage() {
             )}
           </div>
 
-          <div className="stats-row" style={{ marginBottom: 28 }}>
-            {variant === 'federal' ? (
-              <>
-                <div className="stat-card">
-                  <div className="stat-card-value">{respTotal}</div>
-                  <div className="stat-card-label">Responses</div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #ffb300' }}>
-                  <div className="stat-card-value" style={{ color: '#ffb300' }}>
-                    {draft}
-                  </div>
-                  <div className="stat-card-label">Draft</div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #00bcd4' }}>
-                  <div className="stat-card-value" style={{ color: '#00bcd4' }}>
-                    {clarificationsPending}
-                  </div>
-                  <div className="stat-card-label">Clarification</div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #4caf50' }}>
-                  <div className="stat-card-value" style={{ color: '#4caf50' }}>
-                    {needsMod}
-                  </div>
-                  <div className="stat-card-label">Modifications</div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="stat-card">
-                  <div className="stat-card-value">{summary.hr_requests_total}</div>
-                  <div className="stat-card-label">
-                    {variant === 'minimal' ? 'Requests in scope' : 'HR requests'}
-                  </div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #ffb300' }}>
-                  <div className="stat-card-value" style={{ color: '#ffb300' }}>
-                    {draft}
-                  </div>
-                  <div className="stat-card-label">Draft</div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #00bcd4' }}>
-                  <div className="stat-card-value" style={{ color: '#00bcd4' }}>
-                    {active}
-                  </div>
-                  <div className="stat-card-label">Active</div>
-                </div>
-              </>
-            )}
-            {variant !== 'federal' && (
-              <>
-                {variant === 'regional' ? (
-              <>
-                <div className="stat-card" style={{ borderLeft: '4px solid #4caf50' }}>
-                  <div className="stat-card-value" style={{ color: '#4caf50' }}>
-                    {acceptedResp}
-                  </div>
-                  <div className="stat-card-label">Accepted responses</div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #f44336' }}>
-                  <div className="stat-card-value" style={{ color: '#f44336' }}>
-                    {needsMod}
-                  </div>
-                  <div className="stat-card-label">Needs modification</div>
-                </div>
-              </>
-            ) : variant === 'department' || variant === 'viewer' ? (
-              <>
-                <div className="stat-card" style={{ borderLeft: '4px solid #4caf50' }}>
-                  <div className="stat-card-value" style={{ color: '#4caf50' }}>
-                    {taskSubmitted}
-                  </div>
-                  <div className="stat-card-label">Tasks submitted</div>
-                </div>
-                <div className="stat-card" style={{ borderLeft: '4px solid #f44336' }}>
-                  <div className="stat-card-value" style={{ color: '#f44336' }}>
-                    {taskAssigned}
-                  </div>
-                  <div className="stat-card-label">Tasks open</div>
-                </div>
-              </>
-            ) : variant === 'minimal' ? (
-              <>
-                <div className="stat-card" style={{ borderLeft: '4px solid #4caf50' }}>
-                  <div className="stat-card-value" style={{ color: '#4caf50' }}>
-                    {urgentRequestCount}
-                  </div>
-                  <div className="stat-card-label">Urgent queue</div>
-                </div>
-              </>
-            ) : null}
-              </>
-            )}
-          </div>
-
-          {(variant === 'federal' || variant === 'regional') && respTotal > 0 && (
-            <div className="table-card table-card-padded" style={{ marginBottom: 24 }}>
-              <h3 className="dashboard-panel-title" style={{ marginBottom: 12 }}>
-                {variant === 'federal' ? LABEL_REGIONAL_RESPONSES : LABEL_REGIONAL_RESPONSE_PIPELINE}
-              </h3>
-              <div className="summary-metric-grid">
-                {['pending', 'accepted', 'needs-modification', 'rejected'].map((k) => (
-                  <div key={k} className="summary-metric-card">
-                    <div className="summary-metric-title">{formatStatus(k)}</div>
-                    <div className="summary-metric-value">{count(review, k)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {variant === 'federal' ? (
+            <StatsCards
+              className="dashboard-status-stats"
+              items={[
+                { label: 'Pending', value: count(review, 'pending'), accent: '#ffb300' },
+                { label: 'Accepted', value: count(review, 'accepted'), accent: '#4caf50' },
+                {
+                  label: 'Needs Modification',
+                  value: count(review, 'needs-modification'),
+                  accent: '#00bcd4',
+                },
+                { label: 'Rejected', value: count(review, 'rejected'), accent: '#f44336' },
+              ]}
+            />
+          ) : variant === 'regional' || variant === 'department' || variant === 'viewer' ? (
+            <StatsCards
+              className="dashboard-status-stats"
+              items={[
+                { label: 'Pending', value: workflowPending, accent: '#ffb300' },
+                { label: 'Under Review', value: workflowReview, accent: '#00bcd4' },
+                { label: 'Revision', value: workflowRevision, accent: '#f44336' },
+                { label: 'Accepted', value: workflowAccepted, accent: '#4caf50' },
+              ]}
+            />
+          ) : (
+            <StatsCards
+              className="dashboard-status-stats"
+              items={[
+                {
+                  label: variant === 'minimal' ? 'Requests in scope' : 'HR requests',
+                  value: summary.hr_requests_total,
+                },
+                { label: 'Draft', value: draft, accent: '#ffb300' },
+                { label: 'Active', value: active, accent: '#00bcd4' },
+                { label: 'Urgent queue', value: urgentRequestCount, accent: '#4caf50' },
+              ]}
+            />
           )}
 
           <div
@@ -526,54 +494,99 @@ export function DashboardPage() {
               <div className="dashboard-panel-head">
                 <h3 className="dashboard-panel-title">
                   {variant === 'federal' ? <Bell size={20} /> : <Clock size={20} />}
-                  {variant === 'federal' ? 'Notifications' : 'Requests'}
+                  {variant === 'federal'
+                    ? 'Recent Clarifications'
+                    : variant === 'department' || variant === 'viewer'
+                      ? 'Recent Tasks'
+                      : 'Recent Requests'}
                 </h3>
                 <button
                   type="button"
                   className="btn btn-secondary btn-compact"
-                  onClick={() =>
-                    variant === 'federal' ? navigate('/requests/clarifications') : navigate('/requests')
-                  }
+                  onClick={() => {
+                    if (variant === 'federal') {
+                      navigate('/requests/clarifications')
+                      return
+                    }
+                    if (variant === 'regional') {
+                      navigate('/region-received')
+                      return
+                    }
+                    if (variant === 'department' || variant === 'viewer') {
+                      navigate('/department-tasks')
+                      return
+                    }
+                    navigate('/requests')
+                  }}
                 >
                   {LABEL_VIEW_ALL}
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {variant === 'federal' ? (
-                  federalNotifications.length > 0 ? (
-                    federalNotifications.map((n) => (
-                      <button
-                        key={n.id}
-                        type="button"
-                        onClick={() => {
-                          void (async () => {
-                            if (n.read_at === null) await markRead(n.id)
-                            if (n.route) navigate(n.route)
-                          })()
-                        }}
-                        style={{
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          padding: 12,
-                          background: n.read_at ? '#f5f7fb' : '#e8eefb',
-                          borderRadius: 8,
-                          border: 'none',
-                          borderLeft: `4px solid ${n.read_at ? '#c5d0e6' : '#2e4fa3'}`,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 4,
-                          font: 'inherit',
-                          color: 'inherit',
-                        }}
-                      >
-                        <div className="font-semibold text-sm">{n.title}</div>
-                        <div className="muted small">{n.message}</div>
-                      </button>
-                    ))
+                  recentClarifications.length > 0 ? (
+                    recentClarifications.map((c) => {
+                      const clarStatus = clarificationStatusPresentation(c.status)
+                      const preview = c.region_message.trim()
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() =>
+                            navigate(`/requests/clarifications?id=${encodeURIComponent(String(c.id))}`)
+                          }
+                          style={{
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            padding: 12,
+                            background: c.status === 'pending_federal' ? '#e8eefb' : '#f5f7fb',
+                            borderRadius: 8,
+                            border: 'none',
+                            borderLeft: `4px solid ${
+                              c.status === 'pending_federal'
+                                ? '#2e4fa3'
+                                : c.status === 'pending_region'
+                                  ? '#00bcd4'
+                                  : '#c5d0e6'
+                            }`,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: 12,
+                            font: 'inherit',
+                            color: 'inherit',
+                          }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <div className="font-semibold text-sm">
+                              {c.hr_request?.title?.trim() || c.hr_request_id}
+                            </div>
+                            <div className="muted small" style={{ marginTop: 2 }}>
+                              {c.region_name ?? `Region #${c.region_id}`}
+                              {preview
+                                ? ` · ${preview.length > 100 ? `${preview.slice(0, 100)}…` : preview}`
+                                : ''}
+                            </div>
+                          </div>
+                          <span
+                            className={`status-badge ${
+                              clarStatus.tone === 'success'
+                                ? 'success'
+                                : clarStatus.tone === 'warning'
+                                  ? 'warning'
+                                  : 'default'
+                            }`}
+                            style={{ fontSize: 'var(--font-size-micro)', flexShrink: 0 }}
+                          >
+                            {clarStatus.label}
+                          </span>
+                        </button>
+                      )
+                    })
                   ) : (
                     <div className="empty-state">
                       <CheckCircle size={32} style={{ margin: '0 auto 10px', display: 'block' }} />
-                      {inboxLoading ? 'Loading notifications…' : 'No notifications yet.'}
+                      {clarificationsLoading ? 'Loading clarifications…' : 'No clarifications yet.'}
                     </div>
                   )
                 ) : requestsPanelRows.length > 0 ? (
@@ -585,9 +598,19 @@ export function DashboardPage() {
                         key={taskId ? `${r.id}-${taskId}` : r.id}
                         type="button"
                         onClick={() => {
+                          if (variant === 'regional') {
+                            navigate(
+                              `/requests/${encodeURIComponent(r.id)}?from=${encodeURIComponent('/region-received')}`,
+                            )
+                            return
+                          }
+                          const from =
+                            variant === 'department' || variant === 'viewer'
+                              ? '/department-tasks'
+                              : '/'
                           const q = taskId
-                            ? `?task=${encodeURIComponent(taskId)}&from=${encodeURIComponent('/')}`
-                            : `?from=${encodeURIComponent('/')}`
+                            ? `?task=${encodeURIComponent(taskId)}&from=${encodeURIComponent(from)}`
+                            : `?from=${encodeURIComponent(from)}`
                           navigate(`/requests/${encodeURIComponent(r.id)}${q}`)
                         }}
                         style={{

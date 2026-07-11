@@ -36,6 +36,8 @@ export type HrRequestIssueIndicator = {
     religion_ids?: number[]
     religions?: { id: number; name: string }[]
   }>
+  /** Qualitative years (independent of quantitative disaggregation years). */
+  qualitative_collection_by_year?: Array<{ year_id: number; label: string }>
 }
 
 export type HrRequestIssueArticle = {

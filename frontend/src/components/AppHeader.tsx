@@ -3,15 +3,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useNotify } from '../context/NotificationsContext'
+import { resolveNotificationRoute } from '../lib/notificationRoutes'
 import { accountPortalSubtitle, formatAccountDisplayName } from '../lib/userDisplayLabels'
+import { LABEL_VIEW_ALL } from '../lib/uiLabels'
 
 type Props = {
   onToggleSidebar: () => void
 }
 
+const HEADER_NOTIFICATION_LIMIT = 10
+
 export function AppHeader({ onToggleSidebar }: Props) {
   const { user, logout } = useAuth()
-  const { inbox, unreadCount, inboxLoading, markRead, markAllRead } = useNotify()
+  const { inbox, unreadCount, inboxLoading, markRead } = useNotify()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -19,7 +23,10 @@ export function AppHeader({ onToggleSidebar }: Props) {
   if (!user) return null
 
   const subtitle = accountPortalSubtitle(user)
-  const visibleItems = useMemo(() => inbox.slice(0, 8), [inbox])
+  const visibleItems = useMemo(
+    () => inbox.slice(0, HEADER_NOTIFICATION_LIMIT),
+    [inbox],
+  )
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -35,13 +42,20 @@ export function AppHeader({ onToggleSidebar }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
-  async function handleOpenNotification(id: number, route: string | null) {
+  async function handleOpenNotification(id: number) {
     const item = inbox.find((entry) => entry.id === id)
-    if (item && item.read_at === null) {
+    if (!item) return
+    if (item.read_at === null) {
       await markRead(id)
     }
     setOpen(false)
+    const route = resolveNotificationRoute(item, user)
     if (route) navigate(route)
+  }
+
+  function handleViewAll() {
+    setOpen(false)
+    navigate('/notifications')
   }
 
   return (
@@ -75,11 +89,9 @@ export function AppHeader({ onToggleSidebar }: Props) {
               <div className="notification-panel">
                 <div className="notification-panel-head">
                   <strong>Notifications</strong>
-                  {unreadCount > 0 && (
-                    <button type="button" className="link-button" onClick={() => void markAllRead()}>
-                      Mark all read
-                    </button>
-                  )}
+                  <button type="button" className="link-button" onClick={handleViewAll}>
+                    {LABEL_VIEW_ALL}
+                  </button>
                 </div>
                 {inboxLoading && <div className="notification-empty">Loading…</div>}
                 {!inboxLoading && visibleItems.length === 0 && (
@@ -91,7 +103,7 @@ export function AppHeader({ onToggleSidebar }: Props) {
                       key={item.id}
                       type="button"
                       className={`notification-item${item.read_at ? '' : ' unread'}`}
-                      onClick={() => void handleOpenNotification(item.id, item.route)}
+                      onClick={() => void handleOpenNotification(item.id)}
                     >
                       <div className="notification-item-title">{item.title}</div>
                       <div className="notification-item-message">{item.message}</div>

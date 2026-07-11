@@ -44,10 +44,26 @@ class DepartmentTaskController extends Controller
             'regional_review_comments' => $t->regional_review_comments,
             'assigned_date' => $t->assigned_date->format('Y-m-d'),
             'assignment_instructions' => $redact ? null : $t->assignment_instructions,
+            'assigned_indicator_ids' => self::normalizeAssignedIndicatorIds($t->assigned_indicator_ids),
             'submission_date' => $t->submission_date?->format('Y-m-d'),
             'response_data' => $redact ? null : $t->response_data,
             'attachment_url' => $redact ? null : $t->attachment_url,
         ];
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<int>|null
+     */
+    private static function normalizeAssignedIndicatorIds(mixed $raw): ?array
+    {
+        if (! is_array($raw) || $raw === []) {
+            return null;
+        }
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', $raw), static fn (int $id) => $id > 0)));
+
+        return $ids === [] ? null : $ids;
     }
 
     /**
@@ -70,11 +86,37 @@ class DepartmentTaskController extends Controller
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
             'department_id' => ['required', 'integer', 'exists:departments,id'],
             'assignment_instructions' => ['nullable', 'string', 'max:20000'],
+            'issue_indicator_ids' => ['sometimes', 'array'],
+            'issue_indicator_ids.*' => ['integer', 'distinct', 'exists:issue_indicators,id'],
         ]);
 
-        $hrRequest = HrRequest::query()->with('regions')->find($data['hr_request_id']);
+        $hrRequest = HrRequest::query()->with(['regions', 'issue.indicators', 'indicatorResponses'])->find($data['hr_request_id']);
         if (! $hrRequest) {
             return response()->json(['message' => 'Request not found'], 404);
+        }
+
+        $allowedIndicatorIds = $this->allowedIssueIndicatorIdsForRequest($hrRequest);
+        $assignedIndicatorIds = array_values(array_unique(array_map(
+            'intval',
+            is_array($data['issue_indicator_ids'] ?? null) ? $data['issue_indicator_ids'] : [],
+        )));
+        $assignedIndicatorIds = array_values(array_filter($assignedIndicatorIds, static fn (int $id) => $id > 0));
+
+        if ($allowedIndicatorIds !== []) {
+            if ($assignedIndicatorIds === []) {
+                return response()->json([
+                    'message' => 'Select at least one indicator for this department assignment.',
+                ], 422);
+            }
+            foreach ($assignedIndicatorIds as $indicatorId) {
+                if (! in_array($indicatorId, $allowedIndicatorIds, true)) {
+                    return response()->json([
+                        'message' => 'One or more indicators are not part of this request.',
+                    ], 422);
+                }
+            }
+        } else {
+            $assignedIndicatorIds = [];
         }
 
         $requestRegionIds = $hrRequest->regions->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
@@ -141,6 +183,9 @@ class DepartmentTaskController extends Controller
         ];
         if (Schema::hasColumn('department_tasks', 'assignment_instructions')) {
             $payload['assignment_instructions'] = $instructions !== '' ? $instructions : null;
+        }
+        if (Schema::hasColumn('department_tasks', 'assigned_indicator_ids')) {
+            $payload['assigned_indicator_ids'] = $assignedIndicatorIds !== [] ? $assignedIndicatorIds : null;
         }
         $task = DepartmentTask::query()->create($payload);
 
@@ -320,6 +365,24 @@ class DepartmentTaskController extends Controller
                 }
                 $out[$yearKey][$genderKey] = ['value' => (float) $valRaw];
             }
+
+            // Optional editable year total (when gender breakdown is unknown or as a checksum).
+            $totalIn = $yearIn['total'] ?? null;
+            $totalRaw = is_array($totalIn) ? ($totalIn['value'] ?? null) : $totalIn;
+            if ($totalRaw !== null && trim((string) $totalRaw) !== '') {
+                if (! is_numeric($totalRaw)) {
+                    return response()->json([
+                        'message' => 'Indicator '.$indicator->id.': year total must be numeric.',
+                    ], 422);
+                }
+                $out[$yearKey]['total'] = ['value' => (float) $totalRaw];
+            } else {
+                $sum = 0.0;
+                foreach ($out[$yearKey] as $cell) {
+                    $sum += (float) ($cell['value'] ?? 0);
+                }
+                $out[$yearKey]['total'] = ['value' => $sum];
+            }
         }
 
         return $out;
@@ -463,6 +526,33 @@ class DepartmentTaskController extends Controller
     private function configuredCollectionYearIds(IssueIndicator $indicator): array
     {
         return $indicator->configuredCollectionYearIds();
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function allowedIssueIndicatorIdsForRequest(HrRequest $hrRequest): array
+    {
+        $hrRequest->loadMissing(['issue.indicators', 'indicatorResponses']);
+        $issue = $hrRequest->issue;
+        if (! $issue) {
+            return [];
+        }
+
+        $selectedIds = $hrRequest->indicatorResponses->pluck('issue_indicator_id')->map(fn ($id) => (int) $id)->all();
+        $ids = [];
+        foreach ($issue->indicators as $ind) {
+            $f = $issue->effectiveIndicatorFlags($ind);
+            if (! $f['has_quantitative'] && ! $f['has_qualitative']) {
+                continue;
+            }
+            if ($selectedIds !== [] && ! in_array((int) $ind->id, $selectedIds, true)) {
+                continue;
+            }
+            $ids[] = (int) $ind->id;
+        }
+
+        return $ids;
     }
 
     private function departmentTaskUsesIndicatorBundles(?HrRequest $hrRequest): bool

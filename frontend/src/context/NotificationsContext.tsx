@@ -74,7 +74,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     setInboxLoading(true)
     try {
-      const res = await fetchNotifications()
+      const res = await fetchNotifications(10)
       setInbox(res.data)
       setUnreadCount(res.meta.unread_count)
     } catch {

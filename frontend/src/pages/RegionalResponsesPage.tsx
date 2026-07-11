@@ -230,12 +230,12 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
               ? [
                   { label: 'Provinces Assigned', value: coverageCounts.assigned },
                   { label: 'Submitted', value: coverageCounts.submitted },
-                  { label: 'Awaiting Submission', value: coverageCounts.pending },
+                  { label: 'Pending', value: coverageCounts.pending },
                   { label: 'Accepted', value: coverageCounts.accepted },
                 ]
               : [
-                  { label: 'Total', value: rows.length },
-                  { label: 'Awaiting Submission', value: awaitingSubmissionCount },
+                  { label: 'Pending', value: awaitingSubmissionCount },
+                  { label: 'Responses', value: rows.length },
                   ...statusCounts.map((s) => ({ label: s.label, value: s.count })),
                 ]
           }
@@ -254,6 +254,9 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
           onChange={(e) => setFilter('status', e.target.value)}
         >
           <option value="">All review statuses</option>
+          <option value={AWAITING_SUBMISSION_REVIEW_FILTER}>
+            {regionalResponseReviewPresentation(AWAITING_SUBMISSION_REVIEW_FILTER).label}
+          </option>
           {REVIEW_STATUSES.map((status) => {
             const { label } = regionalResponseReviewPresentation(status)
             return (
@@ -262,9 +265,6 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
               </option>
             )
           })}
-          <option value={AWAITING_SUBMISSION_REVIEW_FILTER}>
-            {regionalResponseReviewPresentation(AWAITING_SUBMISSION_REVIEW_FILTER).label}
-          </option>
         </select>
         <select value={reqIdFilter} onChange={(e) => setFilter('reqId', e.target.value)}>
           <option value="">All request IDs</option>
@@ -339,7 +339,7 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
                     <td>{entry.requestTitle}</td>
                     <td className="muted">Not yet</td>
                     <td>
-                      <StatusBadge tone="in-progress">Awaiting submission</StatusBadge>
+                      <StatusBadge tone="in-progress">Pending</StatusBadge>
                     </td>
                     <td className="table-actions">
                       <RowActionsMenu

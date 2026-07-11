@@ -8,7 +8,7 @@ import { sortRowsLatestFirst } from './tableRowSort'
 export const WORKFLOW_BUCKET_FILTER_OPTIONS: { value: DepartmentTaskWorkflowBucket | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
   { value: 'in_process', label: 'Pending' },
-  { value: 'responded', label: 'Review' },
+  { value: 'responded', label: 'Under Review' },
   { value: 'revision', label: 'Revision' },
   { value: 'accepted', label: 'Accepted' },
 ]

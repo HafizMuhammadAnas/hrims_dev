@@ -23,6 +23,8 @@ import { RegionalCompilationViewPage } from './pages/RegionalCompilationViewPage
 import { RegionalResponseFederalReviewPage } from './pages/RegionalResponseFederalReviewPage'
 import { RegionalResponsesPage } from './pages/RegionalResponsesPage'
 import { ReportGeneratorPage } from './pages/ReportGeneratorPage'
+import { GovernanceDashboardPage } from './pages/GovernanceDashboardPage'
+import { NotificationsPage } from './pages/NotificationsPage'
 import { IssuesMappingsAdminPage } from './pages/IssuesMappingsAdminPage'
 import { RegionsDistrictsAdminPage } from './pages/RegionsDistrictsAdminPage'
 import { SuperAdminConsolePage } from './pages/SuperAdminConsolePage'
@@ -55,6 +57,7 @@ function App() {
           <Route element={<ProtectedLayout />}>
             <Route element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
               <Route path="requests/:id/edit" element={<HrRequestEditPage />} />
               <Route path="requests/:id" element={<HrRequestViewPage />} />
               <Route path="regional-responses/:responseId" element={<RegionalResponseFederalReviewPage />} />
@@ -149,6 +152,7 @@ function App() {
                 element={<SubmissionHistoryPage title={LABEL_SUBMISSION_HISTORY} />}
               />
               <Route path="report-generator" element={<ReportGeneratorPage />} />
+              <Route path="governance-dashboard" element={<GovernanceDashboardPage />} />
               <Route path="analysis" element={<Navigate to="/report-generator" replace />} />
               <Route path="conventions" element={<ConventionsInfoPage />} />
               <Route path="indicators" element={<IndicatorsInfoPage />} />

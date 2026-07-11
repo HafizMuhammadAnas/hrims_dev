@@ -140,7 +140,7 @@ export function SubmissionHistoryPage({ title }: Props) {
               items={[
                 { label: 'Submitted', value: filteredDeptTasks.length },
                 { label: 'Pending', value: deptWorkflowCounts.in_process },
-                { label: 'Review', value: deptWorkflowCounts.responded },
+                { label: 'Under Review', value: deptWorkflowCounts.responded },
                 { label: 'Revision', value: deptWorkflowCounts.revision },
                 { label: 'Accepted', value: deptWorkflowCounts.accepted },
               ]}

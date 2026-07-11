@@ -17,7 +17,7 @@ class NotificationService
             return;
         }
 
-        $this->notifyUsers(
+        $this->notifyUsersWithRoutes(
             $this->usersForHrRequest($requestModel),
             $actor,
             'hr_request.created',
@@ -25,7 +25,7 @@ class NotificationService
             sprintf('%s created request %s.', $actor->name, $requestModel->id),
             'hr_request',
             $requestModel->id,
-            '/requests/'.$requestModel->id,
+            fn (User $user) => $this->routeForHrRequest($user, $requestModel->id),
             [
                 'status' => $requestModel->status,
             ],
@@ -59,7 +59,7 @@ class NotificationService
             );
         }
 
-        $this->notifyUsers(
+        $this->notifyUsersWithRoutes(
             $this->usersForHrRequest($requestModel),
             $actor,
             'hr_request.updated',
@@ -67,7 +67,7 @@ class NotificationService
             $message,
             'hr_request',
             $requestModel->id,
-            '/requests/'.$requestModel->id,
+            fn (User $user) => $this->routeForHrRequest($user, $requestModel->id),
             [
                 'status' => $requestModel->status,
                 'previous_status' => $previousStatus,
@@ -77,15 +77,16 @@ class NotificationService
 
     public function notifyRegionalResponseCreated(RegionalResponse $response, User $actor): void
     {
-        $this->notifyUsers(
-            $this->usersForRegionalResponse($response),
+        // Federal / super-admin review only — regional actor is excluded; departments are not notified.
+        $this->notifyUsersWithRoutes(
+            $this->federalAdmins(),
             $actor,
             'regional_response.created',
             'Regional response submitted',
             sprintf('%s submitted response %s for request %s.', $actor->name, $response->id, $response->hr_request_id),
             'regional_response',
             $response->id,
-            '/responses',
+            fn () => '/regional-responses/'.$response->id.'?from='.rawurlencode('/responses'),
             [
                 'review_status' => $response->review_status,
                 'hr_request_id' => $response->hr_request_id,
@@ -95,8 +96,8 @@ class NotificationService
 
     public function notifyRegionalResponseReviewed(RegionalResponse $response, User $actor, ?string $previousStatus = null): void
     {
-        $this->notifyUsers(
-            $this->usersForRegionalResponse($response),
+        $this->notifyUsersWithRoutes(
+            $this->usersForRegionalResponseReview($response),
             $actor,
             'regional_response.reviewed',
             'Regional response reviewed',
@@ -109,7 +110,7 @@ class NotificationService
             ),
             'regional_response',
             $response->id,
-            '/responses',
+            fn (User $user) => $this->routeForRegionalResponse($user, $response),
             [
                 'review_status' => $response->review_status,
                 'previous_review_status' => $previousStatus,
@@ -120,7 +121,7 @@ class NotificationService
 
     public function notifyDepartmentTaskAssigned(DepartmentTask $task, User $actor): void
     {
-        $this->notifyUsers(
+        $this->notifyUsersWithRoutes(
             $this->usersForDepartmentTask($task),
             $actor,
             'department_task.assigned',
@@ -128,7 +129,7 @@ class NotificationService
             sprintf('%s assigned department task %s for request %s.', $actor->name, $task->id, $task->hr_request_id),
             'department_task',
             $task->id,
-            '/department-tasks',
+            fn (User $user) => $this->routeForDepartmentTask($user, $task),
             [
                 'status' => $task->status,
                 'hr_request_id' => $task->hr_request_id,
@@ -138,7 +139,7 @@ class NotificationService
 
     public function notifyUserManaged(User $subject, User $actor, string $eventKey, string $title, string $message): void
     {
-        $this->notifyUsers(
+        $this->notifyUsersWithRoutes(
             $this->usersForManagedUser($subject),
             $actor,
             $eventKey,
@@ -146,7 +147,7 @@ class NotificationService
             $message,
             'user',
             (string) $subject->id,
-            $this->routeForManagedUser($subject),
+            fn (User $user) => $this->routeForManagedUser($user, $subject),
             [
                 'subject_role' => $subject->roles->pluck('slug')->values()->all(),
             ],
@@ -155,9 +156,10 @@ class NotificationService
 
     /**
      * @param  Collection<int, User>  $users
+     * @param  callable(User): (?string)  $routeForUser
      * @param  array<string, mixed>  $meta
      */
-    private function notifyUsers(
+    private function notifyUsersWithRoutes(
         Collection $users,
         ?User $actor,
         string $eventKey,
@@ -165,14 +167,14 @@ class NotificationService
         string $message,
         ?string $entityType,
         ?string $entityId,
-        ?string $route,
+        callable $routeForUser,
         array $meta = [],
     ): void {
         $rows = $users
             ->filter(fn (User $user) => $actor === null || (int) $user->id !== (int) $actor->id)
             ->unique('id')
             ->values()
-            ->map(function (User $user) use ($eventKey, $title, $message, $entityType, $entityId, $route, $meta): array {
+            ->map(function (User $user) use ($eventKey, $title, $message, $entityType, $entityId, $routeForUser, $meta): array {
                 $encoded = json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
                 if ($encoded === false) {
                     $encoded = '{}';
@@ -185,7 +187,7 @@ class NotificationService
                     'message' => $message,
                     'entity_type' => $entityType,
                     'entity_id' => $entityId,
-                    'route' => $route,
+                    'route' => $routeForUser($user),
                     'meta' => $encoded,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -196,6 +198,17 @@ class NotificationService
         if ($rows !== []) {
             Notification::query()->insert($rows);
         }
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function federalAdmins(): Collection
+    {
+        return User::query()
+            ->with('roles')
+            ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['super_admin', 'federal_admin']))
+            ->get();
     }
 
     /**
@@ -212,7 +225,7 @@ class NotificationService
         $departmentIds = $requestModel->departments->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         return User::query()
-            ->with('roles')
+            ->with(['roles', 'department.regions'])
             ->where(function ($query) use ($regionIds, $departmentIds): void {
                 $query->whereHas('roles', fn ($r) => $r->whereIn('slug', ['super_admin', 'federal_admin']));
 
@@ -238,39 +251,20 @@ class NotificationService
     /**
      * @return Collection<int, User>
      */
-    private function usersForRegionalResponse(RegionalResponse $response): Collection
+    private function usersForRegionalResponseReview(RegionalResponse $response): Collection
     {
-        $response->loadMissing(['hrRequest.departments:id', 'hrRequest.regions:id']);
-
-        $regionIds = [];
-        if ($response->region_id !== null) {
-            $regionIds[] = (int) $response->region_id;
-        }
-        foreach ($response->hrRequest?->regions ?? [] as $region) {
-            $regionIds[] = (int) $region->id;
-        }
-        $regionIds = array_values(array_unique($regionIds));
-
-        $departmentIds = $response->hrRequest?->departments?->pluck('id')->map(fn ($id) => (int) $id)->all() ?? [];
+        $response->loadMissing(['region:id']);
 
         return User::query()
             ->with('roles')
-            ->where(function ($query) use ($regionIds, $departmentIds): void {
+            ->where(function ($query) use ($response): void {
                 $query->whereHas('roles', fn ($r) => $r->whereIn('slug', ['super_admin', 'federal_admin']));
 
-                if ($regionIds !== []) {
-                    $query->orWhere(function ($inner) use ($regionIds): void {
+                if ($response->region_id !== null) {
+                    $query->orWhere(function ($inner) use ($response): void {
                         $inner
                             ->whereHas('roles', fn ($r) => $r->where('slug', 'regional_admin'))
-                            ->whereIn('region_id', $regionIds);
-                    });
-                }
-
-                if ($departmentIds !== []) {
-                    $query->orWhere(function ($inner) use ($departmentIds): void {
-                        $inner
-                            ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
-                            ->whereIn('department_id', $departmentIds);
+                            ->where('region_id', $response->region_id);
                     });
                 }
             })
@@ -278,30 +272,33 @@ class NotificationService
     }
 
     /**
+     * Department task notifications: department users + owning regional (or federal for ICT) only.
+     *
      * @return Collection<int, User>
      */
     private function usersForDepartmentTask(DepartmentTask $task): Collection
     {
-        $regionIds = $task->region_id !== null ? [(int) $task->region_id] : [];
+        $task->loadMissing(['department.regions']);
+        $isIct = $task->department?->coversRegionSlug('ict') ?? false;
 
         return User::query()
-            ->with('roles')
-            ->where(function ($query) use ($task, $regionIds): void {
-                $query->whereHas('roles', fn ($r) => $r->whereIn('slug', ['super_admin', 'federal_admin']));
-
-                if ($regionIds !== []) {
-                    $query->orWhere(function ($inner) use ($regionIds): void {
-                        $inner
-                            ->whereHas('roles', fn ($r) => $r->where('slug', 'regional_admin'))
-                            ->whereIn('region_id', $regionIds);
-                    });
-                }
-
-                $query->orWhere(function ($inner) use ($task): void {
+            ->with(['roles', 'department.regions'])
+            ->where(function ($query) use ($task, $isIct): void {
+                $query->where(function ($inner) use ($task): void {
                     $inner
                         ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
                         ->where('department_id', $task->department_id);
                 });
+
+                if ($isIct) {
+                    $query->orWhereHas('roles', fn ($r) => $r->whereIn('slug', ['super_admin', 'federal_admin']));
+                } elseif ($task->region_id !== null) {
+                    $query->orWhere(function ($inner) use ($task): void {
+                        $inner
+                            ->whereHas('roles', fn ($r) => $r->where('slug', 'regional_admin'))
+                            ->where('region_id', $task->region_id);
+                    });
+                }
             })
             ->get();
     }
@@ -315,7 +312,7 @@ class NotificationService
         $subjectRoleSlugs = $subject->roles->pluck('slug')->all();
 
         return User::query()
-            ->with('roles')
+            ->with(['roles', 'department.regions'])
             ->where(function ($query) use ($subject, $subjectRoleSlugs): void {
                 $query->whereHas('roles', fn ($r) => $r->where('slug', 'super_admin'));
 
@@ -336,14 +333,81 @@ class NotificationService
             ->get();
     }
 
-    private function routeForManagedUser(User $subject): string
+    private function primaryRoleSlug(User $user): ?string
     {
-        $subject->loadMissing('department.regions');
-
-        if ($subject->department?->coversRegionSlug('ict')) {
-            return '/federal-users-mgmt';
+        $user->loadMissing('roles');
+        $slugs = $user->roles->pluck('slug')->all();
+        foreach (['super_admin', 'federal_admin', 'regional_admin', 'department_admin', 'viewer'] as $slug) {
+            if (in_array($slug, $slugs, true)) {
+                return $slug;
+            }
         }
 
-        return '/regional-users-mgmt';
+        return $slugs[0] ?? null;
+    }
+
+    private function routeForHrRequest(User $user, string $requestId): string
+    {
+        $role = $this->primaryRoleSlug($user);
+
+        if ($role === 'regional_admin') {
+            return '/requests/'.rawurlencode($requestId).'?from='.rawurlencode('/region-received');
+        }
+
+        if ($role === 'department_admin' || $role === 'viewer') {
+            $from = $user->department?->coversRegionSlug('ict')
+                ? '/federal-department-requests'
+                : '/department-tasks';
+
+            return '/requests/'.rawurlencode($requestId).'?from='.rawurlencode($from);
+        }
+
+        return '/requests/'.rawurlencode($requestId).'?from='.rawurlencode('/requests');
+    }
+
+    private function routeForRegionalResponse(User $user, RegionalResponse $response): string
+    {
+        $role = $this->primaryRoleSlug($user);
+
+        if ($role === 'regional_admin') {
+            return '/regional-compilations/'.rawurlencode($response->id).'?from='.rawurlencode('/region-history');
+        }
+
+        return '/regional-responses/'.rawurlencode($response->id).'?from='.rawurlencode('/responses');
+    }
+
+    private function routeForDepartmentTask(User $user, DepartmentTask $task): string
+    {
+        $role = $this->primaryRoleSlug($user);
+        $requestId = (string) $task->hr_request_id;
+        $taskId = (string) $task->id;
+
+        if ($role === 'regional_admin') {
+            $from = '/region-monitoring';
+        } elseif ($role === 'department_admin' || $role === 'viewer') {
+            $from = $user->department?->coversRegionSlug('ict')
+                ? '/federal-department-requests'
+                : '/department-tasks';
+        } else {
+            $from = '/federal-department-requests';
+        }
+
+        return '/requests/'.rawurlencode($requestId).'?task='.rawurlencode($taskId).'&from='.rawurlencode($from);
+    }
+
+    private function routeForManagedUser(User $viewer, User $subject): string
+    {
+        $subject->loadMissing('department.regions');
+        $viewerRole = $this->primaryRoleSlug($viewer);
+
+        if ($viewerRole === 'regional_admin') {
+            return '/regional-users-mgmt/'.$subject->id.'/edit';
+        }
+
+        if ($subject->department?->coversRegionSlug('ict') || in_array($viewerRole, ['federal_admin', 'super_admin'], true)) {
+            return '/federal-users-mgmt/'.$subject->id.'/edit';
+        }
+
+        return '/regional-users-mgmt/'.$subject->id.'/edit';
     }
 }

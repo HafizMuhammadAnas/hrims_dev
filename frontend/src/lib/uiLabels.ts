@@ -2,6 +2,8 @@
 
 export const LABEL_USER_MANAGEMENT = 'User Management'
 export const LABEL_REPORTING_DASHBOARD = 'Reporting Dashboard'
+export const LABEL_DASHBOARDS = 'Dashboards'
+export const LABEL_GOVERNANCE_DASHBOARD = 'Governance Dashboard'
 export const LABEL_CONVENTION_INFO = 'Convention Info'
 export const LABEL_HUMAN_RIGHTS_INDICATORS = 'Human Rights Indicators'
 export const LABEL_SUSTAINABLE_DEVELOPMENT_GOALS = 'Sustainable Development Goals'

@@ -44,7 +44,7 @@ export function workflowPresentation(t: DepartmentTaskRow): {
   if (b === 'in_process') return { label: 'Pending', tone: 'pending' }
   if (b === 'revision') return { label: 'Revision', tone: 'warning' }
   if (b === 'accepted') return { label: 'Accepted', tone: 'success' }
-  return { label: 'Review', tone: 'in-progress' }
+  return { label: 'Under Review', tone: 'in-progress' }
 }
 
 export function workflowStatsLabels(scope: 'regional' | 'federal-ict'): {
@@ -52,7 +52,7 @@ export function workflowStatsLabels(scope: 'regional' | 'federal-ict'): {
   accepted: string
 } {
   if (scope === 'federal-ict') {
-    return { responded: 'Review', accepted: 'Accepted' }
+    return { responded: 'Under Review', accepted: 'Accepted' }
   }
-  return { responded: 'Review', accepted: 'Accepted' }
+  return { responded: 'Under Review', accepted: 'Accepted' }
 }

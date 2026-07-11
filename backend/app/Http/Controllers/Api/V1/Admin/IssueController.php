@@ -180,6 +180,8 @@ class IssueController extends Controller
             'indicators.*.collection_by_year.*.collection_gender_ids.*' => ['integer', Rule::exists('collection_genders', 'id')->where('is_active', true)],
             'indicators.*.collection_by_year.*.collection_religion_ids' => ['sometimes', 'array'],
             'indicators.*.collection_by_year.*.collection_religion_ids.*' => ['integer', 'exists:collection_religions,id'],
+            'indicators.*.qualitative_collection_by_year' => ['sometimes', 'array'],
+            'indicators.*.qualitative_collection_by_year.*' => ['nullable'],
         ]);
 
         $conventionId = (int) ($data['convention_id'] ?? $issue?->convention_id ?? $request->input('convention_id', 0));
@@ -291,11 +293,36 @@ class IssueController extends Controller
             $collectsByLocation = (bool) ($row['collects_by_location'] ?? false);
             $collectsByDisability = (bool) ($row['collects_by_disability'] ?? false);
             $collectsByReligion = (bool) ($row['collects_by_religion'] ?? false);
+            $hasQuantitative = (bool) ($row['has_quantitative'] ?? false);
+            $hasQualitative = (bool) ($row['has_qualitative'] ?? false);
             $collectionByYear = $this->normalizeCollectionByYear($row['collection_by_year'] ?? []);
+            $qualitativeYearIds = $this->normalizeQualitativeYearIds($row['qualitative_collection_by_year'] ?? []);
             $usesDisaggregation = $collectsByGender || $collectsByAge || $collectsByLocation
                 || $collectsByDisability || $collectsByReligion;
 
-            if ($collectsByYear && $collectionByYear === []) {
+            // Year-only qualitative uses qualitative_collection_by_year; also accept collection_by_year.
+            if ($hasQualitative && ! $hasQuantitative && $qualitativeYearIds === [] && $collectionByYear !== []) {
+                $qualitativeYearIds = array_values(array_map(
+                    static fn (array $yearRow): int => (int) $yearRow['collection_year_id'],
+                    $collectionByYear,
+                ));
+            }
+
+            if ($hasQualitative && $qualitativeYearIds === []) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'indicators' => ['Each qualitative indicator must include at least one year.'],
+                ]);
+            }
+
+            if ($hasQuantitative && $collectionByYear === []) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'indicators' => ['Each quantitative indicator must include at least one year.'],
+                ]);
+            }
+
+            $collectsByYear = $collectsByYear || $collectionByYear !== [] || $qualitativeYearIds !== [];
+
+            if ($collectsByYear && $collectionByYear === [] && $qualitativeYearIds === []) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'indicators' => ['Each indicator with year collection must include at least one year.'],
                 ]);
@@ -324,14 +351,14 @@ class IssueController extends Controller
                 'disaggregation' => isset($row['disaggregation']) && $row['disaggregation'] !== ''
                     ? (string) $row['disaggregation']
                     : null,
-                'has_quantitative' => (bool) ($row['has_quantitative'] ?? false),
-                'has_qualitative' => (bool) ($row['has_qualitative'] ?? false),
+                'has_quantitative' => $hasQuantitative,
+                'has_qualitative' => $hasQualitative,
                 'collects_by_year' => $collectsByYear,
-                'collects_by_gender' => $collectsByYear && $collectsByGender,
-                'collects_by_age' => $collectsByYear && $collectsByAge,
-                'collects_by_location' => $collectsByYear && $collectsByLocation,
-                'collects_by_disability' => $collectsByYear && $collectsByDisability,
-                'collects_by_religion' => $collectsByYear && $collectsByReligion,
+                'collects_by_gender' => $hasQuantitative && $collectsByYear && $collectsByGender,
+                'collects_by_age' => $hasQuantitative && $collectsByYear && $collectsByAge,
+                'collects_by_location' => $hasQuantitative && $collectsByYear && $collectsByLocation,
+                'collects_by_disability' => $hasQuantitative && $collectsByYear && $collectsByDisability,
+                'collects_by_religion' => $hasQuantitative && $collectsByYear && $collectsByReligion,
             ];
             if (IssueIndicator::hasSortOrderColumn()) {
                 $indicatorAttributes['sort_order'] = (int) $sortOrder;
@@ -339,8 +366,12 @@ class IssueController extends Controller
 
             $indicator = IssueIndicator::query()->create($indicatorAttributes);
 
-            if ($collectsByYear) {
-                $indicator->syncCollectionByYear($collectionByYear, $collectsByGender);
+            if ($collectsByYear || $qualitativeYearIds !== []) {
+                $indicator->syncCollectionByYear(
+                    $hasQuantitative ? $collectionByYear : [],
+                    (bool) $indicatorAttributes['collects_by_gender'],
+                    $hasQualitative ? $qualitativeYearIds : [],
+                );
             }
         }
     }
@@ -389,6 +420,35 @@ class IssueController extends Controller
                 'collection_gender_ids' => $genderIds,
                 'collection_religion_ids' => $religionIds,
             ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  mixed  $rows
+     * @return list<int>
+     */
+    private function normalizeQualitativeYearIds(mixed $rows): array
+    {
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $out = [];
+        $seen = [];
+        foreach ($rows as $row) {
+            $yearId = 0;
+            if (is_array($row)) {
+                $yearId = (int) ($row['collection_year_id'] ?? $row['year_id'] ?? 0);
+            } elseif (is_numeric($row)) {
+                $yearId = (int) $row;
+            }
+            if ($yearId <= 0 || isset($seen[$yearId])) {
+                continue;
+            }
+            $seen[$yearId] = true;
+            $out[] = $yearId;
         }
 
         return $out;

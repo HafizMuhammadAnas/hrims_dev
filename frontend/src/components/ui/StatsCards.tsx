@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 export type StatCardItem = {
   label: string
@@ -8,6 +8,8 @@ export type StatCardItem = {
   icon?: ReactNode
   /** Hex color used for the icon glyph and its tinted background. */
   iconTone?: string
+  /** Colored left border + value accent (dashboard status cards). */
+  accent?: string
 }
 
 type StatsCardsProps = {
@@ -23,40 +25,50 @@ export function StatsCards({ items, className, variant = 'default' }: StatsCards
     <div
       className={`stats-row${titleTop ? ' stats-row--title-top' : ''}${className ? ` ${className}` : ''}`.trim()}
     >
-      {items.map((item) => (
-        <div className="stat-card" key={item.label}>
-          {titleTop ? (
-            <>
-              {item.icon ? (
-                <span
-                  className="stat-card__icon"
-                  style={
-                    item.iconTone
-                      ? { color: item.iconTone, background: `${item.iconTone}1f` }
-                      : undefined
-                  }
-                  aria-hidden
-                >
-                  {item.icon}
-                </span>
-              ) : null}
-              <div className="stat-card__body">
-                <div className="stat-card-label">{item.label}</div>
-                <div className="stat-card-value">{item.value}</div>
-                <div className={`stat-card-detail${item.detail ? '' : ' stat-card-detail--empty'}`}>
-                  {item.detail ?? '\u00a0'}
+      {items.map((item) => {
+        const cardStyle: CSSProperties | undefined = item.accent
+          ? { borderLeft: `4px solid ${item.accent}` }
+          : undefined
+        const valueStyle: CSSProperties | undefined = item.accent ? { color: item.accent } : undefined
+        return (
+          <div className="stat-card" key={item.label} style={cardStyle}>
+            {titleTop ? (
+              <>
+                {item.icon ? (
+                  <span
+                    className="stat-card__icon"
+                    style={
+                      item.iconTone
+                        ? { color: item.iconTone, background: `${item.iconTone}1f` }
+                        : undefined
+                    }
+                    aria-hidden
+                  >
+                    {item.icon}
+                  </span>
+                ) : null}
+                <div className="stat-card__body">
+                  <div className="stat-card-label">{item.label}</div>
+                  <div className="stat-card-value" style={valueStyle}>
+                    {item.value}
+                  </div>
+                  <div className={`stat-card-detail${item.detail ? '' : ' stat-card-detail--empty'}`}>
+                    {item.detail ?? '\u00a0'}
+                  </div>
                 </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="stat-card-value">{item.value}</div>
-              {item.detail ? <div className="stat-card-detail">{item.detail}</div> : null}
-              <div className="stat-card-label">{item.label}</div>
-            </>
-          )}
-        </div>
-      ))}
+              </>
+            ) : (
+              <>
+                <div className="stat-card-value" style={valueStyle}>
+                  {item.value}
+                </div>
+                {item.detail ? <div className="stat-card-detail">{item.detail}</div> : null}
+                <div className="stat-card-label">{item.label}</div>
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

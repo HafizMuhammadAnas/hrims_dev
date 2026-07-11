@@ -15,3 +15,17 @@ export function indicatorsScopedToRequest(detail: HrRequestRow | null | undefine
   const selected = new Set(rows.map((r) => r.issue_indicator_id))
   return collecting.filter((i) => selected.has(i.id))
 }
+
+/**
+ * Further narrow request indicators to those assigned on a department task.
+ * Legacy tasks with no `assigned_indicator_ids` keep the full request scope.
+ */
+export function indicatorsScopedToDepartmentTask(
+  detail: HrRequestRow | null | undefined,
+  assignedIndicatorIds: number[] | null | undefined,
+): HrRequestIssueIndicator[] {
+  const scoped = indicatorsScopedToRequest(detail)
+  if (!assignedIndicatorIds || assignedIndicatorIds.length === 0) return scoped
+  const allowed = new Set(assignedIndicatorIds)
+  return scoped.filter((i) => allowed.has(i.id))
+}

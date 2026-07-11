@@ -40,7 +40,13 @@ type Props = {
   religionValues: MatrixValues
   districts: DistrictRow[]
   religions: CollectionReligionRow[]
-  onGenderChange?: (indicatorId: number, yearId: number, columnId: number | string, value: string) => void
+  onGenderChange?: (
+    indicatorId: number,
+    yearId: number,
+    columnId: number | string,
+    value: string,
+    autoTotalValue?: string,
+  ) => void
   onAgeChange?: (indicatorId: number, yearId: number, columnId: number | string, value: string) => void
   onDisabilityChange?: (indicatorId: number, yearId: number, columnId: number | string, value: string) => void
   onDistrictChange?: (indicatorId: number, yearId: number, columnId: number | string, value: string) => void
@@ -221,7 +227,8 @@ export function DepartmentIndicatorDisaggregationMatrices({
           indicatorGenderCellAllowed(ind, yearId, Number(columnId))
         }
         columnHeaderClass={genderHeaderClass}
-        hint="Enter a number for each year and gender combination required for that metric."
+        showYearTotals
+        hint="Enter gender values when available — Total updates automatically. If you only know the overall count, enter it in Total."
       />
       <DepartmentDisaggregationMatrixTable
         title="Age"

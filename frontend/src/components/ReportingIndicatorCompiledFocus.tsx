@@ -25,12 +25,12 @@ type Props = {
   filterYearLabel?: string
 }
 
-/** A ministry submission (federal → ministry), as opposed to a national/regional compilation. */
+/** A final Compilation Center submission (as opposed to a draft national/regional compilation). */
 function isMinistryCompiledRecord(r: CompiledRecordRow): boolean {
-  return Boolean(r.submitted_to && /ministry/i.test(r.submitted_to))
+  return Boolean(r.submitted_to)
 }
 
-/** Prefer the most final compiled row for a request: ministry submission, then latest date. */
+/** Prefer the most final compiled row for a request: submitted compilation, then latest date. */
 function preferCompiledRecord(a: CompiledRecordRow, b: CompiledRecordRow): CompiledRecordRow {
   const rank = (r: CompiledRecordRow) => (isMinistryCompiledRecord(r) ? 2 : r.status === 'submitted' ? 1 : 0)
   if (rank(b) !== rank(a)) return rank(b) > rank(a) ? b : a
@@ -50,11 +50,11 @@ export function ReportingIndicatorCompiledFocus({
   const [recordViews, setRecordViews] = useState<RecordView[]>([])
 
   /**
-   * A request can have multiple compiled rows (e.g. national compilation and ministry submission)
+   * A request can have multiple compiled rows (e.g. draft compilation and final submission)
    * that carry the same responses. Keep one per request so the focus view is not duplicated.
    */
   const dedupedRecords = useMemo(() => {
-    // Only ministry submissions; fall back to all rows if none are marked (avoids an empty view).
+    // Prefer final submissions; fall back to all rows if none are marked (avoids an empty view).
     const ministry = records.filter(isMinistryCompiledRecord)
     const source = ministry.length > 0 ? ministry : records
     const byReq = new Map<string, CompiledRecordRow>()

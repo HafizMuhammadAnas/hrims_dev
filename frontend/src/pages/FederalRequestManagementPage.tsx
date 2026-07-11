@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   deleteHrRequest,
   fetchHrRequests,
@@ -63,6 +63,7 @@ function resolveRequestsTab(pathname: string): RequestsTab {
 export function FederalRequestManagementPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const view = resolveRequestsTab(location.pathname)
   const { user } = useAuth()
   const canManage = canManageHrRequests(user)
@@ -101,6 +102,18 @@ export function FederalRequestManagementPage() {
     setClarifications(rows)
     setPendingClarificationCount(count)
   }, [])
+
+  useEffect(() => {
+    if (view !== 'clarifications') return
+    const raw = searchParams.get('id')
+    if (!raw) return
+    const id = Number(raw)
+    if (!Number.isFinite(id) || id <= 0) return
+    setViewingClarificationId(id)
+    const next = new URLSearchParams(searchParams)
+    next.delete('id')
+    setSearchParams(next, { replace: true })
+  }, [view, searchParams, setSearchParams])
 
   useEffect(() => {
     let cancelled = false

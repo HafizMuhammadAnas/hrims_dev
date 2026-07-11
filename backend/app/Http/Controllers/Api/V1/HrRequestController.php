@@ -882,14 +882,38 @@ class HrRequestController extends Controller
                 continue;
             }
 
-            $task = DepartmentTask::query()->create([
+            $createPayload = [
                 'id' => 'TSK-'.strtoupper(Str::random(10)),
                 'hr_request_id' => $hrRequest->id,
                 'region_id' => $taskRegionId,
                 'department_id' => (int) $deptId,
                 'status' => 'assigned',
                 'assigned_date' => now()->toDateString(),
-            ]);
+            ];
+            if (Schema::hasColumn('department_tasks', 'assigned_indicator_ids')) {
+                $hrRequest->loadMissing(['issue.indicators', 'indicatorResponses']);
+                $indicatorIds = [];
+                if ($hrRequest->issue) {
+                    $selectedIds = $hrRequest->indicatorResponses
+                        ->pluck('issue_indicator_id')
+                        ->map(fn ($id) => (int) $id)
+                        ->all();
+                    foreach ($hrRequest->issue->indicators as $ind) {
+                        $f = $hrRequest->issue->effectiveIndicatorFlags($ind);
+                        if (! $f['has_quantitative'] && ! $f['has_qualitative']) {
+                            continue;
+                        }
+                        if ($selectedIds !== [] && ! in_array((int) $ind->id, $selectedIds, true)) {
+                            continue;
+                        }
+                        $indicatorIds[] = (int) $ind->id;
+                    }
+                }
+                if ($indicatorIds !== []) {
+                    $createPayload['assigned_indicator_ids'] = $indicatorIds;
+                }
+            }
+            $task = DepartmentTask::query()->create($createPayload);
 
             try {
                 $task->load(['region', 'department']);

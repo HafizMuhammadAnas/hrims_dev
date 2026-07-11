@@ -86,7 +86,7 @@ export function mapRegionalResponseDisplayExportRow(
       region: entry.regionName,
       title: entry.requestTitle,
       submitted: 'Not yet',
-      status: 'Awaiting submission',
+      status: 'Pending',
     }
   }
   const row = entry.row

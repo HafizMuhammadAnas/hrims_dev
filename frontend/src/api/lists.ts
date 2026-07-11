@@ -60,6 +60,8 @@ export type DepartmentTaskRow = {
   regional_review_comments?: string | null
   assigned_date: string
   assignment_instructions?: string | null
+  /** Issue indicator IDs this department must respond to; null/omitted = full request scope (legacy). */
+  assigned_indicator_ids?: number[] | null
   submission_date?: string | null
   response_data?: string | null
   attachment_url?: string | null

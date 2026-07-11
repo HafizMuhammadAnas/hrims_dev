@@ -21,6 +21,7 @@ class DepartmentTask extends Model
         'regional_review_comments',
         'assigned_date',
         'assignment_instructions',
+        'assigned_indicator_ids',
         'submission_date',
         'response_data',
         'attachment_url',
@@ -34,6 +35,7 @@ class DepartmentTask extends Model
         return [
             'assigned_date' => 'date',
             'submission_date' => 'date',
+            'assigned_indicator_ids' => 'array',
         ];
     }
 

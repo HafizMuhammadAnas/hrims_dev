@@ -206,6 +206,7 @@ export function IssuesMappingsAdminPage() {
         issueId={viewIssueId}
         user={user}
         issues={issues}
+        collectionGenders={activeCollectionGenders}
         error={error}
         setError={setError}
         onRefreshIssues={refreshIssues}
@@ -1692,8 +1693,8 @@ function IssuesCollectionReligionsSection({
       <div style={{ marginBottom: 16 }}>
         <TableCard padded>
           <p className="text-muted text-compact" style={{ margin: 0 }}>
-            Official religion options are stored in the database. When an indicator has Religion enabled,
-            respondents see the full list below — admins only turn the dimension on and pick collection years.
+            Official religion options are stored in the database. Quantitative indicators always include the Religion
+            dimension; respondents see the full list below for the collection years selected on the indicator.
           </p>
         </TableCard>
       </div>
@@ -1907,7 +1908,8 @@ function indicatorDataTypeLabel(ind: AdminIssue['indicators'][number], issue: Ad
 
 /** Year collection and disaggregation dimensions summary. */
 function indicatorDisaggregationLabel(ind: AdminIssue['indicators'][number]): string {
-  if (ind.collects_by_year && (ind.collection_by_year?.length ?? 0) > 0) {
+  const parts: string[] = []
+  if (ind.has_quantitative && ind.collects_by_year && (ind.collection_by_year?.length ?? 0) > 0) {
     const years = ind.collection_by_year.map((y) => y.label).join('; ')
     const dims: string[] = []
     if (ind.collects_by_gender) dims.push('Gender')
@@ -1915,11 +1917,13 @@ function indicatorDisaggregationLabel(ind: AdminIssue['indicators'][number]): st
     if (ind.collects_by_location) dims.push('Location')
     if (ind.collects_by_disability) dims.push('Disability')
     if (ind.collects_by_religion) dims.push('Religion')
-    if (dims.length === 0) {
-      return years
-    }
-    return `${years} (${dims.join(', ')})`
+    parts.push(dims.length > 0 ? `Q: ${years} (${dims.join(', ')})` : `Q: ${years}`)
   }
+  const qualYears = ind.qualitative_collection_by_year ?? []
+  if (ind.has_qualitative && qualYears.length > 0) {
+    parts.push(`L: ${qualYears.map((y) => y.label).join('; ')}`)
+  }
+  if (parts.length > 0) return parts.join(' · ')
   const text = ind.disaggregation?.trim()
   return text || '—'
 }
@@ -1983,16 +1987,15 @@ type IndicatorDisaggregatedYearRow = {
   gender_ids: number[]
 }
 
-type IndicatorCollectionMode = 'none' | 'year' | 'year_disaggregated'
-
 type IndicatorDraft = {
   client_key: string
   indicator_text: string
   collects_quantitative: boolean
   collects_qualitative: boolean
-  collection_mode: IndicatorCollectionMode
-  year_ids: number[]
+  /** Quantitative disaggregation years (with genders). */
   disaggregated_years: IndicatorDisaggregatedYearRow[]
+  /** Qualitative years only — independent of quantitative years. */
+  qualitative_year_ids: number[]
   collects_by_gender: boolean
   collects_by_age: boolean
   collects_by_location: boolean
@@ -2014,9 +2017,8 @@ function emptyIndicator(): IndicatorDraft {
     indicator_text: '',
     collects_quantitative: false,
     collects_qualitative: true,
-    collection_mode: 'none',
-    year_ids: [],
     disaggregated_years: [],
+    qualitative_year_ids: [],
     collects_by_gender: false,
     collects_by_age: false,
     collects_by_location: false,
@@ -2031,151 +2033,76 @@ function validateIndicatorDataTypes(rows: IndicatorDraft[]): string | null {
     if (!x.collects_quantitative && !x.collects_qualitative) {
       return 'Each indicator must have Quantitative and/or Qualitative selected.'
     }
-    if (x.collection_mode === 'year' && x.year_ids.length === 0) {
-      return 'Add at least one year when collecting by year only.'
+    if (x.collects_quantitative && x.disaggregated_years.length === 0) {
+      return 'Select at least one year for each quantitative indicator.'
     }
-    if (x.collection_mode === 'year_disaggregated') {
-      if (x.disaggregated_years.length === 0) {
-        return 'Add at least one year when collecting by year and disaggregated data.'
-      }
-      if (
-        !x.collects_by_gender &&
-        !x.collects_by_age &&
-        !x.collects_by_location &&
-        !x.collects_by_disability &&
-        !x.collects_by_religion
-      ) {
-        return 'Select at least one disaggregation dimension.'
-      }
-      if (x.collects_by_gender) {
-        for (const yRow of x.disaggregated_years) {
-          if (yRow.gender_ids.length === 0) {
-            return 'Each selected year must have at least one gender when the gender dimension is enabled.'
-          }
-        }
-      }
+    if (x.collects_qualitative && x.qualitative_year_ids.length === 0) {
+      return 'Select at least one year for each qualitative indicator.'
     }
   }
   return null
 }
 
 function indicatorFromAdmin(ind: AdminIssueIndicator): IndicatorDraft {
-  const hasDisaggregation =
-    ind.collects_by_gender ||
-    ind.collects_by_age ||
-    ind.collects_by_location ||
-    ind.collects_by_disability ||
-    ind.collects_by_religion
-  let collection_mode: IndicatorCollectionMode = 'none'
-  if (ind.collects_by_year) {
-    collection_mode = hasDisaggregation ? 'year_disaggregated' : 'year'
+  const quantitative = ind.has_quantitative
+  const qualitative = ind.has_qualitative
+  const quantYearRows = quantitative
+    ? (ind.collection_by_year ?? []).map((y) => ({
+        year_id: y.year_id,
+        gender_ids: y.gender_ids ?? [],
+      }))
+    : []
+  const qualFromApi = ind.qualitative_collection_by_year ?? []
+  let qualitative_year_ids = qualitative ? qualFromApi.map((y) => y.year_id) : []
+  // Legacy: qualitative-only year-only rows lived in collection_by_year.
+  if (qualitative && !quantitative && qualitative_year_ids.length === 0) {
+    qualitative_year_ids = (ind.collection_by_year ?? []).map((y) => y.year_id)
   }
   return {
     client_key: nextIndicatorClientKey(ind.id),
     indicator_text: ind.indicator_text,
-    collects_quantitative: ind.has_quantitative,
-    collects_qualitative: ind.has_qualitative,
-    collection_mode,
-    year_ids: collection_mode === 'year' ? ind.collection_by_year.map((y) => y.year_id) : [],
-    disaggregated_years:
-      collection_mode === 'year_disaggregated'
-        ? ind.collection_by_year.map((y) => ({
-            year_id: y.year_id,
-            gender_ids: y.gender_ids ?? [],
-          }))
-        : [],
-    collects_by_gender: ind.collects_by_gender,
-    collects_by_age: ind.collects_by_age,
-    collects_by_location: ind.collects_by_location,
-    collects_by_disability: ind.collects_by_disability,
-    collects_by_religion: ind.collects_by_religion,
+    collects_quantitative: quantitative,
+    collects_qualitative: qualitative,
+    disaggregated_years: quantYearRows,
+    qualitative_year_ids,
+    collects_by_gender: quantitative,
+    collects_by_age: quantitative,
+    collects_by_location: false,
+    collects_by_disability: quantitative,
+    collects_by_religion: quantitative,
   }
 }
 
-function indicatorAdminToPayload(ind: AdminIssueIndicator) {
-  return indicatorToPayload(indicatorFromAdmin(ind))
+function indicatorAdminToPayload(ind: AdminIssueIndicator, fallbackGenderIds: number[] = []) {
+  return indicatorToPayload(indicatorFromAdmin(ind), fallbackGenderIds)
 }
 
-function indicatorToPayload(x: IndicatorDraft) {
-  const collectsByYear = x.collection_mode !== 'none'
-  const disaggregated = x.collection_mode === 'year_disaggregated'
+/** Quantitative: years + fixed dimensions. Qualitative: separate year list only. */
+function indicatorToPayload(x: IndicatorDraft, fallbackGenderIds: number[] = []) {
+  const quantYears = x.collects_quantitative ? x.disaggregated_years : []
+  const qualYears = x.collects_qualitative ? x.qualitative_year_ids : []
+  const collectsByYear = quantYears.length > 0 || qualYears.length > 0
+
   return {
     indicator_text: x.indicator_text.trim(),
     disaggregation: null,
     has_quantitative: x.collects_quantitative,
     has_qualitative: x.collects_qualitative,
     collects_by_year: collectsByYear,
-    collects_by_gender: disaggregated && x.collects_by_gender,
-    collects_by_age: disaggregated && x.collects_by_age,
-    collects_by_location: disaggregated && x.collects_by_location,
-    collects_by_disability: disaggregated && x.collects_by_disability,
-    collects_by_religion: disaggregated && x.collects_by_religion,
-    collection_by_year: collectsByYear
-      ? x.collection_mode === 'year'
-        ? x.year_ids.map((yearId) => ({
-            collection_year_id: yearId,
-            collection_gender_ids: [] as number[],
-            collection_religion_ids: [] as number[],
-          }))
-        : x.disaggregated_years.map((row) => ({
-            collection_year_id: row.year_id,
-            collection_gender_ids: x.collects_by_gender ? row.gender_ids : [],
-            collection_religion_ids: [] as number[],
-          }))
-      : [],
+    collects_by_gender: x.collects_quantitative && quantYears.length > 0,
+    collects_by_age: x.collects_quantitative && quantYears.length > 0,
+    collects_by_location: false,
+    collects_by_disability: x.collects_quantitative && quantYears.length > 0,
+    collects_by_religion: x.collects_quantitative && quantYears.length > 0,
+    collection_by_year: quantYears.map((row) => ({
+      collection_year_id: row.year_id,
+      collection_gender_ids: row.gender_ids.length > 0 ? row.gender_ids : fallbackGenderIds,
+      collection_religion_ids: [] as number[],
+    })),
+    qualitative_collection_by_year: qualYears.map((yearId) => ({
+      collection_year_id: yearId,
+    })),
   }
-}
-
-function IndicatorGenderPerYearMapper({
-  rows,
-  onChange,
-  collectionYears,
-  collectionGenders,
-  disabled,
-}: {
-  rows: IndicatorDisaggregatedYearRow[]
-  onChange: (rows: IndicatorDisaggregatedYearRow[]) => void
-  collectionYears: AdminCollectionYear[]
-  collectionGenders: AdminCollectionGender[]
-  disabled?: boolean
-}) {
-  const sortedYears = useMemo(
-    () => [...collectionYears].sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)),
-    [collectionYears],
-  )
-  const sortedGenders = useMemo(
-    () =>
-      filterSelectableCollectionGenders([...collectionGenders]).sort(
-        (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
-      ),
-    [collectionGenders],
-  )
-
-  const yearLabel = (yearId: number) => sortedYears.find((y) => y.id === yearId)?.label ?? `Year #${yearId}`
-
-  if (rows.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="issue-indicator-year-gender-map issue-indicator-dimension-checks__nested">
-      {rows.map((row) => (
-        <div key={row.year_id} className="issue-indicator-year-gender-map__year">
-          <strong className="text-compact issue-indicator-year-gender-map__year-label">{yearLabel(row.year_id)}</strong>
-          <CatalogIdCheckboxList
-            label={`Genders for ${yearLabel(row.year_id)}`}
-            items={sortedGenders}
-            labelKey="name"
-            selectedIds={row.gender_ids}
-            disabled={disabled}
-            onChange={(gender_ids) => {
-              onChange(rows.map((r) => (r.year_id === row.year_id ? { ...r, gender_ids } : r)))
-            }}
-          />
-        </div>
-      ))}
-    </div>
-  )
 }
 
 function IndicatorYearOnlyPicker({
@@ -2384,11 +2311,11 @@ function IssueIndicatorsEditor({
     () => [...collectionYears].sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)),
     [collectionYears],
   )
-  const sortedGenders = useMemo(
+  const allSelectableGenderIds = useMemo(
     () =>
-      filterSelectableCollectionGenders([...collectionGenders]).sort(
-        (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
-      ),
+      filterSelectableCollectionGenders([...collectionGenders])
+        .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+        .map((g) => g.id),
     [collectionGenders],
   )
 
@@ -2404,6 +2331,66 @@ function IssueIndicatorsEditor({
     }
     onChange(reorderList(rows, dragIndex, toIndex))
     finishDrag()
+  }
+
+  function patchRow(idx: number, patch: Partial<IndicatorDraft>) {
+    const next = [...rows]
+    next[idx] = { ...rows[idx], ...patch }
+    onChange(next)
+  }
+
+  function setQuantitative(idx: number, row: IndicatorDraft, checked: boolean) {
+    if (checked) {
+      const years = row.disaggregated_years.map((y) => ({
+        year_id: y.year_id,
+        gender_ids: y.gender_ids.length > 0 ? y.gender_ids : allSelectableGenderIds,
+      }))
+      patchRow(idx, {
+        collects_quantitative: true,
+        disaggregated_years: years,
+        collects_by_gender: true,
+        collects_by_age: true,
+        collects_by_location: false,
+        collects_by_disability: true,
+        collects_by_religion: true,
+      })
+      return
+    }
+    patchRow(idx, {
+      collects_quantitative: false,
+      disaggregated_years: [],
+      collects_by_gender: false,
+      collects_by_age: false,
+      collects_by_location: false,
+      collects_by_disability: false,
+      collects_by_religion: false,
+    })
+  }
+
+  function setQualitative(idx: number, row: IndicatorDraft, checked: boolean) {
+    patchRow(idx, {
+      collects_qualitative: checked,
+      qualitative_year_ids: checked ? row.qualitative_year_ids : [],
+    })
+  }
+
+  function setQuantitativeYears(idx: number, row: IndicatorDraft, yearIds: number[]) {
+    const existing = new Map(row.disaggregated_years.map((y) => [y.year_id, y]))
+    patchRow(idx, {
+      disaggregated_years: yearIds.map((year_id) => {
+        const prev = existing.get(year_id)
+        return {
+          year_id,
+          gender_ids:
+            prev && prev.gender_ids.length > 0 ? prev.gender_ids : allSelectableGenderIds,
+        }
+      }),
+      collects_by_gender: true,
+      collects_by_age: true,
+      collects_by_location: false,
+      collects_by_disability: true,
+      collects_by_religion: true,
+    })
   }
 
   return (
@@ -2452,11 +2439,7 @@ function IssueIndicatorsEditor({
                 placeholder="Indicator text"
                 value={row.indicator_text}
                 disabled={disabled}
-                onChange={(e) => {
-                  const next = [...rows]
-                  next[idx] = { ...row, indicator_text: e.target.value }
-                  onChange(next)
-                }}
+                onChange={(e) => patchRow(idx, { indicator_text: e.target.value })}
               />
             </FormControl>
             <FormControl label="Response data type (Q/L)">
@@ -2466,11 +2449,7 @@ function IssueIndicatorsEditor({
                     type="checkbox"
                     checked={row.collects_quantitative}
                     disabled={disabled}
-                    onChange={(e) => {
-                      const next = [...rows]
-                      next[idx] = { ...row, collects_quantitative: e.target.checked }
-                      onChange(next)
-                    }}
+                    onChange={(e) => setQuantitative(idx, row, e.target.checked)}
                   />
                   Quantitative
                 </label>
@@ -2479,143 +2458,53 @@ function IssueIndicatorsEditor({
                     type="checkbox"
                     checked={row.collects_qualitative}
                     disabled={disabled}
-                    onChange={(e) => {
-                      const next = [...rows]
-                      next[idx] = { ...row, collects_qualitative: e.target.checked }
-                      onChange(next)
-                    }}
+                    onChange={(e) => setQualitative(idx, row, e.target.checked)}
                   />
                   Qualitative
                 </label>
               </div>
             </FormControl>
           </FormRow>
-          <div className="issue-indicator-collection-checks">
-            <label className="checkbox-label issue-indicator-collection-checks__item">
-              <input
-                type="checkbox"
-                checked={row.collection_mode === 'year'}
-                disabled={disabled}
-                onChange={(e) => {
-                  const next = [...rows]
-                  next[idx] = {
-                    ...row,
-                    collection_mode: e.target.checked ? 'year' : 'none',
-                    year_ids: e.target.checked ? row.year_ids : [],
-                    disaggregated_years: [],
-                  }
-                  onChange(next)
-                }}
-              />
-              By year only
-            </label>
-            <label className="checkbox-label issue-indicator-collection-checks__item">
-              <input
-                type="checkbox"
-                checked={row.collection_mode === 'year_disaggregated'}
-                disabled={disabled}
-                onChange={(e) => {
-                  const next = [...rows]
-                  next[idx] = {
-                    ...row,
-                    collection_mode: e.target.checked ? 'year_disaggregated' : 'none',
-                    year_ids: [],
-                    disaggregated_years: e.target.checked ? row.disaggregated_years : [],
-                  }
-                  onChange(next)
-                }}
-              />
-              By year, disaggregated
-            </label>
-          </div>
-          {row.collection_mode === 'year' ? (
-            <IndicatorYearOnlyPicker
-              yearIds={row.year_ids}
-              collectionYears={sortedYears}
-              disabled={disabled}
-              onChange={(year_ids) => {
-                const next = [...rows]
-                next[idx] = { ...row, year_ids }
-                onChange(next)
-              }}
-            />
-          ) : null}
-          {row.collection_mode === 'year_disaggregated' ? (
-            <>
+          {row.collects_quantitative ? (
+            <div className="issue-indicator-mapping-block">
+              <div className="issue-indicator-mapping-block__label text-compact font-semibold">
+                Quantitative years
+              </div>
               <IndicatorYearOnlyPicker
                 yearIds={row.disaggregated_years.map((y) => y.year_id)}
                 collectionYears={sortedYears}
                 disabled={disabled}
-                onChange={(year_ids) => {
-                  const next = [...rows]
-                  const existing = new Map(row.disaggregated_years.map((y) => [y.year_id, y]))
-                  next[idx] = {
-                    ...row,
-                    disaggregated_years: year_ids.map((year_id) =>
-                      existing.get(year_id) ?? { year_id, gender_ids: [] },
-                    ),
-                  }
-                  onChange(next)
-                }}
+                onChange={(yearIds) => setQuantitativeYears(idx, row, yearIds)}
               />
-              {row.disaggregated_years.length > 0 ? (
-                <div className="issue-indicator-dimension-checks" role="group" aria-label="Disaggregation dimensions">
-                  <p className="text-muted text-compact" style={{ margin: '0 0 8px' }}>
-                    Choose which dimensions apply to this indicator. Religion, disability, and age options are shown to
-                    respondents when enabled.
-                  </p>
-                  <div className="issue-indicator-dimension-checks__block">
-                    <label className="checkbox-label issue-indicator-dimension-checks__item">
-                      <input
-                        type="checkbox"
-                        checked={row.collects_by_gender}
-                        disabled={disabled}
-                        onChange={(e) => {
-                          const next = [...rows]
-                          next[idx] = { ...row, collects_by_gender: e.target.checked }
-                          onChange(next)
-                        }}
-                      />
-                      Gender
-                    </label>
-                    {row.collects_by_gender ? (
-                      <IndicatorGenderPerYearMapper
-                        rows={row.disaggregated_years}
-                        collectionYears={sortedYears}
-                        collectionGenders={sortedGenders}
-                        disabled={disabled}
-                        onChange={(disaggregated_years) => {
-                          const next = [...rows]
-                          next[idx] = { ...row, disaggregated_years }
-                          onChange(next)
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                  {(
-                    [
-                      ['collects_by_age', 'Age (Under 18, 18 - 60, Above 60 for respondents)'],
-                      ['collects_by_disability', 'Disability (Persons with disability count for respondents)'],
-                      ['collects_by_religion', 'Religion (full list for respondents)'],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <label key={key} className="checkbox-label issue-indicator-dimension-checks__item">
-                      <input
-                        type="checkbox"
-                        checked={row[key]}
-                        disabled={disabled}
-                        onChange={(e) => {
-                          const next = [...rows]
-                          next[idx] = { ...row, [key]: e.target.checked }
-                          onChange(next)
-                        }}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-            </>
+              <div className="issue-indicator-dimension-checks" role="group" aria-label="Disaggregation dimensions">
+                {(
+                  [
+                    'Gender',
+                    'Age (Under 18, 18 - 60, Above 60 for respondents)',
+                    'Disability (Persons with disability count for respondents)',
+                    'Religion (full list for respondents)',
+                  ] as const
+                ).map((label) => (
+                  <label key={label} className="checkbox-label issue-indicator-dimension-checks__item">
+                    <input type="checkbox" checked disabled />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {row.collects_qualitative ? (
+            <div className="issue-indicator-mapping-block">
+              <div className="issue-indicator-mapping-block__label text-compact font-semibold">
+                Qualitative years
+              </div>
+              <IndicatorYearOnlyPicker
+                yearIds={row.qualitative_year_ids}
+                collectionYears={sortedYears}
+                disabled={disabled}
+                onChange={(yearIds) => patchRow(idx, { qualitative_year_ids: yearIds })}
+              />
+            </div>
           ) : null}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button variant="link" compact dangerLink disabled={disabled} onClick={() => onChange(rows.filter((_, i) => i !== idx))}>
@@ -2794,7 +2683,8 @@ function IssuesCreateForm({
                   return
                 }
                 const filled = indicators.filter((x) => x.indicator_text.trim())
-                const indPayload = filled.map((x) => indicatorToPayload(x))
+                const fallbackGenderIds = filterSelectableCollectionGenders(collectionGenders).map((g) => g.id)
+                const indPayload = filled.map((x) => indicatorToPayload(x, fallbackGenderIds))
                 const hasQuantitative = filled.some((x) => x.collects_quantitative)
                 const hasQualitative = filled.some((x) => x.collects_qualitative)
                 const textFields = issueEntryPayloadFields(activeEntryKind, issueTitle, issueDescription)
@@ -2966,6 +2856,7 @@ function IssuesIssueViewPage({
   issueId,
   user,
   issues,
+  collectionGenders,
   error,
   setError,
   onRefreshIssues,
@@ -2973,6 +2864,7 @@ function IssuesIssueViewPage({
   issueId: number
   user: AuthUser
   issues: AdminIssue[]
+  collectionGenders: AdminCollectionGender[]
   error: string | null
   setError: (s: string | null) => void
   onRefreshIssues: () => Promise<void>
@@ -2981,6 +2873,10 @@ function IssuesIssueViewPage({
   const [issue, setIssue] = useState<AdminIssue | null>(null)
   const [loading, setLoading] = useState(true)
   const [reorderBusy, setReorderBusy] = useState(false)
+  const fallbackGenderIds = useMemo(
+    () => filterSelectableCollectionGenders(collectionGenders).map((g) => g.id),
+    [collectionGenders],
+  )
 
   async function saveIndicatorOrder(next: AdminIssueIndicator[]) {
     if (!issue) return
@@ -2988,7 +2884,7 @@ function IssuesIssueViewPage({
     setError(null)
     try {
       const updated = await adminUpdateIssue(issue.id, {
-        indicators: next.map((ind) => indicatorAdminToPayload(ind)),
+        indicators: next.map((ind) => indicatorAdminToPayload(ind, fallbackGenderIds)),
       })
       setIssue(updated)
       await onRefreshIssues()

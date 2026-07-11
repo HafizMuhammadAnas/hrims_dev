@@ -53,6 +53,7 @@ import { fetchCollectionReligions, type CollectionReligionRow } from '../api/col
 import {
   deptFormUsesIndicatorMatrix,
   forEachIndicatorMatrixCell,
+  genderTotalCellKey,
   indicatorUsesDataMatrix,
   matrixCellKey,
 } from '../lib/indicatorMatrixColumns'
@@ -74,6 +75,10 @@ import { Alert } from '../components/ui/Alert'
 import { buildDepartmentForwardedViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import { ClarificationThreadCard } from '../components/ClarificationThreadCard'
 import { PendingFileAttachmentRow } from '../components/PendingFileAttachmentRow'
+import {
+  assignedDepartmentIndicatorMap,
+  RegionalAssignDepartmentsPanel,
+} from '../components/RegionalAssignDepartmentsPanel'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -94,7 +99,7 @@ import {
 } from '../lib/departmentTaskWorkflow'
 import { loiMetadataLoadErrorPageMessage } from '../lib/issueEntryKind'
 import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isViewer } from '../lib/roles'
-import { indicatorsScopedToRequest } from '../lib/hrRequestIndicatorScope'
+import { indicatorsScopedToDepartmentTask, indicatorsScopedToRequest } from '../lib/hrRequestIndicatorScope'
 import { reviewFeedbackLabelForTask } from '../lib/ictRegion'
 import type { AuthUser } from '../types/auth'
 import type { HrRequestRow } from '../types/hrRequest'
@@ -181,7 +186,7 @@ export function HrRequestViewPage() {
 
   const [departments, setDepartments] = useState<DepartmentRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
-  const [assignDeptIds, setAssignDeptIds] = useState<number[]>([])
+  const [assignDepartmentIndicators, setAssignDepartmentIndicators] = useState<Record<number, number[]>>({})
   const [assignRegionalNotes, setAssignRegionalNotes] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
@@ -357,12 +362,21 @@ export function HrRequestViewPage() {
     }
   }, [deptLocationRegionIds])
 
-  const deptIndicatorsForForm = useMemo(() => indicatorsScopedToRequest(detail), [detail])
+  const deptIndicatorsForForm = useMemo(
+    () => indicatorsScopedToDepartmentTask(detail, activeTask?.assigned_indicator_ids),
+    [detail, activeTask?.assigned_indicator_ids],
+  )
 
   const deptResponseDisplayScopeIds = useMemo(() => {
+    const scoped = indicatorsScopedToDepartmentTask(detail, activeTask?.assigned_indicator_ids)
+    if (activeTask?.assigned_indicator_ids && activeTask.assigned_indicator_ids.length > 0) {
+      return scoped.map((i) => i.id)
+    }
     if (!detail || (detail.indicator_responses?.length ?? 0) === 0) return undefined
-    return indicatorsScopedToRequest(detail).map((i) => i.id)
-  }, [detail])
+    return scoped.map((i) => i.id)
+  }, [detail, activeTask?.assigned_indicator_ids])
+
+  const requestIndicatorsForAssign = useMemo(() => indicatorsScopedToRequest(detail), [detail])
 
   useEffect(() => {
     if (!activeTask) {
@@ -378,7 +392,7 @@ export function HrRequestViewPage() {
     setLegacyAttachmentClear(false)
     setDeptFileInputRev({})
     setSubmitResponseError(null)
-    const collecting = indicatorsScopedToRequest(detail)
+    const collecting = indicatorsScopedToDepartmentTask(detail, activeTask.assigned_indicator_ids)
     if (collecting.length > 0) {
       setResponseText('')
       const parsed = parseDepartmentTaskResponseData(
@@ -442,7 +456,7 @@ export function HrRequestViewPage() {
     }
     setIndicatorDrafts({})
     setResponseText(activeTask.response_data?.trim() ? activeTask.response_data : '')
-  }, [activeTask?.id, activeTask?.response_data, activeTask?.attachment_url, detail])
+  }, [activeTask?.id, activeTask?.response_data, activeTask?.attachment_url, activeTask?.assigned_indicator_ids, detail])
 
   const deptParsedTaskResponse = useMemo(() => {
     if (!activeTask) return null
@@ -590,30 +604,24 @@ export function HrRequestViewPage() {
     hasDepartmentResponse(activeTask) &&
     !canDepartmentSubmitResponse(activeTask)
 
-  const selectedAssignDepartmentsText = useMemo(() => {
-    if (assignDeptIds.length === 0) return 'Select departments'
-    const selected = regionDepartments.filter((d) => assignDeptIds.includes(d.id))
-    if (selected.length === 0) return 'Select departments'
-    if (selected.length <= 2) return selected.map((d) => d.name).join(', ')
-    return `${selected.length} departments selected`
-  }, [assignDeptIds, regionDepartments])
-
   async function assignSelectedDepartments() {
     if (!detail) return
-    if (assignDeptIds.length === 0) {
-      setAssignError('Select at least one department.')
+    const byDepartment = assignedDepartmentIndicatorMap(assignDepartmentIndicators)
+    if (byDepartment.size === 0) {
+      setAssignError('Select at least one indicator for a department.')
       return
     }
     setAssigning(true)
     setAssignError(null)
     try {
       const notes = assignRegionalNotes.trim() || null
-      for (const departmentId of assignDeptIds) {
+      for (const [departmentId, indicatorIds] of byDepartment) {
         await createDepartmentTask(detail.id, departmentId, {
           assignment_instructions: notes,
+          issue_indicator_ids: indicatorIds,
         })
       }
-      setAssignDeptIds([])
+      setAssignDepartmentIndicators({})
       setAssignRegionalNotes('')
       setRegionalPathChoice(null)
       await reloadTasksAndDepartments()
@@ -679,13 +687,22 @@ export function HrRequestViewPage() {
               isMatrixRowEnabled(d.matrixRowEnabled, 'gender')
             ) {
               const by_year_gender: Record<string, Record<string, { value: string }>> = {}
+              const years = new Set<number>()
               forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
+                years.add(yearId)
                 const yearKey = String(yearId)
                 if (!by_year_gender[yearKey]) by_year_gender[yearKey] = {}
                 by_year_gender[yearKey][String(genderId)] = {
                   value: matrixCellNumericValue(d.yearGenderValues[matrixCellKey(yearId, genderId)]),
                 }
               })
+              for (const yearId of years) {
+                const yearKey = String(yearId)
+                if (!by_year_gender[yearKey]) by_year_gender[yearKey] = {}
+                by_year_gender[yearKey].total = {
+                  value: matrixCellNumericValue(d.yearGenderValues[genderTotalCellKey(yearId)]),
+                }
+              }
               quantitative.by_year_gender = by_year_gender
             }
 
@@ -1045,63 +1062,23 @@ export function HrRequestViewPage() {
         )}
 
         {showRegionalAssign && (
-          <section className="hr-request-view-template__card hr-request-regional-workflow-section">
-            <Button variant="link" compact type="button" onClick={() => setRegionalPathChoice(null)}>
-              ← Choose a different path
-            </Button>
-            <h4 className="dashboard-panel-title" style={{ marginTop: 0, marginBottom: 12 }}>
-              Assign to departments ({user?.region?.name ?? 'your region'})
-            </h4>
-            <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-              Select one or more departments, then assign tasks for this request.
-            </p>
-            <label className="muted" htmlFor="reg-assign-dept-summary">
-              Departments
-            </label>
-            <details className="hr-request-ict-dept-dropdown" style={{ marginTop: 8 }}>
-              <summary id="reg-assign-dept-summary">{selectedAssignDepartmentsText}</summary>
-              <div className="hr-request-ict-dept-dropdown__menu" role="group" aria-label="Assign departments">
-                {regionDepartments.map((d) => (
-                  <label key={d.id} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={assignDeptIds.includes(d.id)}
-                      onChange={(e) =>
-                        setAssignDeptIds((prev) =>
-                          e.target.checked ? [...prev, d.id] : prev.filter((x) => x !== d.id),
-                        )
-                      }
-                    />
-                    <span>
-                      {d.name} {d.code ? <span className="muted small">({d.code})</span> : null}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </details>
-            <div className="form-row" style={{ marginTop: 14 }}>
-              <label htmlFor="reg-assign-instructions">Comments or instructions for departments (optional)</label>
-              <textarea
-                id="reg-assign-instructions"
-                rows={4}
-                value={assignRegionalNotes}
-                onChange={(e) => setAssignRegionalNotes(e.target.value)}
-                placeholder="e.g. Prioritize disaggregated figures by district; deadline for draft input is Friday."
-                style={{ width: '100%', boxSizing: 'border-box' }}
-              />
-            </div>
-            {assignError && <p className="login-error" style={{ marginTop: 12 }}>{assignError}</p>}
-            <div style={{ marginTop: 16 }}>
-              <Button
-                variant="primary"
-                compact
-                disabled={assigning || assignDeptIds.length === 0}
-                onClick={() => void assignSelectedDepartments()}
-              >
-                {assigning ? 'Assigning…' : 'Assign selected departments'}
-              </Button>
-            </div>
-          </section>
+          <RegionalAssignDepartmentsPanel
+            regionName={user?.region?.name ?? 'your region'}
+            indicators={requestIndicatorsForAssign}
+            departments={regionDepartments}
+            departmentIndicators={assignDepartmentIndicators}
+            onChangeDepartmentIndicators={setAssignDepartmentIndicators}
+            notes={assignRegionalNotes}
+            onChangeNotes={setAssignRegionalNotes}
+            assigning={assigning}
+            error={assignError}
+            onBack={() => {
+              setRegionalPathChoice(null)
+              setAssignError(null)
+            }}
+            onAssign={() => void assignSelectedDepartments()}
+            showBackLink
+          />
         )}
 
         {regionalUser && tasksForRequest.length === 0 && regionDepartments.length === 0 && (
@@ -1453,18 +1430,22 @@ export function HrRequestViewPage() {
                         indicatorDrafts[ind.id]?.yearReligionValues ?? {},
                       ]),
                     )}
-                    onGenderChange={(indicatorId, yearId, columnId, value) => {
+                    onGenderChange={(indicatorId, yearId, columnId, value, autoTotalValue) => {
                       const key =
                         typeof columnId === 'string'
                           ? `${yearId}-${columnId}`
                           : matrixCellKey(yearId, columnId)
                       setIndicatorDrafts((prev) => {
                         const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        const yearGenderValues = { ...cur.yearGenderValues, [key]: value }
+                        if (autoTotalValue != null) {
+                          yearGenderValues[genderTotalCellKey(yearId)] = autoTotalValue
+                        }
                         return {
                           ...prev,
                           [indicatorId]: {
                             ...cur,
-                            yearGenderValues: { ...cur.yearGenderValues, [key]: value },
+                            yearGenderValues,
                           },
                         }
                       })
@@ -1722,60 +1703,19 @@ export function HrRequestViewPage() {
           )}
 
         {showRegionalAssign && !fromRegionReceived && (
-          <div className="hr-request-view-panel">
-            <h3 className="dashboard-panel-title" style={{ marginTop: 0, marginBottom: 12 }}>
-              Assign to departments ({user?.region?.name ?? 'your region'})
-            </h3>
-            <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-              Select one or more departments, then assign tasks for this request.
-            </p>
-            <label className="muted" htmlFor="reg-assign-dept-summary">
-              Departments
-            </label>
-            <details className="hr-request-ict-dept-dropdown" style={{ marginTop: 8 }}>
-              <summary id="reg-assign-dept-summary">{selectedAssignDepartmentsText}</summary>
-              <div className="hr-request-ict-dept-dropdown__menu" role="group" aria-label="Assign departments">
-                {regionDepartments.map((d) => (
-                  <label key={d.id} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={assignDeptIds.includes(d.id)}
-                      onChange={(e) =>
-                        setAssignDeptIds((prev) =>
-                          e.target.checked ? [...prev, d.id] : prev.filter((x) => x !== d.id),
-                        )
-                      }
-                    />
-                    <span>
-                      {d.name} {d.code ? <span className="muted small">({d.code})</span> : null}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </details>
-            <div className="form-row" style={{ marginTop: 14 }}>
-              <label htmlFor="reg-assign-instructions">Comments or instructions for departments (optional)</label>
-              <textarea
-                id="reg-assign-instructions"
-                rows={4}
-                value={assignRegionalNotes}
-                onChange={(e) => setAssignRegionalNotes(e.target.value)}
-                placeholder="e.g. Prioritize disaggregated figures by district; deadline for draft input is Friday."
-                style={{ width: '100%', boxSizing: 'border-box' }}
-              />
-            </div>
-            {assignError && <p className="login-error" style={{ marginTop: 12 }}>{assignError}</p>}
-            <div style={{ marginTop: 16 }}>
-              <Button
-                variant="primary"
-                compact
-                disabled={assigning || assignDeptIds.length === 0}
-                onClick={() => void assignSelectedDepartments()}
-              >
-                {assigning ? 'Assigning…' : 'Assign selected departments'}
-              </Button>
-            </div>
-          </div>
+          <RegionalAssignDepartmentsPanel
+            regionName={user?.region?.name ?? 'your region'}
+            indicators={requestIndicatorsForAssign}
+            departments={regionDepartments}
+            departmentIndicators={assignDepartmentIndicators}
+            onChangeDepartmentIndicators={setAssignDepartmentIndicators}
+            notes={assignRegionalNotes}
+            onChangeNotes={setAssignRegionalNotes}
+            assigning={assigning}
+            error={assignError}
+            onAssign={() => void assignSelectedDepartments()}
+            showBackLink={false}
+          />
         )}
 
         {regionalUser &&

@@ -126,6 +126,8 @@ export type AdminIssueIndicator = {
   collects_by_disability: boolean
   collects_by_religion: boolean
   collection_by_year: AdminIssueIndicatorYearRow[]
+  /** Years for qualitative data gathering (separate from quantitative disaggregation years). */
+  qualitative_collection_by_year?: Array<{ year_id: number; label: string }>
 }
 
 export type AdminIssueIndicatorYearRow = {

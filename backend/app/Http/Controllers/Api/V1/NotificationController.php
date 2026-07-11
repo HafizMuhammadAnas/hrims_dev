@@ -11,7 +11,7 @@ class NotificationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $limit = max(1, min((int) $request->query('limit', 10), 25));
+        $limit = max(1, min((int) $request->query('limit', 10), 200));
         $user = $request->user();
 
         $rows = Notification::query()

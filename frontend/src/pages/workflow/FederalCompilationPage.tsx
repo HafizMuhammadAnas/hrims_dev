@@ -96,7 +96,7 @@ export function FederalCompilationPage() {
     return [...s].sort((a, b) => a.localeCompare(b))
   }, [responses, deptTasks])
 
-  /** Requests already submitted to the ministry from this center — hide from the picker. */
+  /** Requests already submitted from this center — hide from the picker. */
   const reqIdsNationallySubmitted = useMemo(() => {
     const s = new Set<string>()
     for (const c of compiledRecords) {
@@ -268,7 +268,7 @@ export function FederalCompilationPage() {
         region_names: selectedRegionNames,
         summary: summary || null,
         status,
-        submitted_to: status === 'submitted' ? 'Ministry of Human Rights' : null,
+        submitted_to: status === 'submitted' ? 'Compilation Center' : null,
       })
       setSummary('')
       setSelectedReqId('')
@@ -310,7 +310,7 @@ export function FederalCompilationPage() {
         {requestsForSelect.length === 0 && reqIdsForPicker.length > 0 ? (
           <p className="muted" style={{ margin: '8px 0 12px' }}>
             Every request that still had an open national compilation has already been{' '}
-            <strong>submitted to the ministry</strong> from this center. Open{' '}
+            <strong>submitted</strong> from this center. Open{' '}
             <Link to="/compiled-records">Compiled records</Link> to review saved national records.
           </p>
         ) : null}
@@ -393,7 +393,7 @@ export function FederalCompilationPage() {
               items={[
                 { label: 'Provinces Assigned', value: provinceCounts.assigned },
                 { label: 'Submitted', value: provinceCounts.submitted },
-                { label: 'Awaiting Submission', value: provinceCounts.pending },
+                { label: 'Pending', value: provinceCounts.pending },
                 { label: 'Accepted (Review)', value: provinceCounts.accepted },
                 ...(selectedResponses.length > 0
                   ? [
@@ -507,7 +507,7 @@ export function FederalCompilationPage() {
                               </span>
                               <span className="compilation-dept-status-row__dept">{item.regionName}</span>
                             </span>
-                            <StatusBadge tone="in-progress">Awaiting submission</StatusBadge>
+                            <StatusBadge tone="in-progress">Pending</StatusBadge>
                           </div>
                         </div>
                       )
@@ -558,13 +558,13 @@ export function FederalCompilationPage() {
             )}
           </div>
         )}
-        <label className="muted">Federal summary for ministry</label>
+        <label className="muted">Federal summary</label>
         <textarea
           rows={8}
           style={{ width: '100%', marginTop: 6 }}
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          placeholder="Write the federal administrator’s summary for ministry submission. Source material: provincial rows above when present, and national-line (ICT) departmental submissions accepted under Departmental responses."
+          placeholder="Write the federal administrator’s summary. Source material: provincial rows above when present, and national-line (ICT) departmental submissions accepted under Departmental responses."
         />
         <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
           <Button
@@ -581,7 +581,7 @@ export function FederalCompilationPage() {
             disabled={saving !== null || !canPersistCompilation}
             onClick={() => void save('submitted')}
           >
-            {saving === 'submitted' ? 'Submitting...' : 'Submit to ministry'}
+            {saving === 'submitted' ? 'Submitting...' : 'Submit'}
           </Button>
           {!canPersistCompilation && selectedReqId ? (
             <span className="muted small" style={{ flex: '1 1 200px' }}>

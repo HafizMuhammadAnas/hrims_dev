@@ -86,6 +86,18 @@ class DashboardController extends Controller
                 ->count();
         }
 
+        if ($user->hasRole('regional_admin') && $user->region_id !== null) {
+            $tq = DepartmentTask::query()->where('region_id', $user->region_id);
+            $data['department_tasks_total'] = (clone $tq)->count();
+            $data['department_tasks_by_status'] = (clone $tq)
+                ->select('status', DB::raw('count(*) as c'))
+                ->groupBy('status')
+                ->pluck('c', 'status')
+                ->map(fn ($c) => (int) $c)
+                ->all();
+            $data['department_tasks_by_workflow'] = $this->departmentTasksByWorkflow(clone $tq);
+        }
+
         if ($user->hasRole('department_admin') || $user->hasRole('viewer')) {
             if ($user->department_id) {
                 $tq = DepartmentTask::query()->where('department_id', $user->department_id);
@@ -96,6 +108,7 @@ class DashboardController extends Controller
                     ->pluck('c', 'status')
                     ->map(fn ($c) => (int) $c)
                     ->all();
+                $data['department_tasks_by_workflow'] = $this->departmentTasksByWorkflow(clone $tq);
                 $data['department_tasks_by_month'] = $this->monthlyCounts(clone $tq, 'assigned_date', 6);
 
                 $openForAction = DepartmentTask::query()
@@ -127,12 +140,63 @@ class DashboardController extends Controller
             } else {
                 $data['department_tasks_total'] = 0;
                 $data['department_tasks_by_status'] = [];
+                $data['department_tasks_by_workflow'] = $this->emptyDepartmentWorkflowCounts();
                 $data['department_tasks_by_month'] = $this->emptyMonthSeries(6);
                 $data['urgent_department_tasks'] = [];
             }
         }
 
         return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Department task workflow buckets (aligned with department/regional task lists).
+     *
+     * @return array{in_process: int, responded: int, revision: int, accepted: int}
+     */
+    private function departmentTasksByWorkflow(Builder $taskQuery): array
+    {
+        $rows = (clone $taskQuery)->get(['status', 'regional_review_status', 'submission_date']);
+        $out = $this->emptyDepartmentWorkflowCounts();
+
+        foreach ($rows as $row) {
+            $status = (string) $row->getAttribute('status');
+            $review = $row->getAttribute('regional_review_status');
+            $submissionDate = $row->getAttribute('submission_date');
+            $hasResponse = $submissionDate !== null || $status === 'submitted';
+
+            if (! $hasResponse) {
+                $out['in_process']++;
+                continue;
+            }
+
+            if ($review === 'needs-modification') {
+                $out['revision']++;
+                continue;
+            }
+
+            if ($review === 'accepted') {
+                $out['accepted']++;
+                continue;
+            }
+
+            $out['responded']++;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{in_process: int, responded: int, revision: int, accepted: int}
+     */
+    private function emptyDepartmentWorkflowCounts(): array
+    {
+        return [
+            'in_process' => 0,
+            'responded' => 0,
+            'revision' => 0,
+            'accepted' => 0,
+        ];
     }
 
     private function scopedRegionalResponsesQuery(User $user): Builder

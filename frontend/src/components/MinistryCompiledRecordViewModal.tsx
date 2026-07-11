@@ -11,6 +11,7 @@ import {
 } from '../api/lists'
 import { updateCompiledRecord } from '../api/workflows'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
+import { downloadElementAsWord } from '../lib/downloadElementAsWord'
 import { LABEL_COMPILATION_CENTER } from '../lib/uiLabels'
 import { loadDepartmentTasksForRegion } from '../lib/compiledRecordDepartmentTasks'
 import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
@@ -45,7 +46,7 @@ function compiledStatusTone(status: string): StatusBadgeTone {
 }
 
 function formatCompiledStatusLabel(status: string): string {
-  if (status === 'submitted') return 'Submitted to ministry'
+  if (status === 'submitted') return 'Submitted'
   if (status === 'draft') return 'Draft'
   const s = status.replace(/-/g, ' ')
   if (!s) return status
@@ -72,6 +73,8 @@ export function MinistryCompiledRecordViewModal({
   const [finalizing, setFinalizing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [wordLoading, setWordLoading] = useState(false)
+  const [wordError, setWordError] = useState<string | null>(null)
 
   const regions = record.region_names ?? []
   const regionKey = regions.join('\u0001')
@@ -79,6 +82,7 @@ export function MinistryCompiledRecordViewModal({
   useEffect(() => {
     setFinalizeError(null)
     setPdfError(null)
+    setWordError(null)
   }, [record.id])
 
   useEffect(() => {
@@ -185,6 +189,24 @@ export function MinistryCompiledRecordViewModal({
     }
   }
 
+  async function handleDownloadWord() {
+    const el = printRef.current
+    if (!el) return
+    setWordLoading(true)
+    setWordError(null)
+    try {
+      const base = [record.req_id, record.title?.trim() || record.id].filter(Boolean).join(' — ')
+      await downloadElementAsWord(el, base, {
+        captureClass: 'ministry-compiled-pdf-capture',
+        documentTitle: record.title?.trim() || 'Compiled record',
+      })
+    } catch (e: unknown) {
+      setWordError(e instanceof Error ? e.message : 'Could not generate Word document.')
+    } finally {
+      setWordLoading(false)
+    }
+  }
+
   const card = (
     <div
       className={
@@ -194,7 +216,7 @@ export function MinistryCompiledRecordViewModal({
     >
       <div ref={printRef} className="ministry-compiled-print-root">
         <WorkflowModalHero
-          eyebrow="National compilation | Ministry submission"
+          eyebrow="National compilation"
           title={record.title?.trim() || 'Compiled record'}
           titleId="ministry-compiled-title"
           onClose={isPage ? undefined : onClose}
@@ -211,7 +233,7 @@ export function MinistryCompiledRecordViewModal({
             <Alert variant="info" title="Draft record" className="ministry-compiled-draft-alert">
               <p style={{ margin: 0 }}>
                 This compilation is not yet marked as sent. Review the request, provincial responses, and summary
-                below, then use <strong>Submit to ministry</strong> when ready.
+                below, then use <strong>Submit</strong> when ready.
                 {record.req_id ? (
                   <>
                     {' '}
@@ -317,13 +339,24 @@ export function MinistryCompiledRecordViewModal({
             variant="secondary"
             compact
             type="button"
-            disabled={pdfLoading || responsesLoading || hrLoading}
+            disabled={pdfLoading || wordLoading || responsesLoading || hrLoading}
             onClick={() => void handleDownloadPdf()}
           >
             <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
             {pdfLoading ? 'Generating PDF…' : 'Download PDF'}
           </Button>
+          <Button
+            variant="secondary"
+            compact
+            type="button"
+            disabled={pdfLoading || wordLoading || responsesLoading || hrLoading}
+            onClick={() => void handleDownloadWord()}
+          >
+            <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
+            {wordLoading ? 'Generating Word…' : 'Download Word'}
+          </Button>
           {pdfError ? <span className="login-error small">{pdfError}</span> : null}
+          {wordError ? <span className="login-error small">{wordError}</span> : null}
         </div>
       ) : null}
 
@@ -337,7 +370,7 @@ export function MinistryCompiledRecordViewModal({
         ) : null}
         {record.status === 'draft' && canFinalize ? (
           <Button variant="primary" compact type="button" disabled={finalizing} onClick={() => void submitToMinistry()}>
-            {finalizing ? 'Submitting…' : 'Submit to ministry'}
+            {finalizing ? 'Submitting…' : 'Submit'}
           </Button>
         ) : null}
       </ModalActions>

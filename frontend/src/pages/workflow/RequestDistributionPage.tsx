@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { TableCard } from '../../components/ui/TableCard'
+import { indicatorsScopedToRequest } from '../../lib/hrRequestIndicatorScope'
 
 type Props = {
   title: string
@@ -73,11 +74,17 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
       setError('Select at least one department.')
       return
     }
+    const selectedRequest = requests.find((r) => r.id === selectedReq)
+    const indicatorIds = indicatorsScopedToRequest(selectedRequest).map((i) => i.id)
+    if (indicatorIds.length === 0) {
+      setError('This request has no indicators to assign.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       for (const id of selectedDeptIds) {
-        await createDepartmentTask(selectedReq, id)
+        await createDepartmentTask(selectedReq, id, { issue_indicator_ids: indicatorIds })
       }
       setSelectedReq('')
       setSelectedDeptIds([])
