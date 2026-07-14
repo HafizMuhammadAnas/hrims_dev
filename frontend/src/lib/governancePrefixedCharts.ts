@@ -305,3 +305,86 @@ export function prefixedIndicatorIds(resolved: ResolvedPrefixedChart[]): string[
   }
   return [...new Set(ids)]
 }
+
+export type SavedGovernanceChartConfig = {
+  id: number
+  kind: 'trend' | 'comparison'
+  title: string
+  shape: string
+  series_a_key: string
+  series_a_label: string
+  series_a_indicator_id: number | null
+  series_b_key: string | null
+  series_b_label: string | null
+  series_b_indicator_id: number | null
+}
+
+function indicatorById(
+  indicators: ReportLookupIndicator[],
+  id: number | null,
+): ReportLookupIndicator | null {
+  if (id == null) return null
+  return indicators.find((i) => Number(i.id) === Number(id)) ?? null
+}
+
+function asTrendShape(shape: string): GovernanceTrendChartShapeId {
+  const allowed: GovernanceTrendChartShapeId[] = ['line', 'bar', 'pie', 'area', 'step', 'composed']
+  return (allowed.includes(shape as GovernanceTrendChartShapeId)
+    ? shape
+    : 'line') as GovernanceTrendChartShapeId
+}
+
+function asComparisonShape(shape: string): 'line' | 'bar' | 'composed' {
+  if (shape === 'bar' || shape === 'composed') return shape
+  return 'line'
+}
+
+/** Build mode-2 charts from Super Admin saved config (indicator ids), falling back to name matching. */
+export function resolveChartsFromSavedConfig(
+  configs: SavedGovernanceChartConfig[],
+  indicators: ReportLookupIndicator[],
+): ResolvedPrefixedChart[] {
+  if (configs.length === 0) return resolvePrefixedCharts(indicators)
+
+  return configs.map((cfg) => {
+    const a = indicatorById(indicators, cfg.series_a_indicator_id)
+    if (cfg.kind === 'comparison') {
+      const b = indicatorById(indicators, cfg.series_b_indicator_id)
+      return {
+        key: `saved-${cfg.id}`,
+        kind: 'comparison' as const,
+        title: cfg.title,
+        shape: asComparisonShape(cfg.shape),
+        series: [
+          {
+            key: cfg.series_a_key || 'series_a',
+            label: cfg.series_a_label || 'Series A',
+            includes: [],
+            indicator: a,
+          },
+          {
+            key: cfg.series_b_key || 'series_b',
+            label: cfg.series_b_label || 'Series B',
+            includes: [],
+            indicator: b,
+          },
+        ],
+      }
+    }
+
+    return {
+      key: `saved-${cfg.id}`,
+      kind: 'trend' as const,
+      title: cfg.title,
+      shape: asTrendShape(cfg.shape),
+      series: [
+        {
+          key: cfg.series_a_key || 'total',
+          label: cfg.series_a_label || 'Total',
+          includes: [],
+          indicator: a,
+        },
+      ],
+    }
+  })
+}

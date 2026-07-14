@@ -6,7 +6,7 @@ import {
   RotateCcw,
   Settings,
 } from 'lucide-react'
-import { fetchDepartmentTasks } from '../api/lists'
+import { fetchDepartmentTasks, fetchGovernanceDefaultCharts } from '../api/lists'
 import {
   fetchReportConventions,
   fetchReportIndicators,
@@ -27,7 +27,8 @@ import {
 } from '../lib/governanceDashboardData'
 import {
   prefixedIndicatorIds,
-  resolvePrefixedCharts,
+  resolveChartsFromSavedConfig,
+  type SavedGovernanceChartConfig,
 } from '../lib/governancePrefixedCharts'
 import { buildGovernanceTrendChartRows } from '../lib/governanceTrendCharts'
 import {
@@ -80,17 +81,20 @@ export function GovernanceDashboardPage() {
   const [defaultLoading, setDefaultLoading] = useState(true)
   const [trendSeries, setTrendSeries] = useState<IndicatorTrendSeries[] | null>(null)
   const [prefixedSeries, setPrefixedSeries] = useState<IndicatorTrendSeries[]>([])
+  const [savedDefaultCharts, setSavedDefaultCharts] = useState<SavedGovernanceChartConfig[]>([])
 
   useEffect(() => {
     void Promise.all([
       fetchReportConventions(),
       fetchReportIssueCategories(),
       fetchReportIndicators({}),
+      fetchGovernanceDefaultCharts().catch(() => [] as Awaited<ReturnType<typeof fetchGovernanceDefaultCharts>>),
     ])
-      .then(([conv, cats, inds]) => {
+      .then(([conv, cats, inds, defaultCharts]) => {
         setConventions(conv)
         setCategories(cats)
         setAllIndicators(inds)
+        setSavedDefaultCharts(defaultCharts)
       })
       .catch((e: unknown) => {
         setLoadError(e instanceof Error ? e.message : 'Failed to load data')
@@ -137,8 +141,8 @@ export function GovernanceDashboardPage() {
   }, [categorySelectOptions, filters.categoryId])
 
   const prefixedCharts = useMemo(
-    () => resolvePrefixedCharts(allIndicators),
-    [allIndicators],
+    () => resolveChartsFromSavedConfig(savedDefaultCharts, allIndicators),
+    [savedDefaultCharts, allIndicators],
   )
 
   const prefixedSeriesById = useMemo(() => {
@@ -158,7 +162,7 @@ export function GovernanceDashboardPage() {
 
     void (async () => {
       try {
-        const resolved = resolvePrefixedCharts(allIndicators)
+        const resolved = resolveChartsFromSavedConfig(savedDefaultCharts, allIndicators)
         const ids = prefixedIndicatorIds(resolved)
         if (ids.length === 0) {
           if (!cancelled) setPrefixedSeries([])
@@ -191,7 +195,7 @@ export function GovernanceDashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [allIndicators, federalPortal, lockedRegionalId])
+  }, [allIndicators, savedDefaultCharts, federalPortal, lockedRegionalId])
 
   const dirty = filtersAreDirty(filters, defaults)
   const canApply = filters.indicatorIds.length > 0

@@ -24,6 +24,7 @@ import { RegionalResponseFederalReviewPage } from './pages/RegionalResponseFeder
 import { RegionalResponsesPage } from './pages/RegionalResponsesPage'
 import { ReportGeneratorPage } from './pages/ReportGeneratorPage'
 import { GovernanceDashboardPage } from './pages/GovernanceDashboardPage'
+import { GovernanceDefaultChartsAdminPage } from './pages/GovernanceDefaultChartsAdminPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { IssuesMappingsAdminPage } from './pages/IssuesMappingsAdminPage'
 import { RegionsDistrictsAdminPage } from './pages/RegionsDistrictsAdminPage'
@@ -168,6 +169,7 @@ function App() {
               <Route path="admin/issues/:issuesView" element={<IssuesMappingsAdminPage />} />
               <Route path="admin/regions-districts" element={<RegionsDistrictsAdminPage />} />
               <Route path="admin/regions-districts/:geoView" element={<RegionsDistrictsAdminPage />} />
+              <Route path="admin/governance-charts" element={<GovernanceDefaultChartsAdminPage />} />
               <Route path="admin/:section" element={<SuperAdminConsolePage />} />
             </Route>
           </Route>

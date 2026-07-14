@@ -176,7 +176,7 @@ function ComparisonChart({
         </span>
       </h4>
       {!a.indicator || !b.indicator ? (
-        <EmptyTrend message="Matching indicators were not found in the catalog." />
+        <EmptyTrend message="Selected indicator was not found in the catalog." />
       ) : empty ? (
         <EmptyTrend />
       ) : (
@@ -260,7 +260,7 @@ function TrendChart({
         <span className="governance-dashboard__chart-shape-tag">{shapeTag(chart.shape)}</span>
       </h4>
       {!slot.indicator ? (
-        <EmptyTrend message="Matching indicator was not found in the catalog." />
+        <EmptyTrend message="Selected indicator was not found in the catalog." />
       ) : (
         <TrendShapeChart
           shape={chart.shape}

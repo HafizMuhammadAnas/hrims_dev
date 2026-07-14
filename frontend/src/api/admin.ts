@@ -695,3 +695,46 @@ export async function adminDeleteIssue(id: number): Promise<void> {
   const res = await adminSend('DELETE', `/issues/${id}`)
   await throwIfNotOk(res)
 }
+
+export type AdminGovernanceDefaultChart = {
+  id: number
+  sort_order: number
+  kind: 'trend' | 'comparison'
+  title: string
+  shape: 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
+  series_a_key: string
+  series_a_label: string
+  series_a_indicator_id: number | null
+  series_a_indicator_text: string | null
+  series_b_key: string | null
+  series_b_label: string | null
+  series_b_indicator_id: number | null
+  series_b_indicator_text: string | null
+  is_active: boolean
+}
+
+export type AdminGovernanceDefaultChartPayload = {
+  kind: 'trend' | 'comparison'
+  title: string
+  shape: 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
+  series_a_key?: string | null
+  series_a_label: string
+  series_a_indicator_id?: number | null
+  series_b_key?: string | null
+  series_b_label?: string | null
+  series_b_indicator_id?: number | null
+  is_active?: boolean
+}
+
+export async function adminFetchGovernanceDefaultCharts(): Promise<AdminGovernanceDefaultChart[]> {
+  const json = await adminGet<{ data: AdminGovernanceDefaultChart[] }>('/governance/default-charts')
+  return json.data
+}
+
+export async function adminSyncGovernanceDefaultCharts(
+  charts: AdminGovernanceDefaultChartPayload[],
+): Promise<AdminGovernanceDefaultChart[]> {
+  const res = await adminSend('PUT', '/governance/default-charts', { charts })
+  await throwIfNotOk(res)
+  return ((await res.json()) as { data: AdminGovernanceDefaultChart[] }).data
+}

@@ -75,6 +75,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/report-form/indicators', [ReportLookupController::class, 'indicators'])->name('api.v1.report-form.indicators');
         Route::get('/report-form/summary', [ReportLookupController::class, 'summary'])->name('api.v1.report-form.summary');
         Route::get('/report-form/issue-article-links', [ReportLookupController::class, 'issueArticleLinks'])->name('api.v1.report-form.issue-article-links');
+        Route::get('/governance/default-charts', [\App\Http\Controllers\Api\V1\GovernanceDefaultChartController::class, 'index'])->name('api.v1.governance.default-charts.index');
 
         Route::get('/regional-responses', [RegionalResponseController::class, 'index'])->name('api.v1.regional-responses.index');
         Route::post('/regional-responses', [RegionalResponseController::class, 'store'])->name('api.v1.regional-responses.store');
@@ -192,6 +193,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/issues/{issue}', [AdminIssueController::class, 'show'])->name('api.v1.admin.issues.show');
             Route::patch('/issues/{issue}', [AdminIssueController::class, 'update'])->name('api.v1.admin.issues.update');
             Route::delete('/issues/{issue}', [AdminIssueController::class, 'destroy'])->name('api.v1.admin.issues.destroy');
+
+            Route::get('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'index'])->name('api.v1.admin.governance.default-charts.index');
+            Route::put('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'sync'])->name('api.v1.admin.governance.default-charts.sync');
         });
     });
 });

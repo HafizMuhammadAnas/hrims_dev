@@ -79,6 +79,29 @@ export async function fetchDepartmentTasks(options?: {
   return j.data
 }
 
+/** Public: active default (mode 2) governance charts configured by Super Admin. */
+export type GovernanceDefaultChartRow = {
+  id: number
+  sort_order: number
+  kind: 'trend' | 'comparison'
+  title: string
+  shape: 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
+  series_a_key: string
+  series_a_label: string
+  series_a_indicator_id: number | null
+  series_a_indicator_text: string | null
+  series_b_key: string | null
+  series_b_label: string | null
+  series_b_indicator_id: number | null
+  series_b_indicator_text: string | null
+  is_active: boolean
+}
+
+export async function fetchGovernanceDefaultCharts(): Promise<GovernanceDefaultChartRow[]> {
+  const j = await getData<{ data: GovernanceDefaultChartRow[] }>('/api/v1/governance/default-charts')
+  return j.data
+}
+
 /** Provincial department tasks for federal review of a regional compilation. */
 export async function fetchRegionalResponseDepartmentTasks(
   regionalResponseId: string,
