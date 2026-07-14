@@ -20,10 +20,16 @@ import { FormControl } from '../components/ui/FormControl'
 import { PageSection } from '../components/ui/PageSection'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { TableCard } from '../components/ui/TableCard'
-import { isSuperAdmin } from '../lib/roles'
+import { isDepartmentAdmin, isSuperAdmin } from '../lib/roles'
 import { LABEL_INDICATOR_WISE_DATA } from '../lib/uiLabels'
 
 const STORAGE_KEY = 'hrims_indicator_wise_wireframe_v1'
+const ADMIN_BASE = '/admin/indicator-wise-data'
+const DEPARTMENT_BASE = '/department-indicator-wise-data'
+
+function indicatorWiseDataBasePath(pathname: string): string {
+  return pathname.startsWith(DEPARTMENT_BASE) ? DEPARTMENT_BASE : ADMIN_BASE
+}
 
 type DataView = 'list' | 'create' | 'view'
 
@@ -92,11 +98,6 @@ type WireframeRecord = {
   dimensions: Record<DimensionId, DimCells>
 }
 
-const TABS: { view: DataView; to: string; label: string; end?: boolean }[] = [
-  { view: 'list', to: '/admin/indicator-wise-data', label: 'View list', end: true },
-  { view: 'create', to: '/admin/indicator-wise-data/create', label: 'Create' },
-]
-
 function readStore(): WireframeRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -143,15 +144,21 @@ export function IndicatorWiseDataAdminPage() {
   const navigate = useNavigate()
 
   const path = location.pathname
+  const basePath = indicatorWiseDataBasePath(path)
   const view: DataView = path.includes('/create')
     ? 'create'
     : path.includes('/view/')
       ? 'view'
       : 'list'
 
-  if (!user || !isSuperAdmin(user)) {
+  if (!user || (!isSuperAdmin(user) && !isDepartmentAdmin(user))) {
     return <Navigate to="/" replace />
   }
+
+  const tabs: { view: DataView; to: string; label: string; end?: boolean }[] = [
+    { view: 'list', to: basePath, label: 'View list', end: true },
+    { view: 'create', to: `${basePath}/create`, label: 'Create' },
+  ]
 
   return (
     <PageSection
@@ -160,7 +167,7 @@ export function IndicatorWiseDataAdminPage() {
       subtitle="Wireframe: enter year totals for an indicator, then distribute by dimension. Remaining values appear in Unaccounted. Submit is blocked if any dimension exceeds the year total."
     >
       <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label="Indicator-wise data sections">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <NavLink
             key={tab.view}
             to={tab.to}
@@ -179,16 +186,16 @@ export function IndicatorWiseDataAdminPage() {
         ) : null}
       </nav>
 
-      {view === 'list' ? <ListSection /> : null}
+      {view === 'list' ? <ListSection basePath={basePath} /> : null}
       {view === 'create' ? (
-        <CreateSection onSaved={(id) => navigate(`/admin/indicator-wise-data/view/${id}`)} />
+        <CreateSection onSaved={(id) => navigate(`${basePath}/view/${id}`)} />
       ) : null}
-      {view === 'view' ? <ViewSection recordId={recordId} /> : null}
+      {view === 'view' ? <ViewSection recordId={recordId} basePath={basePath} /> : null}
     </PageSection>
   )
 }
 
-function ListSection() {
+function ListSection({ basePath }: { basePath: string }) {
   const navigate = useNavigate()
   const [rows, setRows] = useState<WireframeRecord[]>(() => readStore())
 
@@ -209,7 +216,7 @@ function ListSection() {
         }}
       >
         <h3 style={{ margin: 0 }}>Submitted indicator-wise records</h3>
-        <Button type="button" onClick={() => navigate('/admin/indicator-wise-data/create')}>
+        <Button type="button" onClick={() => navigate(`${basePath}/create`)}>
           <Plus size={16} aria-hidden /> Create
         </Button>
       </div>
@@ -242,7 +249,7 @@ function ListSection() {
                     <td>{grand}</td>
                     <td>{new Date(r.createdAt).toLocaleString()}</td>
                     <td>
-                      <NavLink to={`/admin/indicator-wise-data/view/${r.id}`} className="link-button">
+                      <NavLink to={`${basePath}/view/${r.id}`} className="link-button">
                         <Eye size={14} aria-hidden /> View
                       </NavLink>
                     </td>
@@ -774,7 +781,7 @@ function DimensionYearPanels({
   )
 }
 
-function ViewSection({ recordId }: { recordId?: string }) {
+function ViewSection({ recordId, basePath }: { recordId?: string; basePath: string }) {
   const record = useMemo(() => {
     if (!recordId) return null
     return readStore().find((r) => r.id === recordId) ?? null
@@ -784,7 +791,7 @@ function ViewSection({ recordId }: { recordId?: string }) {
     return (
       <Alert variant="warning">
         Record not found.{' '}
-        <NavLink to="/admin/indicator-wise-data">Back to list</NavLink>
+        <NavLink to={basePath}>Back to list</NavLink>
       </Alert>
     )
   }
@@ -801,7 +808,7 @@ function ViewSection({ recordId }: { recordId?: string }) {
   return (
     <div className="iwd-wireframe">
       <div className="iwd-wireframe__actions" style={{ marginBottom: 12 }}>
-        <NavLink to="/admin/indicator-wise-data" className="btn btn-secondary">
+        <NavLink to={basePath} className="btn btn-secondary">
           Back to list
         </NavLink>
       </div>

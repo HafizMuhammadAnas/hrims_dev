@@ -153,6 +153,12 @@ function App() {
                 path="department-history"
                 element={<SubmissionHistoryPage title={LABEL_SUBMISSION_HISTORY} />}
               />
+              <Route path="department-indicator-wise-data" element={<IndicatorWiseDataAdminPage />} />
+              <Route path="department-indicator-wise-data/create" element={<IndicatorWiseDataAdminPage />} />
+              <Route
+                path="department-indicator-wise-data/view/:recordId"
+                element={<IndicatorWiseDataAdminPage />}
+              />
               <Route path="report-generator" element={<ReportGeneratorPage />} />
               <Route path="governance-dashboard" element={<GovernanceDashboardPage />} />
               <Route path="analysis" element={<Navigate to="/report-generator" replace />} />

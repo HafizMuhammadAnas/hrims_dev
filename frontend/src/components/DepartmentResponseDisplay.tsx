@@ -5,8 +5,10 @@ import { fetchRegions, type RegionRow } from '../api/regions'
 import { loadYearKeyedValuesFromBundle } from '../lib/departmentMatrixLoaders'
 import {
   parseDepartmentTaskResponseData,
+  qualitativeTextsForDisplay,
   type DepartmentIndicatorBundle,
 } from '../lib/departmentTaskResponseFormat'
+import { indicatorQualitativeYears } from '../lib/indicatorDisaggregation'
 import { parseMatrixRowEnabled } from '../lib/deptMatrixRowEnabled'
 import type { MatrixDimensionKey } from '../lib/deptMatrixRowEnabled'
 import { scopeLocationCatalogToRegions } from '../lib/departmentLocationCatalog'
@@ -27,9 +29,14 @@ function quantitativeHasMatrixData(bundle: DepartmentIndicatorBundle): boolean {
   )
 }
 
-function bundleHasSupplementaryContent(bundle: DepartmentIndicatorBundle): boolean {
+function bundleHasSupplementaryContent(
+  bundle: DepartmentIndicatorBundle,
+  filterYearId?: number,
+  qualYearLabels?: Array<{ year_id: number; label: string }>,
+): boolean {
   const hasMatrix = quantitativeHasMatrixData(bundle)
-  if (bundle.qualitative?.text?.trim() || bundle.qualitative?.attachment_url?.trim()) return true
+  if (qualitativeTextsForDisplay(bundle.qualitative, qualYearLabels, filterYearId).length > 0) return true
+  if (bundle.qualitative?.attachment_url?.trim()) return true
   if (bundle.quantitative?.comment?.trim() || bundle.quantitative?.attachment_url?.trim()) return true
   if (
     bundle.quantitative?.value != null &&
@@ -100,49 +107,30 @@ export function DepartmentResponseDisplay({
     [regions, districts, locationRegionIds],
   )
 
-  if (parsed.kind === 'legacy') {
-    const text = parsed.text?.trim() ? parsed.text : '—'
-    return (
-      <>
-        <textarea
-          readOnly
-          rows={8}
-          value={text}
-          className="hr-request-readonly-prose"
-          style={{ width: '100%', boxSizing: 'border-box' }}
-        />
-        {parsed.attachmentUrl ? (
-          <div style={{ marginTop: 10 }}>
-            <AttachmentViewLink url={parsed.attachmentUrl} />
-          </div>
-        ) : null}
-      </>
-    )
-  }
+  const entries = useMemo(() => {
+    if (parsed.kind !== 'structured') return [] as Array<[string, DepartmentIndicatorBundle]>
+    let list = Object.entries(parsed.payload.by_indicator).sort(([a], [b]) => Number(a) - Number(b))
+    if (onlyIndicatorIds && onlyIndicatorIds.length > 0) {
+      const allow = new Set(onlyIndicatorIds.map((id) => String(id)))
+      list = list.filter(([id]) => allow.has(id))
+    }
+    return list
+  }, [parsed, onlyIndicatorIds])
 
-  let entries = Object.entries(parsed.payload.by_indicator).sort(([a], [b]) => Number(a) - Number(b))
-  if (onlyIndicatorIds && onlyIndicatorIds.length > 0) {
-    const allow = new Set(onlyIndicatorIds.map((id) => String(id)))
-    entries = entries.filter(([id]) => allow.has(id))
-  }
-  if (entries.length === 0) {
-    return <p className="muted">—</p>
-  }
-
-  const scopedIndicatorsBase =
-    onlyIndicatorIds && onlyIndicatorIds.length > 0
-      ? issueIndicators.filter((i) => onlyIndicatorIds.includes(i.id))
-      : issueIndicators
-
-  const scopedIndicators =
-    filterYearId != null
-      ? scopedIndicatorsBase.map((ind) => ({
-          ...ind,
-          collection_by_year: (ind.collection_by_year ?? []).filter(
-            (y) => y.year_id === filterYearId,
-          ),
-        }))
-      : scopedIndicatorsBase
+  const scopedIndicators = useMemo(() => {
+    const base =
+      onlyIndicatorIds && onlyIndicatorIds.length > 0
+        ? issueIndicators.filter((i) => onlyIndicatorIds.includes(i.id))
+        : issueIndicators
+    if (filterYearId == null) return base
+    return base.map((ind) => ({
+      ...ind,
+      collection_by_year: (ind.collection_by_year ?? []).filter((y) => y.year_id === filterYearId),
+      qualitative_collection_by_year: (ind.qualitative_collection_by_year ?? []).filter(
+        (y) => y.year_id === filterYearId,
+      ),
+    }))
+  }, [issueIndicators, onlyIndicatorIds, filterYearId])
 
   const matrixValues = useMemo(() => {
     const gender: Record<number, Record<string, string>> = {}
@@ -176,6 +164,30 @@ export function DepartmentResponseDisplay({
     return out
   }, [entries])
 
+  if (parsed.kind === 'legacy') {
+    const text = parsed.text?.trim() ? parsed.text : '—'
+    return (
+      <>
+        <textarea
+          readOnly
+          rows={8}
+          value={text}
+          className="hr-request-readonly-prose"
+          style={{ width: '100%', boxSizing: 'border-box' }}
+        />
+        {parsed.attachmentUrl ? (
+          <div style={{ marginTop: 10 }}>
+            <AttachmentViewLink url={parsed.attachmentUrl} />
+          </div>
+        ) : null}
+      </>
+    )
+  }
+
+  if (entries.length === 0) {
+    return <p className="muted">—</p>
+  }
+
   const matrixIndicators = scopedIndicators.filter((ind) => {
     if (!indicatorUsesDataMatrix(ind)) return false
     const bundle = entries.find(([id]) => Number(id) === ind.id)?.[1]
@@ -184,7 +196,11 @@ export function DepartmentResponseDisplay({
   })
   const showMatrix = matrixIndicators.length > 0 && deptFormUsesIndicatorMatrix(matrixIndicators)
 
-  const cardEntries = entries.filter(([, bundle]) => bundleHasSupplementaryContent(bundle))
+  const cardEntries = entries.filter(([id, bundle]) => {
+    const ind = scopedIndicators.find((i) => i.id === Number(id))
+    const qualYears = ind ? indicatorQualitativeYears(ind) : []
+    return bundleHasSupplementaryContent(bundle, filterYearId, qualYears)
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -212,6 +228,10 @@ export function DepartmentResponseDisplay({
       {cardEntries.map(([id, bundle]) => {
         const title = bundle.indicator_label?.trim() || `Indicator #${id}`
         const hasMatrix = quantitativeHasMatrixData(bundle)
+        const ind = scopedIndicators.find((i) => i.id === Number(id))
+        const qualYears = ind ? indicatorQualitativeYears(ind) : []
+        const qualRows = qualitativeTextsForDisplay(bundle.qualitative, qualYears, filterYearId)
+        const showQualAttachment = Boolean(bundle.qualitative?.attachment_url?.trim())
         return (
           <div
             key={id}
@@ -226,7 +246,7 @@ export function DepartmentResponseDisplay({
               {title}
             </strong>
             {bundle.quantitative ? (
-              <div style={{ marginBottom: bundle.qualitative ? 12 : 0 }}>
+              <div style={{ marginBottom: qualRows.length > 0 || showQualAttachment ? 12 : 0 }}>
                 {!hasMatrix ? (
                   <>
                     <div className="muted small" style={{ marginBottom: 6 }}>
@@ -247,23 +267,34 @@ export function DepartmentResponseDisplay({
                 ) : null}
               </div>
             ) : null}
-            {bundle.qualitative ? (
+            {qualRows.length > 0 || showQualAttachment ? (
               <div>
                 <div className="muted small" style={{ marginBottom: 6 }}>
                   Qualitative
                 </div>
-                {bundle.qualitative.text ? (
-                  <p className="text-sm" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                    {bundle.qualitative.text}
-                  </p>
+                {qualRows.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {qualRows.map((row) => (
+                      <div key={`${id}-qual-${row.year_id ?? 'legacy'}-${row.label}`}>
+                        {row.year_id != null || qualRows.length > 1 ? (
+                          <div className="muted small" style={{ marginBottom: 4 }}>
+                            {row.label}
+                          </div>
+                        ) : null}
+                        <p className="text-sm" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                          {row.text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <p className="muted small" style={{ margin: 0 }}>
                     (No narrative text)
                   </p>
                 )}
-                {bundle.qualitative.attachment_url ? (
+                {showQualAttachment ? (
                   <div style={{ marginTop: 8 }}>
-                    <AttachmentViewLink url={bundle.qualitative.attachment_url} />
+                    <AttachmentViewLink url={bundle.qualitative!.attachment_url!} />
                   </div>
                 ) : null}
               </div>

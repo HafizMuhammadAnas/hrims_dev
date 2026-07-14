@@ -99,7 +99,9 @@ function indicatorsForDimension(
   indicators: HrRequestIssueIndicator[],
   enabled: (ind: HrRequestIssueIndicator) => boolean,
 ): HrRequestIssueIndicator[] {
-  return indicators.filter((ind) => ind.collects_by_year && enabled(ind))
+  return indicators.filter(
+    (ind) => ind.has_quantitative && ind.collects_by_year && enabled(ind),
+  )
 }
 
 export function DepartmentIndicatorDisaggregationMatrices({
@@ -131,7 +133,10 @@ export function DepartmentIndicatorDisaggregationMatrices({
   const genderIndicators = useMemo(
     () =>
       indicators.filter(
-        (ind) => ind.collects_by_year && (indicatorIsYearOnly(ind) || ind.collects_by_gender),
+        (ind) =>
+          ind.has_quantitative &&
+          ind.collects_by_year &&
+          (indicatorIsYearOnly(ind) || ind.collects_by_gender),
       ),
     [indicators],
   )
@@ -263,6 +268,26 @@ export function DepartmentIndicatorDisaggregationMatrices({
         </p>
       ) : null}
       <DepartmentDisaggregationMatrixTable
+        title="Year Wise Consolidated Data"
+        indicators={othersIndicators}
+        columnGroups={othersGroups}
+        cellValues={othersValues}
+        onCellChange={onOthersChange}
+        readOnly={readOnly}
+        savedByIndicator={savedOthersByIndicator}
+        dimensionKey="others"
+        rowEnabledByIndicator={rowEnabledByIndicator ? othersRowEnabled : undefined}
+        onRowEnabledChange={
+          onRowEnabledChange
+            ? (indicatorId, enabled) => handleRowEnabledChange('others', indicatorId, enabled)
+            : undefined
+        }
+        cellAllowed={() => true}
+        showYearTotals
+        showGrandTotal={false}
+        hint="Enter a Total count for each configured year."
+      />
+      <DepartmentDisaggregationMatrixTable
         title="Gender"
         indicators={genderIndicators}
         columnGroups={genderGroups}
@@ -379,26 +404,6 @@ export function DepartmentIndicatorDisaggregationMatrices({
         }
         showYearTotals
         hint="Enter religion values when available — Total updates automatically. If you only know the overall count, enter it in Total."
-      />
-      <DepartmentDisaggregationMatrixTable
-        title="Others"
-        indicators={othersIndicators}
-        columnGroups={othersGroups}
-        cellValues={othersValues}
-        onCellChange={onOthersChange}
-        readOnly={readOnly}
-        savedByIndicator={savedOthersByIndicator}
-        dimensionKey="others"
-        rowEnabledByIndicator={rowEnabledByIndicator ? othersRowEnabled : undefined}
-        onRowEnabledChange={
-          onRowEnabledChange
-            ? (indicatorId, enabled) => handleRowEnabledChange('others', indicatorId, enabled)
-            : undefined
-        }
-        cellAllowed={() => true}
-        showYearTotals
-        showGrandTotal={false}
-        hint="Enter a Total count for each configured year."
       />
     </div>
   )

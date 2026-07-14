@@ -67,7 +67,8 @@ function indicatorDataTypeLabel(
 }
 
 function indicatorDisaggregationLabel(ind: KnowledgeConventionIssueDetail['indicators'][number]): string {
-  if (ind.collects_by_year && (ind.collection_by_year?.length ?? 0) > 0) {
+  const parts: string[] = []
+  if (ind.has_quantitative !== false && ind.collects_by_year && (ind.collection_by_year?.length ?? 0) > 0) {
     const years = [...(ind.collection_by_year ?? [])]
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
       .map((y) => y.label)
@@ -79,8 +80,17 @@ function indicatorDisaggregationLabel(ind: KnowledgeConventionIssueDetail['indic
     if (ind.collects_by_disability) dims.push('Disability')
     if (ind.collects_by_religion) dims.push('Religion')
     if (ind.collects_by_others) dims.push('Others')
-    return dims.length === 0 ? years : `${years} (${dims.join(', ')})`
+    parts.push(dims.length === 0 ? `${years} (Quantitative)` : `${years} (${dims.join(', ')})`)
   }
+  const qualYears = ind.qualitative_collection_by_year ?? []
+  if (ind.has_qualitative && qualYears.length > 0) {
+    const years = [...qualYears]
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+      .map((y) => y.label)
+      .join('; ')
+    parts.push(`${years} (Qualitative)`)
+  }
+  if (parts.length > 0) return parts.join(' · ')
   return ind.disaggregation?.trim() || '—'
 }
 

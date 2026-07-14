@@ -1,5 +1,6 @@
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import { indicatorUsesDataMatrix } from '../lib/indicatorMatrixColumns'
+import { indicatorQualitativeYears } from '../lib/indicatorDisaggregation'
 import type { ParsedDepartmentResponse } from '../lib/departmentTaskResponseFormat'
 import { IndicatorYearGenderHint } from './IndicatorYearGenderHint'
 import { PendingFileAttachmentRow } from './PendingFileAttachmentRow'
@@ -10,7 +11,10 @@ import type { MatrixRowEnabledMap } from '../lib/deptMatrixRowEnabled'
 export type DeptIndicatorDraft = {
   value: string
   comment: string
+  /** Legacy single qualitative text when no qualitative years are configured. */
   qualText: string
+  /** year_id → narrative text for each qualitative collection year. */
+  qualByYear: Record<string, string>
   yearGenderValues: Record<string, string>
   yearAgeValues: Record<string, string>
   yearDisabilityValues: Record<string, string>
@@ -30,6 +34,7 @@ export function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
     value: '',
     comment: '',
     qualText: '',
+    qualByYear: {},
     yearGenderValues: {},
     yearAgeValues: {},
     yearDisabilityValues: {},
@@ -67,6 +72,7 @@ export function DepartmentIndicatorSupplementaryFields({
   const ind = indicator
   const d = draft
   const usesMatrix = matrixMode || indicatorUsesDataMatrix(ind)
+  const qualYears = indicatorQualitativeYears(ind)
 
   const prevQuantUrl =
     parsed?.kind === 'structured'
@@ -170,22 +176,50 @@ export function DepartmentIndicatorSupplementaryFields({
           <div className="muted small" style={{ marginBottom: 8 }}>
             Qualitative
           </div>
-          {usesMatrix && ind.has_quantitative ? (
+          {qualYears.length > 0 ? (
+            <p className="muted small" style={{ margin: '0 0 8px' }}>
+              Enter a narrative response for each selected qualitative year.
+            </p>
+          ) : usesMatrix && ind.has_quantitative ? (
             <p className="muted small" style={{ margin: '0 0 8px' }}>
               Narrative response for this metric (required unless you attach a file).
             </p>
           ) : null}
-          <div className="form-row" style={{ marginBottom: 8 }}>
-            <label htmlFor={`dept-ind-${ind.id}-qual`}>Response</label>
-            <textarea
-              id={`dept-ind-${ind.id}-qual`}
-              rows={5}
-              value={d.qualText}
-              onChange={(e) => onChange({ ...d, qualText: e.target.value })}
-              placeholder="Describe your department's response for this indicator…"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
+          {qualYears.length > 0 ? (
+            qualYears.map((y) => {
+              const yearKey = String(y.year_id)
+              return (
+                <div className="form-row" style={{ marginBottom: 8 }} key={yearKey}>
+                  <label htmlFor={`dept-ind-${ind.id}-qual-${yearKey}`}>{y.label}</label>
+                  <textarea
+                    id={`dept-ind-${ind.id}-qual-${yearKey}`}
+                    rows={4}
+                    value={d.qualByYear[yearKey] ?? ''}
+                    onChange={(e) =>
+                      onChange({
+                        ...d,
+                        qualByYear: { ...d.qualByYear, [yearKey]: e.target.value },
+                      })
+                    }
+                    placeholder={`Describe your department's response for ${y.label}…`}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )
+            })
+          ) : (
+            <div className="form-row" style={{ marginBottom: 8 }}>
+              <label htmlFor={`dept-ind-${ind.id}-qual`}>Response</label>
+              <textarea
+                id={`dept-ind-${ind.id}-qual`}
+                rows={5}
+                value={d.qualText}
+                onChange={(e) => onChange({ ...d, qualText: e.target.value })}
+                placeholder="Describe your department's response for this indicator…"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+          )}
           {prevQualUrl && !d.clearSavedQualAttachment ? (
             <div className="form-row" style={{ marginBottom: 8 }}>
               <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>

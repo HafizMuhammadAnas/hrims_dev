@@ -11,6 +11,7 @@ use App\Models\HrRequest;
 use App\Models\HrRequestClarification;
 use App\Models\Region;
 use App\Models\IssueIndicator;
+use App\Models\IssueIndicatorYear;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -330,6 +331,9 @@ class DepartmentTaskController extends Controller
             }
         } else {
             foreach ($indicator->collectionYearRows as $row) {
+                if (($row->kind ?? IssueIndicatorYear::KIND_QUALITATIVE) !== IssueIndicatorYear::KIND_QUANTITATIVE) {
+                    continue;
+                }
                 $yearId = (int) $row->collection_year_id;
                 $expected[$yearId][IssueIndicator::YEAR_ONLY_GENDER_ID] = true;
             }
@@ -769,8 +773,8 @@ class DepartmentTaskController extends Controller
                 'indicator_label' => $labelRaw !== '' ? $labelRaw : null,
             ];
 
-            $collectsYearGender = (bool) $indicator->collects_by_year;
-            if ($collectsYearGender || $flags['has_quantitative']) {
+            $collectsYearGender = (bool) $indicator->collects_by_year && $flags['has_quantitative'];
+            if ($flags['has_quantitative']) {
                 $qIn = $entry['quantitative'] ?? null;
                 if (! is_array($qIn)) {
                     $msg = $collectsYearGender
@@ -891,7 +895,44 @@ class DepartmentTaskController extends Controller
                 if (! is_array($lIn)) {
                     return response()->json(['message' => 'Indicator '.$indicator->id.': qualitative fields are required.'], 422);
                 }
+
+                $qualYearIds = $indicator->qualitativeCollectionYearIds();
+                $byYearIn = is_array($lIn['by_year'] ?? null) ? $lIn['by_year'] : null;
+                $byYearOut = [];
+                if ($qualYearIds !== []) {
+                    if (! is_array($byYearIn)) {
+                        // Legacy single-text submit → apply to every qualitative year.
+                        $legacyText = trim((string) ($lIn['text'] ?? ''));
+                        if ($legacyText === '') {
+                            return response()->json([
+                                'message' => 'Indicator '.$indicator->id.': qualitative text is required for each selected year.',
+                            ], 422);
+                        }
+                        foreach ($qualYearIds as $yearId) {
+                            $byYearOut[(string) $yearId] = ['text' => $legacyText];
+                        }
+                    } else {
+                        foreach ($qualYearIds as $yearId) {
+                            $yearKey = (string) $yearId;
+                            $yearEntry = $byYearIn[$yearKey] ?? $byYearIn[$yearId] ?? null;
+                            $yearText = is_array($yearEntry)
+                                ? trim((string) ($yearEntry['text'] ?? ''))
+                                : trim((string) ($yearEntry ?? ''));
+                            if ($yearText === '') {
+                                return response()->json([
+                                    'message' => 'Indicator '.$indicator->id.': qualitative text is required for year '.$yearId.'.',
+                                ], 422);
+                            }
+                            $byYearOut[$yearKey] = ['text' => $yearText];
+                        }
+                    }
+                }
+
                 $lText = trim((string) ($lIn['text'] ?? ''));
+                if ($lText === '' && $byYearOut !== []) {
+                    $lText = collect($byYearOut)->pluck('text')->filter()->implode("\n\n");
+                }
+
                 $lFile = $this->pickKeyedUploadedFile($qualFiles, (int) $indicator->id);
                 $lUrl = null;
                 if ($lFile && $lFile->isValid()) {
@@ -913,12 +954,13 @@ class DepartmentTaskController extends Controller
                     $prevL = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['qualitative'] ?? null) : null;
                     $lUrl = is_array($prevL) ? ($prevL['attachment_url'] ?? null) : null;
                 }
-                if ($lText === '' && ($lUrl === null || $lUrl === '')) {
+                if ($byYearOut === [] && $lText === '' && ($lUrl === null || $lUrl === '')) {
                     return response()->json(['message' => 'Indicator '.$indicator->id.': add a written response and/or attach a file.'], 422);
                 }
                 $row['qualitative'] = [
                     'text' => $lText !== '' ? $lText : null,
                     'attachment_url' => $lUrl,
+                    'by_year' => $byYearOut !== [] ? $byYearOut : null,
                 ];
             } else {
                 $row['qualitative'] = null;

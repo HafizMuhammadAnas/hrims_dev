@@ -66,6 +66,7 @@ import {
   forEachReligionMatrixCell,
   indicatorConfiguredYears,
   indicatorIsYearOnly,
+  indicatorQualitativeYears,
   indicatorRequiresQuantitativeMatrixPayload,
 } from '../lib/indicatorDisaggregation'
 import { scopeLocationCatalogToRegions } from '../lib/departmentLocationCatalog'
@@ -407,6 +408,7 @@ export function HrRequestViewPage() {
         let value = ''
         let comment = ''
         let qualText = ''
+        const qualByYear: Record<string, string> = {}
         let yearGenderValues: Record<string, string> = {}
         let yearAgeValues: Record<string, string> = {}
         let yearDisabilityValues: Record<string, string> = {}
@@ -441,7 +443,18 @@ export function HrRequestViewPage() {
             yearOthersValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_others, false)
           }
           if (b?.quantitative?.comment) comment = b.quantitative.comment
+          if (b?.qualitative?.by_year) {
+            for (const [yearKey, cell] of Object.entries(b.qualitative.by_year)) {
+              qualByYear[yearKey] = cell?.text ?? ''
+            }
+          }
           if (b?.qualitative?.text) qualText = b.qualitative.text
+          // Legacy single text → seed each qualitative year when by_year was not stored.
+          if (Object.keys(qualByYear).length === 0 && qualText.trim()) {
+            for (const y of ind.qualitative_collection_by_year ?? []) {
+              qualByYear[String(y.year_id)] = qualText
+            }
+          }
           matrixRowEnabled = parseMatrixRowEnabled(b?.quantitative?.matrix_row_enabled ?? undefined)
         }
         next[ind.id] = {
@@ -449,6 +462,7 @@ export function HrRequestViewPage() {
           value,
           comment,
           qualText,
+          qualByYear,
           yearGenderValues,
           yearAgeValues,
           yearDisabilityValues,
@@ -541,12 +555,19 @@ export function HrRequestViewPage() {
         if (!v || !Number.isFinite(Number(v))) return false
       }
       if (ind.has_qualitative) {
-        const prevQualUrl =
-          parsed.kind === 'structured'
-            ? parsed.payload.by_indicator[String(ind.id)]?.qualitative?.attachment_url?.trim()
-            : ''
-        const effectiveQualUrl = d.clearSavedQualAttachment ? '' : prevQualUrl
-        if (!d.qualText.trim() && !d.qualFile && !effectiveQualUrl) return false
+        const qualYears = indicatorQualitativeYears(ind)
+        if (qualYears.length > 0) {
+          for (const y of qualYears) {
+            if (!(d.qualByYear[String(y.year_id)] ?? '').trim()) return false
+          }
+        } else {
+          const prevQualUrl =
+            parsed.kind === 'structured'
+              ? parsed.payload.by_indicator[String(ind.id)]?.qualitative?.attachment_url?.trim()
+              : ''
+          const effectiveQualUrl = d.clearSavedQualAttachment ? '' : prevQualUrl
+          if (!d.qualText.trim() && !d.qualFile && !effectiveQualUrl) return false
+        }
       }
     }
     return true
@@ -668,7 +689,7 @@ export function HrRequestViewPage() {
           {
             indicator_label: string
             quantitative?: Record<string, unknown>
-            qualitative?: { text: string }
+            qualitative?: { text?: string; by_year?: Record<string, { text: string }> }
           }
         > = {}
         const quantFiles: Record<number, File> = {}
@@ -845,7 +866,17 @@ export function HrRequestViewPage() {
             if (d.clearSavedQuantAttachment) stripQuantIndicatorIds.push(ind.id)
           }
           if (ind.has_qualitative) {
-            entry.qualitative = { text: d.qualText.trim() }
+            const qualYears = indicatorQualitativeYears(ind)
+            if (qualYears.length > 0) {
+              const by_year: Record<string, { text: string }> = {}
+              for (const y of qualYears) {
+                const yearKey = String(y.year_id)
+                by_year[yearKey] = { text: (d.qualByYear[yearKey] ?? '').trim() }
+              }
+              entry.qualitative = { by_year }
+            } else {
+              entry.qualitative = { text: d.qualText.trim() }
+            }
             if (d.qualFile) qualFiles[ind.id] = d.qualFile
             if (d.clearSavedQualAttachment) stripQualIndicatorIds.push(ind.id)
           }

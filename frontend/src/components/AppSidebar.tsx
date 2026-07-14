@@ -196,6 +196,12 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-sub">
               <NavItem to="/department-tasks" icon={ClipboardList} label={LABEL_ASSIGNED_TASKS} onPick={onPick} />
               <NavItem to="/department-history" icon={History} label={LABEL_SUBMISSION_HISTORY} onPick={onPick} />
+              <NavItem
+                to="/department-indicator-wise-data"
+                icon={ClipboardList}
+                label={LABEL_INDICATOR_WISE_DATA}
+                onPick={onPick}
+              />
             </div>
           </>
         )}

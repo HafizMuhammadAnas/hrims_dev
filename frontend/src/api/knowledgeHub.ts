@@ -72,6 +72,7 @@ export type KnowledgeConventionIssueDetail = KnowledgeConventionIssueRow & {
     collects_by_others?: boolean
     disaggregation?: string | null
     collection_by_year?: Array<{ year_id: number; label: string }>
+    qualitative_collection_by_year?: Array<{ year_id: number; label: string }>
   }>
 }
 

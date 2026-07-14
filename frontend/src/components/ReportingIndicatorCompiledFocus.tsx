@@ -121,12 +121,13 @@ export function ReportingIndicatorCompiledFocus({
     }
   }, [dedupedRecords, indicatorId])
 
-  /** Collection years the selected indicator is configured to collect (from HR details). */
+  /** Collection years the selected indicator is configured to collect (quant + qualitative). */
   const indicatorYearIds = useMemo(() => {
     const ids = new Set<number>()
     for (const view of recordViews) {
       const ind = view.hrDetail?.issue?.indicators?.find((i) => i.id === indicatorId)
       for (const y of ind?.collection_by_year ?? []) ids.add(y.year_id)
+      for (const y of ind?.qualitative_collection_by_year ?? []) ids.add(y.year_id)
     }
     return ids
   }, [recordViews, indicatorId])

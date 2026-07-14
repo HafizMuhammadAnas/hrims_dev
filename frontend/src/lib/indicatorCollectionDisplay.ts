@@ -77,13 +77,30 @@ export function indicatorCollectionLines(
     | 'collects_by_religion'
     | 'collects_by_others'
     | 'collection_by_year'
+    | 'has_quantitative'
   >,
 ): IndicatorCollectionLine[] {
+  if (ind.has_quantitative === false) return []
   if (!ind.collects_by_year || !ind.collection_by_year?.length) {
     return []
   }
   return sortCollectionYearsByLabelValue(
     ind.collection_by_year.map((y) => ({
+      year_id: y.year_id,
+      label: y.label,
+    })),
+  )
+}
+
+/** Qualitative narrative years (never used as quantitative matrix columns). */
+export function indicatorQualitativeCollectionLines(
+  ind: Pick<HrRequestIssueIndicator, 'has_qualitative' | 'qualitative_collection_by_year'>,
+): IndicatorCollectionLine[] {
+  if (!ind.has_qualitative || !ind.qualitative_collection_by_year?.length) {
+    return []
+  }
+  return sortCollectionYearsByLabelValue(
+    ind.qualitative_collection_by_year.map((y) => ({
       year_id: y.year_id,
       label: y.label,
     })),

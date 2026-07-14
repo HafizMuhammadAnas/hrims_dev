@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Navigate } from 'react-router-dom'
 import { BarChart2, GripVertical, Plus, Trash2 } from 'lucide-react'
 import {
@@ -261,6 +261,49 @@ export function GovernanceDefaultChartsAdminPage() {
     setSuccess(null)
   }
 
+  function handleAddGraph() {
+    const key = newClientKey()
+    setDrafts((prev) => [
+      ...prev,
+      {
+        ...emptyDraft(),
+        clientKey: key,
+      },
+    ])
+    setSuccess(null)
+    setError(null)
+    window.requestAnimationFrame(() => {
+      document.getElementById(`gov-chart-draft-${key}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }
+
+  function renderGraphActionsBar(opts?: { addLabel?: string; style?: CSSProperties }) {
+    const addLabel = opts?.addLabel ?? 'Add graph'
+    return (
+      <div
+        className="report-generator__card governance-charts-admin__actions page-toolbar"
+        style={{
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          ...opts?.style,
+        }}
+      >
+        <Button type="button" variant="secondary" disabled={busy || loading} onClick={handleAddGraph}>
+          <Plus size={16} aria-hidden /> {addLabel}
+        </Button>
+        <Button type="button" disabled={busy || loading} onClick={() => void handleSave()}>
+          {busy ? 'Saving…' : 'Save graphs'}
+        </Button>
+      </div>
+    )
+  }
+
   async function handleSave() {
     setError(null)
     setSuccess(null)
@@ -313,60 +356,11 @@ export function GovernanceDefaultChartsAdminPage() {
       {error ? <Alert variant="error">{error}</Alert> : null}
       {success ? <Alert variant="success">{success}</Alert> : null}
 
-      <div className="report-generator__card" style={{ marginBottom: '1rem' }}>
-        <p className="muted" style={{ margin: 0 }}>
-          Each row is one default graph. Use <strong>Add graph</strong> to create more, or{' '}
-          <strong>Remove</strong> on a card to delete one. Use category to narrow the indicator
-          list, then pick the indicator and chart shape. Choose multi-dimension totals to chart
-          every dimension’s year Total for one indicator. Inactive rows stay saved but are hidden
-          on the dashboard.
-        </p>
-        <div
-          style={{
-            marginTop: '1rem',
-            display: 'flex',
-            gap: 8,
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={busy || loading}
-            onClick={() => {
-              setDrafts((prev) => [...prev, emptyDraft()])
-              setSuccess(null)
-            }}
-          >
-            <Plus size={16} aria-hidden /> Add graph
-          </Button>
-          <Button type="button" disabled={busy || loading} onClick={() => void handleSave()}>
-            {busy ? 'Saving…' : 'Save graphs'}
-          </Button>
-        </div>
-      </div>
-
       {loading ? (
         <p className="muted">Loading configuration…</p>
-      ) : drafts.length === 0 ? (
-        <div className="report-generator__card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-          <p className="muted" style={{ marginTop: 0 }}>
-            No default graphs yet. Add a graph to configure the Governance Dashboard view.
-          </p>
-          <Button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setDrafts([emptyDraft()])
-              setSuccess(null)
-            }}
-          >
-            <Plus size={16} aria-hidden /> Add graph
-          </Button>
-        </div>
       ) : (
         <div className="governance-charts-admin__list">
+          {renderGraphActionsBar({ style: { marginBottom: '1rem' } })}
           {drafts.map((draft, index) => {
             const shapes =
               draft.kind === 'comparison'
@@ -377,7 +371,8 @@ export function GovernanceDefaultChartsAdminPage() {
             return (
               <div
                 key={draft.clientKey}
-                className="report-generator__card governance-charts-admin__card"
+                id={`gov-chart-draft-${draft.clientKey}`}
+                className="report-generator__card governance-charts-admin__card page-toolbar"
                 style={{ marginBottom: '1rem' }}
               >
                 <div
@@ -655,32 +650,6 @@ export function GovernanceDefaultChartsAdminPage() {
               </div>
             )
           })}
-          <div
-            className="report-generator__card"
-            style={{
-              marginTop: '0.5rem',
-              display: 'flex',
-              gap: 8,
-              flexWrap: 'wrap',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => {
-                setDrafts((prev) => [...prev, emptyDraft()])
-                setSuccess(null)
-              }}
-            >
-              <Plus size={16} aria-hidden /> Add another graph
-            </Button>
-            <Button type="button" disabled={busy} onClick={() => void handleSave()}>
-              {busy ? 'Saving…' : 'Save graphs'}
-            </Button>
-          </div>
         </div>
       )}
     </PageSection>

@@ -121,15 +121,38 @@ export function indicatorUsesDisaggregatedDimensions(ind: HrRequestIssueIndicato
 
 export function indicatorIsYearOnly(ind: HrRequestIssueIndicator): boolean {
 
-  return Boolean(ind.collects_by_year && !indicatorUsesDisaggregatedDimensions(ind))
+  return Boolean(
+    ind.has_quantitative &&
+      ind.collects_by_year &&
+      !indicatorUsesDisaggregatedDimensions(ind),
+  )
 
 }
 
 
 
+/** Quantitative years for numeric matrices only (never qualitative narrative years). */
 export function indicatorConfiguredYears(ind: HrRequestIssueIndicator): Array<{ year_id: number; label: string }> {
 
+  if (!ind.has_quantitative) return []
+
   const years = (ind.collection_by_year ?? []).map((y) => ({ year_id: y.year_id, label: y.label }))
+
+  return years.sort((a, b) => compareCollectionYearLabels(a.label, b.label))
+
+}
+
+
+
+/** Qualitative years for per-year narrative text entry/view. */
+export function indicatorQualitativeYears(ind: HrRequestIssueIndicator): Array<{ year_id: number; label: string }> {
+
+  if (!ind.has_qualitative) return []
+
+  const years = (ind.qualitative_collection_by_year ?? []).map((y) => ({
+    year_id: y.year_id,
+    label: y.label,
+  }))
 
   return years.sort((a, b) => compareCollectionYearLabels(a.label, b.label))
 
@@ -153,7 +176,7 @@ export function buildGenderMatrixGroups(indicators: HrRequestIssueIndicator[]): 
 
   for (const ind of indicators) {
 
-    if (!ind.collects_by_year) continue
+    if (!ind.has_quantitative || !ind.collects_by_year) continue
 
     if (indicatorIsYearOnly(ind)) {
 
@@ -561,6 +584,8 @@ export function catalogMatrixCellKey(yearId: number, catalogId: number): string 
 
 export function indicatorUsesAnyDataMatrix(ind: HrRequestIssueIndicator): boolean {
 
+  if (!ind.has_quantitative) return false
+
   if (!ind.collects_by_year || (ind.collection_by_year?.length ?? 0) === 0) return false
 
   return (
@@ -587,7 +612,7 @@ export function indicatorUsesAnyDataMatrix(ind: HrRequestIssueIndicator): boolea
 
 export function indicatorRequiresQuantitativeMatrixPayload(ind: HrRequestIssueIndicator): boolean {
 
-  return Boolean(ind.collects_by_year) && indicatorUsesAnyDataMatrix(ind)
+  return Boolean(ind.has_quantitative) && indicatorUsesAnyDataMatrix(ind)
 
 }
 

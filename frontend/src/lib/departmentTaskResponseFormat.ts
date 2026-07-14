@@ -30,8 +30,11 @@ export type DepartmentIndicatorQuantitative = {
 }
 
 export type DepartmentIndicatorQualitative = {
+  /** Combined / legacy single narrative (still filled when by_year exists). */
   text: string | null
   attachment_url: string | null
+  /** Per qualitative collection year — preferred for entry and display. */
+  by_year?: Record<string, { text: string | null }> | null
 }
 
 export type DepartmentIndicatorBundle = {
@@ -113,7 +116,15 @@ export function formatDepartmentResponseAsPlaintext(
     }
     if (bundle.qualitative) {
       const l = bundle.qualitative
-      if (l.text) lines.push(`  Qualitative: ${l.text}`)
+      const byYear = l.by_year && Object.keys(l.by_year).length > 0 ? l.by_year : null
+      if (byYear) {
+        for (const [yearId, cell] of Object.entries(byYear)) {
+          const t = cell?.text?.trim()
+          if (t) lines.push(`  Qualitative (${yearId}): ${t}`)
+        }
+      } else if (l.text) {
+        lines.push(`  Qualitative: ${l.text}`)
+      }
       if (l.attachment_url) lines.push(`  Qual attachment: ${l.attachment_url}`)
     }
     lines.push('')
@@ -155,11 +166,52 @@ export function formatDepartmentResponseTextOnly(
     }
     if (bundle.qualitative) {
       const l = bundle.qualitative
-      if (l.text) lines.push(`  Qualitative: ${l.text}`)
+      const byYear = l.by_year && Object.keys(l.by_year).length > 0 ? l.by_year : null
+      if (byYear) {
+        for (const [yearId, cell] of Object.entries(byYear)) {
+          const t = cell?.text?.trim()
+          if (t) lines.push(`  Qualitative (${yearId}): ${t}`)
+        }
+      } else if (l.text) {
+        lines.push(`  Qualitative: ${l.text}`)
+      }
     }
     lines.push('')
   }
   return lines.join('\n').trim() || '—'
+}
+
+/** Prefer per-year qualitative text; fall back to combined legacy text. */
+export function qualitativeTextsForDisplay(
+  qualitative: DepartmentIndicatorQualitative | null | undefined,
+  yearLabels?: Array<{ year_id: number; label: string }>,
+  filterYearId?: number,
+): Array<{ year_id: number | null; label: string; text: string }> {
+  if (!qualitative) return []
+  const byYear = qualitative.by_year
+  const labelById = new Map((yearLabels ?? []).map((y) => [y.year_id, y.label]))
+  if (byYear && Object.keys(byYear).length > 0) {
+    const rows: Array<{ year_id: number | null; label: string; text: string }> = []
+    for (const [yearKey, cell] of Object.entries(byYear)) {
+      const yearId = Number(yearKey)
+      if (filterYearId != null && yearId !== filterYearId) continue
+      const text = cell?.text?.trim() ?? ''
+      if (!text) continue
+      rows.push({
+        year_id: Number.isFinite(yearId) ? yearId : null,
+        label: labelById.get(yearId) ?? String(yearKey),
+        text,
+      })
+    }
+    if (rows.length > 0) return rows
+  }
+  const legacy = qualitative.text?.trim() ?? ''
+  if (!legacy) return []
+  if (filterYearId != null && yearLabels && yearLabels.length > 0) {
+    const match = yearLabels.find((y) => y.year_id === filterYearId)
+    if (!match) return []
+  }
+  return [{ year_id: null, label: 'Response', text: legacy }]
 }
 
 /** All attachment URLs from a department task (legacy single file + structured per-indicator files). */

@@ -7,11 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class IssueIndicatorYear extends Model
 {
+    public const KIND_QUANTITATIVE = 'quantitative';
+
+    public const KIND_QUALITATIVE = 'qualitative';
+
     protected $table = 'issue_indicator_years';
 
     protected $fillable = [
         'issue_indicator_id',
         'collection_year_id',
+        'kind',
     ];
 
     public function issueIndicator(): BelongsTo

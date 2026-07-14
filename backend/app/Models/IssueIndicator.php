@@ -116,23 +116,34 @@ class IssueIndicator extends Model
         $now = now();
 
         if ($yearOnly) {
-            // Qualitative-only (or legacy year-only) years live in collectionYearRows.
-            $yearIds = $qualitativeYearIds !== []
-                ? $qualitativeYearIds
-                : array_values(array_unique(array_map(
-                    static fn (array $row): int => (int) ($row['collection_year_id'] ?? 0),
-                    $quantitativeRows,
-                )));
-
-            foreach ($yearIds as $yearId) {
-                if ($yearId <= 0) {
-                    continue;
+            // Quantitative year-only years (kind=quantitative) and qualitative years (kind=qualitative).
+            if ((bool) $this->has_quantitative) {
+                foreach ($quantitativeRows as $row) {
+                    $yearId = (int) ($row['collection_year_id'] ?? 0);
+                    if ($yearId <= 0) {
+                        continue;
+                    }
+                    $this->collectionYearRows()->create([
+                        'collection_year_id' => $yearId,
+                        'kind' => IssueIndicatorYear::KIND_QUANTITATIVE,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
                 }
-                $this->collectionYearRows()->create([
-                    'collection_year_id' => $yearId,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
+            }
+
+            if ((bool) $this->has_qualitative) {
+                foreach (array_values(array_unique(array_map('intval', $qualitativeYearIds))) as $yearId) {
+                    if ($yearId <= 0) {
+                        continue;
+                    }
+                    $this->collectionYearRows()->create([
+                        'collection_year_id' => $yearId,
+                        'kind' => IssueIndicatorYear::KIND_QUALITATIVE,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
             }
 
             return;
@@ -158,21 +169,23 @@ class IssueIndicator extends Model
                     ]);
                 }
             } else {
+                // Non-gender quantitative dimensions still need year anchors.
                 $this->collectionYearRows()->create([
                     'collection_year_id' => $yearId,
+                    'kind' => IssueIndicatorYear::KIND_QUANTITATIVE,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
             }
         }
 
-        // Qualitative years are stored separately from quantitative disaggregation cells.
         foreach (array_values(array_unique(array_map('intval', $qualitativeYearIds))) as $yearId) {
             if ($yearId <= 0) {
                 continue;
             }
             $this->collectionYearRows()->create([
                 'collection_year_id' => $yearId,
+                'kind' => IssueIndicatorYear::KIND_QUALITATIVE,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -180,26 +193,67 @@ class IssueIndicator extends Model
     }
 
     /**
+     * Quantitative years only — never include qualitative narrative years.
+     *
      * @return list<int>
      */
-    public function configuredCollectionYearIds(): array
+    public function quantitativeCollectionYearIds(): array
     {
         $this->loadMissing([
             'yearGenderCells',
             'collectionYearRows',
         ]);
 
-        $ids = collect()
-            ->merge($this->yearGenderCells->pluck('collection_year_id'))
-            ->merge($this->collectionYearRows->pluck('collection_year_id'))
+        if ((bool) $this->collects_by_gender && $this->yearGenderCells->isNotEmpty()) {
+            return $this->yearGenderCells
+                ->pluck('collection_year_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn (int $id) => $id > 0)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        }
+
+        return $this->collectionYearRows
+            ->filter(fn (IssueIndicatorYear $row) => ($row->kind ?? IssueIndicatorYear::KIND_QUALITATIVE) === IssueIndicatorYear::KIND_QUANTITATIVE)
+            ->pluck('collection_year_id')
             ->map(fn ($id) => (int) $id)
             ->filter(fn (int $id) => $id > 0)
             ->unique()
             ->sort()
             ->values()
             ->all();
+    }
 
-        return $ids;
+    /**
+     * Qualitative narrative years only.
+     *
+     * @return list<int>
+     */
+    public function qualitativeCollectionYearIds(): array
+    {
+        $this->loadMissing(['collectionYearRows']);
+
+        return $this->collectionYearRows
+            ->filter(fn (IssueIndicatorYear $row) => ($row->kind ?? IssueIndicatorYear::KIND_QUALITATIVE) === IssueIndicatorYear::KIND_QUALITATIVE)
+            ->pluck('collection_year_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @deprecated Use quantitativeCollectionYearIds() for matrices. Kept as alias for compatibility.
+     *
+     * @return list<int>
+     */
+    public function configuredCollectionYearIds(): array
+    {
+        return $this->quantitativeCollectionYearIds();
     }
 
     /**
@@ -252,10 +306,10 @@ class IssueIndicator extends Model
         }
 
         $out = $base;
-        if ($this->collects_by_year) {
+        if ($flags['has_quantitative'] && $this->collects_by_year) {
             $out['collection_by_year'] = $this->buildCollectionByYearPayload();
         }
-        if ((bool) $this->has_qualitative) {
+        if ($flags['has_qualitative']) {
             $out['qualitative_collection_by_year'] = $this->buildQualitativeCollectionByYearPayload();
         }
 
@@ -263,6 +317,8 @@ class IssueIndicator extends Model
     }
 
     /**
+     * Quantitative years for numeric matrices only (never qualitative narrative years).
+     *
      * @return list<array{
      *   year_id: int,
      *   label: string,
@@ -274,11 +330,15 @@ class IssueIndicator extends Model
      */
     public function buildCollectionByYearPayload(): array
     {
-        if ($this->isYearOnlyCollection()) {
-            return $this->buildYearOnlyPayload();
+        if (! (bool) $this->has_quantitative) {
+            return [];
         }
 
-        return $this->buildDisaggregatedYearPayload();
+        if ((bool) $this->collects_by_gender) {
+            return $this->buildDisaggregatedYearPayload();
+        }
+
+        return $this->buildYearOnlyPayload(IssueIndicatorYear::KIND_QUANTITATIVE);
     }
 
     /**
@@ -291,7 +351,7 @@ class IssueIndicator extends Model
      *   religions: list<array{id: int, name: string}>
      * }>
      */
-    private function buildYearOnlyPayload(): array
+    private function buildYearOnlyPayload(string $kind): array
     {
         $rows = $this->relationLoaded('collectionYearRows')
             ? $this->collectionYearRows
@@ -302,6 +362,7 @@ class IssueIndicator extends Model
         }
 
         return $rows
+            ->filter(fn (IssueIndicatorYear $row) => ($row->kind ?? IssueIndicatorYear::KIND_QUALITATIVE) === $kind)
             ->map(function (IssueIndicatorYear $row) {
                 $year = $row->collectionYear;
 
@@ -390,39 +451,12 @@ class IssueIndicator extends Model
             return [];
         }
 
-        // Year-only indicators store qualitative years in collectionYearRows (same as collection_by_year).
-        if ($this->isYearOnlyCollection()) {
-            return array_map(
-                static fn (array $row): array => [
-                    'year_id' => $row['year_id'],
-                    'label' => $row['label'],
-                ],
-                $this->buildYearOnlyPayload(),
-            );
-        }
-
-        $rows = $this->relationLoaded('collectionYearRows')
-            ? $this->collectionYearRows
-            : $this->collectionYearRows()->with('collectionYear')->get();
-
-        if (! $rows->every(fn (IssueIndicatorYear $r) => $r->relationLoaded('collectionYear'))) {
-            $rows->load('collectionYear');
-        }
-
-        return $rows
-            ->map(function (IssueIndicatorYear $row) {
-                $year = $row->collectionYear;
-
-                return [
-                    'year_id' => (int) $row->collection_year_id,
-                    'label' => $year?->label ?? '',
-                ];
-            })
-            ->sortBy(fn (array $row) => [
-                is_numeric($row['label']) ? (int) $row['label'] : PHP_INT_MAX,
-                $row['label'],
-            ])
-            ->values()
-            ->all();
+        return array_map(
+            static fn (array $row): array => [
+                'year_id' => $row['year_id'],
+                'label' => $row['label'],
+            ],
+            $this->buildYearOnlyPayload(IssueIndicatorYear::KIND_QUALITATIVE),
+        );
     }
 }
