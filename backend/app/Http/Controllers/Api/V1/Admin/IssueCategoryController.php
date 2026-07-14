@@ -11,7 +11,7 @@ class IssueCategoryController extends Controller
 {
     public function index(): JsonResponse
     {
-        $rows = IssueCategory::query()->orderBy('name')->get();
+        $rows = IssueCategory::query()->orderByDesc('updated_at')->orderByDesc('created_at')->orderByDesc('id')->get();
 
         return response()->json([
             'data' => $rows->map(fn (IssueCategory $c) => $this->serialize($c)),
@@ -61,6 +61,8 @@ class IssueCategoryController extends Controller
             'id' => $c->id,
             'name' => $c->name,
             'is_active' => (bool) ($c->is_active ?? true),
+            'created_at' => optional($c->created_at)?->toIso8601String(),
+            'updated_at' => optional($c->updated_at)?->toIso8601String(),
         ];
     }
 }

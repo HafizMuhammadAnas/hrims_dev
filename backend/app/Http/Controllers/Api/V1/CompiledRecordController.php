@@ -160,7 +160,7 @@ class CompiledRecordController extends Controller
             }
         }
 
-        $rows = $query->orderByDesc('compilation_date')->get();
+        $rows = $query->orderByDesc('compilation_date')->orderByDesc('id')->get();
 
         return response()->json([
             'data' => $rows->map(fn (CompiledRecord $c) => $this->serializeCompiledRecord($c)),

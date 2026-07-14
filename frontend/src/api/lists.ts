@@ -67,8 +67,15 @@ export type DepartmentTaskRow = {
   attachment_url?: string | null
 }
 
-export async function fetchDepartmentTasks(): Promise<DepartmentTaskRow[]> {
-  const j = await getData<{ data: DepartmentTaskRow[] }>('/api/v1/department-tasks')
+export async function fetchDepartmentTasks(options?: {
+  /** Federal/national dashboards: include all regions (not only ICT). Ignored for regional users. */
+  scope?: 'all' | 'national'
+}): Promise<DepartmentTaskRow[]> {
+  const qs =
+    options?.scope === 'all' || options?.scope === 'national'
+      ? '?scope=all'
+      : ''
+  const j = await getData<{ data: DepartmentTaskRow[] }>(`/api/v1/department-tasks${qs}`)
   return j.data
 }
 

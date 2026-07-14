@@ -19,7 +19,7 @@ import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
-import { sortRowsLatestFirst } from '../lib/tableRowSort'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import {
   departmentsMgmtBasePath,
@@ -66,7 +66,9 @@ export function ManageDepartmentsPage() {
             (d.type ?? '').toLowerCase().includes(q) ||
             (d.region_name ?? '').toLowerCase().includes(q),
         )
-    return sortRowsLatestFirst(matched, (d) => d.id)
+    return sortRowsLatestFirst(matched, (d) =>
+      pickActivityTimestamp(d.updated_at, d.created_at, d.id),
+    )
   }, [rows, search])
 
   const { pageRows } = useMemo(

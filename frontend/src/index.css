@@ -2998,6 +2998,26 @@ textarea.hr-request-readonly-prose {
   background: #f8fafc;
 }
 
+.dept-data-matrix__grand-total-head {
+  min-width: 96px;
+  font-size: var(--font-size-compact, 0.8125rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #eef2ff;
+  color: #312e81;
+  vertical-align: middle;
+}
+
+.dept-data-matrix__cell--grand-total {
+  background: #eef2ff;
+  text-align: center;
+  font-weight: 700;
+}
+
+.dept-data-matrix__grand-total-value {
+  color: #312e81;
+}
+
 .dept-data-matrix__na-label {
   display: inline-block;
   max-width: 9.5rem;
@@ -7062,13 +7082,23 @@ textarea.hr-request-readonly-prose {
 
 .governance-dashboard__chart-row {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   align-items: stretch;
 }
 
 .governance-dashboard__chart-panel {
   min-width: 0;
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.governance-dashboard__chart-canvas {
+  flex: 1;
+  min-height: 300px;
+  width: 100%;
 }
 
 .governance-dashboard__chart-shape-tag {
@@ -7091,10 +7121,6 @@ textarea.hr-request-readonly-prose {
 
   .governance-dashboard__chart-row {
     grid-template-columns: 1fr;
-  }
-
-  .governance-dashboard__chart-panel {
-    grid-column: 1 / -1 !important;
   }
 }
 

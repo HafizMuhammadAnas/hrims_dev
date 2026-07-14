@@ -22,7 +22,7 @@ import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
-import { sortRowsLatestFirst } from '../lib/tableRowSort'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { LABEL_CREATE_ADMIN, LABEL_CREATE_USER, LABEL_EDIT_USER, LABEL_USER_MANAGEMENT } from '../lib/uiLabels'
 import { isSuperAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
@@ -203,7 +203,9 @@ export function UserManagementPage() {
         (u.department?.name ?? '').toLowerCase().includes(q)
       )
     })
-    return sortRowsLatestFirst(matched, (u) => u.id)
+    return sortRowsLatestFirst(matched, (u) =>
+      pickActivityTimestamp(u.updated_at, u.created_at, u.id),
+    )
   }, [scopedRows, search, roleFilter, statusFilter])
   const roleOptions = useMemo(() => {
     if (superUser) return [...ADMIN_ROLE_SLUGS]

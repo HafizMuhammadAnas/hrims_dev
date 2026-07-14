@@ -10,7 +10,7 @@ class DistrictController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = District::query()->with('region')->orderBy('name');
+        $query = District::query()->with('region')->orderByDesc('created_at')->orderByDesc('id');
         if ($request->filled('region_id')) {
             $query->where('region_id', (int) $request->query('region_id'));
         }
@@ -88,6 +88,8 @@ class DistrictController extends Controller
             'region_name' => $d->relationLoaded('region') ? $d->region?->name : null,
             'name' => $d->name,
             'slug' => $d->slug,
+            'created_at' => optional($d->created_at)?->toIso8601String(),
+            'updated_at' => optional($d->updated_at)?->toIso8601String(),
         ];
     }
 }

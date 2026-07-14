@@ -27,6 +27,8 @@ class HrRequestResource extends JsonResource
             'date' => $this->due_date?->format('Y-m-d') ?? '',
             'status' => $this->status,
             'details' => $this->details,
+            'created_at' => optional($this->created_at)?->toIso8601String(),
+            'updated_at' => optional($this->updated_at)?->toIso8601String(),
             'attachment_file_name' => $this->attachment_file_name,
             'category_id' => $this->category_id,
             'subcategory_id' => $this->subcategory_id,

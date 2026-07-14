@@ -19,8 +19,9 @@ class ArticleController extends Controller
                 $conventionId !== null && $conventionId !== '',
                 fn ($q) => $q->where('convention_id', (int) $conventionId),
             )
-            ->orderBy('convention_id')
-            ->orderBy('article_name')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         return response()->json([
@@ -104,6 +105,8 @@ class ArticleController extends Controller
             'article_name' => $a->article_name,
             'description' => $a->description,
             'is_active' => (bool) ($a->is_active ?? true),
+            'created_at' => optional($a->created_at)?->toIso8601String(),
+            'updated_at' => optional($a->updated_at)?->toIso8601String(),
         ];
     }
 

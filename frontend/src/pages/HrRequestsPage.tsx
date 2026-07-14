@@ -19,7 +19,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { formatAppDate } from '../lib/dateFormat'
-import { sortRowsLatestFirst } from '../lib/tableRowSort'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { hrRequestListStats, hrRequestStatusPresentation } from '../lib/hrRequestListMetrics'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
 import { LABEL_DELETE_REQUEST, LABEL_NEW_REQUEST, LABEL_REQUEST_MANAGEMENT } from '../lib/uiLabels'
@@ -79,7 +79,9 @@ export function HrRequestsPage() {
         regionBlob.toLowerCase().includes(q)
       )
     })
-    return sortRowsLatestFirst(filtered, (r) => r.id)
+    return sortRowsLatestFirst(filtered, (r) =>
+      pickActivityTimestamp(r.updated_at, r.created_at, r.date, r.id),
+    )
   }, [rows, search, statusFilter])
 
   const { pageRows } = useMemo(

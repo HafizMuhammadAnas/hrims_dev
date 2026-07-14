@@ -15,6 +15,8 @@ export type DepartmentRow = {
   region_ids?: number[]
   region_slug?: string | null
   region_name?: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export async function fetchDepartments(): Promise<DepartmentRow[]> {

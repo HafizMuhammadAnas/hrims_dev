@@ -20,7 +20,7 @@ import { TableExportButton } from '../../components/ui/TableExportButton'
 import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientTableState'
 import { RECEIVED_REQUEST_EXPORT_COLUMNS } from '../../lib/tableExportColumns'
 import { formatAppDate } from '../../lib/dateFormat'
-import { sortRowsLatestFirst } from '../../lib/tableRowSort'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../../lib/tableRowSort'
 import {
   RECEIVED_REQUEST_STATUS_FILTER_OPTIONS,
   receivedRequestStatusPresentation,
@@ -181,7 +181,9 @@ export function ReceivedRequestsPage({
         r.date.toLowerCase().includes(q)
       )
     })
-    return sortRowsLatestFirst(filtered, (r) => r.id)
+    return sortRowsLatestFirst(filtered, (r) =>
+      pickActivityTimestamp(r.updated_at, r.created_at, r.date, r.id),
+    )
   }, [mapped, search, statusFilter])
   const { pageRows } = useMemo(
     () => derivePaginatedRows(filteredRows, page, pageSize),

@@ -295,7 +295,7 @@ class DepartmentTaskController extends Controller
         }
 
         $out = [];
-        foreach (['gender', 'age', 'disability', 'district', 'religion'] as $dimension) {
+        foreach (['gender', 'age', 'disability', 'district', 'religion', 'others'] as $dimension) {
             if (array_key_exists($dimension, $enabled) && $enabled[$dimension] === false) {
                 $out[$dimension] = false;
             }
@@ -434,6 +434,24 @@ class DepartmentTaskController extends Controller
                 }
                 $out[$yearKey][$cellKey] = ['value' => (float) $valRaw];
             }
+
+            // Optional editable year total (when breakdown is unknown or as a checksum).
+            $totalIn = $yearIn['total'] ?? null;
+            $totalRaw = is_array($totalIn) ? ($totalIn['value'] ?? null) : $totalIn;
+            if ($totalRaw !== null && trim((string) $totalRaw) !== '') {
+                if (! is_numeric($totalRaw)) {
+                    return response()->json([
+                        'message' => 'Indicator '.$indicator->id.': '.$dimensionLabel.' year total must be numeric.',
+                    ], 422);
+                }
+                $out[$yearKey]['total'] = ['value' => (float) $totalRaw];
+            } else {
+                $sum = 0.0;
+                foreach ($out[$yearKey] as $cell) {
+                    $sum += (float) ($cell['value'] ?? 0);
+                }
+                $out[$yearKey]['total'] = ['value' => $sum];
+            }
         }
 
         return $out;
@@ -518,6 +536,53 @@ class DepartmentTaskController extends Controller
         }
 
         return $this->normalizeQuantitativeByYearFixedKeys($indicator, $raw, $religionIds, 'religion');
+    }
+
+    /**
+     * Others dimension: Total only per configured year (no breakdown columns).
+     *
+     * @return array<string, array<string, array{value: float}>>|JsonResponse
+     */
+    private function normalizeQuantitativeByYearOthers(IssueIndicator $indicator, mixed $raw): array|JsonResponse
+    {
+        $yearIds = $this->configuredCollectionYearIds($indicator);
+        if ($yearIds === []) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': no year collection mapping configured on the issue.',
+            ], 422);
+        }
+
+        if (! is_array($raw)) {
+            return response()->json([
+                'message' => 'Indicator '.$indicator->id.': others values are required.',
+            ], 422);
+        }
+
+        $out = [];
+        foreach ($yearIds as $yearId) {
+            $yearKey = (string) $yearId;
+            $yearIn = $raw[$yearKey] ?? $raw[$yearId] ?? null;
+            if (! is_array($yearIn)) {
+                return response()->json([
+                    'message' => 'Indicator '.$indicator->id.': missing others values for year '.$yearId.'.',
+                ], 422);
+            }
+            $totalIn = $yearIn['total'] ?? null;
+            $totalRaw = is_array($totalIn) ? ($totalIn['value'] ?? null) : $totalIn;
+            if ($totalRaw === null || trim((string) $totalRaw) === '') {
+                $totalRaw = '0';
+            }
+            if (! is_numeric($totalRaw)) {
+                return response()->json([
+                    'message' => 'Indicator '.$indicator->id.': others year total must be numeric.',
+                ], 422);
+            }
+            $out[$yearKey] = [
+                'total' => ['value' => (float) $totalRaw],
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -794,6 +859,14 @@ class DepartmentTaskController extends Controller
                         $quantitative['by_year_religion'] = $normalized;
                     }
 
+                    if ((bool) $indicator->collects_by_others && $this->isMatrixDimensionEnabled($qIn, 'others')) {
+                        $normalized = $this->normalizeQuantitativeByYearOthers($indicator, $qIn['by_year_others'] ?? null);
+                        if ($normalized instanceof JsonResponse) {
+                            return $normalized;
+                        }
+                        $quantitative['by_year_others'] = $normalized;
+                    }
+
                     $row['quantitative'] = $quantitative;
                 } else {
                     $valRaw = $qIn['value'] ?? null;
@@ -953,13 +1026,20 @@ class DepartmentTaskController extends Controller
         $user = $request->user();
         $query = DepartmentTask::query()->with(['region', 'department']);
 
+        // Governance / national dashboards: federal sees all regions (same as super admin).
+        $nationalScope = $request->boolean('national')
+            || $request->query('scope') === 'all'
+            || $request->query('scope') === 'national';
+
         // Super admin sees all tasks
         if (HrimsAccess::isSuperAdmin($user)) {
             // no filter
         }
-        // Federal admin sees only ICT/Federal region department tasks
+        // Federal admin: ICT/Federal line by default; all regions when national scope requested
         elseif ($user->hasRole('federal_admin')) {
-            $query->whereHas('region', fn ($q) => $q->where('slug', 'ict'));
+            if (! $nationalScope) {
+                $query->whereHas('region', fn ($q) => $q->whereIn('slug', ['ict', 'federal']));
+            }
         }
         // Department admin/viewer see only their department tasks
         elseif (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
@@ -978,7 +1058,7 @@ class DepartmentTaskController extends Controller
             }
         }
 
-        $rows = $query->orderByDesc('assigned_date')->get();
+        $rows = $query->orderByDesc('assigned_date')->orderByDesc('id')->get();
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($user);
 
         return response()->json([

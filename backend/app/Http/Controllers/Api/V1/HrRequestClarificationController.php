@@ -27,7 +27,8 @@ class HrRequestClarificationController extends Controller
 
         $query = HrRequestClarification::query()
             ->with(['region', 'hrRequest.regions', 'hrRequest.convention', 'attachments', 'requestedBy', 'respondedBy'])
-            ->orderByDesc('updated_at');
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id');
 
         if (HrimsAccess::seesAllRegions($user)) {
             if ($request->filled('status')) {

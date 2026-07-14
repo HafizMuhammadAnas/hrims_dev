@@ -17,6 +17,8 @@ class RegionController extends Controller
                 'id' => $region->id,
                 'name' => $region->name,
                 'slug' => $region->slug,
+                'created_at' => optional($region->created_at)?->toIso8601String(),
+                'updated_at' => optional($region->updated_at)?->toIso8601String(),
             ]),
         ]);
     }

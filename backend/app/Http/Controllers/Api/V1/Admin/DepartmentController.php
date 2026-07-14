@@ -14,7 +14,7 @@ class DepartmentController extends Controller
 {
     public function index(): JsonResponse
     {
-        $rows = Department::query()->with('regions')->orderBy('name')->get();
+        $rows = Department::query()->with('regions')->orderByDesc('updated_at')->orderByDesc('created_at')->orderByDesc('id')->get();
 
         return response()->json([
             'data' => $rows->map(fn (Department $d) => $this->serialize($d)),
@@ -120,6 +120,8 @@ class DepartmentController extends Controller
             'code' => $d->code,
             'name' => $d->name,
             'type' => $d->type,
+            'created_at' => optional($d->created_at)?->toIso8601String(),
+            'updated_at' => optional($d->updated_at)?->toIso8601String(),
         ];
     }
 }

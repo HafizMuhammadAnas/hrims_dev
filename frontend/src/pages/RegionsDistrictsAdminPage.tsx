@@ -27,6 +27,7 @@ import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { isSuperAdmin } from '../lib/roles'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 
 const GEO_PAGE_SIZE = 10
 
@@ -185,7 +186,13 @@ function RegionsListSection({
   const [editRegionSlug, setEditRegionSlug] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: GEO_PAGE_SIZE })
 
-  const sortedRegions = useMemo(() => [...regions].sort((a, b) => b.id - a.id), [regions])
+  const sortedRegions = useMemo(
+    () =>
+      sortRowsLatestFirst(regions, (r) =>
+        pickActivityTimestamp(r.updated_at, r.created_at, r.id),
+      ),
+    [regions],
+  )
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -353,7 +360,13 @@ function DistrictsListSection({
   const [editDistrictSlug, setEditDistrictSlug] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: GEO_PAGE_SIZE })
 
-  const sortedDistricts = useMemo(() => [...districts].sort((a, b) => b.id - a.id), [districts])
+  const sortedDistricts = useMemo(
+    () =>
+      sortRowsLatestFirst(districts, (d) =>
+        pickActivityTimestamp(d.updated_at, d.created_at, d.id),
+      ),
+    [districts],
+  )
 
   const processed = useMemo(() => {
     let data = sortedDistricts

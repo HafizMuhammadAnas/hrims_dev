@@ -11,6 +11,7 @@ import {
   buildFixedKeyMatrixGroups,
   buildGenderMatrixGroups,
   buildReligionMatrixGroups,
+  buildYearTotalOnlyMatrixGroups,
   indicatorCatalogCellAllowed,
   indicatorFixedKeyCellAllowed,
   indicatorGenderCellAllowed,
@@ -38,6 +39,7 @@ type Props = {
   disabilityValues: MatrixValues
   districtValues: MatrixValues
   religionValues: MatrixValues
+  othersValues: MatrixValues
   districts: DistrictRow[]
   religions: CollectionReligionRow[]
   onGenderChange?: (
@@ -47,10 +49,41 @@ type Props = {
     value: string,
     autoTotalValue?: string,
   ) => void
-  onAgeChange?: (indicatorId: number, yearId: number, columnId: number | string, value: string) => void
-  onDisabilityChange?: (indicatorId: number, yearId: number, columnId: number | string, value: string) => void
-  onDistrictChange?: (indicatorId: number, yearId: number, columnId: number | string, value: string) => void
-  onReligionChange?: (indicatorId: number, yearId: number, columnId: number | string, value: string) => void
+  onAgeChange?: (
+    indicatorId: number,
+    yearId: number,
+    columnId: number | string,
+    value: string,
+    autoTotalValue?: string,
+  ) => void
+  onDisabilityChange?: (
+    indicatorId: number,
+    yearId: number,
+    columnId: number | string,
+    value: string,
+    autoTotalValue?: string,
+  ) => void
+  onDistrictChange?: (
+    indicatorId: number,
+    yearId: number,
+    columnId: number | string,
+    value: string,
+    autoTotalValue?: string,
+  ) => void
+  onReligionChange?: (
+    indicatorId: number,
+    yearId: number,
+    columnId: number | string,
+    value: string,
+    autoTotalValue?: string,
+  ) => void
+  onOthersChange?: (
+    indicatorId: number,
+    yearId: number,
+    columnId: number | string,
+    value: string,
+    autoTotalValue?: string,
+  ) => void
   rowEnabledByIndicator?: Record<number, Partial<Record<MatrixDimensionKey, boolean>>>
   onRowEnabledChange?: (indicatorId: number, dimension: MatrixDimensionKey, enabled: boolean) => void
   readOnly?: boolean
@@ -59,6 +92,7 @@ type Props = {
   savedDisabilityByIndicator?: MatrixValues
   savedDistrictByIndicator?: MatrixValues
   savedReligionByIndicator?: MatrixValues
+  savedOthersByIndicator?: MatrixValues
 }
 
 function indicatorsForDimension(
@@ -75,6 +109,7 @@ export function DepartmentIndicatorDisaggregationMatrices({
   disabilityValues,
   districtValues,
   religionValues,
+  othersValues,
   districts,
   religions,
   onGenderChange,
@@ -82,6 +117,7 @@ export function DepartmentIndicatorDisaggregationMatrices({
   onDisabilityChange,
   onDistrictChange,
   onReligionChange,
+  onOthersChange,
   rowEnabledByIndicator,
   onRowEnabledChange,
   readOnly = false,
@@ -90,6 +126,7 @@ export function DepartmentIndicatorDisaggregationMatrices({
   savedDisabilityByIndicator,
   savedDistrictByIndicator,
   savedReligionByIndicator,
+  savedOthersByIndicator,
 }: Props) {
   const genderIndicators = useMemo(
     () =>
@@ -112,6 +149,10 @@ export function DepartmentIndicatorDisaggregationMatrices({
   )
   const religionIndicators = useMemo(
     () => indicatorsForDimension(indicators, (ind) => Boolean(ind.collects_by_religion)),
+    [indicators],
+  )
+  const othersIndicators = useMemo(
+    () => indicatorsForDimension(indicators, (ind) => Boolean(ind.collects_by_others)),
     [indicators],
   )
 
@@ -155,6 +196,11 @@ export function DepartmentIndicatorDisaggregationMatrices({
       ),
     [religionIndicators, religions],
   )
+  const othersGroups = useMemo(
+    () =>
+      buildYearTotalOnlyMatrixGroups(othersIndicators, (ind) => Boolean(ind.collects_by_others)),
+    [othersIndicators],
+  )
 
   function handleRowEnabledChange(dimension: MatrixDimensionKey, indicatorId: number, enabled: boolean) {
     onRowEnabledChange?.(indicatorId, dimension, enabled)
@@ -196,6 +242,14 @@ export function DepartmentIndicatorDisaggregationMatrices({
     const out: Record<number, boolean> = {}
     for (const ind of indicators) {
       out[ind.id] = isMatrixRowEnabled(rowEnabledByIndicator?.[ind.id], 'religion')
+    }
+    return out
+  }, [indicators, rowEnabledByIndicator])
+
+  const othersRowEnabled = useMemo(() => {
+    const out: Record<number, boolean> = {}
+    for (const ind of indicators) {
+      out[ind.id] = isMatrixRowEnabled(rowEnabledByIndicator?.[ind.id], 'others')
     }
     return out
   }, [indicators, rowEnabledByIndicator])
@@ -254,7 +308,8 @@ export function DepartmentIndicatorDisaggregationMatrices({
             String(columnId),
           )
         }
-        hint="Enter a number for Under 18, 18 - 60, and Above 60 for each configured year."
+        showYearTotals
+        hint="Enter age-band values when available — Total updates automatically. If you only know the overall count, enter it in Total."
       />
       <DepartmentDisaggregationMatrixTable
         title="Persons with disability"
@@ -280,7 +335,8 @@ export function DepartmentIndicatorDisaggregationMatrices({
             String(columnId),
           )
         }
-        hint="Enter the count of persons with disability for each configured year."
+        showYearTotals
+        hint="Enter disability counts when available — Total updates automatically. If you only know the overall count, enter it in Total."
       />
       <DepartmentDisaggregationMatrixTable
         title="District"
@@ -300,7 +356,8 @@ export function DepartmentIndicatorDisaggregationMatrices({
         cellAllowed={(ind, yearId, columnId) =>
           indicatorCatalogCellAllowed(ind, yearId, (i) => Boolean(i.collects_by_location), Number(columnId))
         }
-        hint="Enter a number for each district in your assigned region and configured year. Leave blank for zero."
+        showYearTotals
+        hint="Enter district values when available — Total updates automatically. Leave blank for zero. If you only know the overall count, enter it in Total."
       />
       <DepartmentDisaggregationMatrixTable
         title="Religion"
@@ -320,7 +377,28 @@ export function DepartmentIndicatorDisaggregationMatrices({
         cellAllowed={(ind, yearId, columnId) =>
           indicatorReligionCellAllowed(ind, yearId, Number(columnId))
         }
-        hint="Enter a number for each religion and configured year."
+        showYearTotals
+        hint="Enter religion values when available — Total updates automatically. If you only know the overall count, enter it in Total."
+      />
+      <DepartmentDisaggregationMatrixTable
+        title="Others"
+        indicators={othersIndicators}
+        columnGroups={othersGroups}
+        cellValues={othersValues}
+        onCellChange={onOthersChange}
+        readOnly={readOnly}
+        savedByIndicator={savedOthersByIndicator}
+        dimensionKey="others"
+        rowEnabledByIndicator={rowEnabledByIndicator ? othersRowEnabled : undefined}
+        onRowEnabledChange={
+          onRowEnabledChange
+            ? (indicatorId, enabled) => handleRowEnabledChange('others', indicatorId, enabled)
+            : undefined
+        }
+        cellAllowed={() => true}
+        showYearTotals
+        showGrandTotal={false}
+        hint="Enter a Total count for each configured year."
       />
     </div>
   )

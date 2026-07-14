@@ -5,8 +5,22 @@ async function throwIfNotOk(res: Response): Promise<void> {
   if (!res.ok) throw new ApiError(await parseApiErrorResponse(res))
 }
 
-export type AdminRegion = { id: number; name: string; slug: string }
-export type AdminDistrict = { id: number; region_id: number; region_name: string | null; name: string; slug: string | null }
+export type AdminRegion = {
+  id: number
+  name: string
+  slug: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+export type AdminDistrict = {
+  id: number
+  region_id: number
+  region_name: string | null
+  name: string
+  slug: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
 export type AdminCatalogDepartment = {
   id: number
   region_ids: number[]
@@ -14,6 +28,8 @@ export type AdminCatalogDepartment = {
   code: string | null
   name: string
   type: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 export type AdminConvention = {
   id: number
@@ -80,6 +96,8 @@ export type AdminIssueCategory = {
   id: number
   name: string
   is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export type AdminArticleRow = {
@@ -89,6 +107,8 @@ export type AdminArticleRow = {
   article_name: string
   description: string | null
   is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export type AdminCollectionYear = {
@@ -96,6 +116,8 @@ export type AdminCollectionYear = {
   label: string
   sort_order: number
   is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export type AdminCollectionGender = {
@@ -103,6 +125,8 @@ export type AdminCollectionGender = {
   name: string
   sort_order: number
   is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export type AdminCollectionReligion = {
@@ -110,6 +134,8 @@ export type AdminCollectionReligion = {
   name: string
   sort_order: number
   is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export type AdminIssueIndicator = {
@@ -125,6 +151,7 @@ export type AdminIssueIndicator = {
   collects_by_location: boolean
   collects_by_disability: boolean
   collects_by_religion: boolean
+  collects_by_others: boolean
   collection_by_year: AdminIssueIndicatorYearRow[]
   /** Years for qualitative data gathering (separate from quantitative disaggregation years). */
   qualitative_collection_by_year?: Array<{ year_id: number; label: string }>
@@ -163,6 +190,8 @@ export type AdminIssue = {
   has_quantitative: boolean
   has_qualitative: boolean
   is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
   convention: { id: number; code: string; name: string } | null
   category: { id: number; name: string } | null
   articles: AdminIssueArticleRow[]

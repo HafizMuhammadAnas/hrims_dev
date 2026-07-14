@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router
 import {
   deleteHrRequest,
   fetchHrRequests,
+  updateHrRequest,
 } from '../api/hrRequests'
 import { fetchRegions } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
@@ -22,7 +23,7 @@ import { TableExportButton } from '../components/ui/TableExportButton'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { HR_REQUEST_EXPORT_COLUMNS } from '../lib/tableExportColumns'
 import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
-import { sortRowsLatestFirst } from '../lib/tableRowSort'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { hrRequestListStats, hrRequestStatusPresentation } from '../lib/hrRequestListMetrics'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
 import {
@@ -81,6 +82,7 @@ export function FederalRequestManagementPage() {
   const [deleteTarget, setDeleteTarget] = useState<HrRequestRow | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [activatingId, setActivatingId] = useState<string | null>(null)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [pendingClarificationCount, setPendingClarificationCount] = useState(0)
   const [clarifications, setClarifications] = useState<HrRequestClarificationRow[]>([])
@@ -151,7 +153,9 @@ export function FederalRequestManagementPage() {
         regionBlob.toLowerCase().includes(q)
       )
     })
-    return sortRowsLatestFirst(filtered, (r) => r.id)
+    return sortRowsLatestFirst(filtered, (r) =>
+      pickActivityTimestamp(r.updated_at, r.created_at, r.date, r.id),
+    )
   }, [rows, search, statusFilter])
 
   const { pageRows } = useMemo(
@@ -188,7 +192,9 @@ export function FederalRequestManagementPage() {
           c.region_message.toLowerCase().includes(q),
       )
     }
-    return sortRowsLatestFirst(data, (c) => c.updated_at ?? c.created_at ?? c.id)
+    return sortRowsLatestFirst(data, (c) =>
+      pickActivityTimestamp(c.updated_at, c.created_at, c.id),
+    )
   }, [clarifications, clarTable.search, clarTable.filters.status])
 
   const { pageRows: clarPageRows } = useMemo(
@@ -326,6 +332,31 @@ export function FederalRequestManagementPage() {
                               }}
                             >
                               Edit
+                            </Button>
+                            <Button
+                              variant="link"
+                              disabled={activatingId === r.id}
+                              onClick={() => {
+                                void (async () => {
+                                  setActivatingId(r.id)
+                                  setError(null)
+                                  setOpenActionId(null)
+                                  try {
+                                    await updateHrRequest(r.id, { status: 'active' })
+                                    await reload()
+                                  } catch (e: unknown) {
+                                    setError(
+                                      e instanceof Error
+                                        ? e.message
+                                        : 'Failed to activate request. Select at least one region first.',
+                                    )
+                                  } finally {
+                                    setActivatingId(null)
+                                  }
+                                })()
+                              }}
+                            >
+                              {activatingId === r.id ? 'Activating…' : 'Activate'}
                             </Button>
                             <Button
                               variant="link"

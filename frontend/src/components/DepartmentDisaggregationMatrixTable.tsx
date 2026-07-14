@@ -39,8 +39,13 @@ type Props = {
   onRowEnabledChange?: (indicatorId: number, enabled: boolean) => void
   columnHeaderClass?: (name: string) => string
   hint?: string
-  /** When true, append a read-only Total column after each year's gender columns (Gender matrix only). */
+  /** When true, append an editable Total column after each year's breakdown columns. */
   showYearTotals?: boolean
+  /**
+   * When true, append a read-only Grand Total at the end of each row
+   * (sum of year Totals). Defaults to `showYearTotals`.
+   */
+  showGrandTotal?: boolean
 }
 
 function indicatorTypePills(ind: HrRequestIssueIndicator): string[] {
@@ -69,7 +74,9 @@ export function DepartmentDisaggregationMatrixTable({
   columnHeaderClass = defaultColumnHeaderClass,
   hint,
   showYearTotals = false,
+  showGrandTotal,
 }: Props) {
+  const renderGrandTotal = showGrandTotal ?? showYearTotals
   const showRowToggle = !readOnly && dimensionKey != null && onRowEnabledChange != null
 
   function rowIncluded(indicatorId: number): boolean {
@@ -157,6 +164,24 @@ export function DepartmentDisaggregationMatrixTable({
   const yearColSpan = (group: MatrixYearColumnGroup) =>
     group.genders.length + (showYearTotals ? 1 : 0)
 
+  /** Sum of all year Total cells for this indicator row (read-only Grand Total). */
+  function rowGrandTotal(indicator: HrRequestIssueIndicator): string {
+    if (!showYearTotals) return ''
+    if (!rowIncluded(indicator.id) || rowExcludedByDepartment(indicator.id)) return ''
+    let sum = 0
+    let any = false
+    for (const group of columnGroups) {
+      const raw = cellDisplay(indicator.id, group.year_id, GENDER_TOTAL_COLUMN_ID).trim()
+      if (raw === '') continue
+      const n = Number(raw)
+      if (!Number.isFinite(n)) continue
+      sum += n
+      any = true
+    }
+    if (!any) return ''
+    return Number.isInteger(sum) ? String(sum) : String(Math.round(sum * 1000) / 1000)
+  }
+
   function exportCellValue(indicator: HrRequestIssueIndicator, yearId: number, columnId: number | string): string {
     const included = rowIncluded(indicator.id)
     if (!included || rowExcludedByDepartment(indicator.id)) {
@@ -179,6 +204,9 @@ export function DepartmentDisaggregationMatrixTable({
       }
       return genderCols
     })
+    if (renderGrandTotal) {
+      columns.push({ header: 'Grand Total', yearLabel: '' })
+    }
 
     const rows = indicators.map((indicator) => {
       const cells: string[] = []
@@ -195,6 +223,14 @@ export function DepartmentDisaggregationMatrixTable({
             const total = cellDisplay(indicator.id, group.year_id, GENDER_TOTAL_COLUMN_ID).trim()
             cells.push(total || '—')
           }
+        }
+      }
+      if (renderGrandTotal) {
+        const included = rowIncluded(indicator.id)
+        if (!included || rowExcludedByDepartment(indicator.id)) {
+          cells.push(unavailableCellLabel(indicator.id))
+        } else {
+          cells.push(rowGrandTotal(indicator) || '—')
         }
       }
       return {
@@ -248,6 +284,11 @@ export function DepartmentDisaggregationMatrixTable({
                   {group.year_label}
                 </th>
               ))}
+              {renderGrandTotal ? (
+                <th className="dept-data-matrix__grand-total-head" rowSpan={2}>
+                  Grand Total
+                </th>
+              ) : null}
             </tr>
             <tr>
               {columnGroups.map((group) => (
@@ -406,6 +447,43 @@ export function DepartmentDisaggregationMatrixTable({
                       ) : null}
                     </Fragment>
                   ))}
+                  {renderGrandTotal ? (
+                    (() => {
+                      const totalAllowed = included && !rowExcludedByDepartment(indicator.id)
+                      if (!totalAllowed) {
+                        const excluded = rowExcludedByDepartment(indicator.id)
+                        return (
+                          <td
+                            className={
+                              'dept-data-matrix__cell dept-data-matrix__cell--na dept-data-matrix__cell--grand-total' +
+                              (excluded ? ' dept-data-matrix__cell--dept-na' : '')
+                            }
+                          >
+                            <span className={excluded ? 'dept-data-matrix__na-label' : 'text-muted'}>
+                              {unavailableCellLabel(indicator.id)}
+                            </span>
+                          </td>
+                        )
+                      }
+                      const grandDisplay = rowGrandTotal(indicator)
+                      const filled = cellFilled(grandDisplay)
+                      return (
+                        <td
+                          className={
+                            'dept-data-matrix__cell dept-data-matrix__cell--grand-total' +
+                            (filled ? ' dept-data-matrix__cell--filled' : '')
+                          }
+                        >
+                          <span
+                            className="dept-data-matrix__cell-readonly dept-data-matrix__grand-total-value"
+                            aria-label={`${indicator.indicator_text}, Grand Total`}
+                          >
+                            {grandDisplay || '—'}
+                          </span>
+                        </td>
+                      )
+                    })()
+                  ) : null}
                 </tr>
               )
             })}

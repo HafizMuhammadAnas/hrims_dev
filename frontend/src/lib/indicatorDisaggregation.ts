@@ -1,5 +1,6 @@
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 
+import { compareCollectionYearLabels } from './collectionYearSort'
 import { isSelectableCollectionGender } from './collectionGenderOptions'
 
 import {
@@ -88,6 +89,8 @@ export type DisaggregationDimension =
 
   | 'religion'
 
+  | 'others'
+
 
 
 export type LocationCatalogItem = { id: number; name: string }
@@ -106,7 +109,9 @@ export function indicatorUsesDisaggregatedDimensions(ind: HrRequestIssueIndicato
 
       ind.collects_by_disability ||
 
-      ind.collects_by_religion,
+      ind.collects_by_religion ||
+
+      ind.collects_by_others,
 
   )
 
@@ -124,7 +129,9 @@ export function indicatorIsYearOnly(ind: HrRequestIssueIndicator): boolean {
 
 export function indicatorConfiguredYears(ind: HrRequestIssueIndicator): Array<{ year_id: number; label: string }> {
 
-  return (ind.collection_by_year ?? []).map((y) => ({ year_id: y.year_id, label: y.label }))
+  const years = (ind.collection_by_year ?? []).map((y) => ({ year_id: y.year_id, label: y.label }))
+
+  return years.sort((a, b) => compareCollectionYearLabels(a.label, b.label))
 
 }
 
@@ -132,11 +139,7 @@ export function indicatorConfiguredYears(ind: HrRequestIssueIndicator): Array<{ 
 
 function sortYearGroups(groups: MatrixYearColumnGroup[]): MatrixYearColumnGroup[] {
 
-  return [...groups].sort((a, b) =>
-
-    a.year_label.localeCompare(b.year_label, undefined, { numeric: true }),
-
-  )
+  return [...groups].sort((a, b) => compareCollectionYearLabels(a.year_label, b.year_label))
 
 }
 
@@ -572,7 +575,9 @@ export function indicatorUsesAnyDataMatrix(ind: HrRequestIssueIndicator): boolea
 
     Boolean(ind.collects_by_disability) ||
 
-    Boolean(ind.collects_by_religion)
+    Boolean(ind.collects_by_religion) ||
+
+    Boolean(ind.collects_by_others)
 
   )
 
@@ -591,6 +596,40 @@ export function indicatorRequiresQuantitativeMatrixPayload(ind: HrRequestIssueIn
 export function deptFormUsesAnyIndicatorMatrix(indicators: HrRequestIssueIndicator[]): boolean {
 
   return indicators.some((ind) => indicatorUsesAnyDataMatrix(ind))
+
+}
+
+
+
+/** Year groups with no breakdown columns — used for Others (Total-only per year). */
+
+export function buildYearTotalOnlyMatrixGroups(
+
+  indicators: HrRequestIssueIndicator[],
+
+  enabled: (ind: HrRequestIssueIndicator) => boolean,
+
+): MatrixYearColumnGroup[] {
+
+  const years = new Map<number, string>()
+
+  for (const ind of indicators) {
+
+    if (!enabled(ind)) continue
+
+    for (const y of indicatorConfiguredYears(ind)) {
+
+      if (!years.has(y.year_id)) years.set(y.year_id, y.label)
+
+    }
+
+  }
+
+  return [...years.entries()]
+
+    .sort((a, b) => compareCollectionYearLabels(a[1], b[1]))
+
+    .map(([year_id, year_label]) => ({ year_id, year_label, genders: [] }))
 
 }
 

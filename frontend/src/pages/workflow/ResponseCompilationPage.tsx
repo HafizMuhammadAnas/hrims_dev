@@ -20,6 +20,7 @@ import {
 import { isIctLineTask, isIctRegionalResponseRow, isIctRegionSlug } from '../../lib/ictRegion'
 import { isFederalAdmin, isRegionalAdmin } from '../../lib/roles'
 import { LABEL_DEPARTMENTAL_RESPONSES, LABEL_REQUEST_DISTRIBUTION } from '../../lib/uiLabels'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../../lib/tableRowSort'
 import type { HrRequestIssueIndicator, HrRequestRow } from '../../types/hrRequest'
 
 function taskListSignature(tasks: DepartmentTaskRow[]): string {
@@ -88,13 +89,14 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
   )
 
   const requestsForCompilationSelect = useMemo(() => {
-    return requests
-      .filter((r) => {
+    return sortRowsLatestFirst(
+      requests.filter((r) => {
         if (compiledReqIds.has(r.id)) return false
         if (ictScope) return reqIdsWithScopedTasks.has(r.id)
         return true
-      })
-      .sort((a, b) => a.id.localeCompare(b.id))
+      }),
+      (r) => pickActivityTimestamp(r.updated_at, r.created_at, r.date, r.id),
+    )
   }, [requests, compiledReqIds, ictScope, reqIdsWithScopedTasks])
 
   useEffect(() => {

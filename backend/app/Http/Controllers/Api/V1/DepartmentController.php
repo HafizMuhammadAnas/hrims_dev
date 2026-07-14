@@ -17,7 +17,7 @@ class DepartmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = Department::query()->orderBy('name');
+        $query = Department::query()->orderByDesc('updated_at')->orderByDesc('created_at')->orderByDesc('id');
 
         if ($user->hasRole('super_admin')) {
             $rows = $query->with('regions')->get();
@@ -138,6 +138,8 @@ class DepartmentController extends Controller
             'region_ids' => $regionIds,
             'region_slug' => $regions->first()?->slug,
             'region_name' => $regions->isNotEmpty() ? $regions->pluck('name')->join(', ') : null,
+            'created_at' => optional($d->created_at)?->toIso8601String(),
+            'updated_at' => optional($d->updated_at)?->toIso8601String(),
         ];
     }
 

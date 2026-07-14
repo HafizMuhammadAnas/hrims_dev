@@ -114,6 +114,8 @@ class AuthController extends Controller
             'username' => $user->username,
             'email' => $user->email,
             'is_active' => $user->is_active,
+            'created_at' => optional($user->created_at)?->toIso8601String(),
+            'updated_at' => optional($user->updated_at)?->toIso8601String(),
             'region' => $user->region ? [
                 'id' => $user->region->id,
                 'name' => $user->region->name,

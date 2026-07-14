@@ -22,7 +22,7 @@ class UserController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $query = User::query()->with(['roles.permissions', 'region', 'department'])->orderByDesc('created_at')->orderByDesc('id');
+        $query = User::query()->with(['roles.permissions', 'region', 'department'])->orderByDesc('updated_at')->orderByDesc('created_at')->orderByDesc('id');
 
         if ($creator->hasRole('super_admin')) {
             $rows = $query
@@ -262,6 +262,8 @@ class UserController extends Controller
             'username' => $user->username,
             'email' => $user->email,
             'is_active' => $user->is_active,
+            'created_at' => optional($user->created_at)?->toIso8601String(),
+            'updated_at' => optional($user->updated_at)?->toIso8601String(),
             'region' => $user->region ? [
                 'id' => $user->region->id,
                 'name' => $user->region->name,

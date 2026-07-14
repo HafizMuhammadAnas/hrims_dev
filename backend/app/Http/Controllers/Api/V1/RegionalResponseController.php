@@ -171,7 +171,7 @@ class RegionalResponseController extends Controller
             $query->whereRaw('1 = 0');
         }
 
-        $rows = $query->orderByDesc('submission_date')->get();
+        $rows = $query->orderByDesc('submission_date')->orderByDesc('id')->get();
 
         return response()
             ->json([

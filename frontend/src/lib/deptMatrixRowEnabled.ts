@@ -1,7 +1,7 @@
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import { indicatorIsYearOnly } from './indicatorDisaggregation'
 
-export type MatrixDimensionKey = 'gender' | 'age' | 'disability' | 'district' | 'religion'
+export type MatrixDimensionKey = 'gender' | 'age' | 'disability' | 'district' | 'religion' | 'others'
 
 export const MATRIX_DIMENSION_KEYS: MatrixDimensionKey[] = [
   'gender',
@@ -9,6 +9,7 @@ export const MATRIX_DIMENSION_KEYS: MatrixDimensionKey[] = [
   'disability',
   'district',
   'religion',
+  'others',
 ]
 
 export type MatrixRowEnabledMap = Partial<Record<MatrixDimensionKey, boolean>>
@@ -37,6 +38,8 @@ export function indicatorAppliesToMatrixDimension(
       return Boolean(ind.collects_by_location)
     case 'religion':
       return Boolean(ind.collects_by_religion)
+    case 'others':
+      return Boolean(ind.collects_by_others)
     default:
       return false
   }

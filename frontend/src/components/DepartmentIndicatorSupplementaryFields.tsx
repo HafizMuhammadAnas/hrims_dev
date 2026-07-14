@@ -17,6 +17,7 @@ export type DeptIndicatorDraft = {
   yearRegionValues: Record<string, string>
   yearDistrictValues: Record<string, string>
   yearReligionValues: Record<string, string>
+  yearOthersValues: Record<string, string>
   matrixRowEnabled: MatrixRowEnabledMap
   quantFile: File | null
   qualFile: File | null
@@ -35,6 +36,7 @@ export function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
     yearRegionValues: {},
     yearDistrictValues: {},
     yearReligionValues: {},
+    yearOthersValues: {},
     matrixRowEnabled: {},
     quantFile: null,
     qualFile: null,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import {
   adminCreateConvention,
@@ -40,6 +40,7 @@ import { FormField } from '../components/ui/FormField'
 import { FormGrid } from '../components/ui/FormGrid'
 import { FormRow } from '../components/ui/FormRow'
 import { isSuperAdmin } from '../lib/roles'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_HUMAN_RIGHTS_INDICATORS, LABEL_KNOWLEDGE_HUB } from '../lib/uiLabels'
 import { uprConcludingObservationsLabel } from '../lib/issueEntryKind'
 
@@ -177,6 +178,14 @@ export function SuperAdminConsolePage() {
     }
   }, [tab, selConv])
 
+  const departmentsLatestFirst = useMemo(
+    () =>
+      sortRowsLatestFirst(departments, (d) =>
+        pickActivityTimestamp(d.updated_at, d.created_at, d.id),
+      ),
+    [departments],
+  )
+
   useEffect(() => {
     void refresh()
   }, [refresh])
@@ -220,7 +229,7 @@ export function SuperAdminConsolePage() {
               </tr>
             </thead>
             <tbody>
-              {departments.map((d) =>
+              {departmentsLatestFirst.map((d) =>
                 editingDeptId === d.id ? (
                   <tr key={d.id}>
                     <td colSpan={5}>

@@ -39,6 +39,7 @@ class IssueController extends Controller
                 ],
                 $this->indicatorRelations(),
             ))
+            ->orderByDesc('updated_at')
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->get();
@@ -174,6 +175,7 @@ class IssueController extends Controller
             'indicators.*.collects_by_location' => ['sometimes', 'boolean'],
             'indicators.*.collects_by_disability' => ['sometimes', 'boolean'],
             'indicators.*.collects_by_religion' => ['sometimes', 'boolean'],
+            'indicators.*.collects_by_others' => ['sometimes', 'boolean'],
             'indicators.*.collection_by_year' => ['sometimes', 'array'],
             'indicators.*.collection_by_year.*.collection_year_id' => ['required', 'integer', Rule::exists('collection_years', 'id')->where('is_active', true)],
             'indicators.*.collection_by_year.*.collection_gender_ids' => ['sometimes', 'array'],
@@ -293,12 +295,13 @@ class IssueController extends Controller
             $collectsByLocation = (bool) ($row['collects_by_location'] ?? false);
             $collectsByDisability = (bool) ($row['collects_by_disability'] ?? false);
             $collectsByReligion = (bool) ($row['collects_by_religion'] ?? false);
+            $collectsByOthers = (bool) ($row['collects_by_others'] ?? false);
             $hasQuantitative = (bool) ($row['has_quantitative'] ?? false);
             $hasQualitative = (bool) ($row['has_qualitative'] ?? false);
             $collectionByYear = $this->normalizeCollectionByYear($row['collection_by_year'] ?? []);
             $qualitativeYearIds = $this->normalizeQualitativeYearIds($row['qualitative_collection_by_year'] ?? []);
             $usesDisaggregation = $collectsByGender || $collectsByAge || $collectsByLocation
-                || $collectsByDisability || $collectsByReligion;
+                || $collectsByDisability || $collectsByReligion || $collectsByOthers;
 
             // Year-only qualitative uses qualitative_collection_by_year; also accept collection_by_year.
             if ($hasQualitative && ! $hasQuantitative && $qualitativeYearIds === [] && $collectionByYear !== []) {
@@ -329,7 +332,7 @@ class IssueController extends Controller
             }
 
             if ($collectsByYear && $usesDisaggregation && ! $collectsByGender && ! $collectsByAge
-                && ! $collectsByLocation && ! $collectsByDisability && ! $collectsByReligion) {
+                && ! $collectsByLocation && ! $collectsByDisability && ! $collectsByReligion && ! $collectsByOthers) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'indicators' => ['Select at least one disaggregation dimension when collecting by year and disaggregated data.'],
                 ]);
@@ -359,6 +362,7 @@ class IssueController extends Controller
                 'collects_by_location' => $hasQuantitative && $collectsByYear && $collectsByLocation,
                 'collects_by_disability' => $hasQuantitative && $collectsByYear && $collectsByDisability,
                 'collects_by_religion' => $hasQuantitative && $collectsByYear && $collectsByReligion,
+                'collects_by_others' => $hasQuantitative && $collectsByYear && $collectsByOthers,
             ];
             if (IssueIndicator::hasSortOrderColumn()) {
                 $indicatorAttributes['sort_order'] = (int) $sortOrder;
@@ -486,6 +490,8 @@ class IssueController extends Controller
             'has_quantitative' => (bool) $i->has_quantitative,
             'has_qualitative' => (bool) $i->has_qualitative,
             'is_active' => (bool) ($i->is_active ?? true),
+            'created_at' => optional($i->created_at)?->toIso8601String(),
+            'updated_at' => optional($i->updated_at)?->toIso8601String(),
             'convention' => $i->relationLoaded('convention') && $i->convention
                 ? ['id' => $i->convention->id, 'code' => $i->convention->code, 'name' => $i->convention->name]
                 : null,

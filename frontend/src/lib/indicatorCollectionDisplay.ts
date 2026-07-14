@@ -1,5 +1,5 @@
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
-import { isSelectableCollectionGender } from './collectionGenderOptions'
+import { sortCollectionYearsByLabelValue, sortCollectionYearLabels } from './collectionYearSort'
 import {
   AGE_KEYS,
   AGE_LABELS,
@@ -10,8 +10,6 @@ import {
 export type IndicatorCollectionLine = {
   year_id: number
   label: string
-  genders: string[]
-  religions: string[]
 }
 
 /** @deprecated use IndicatorCollectionLine */
@@ -25,6 +23,7 @@ export type IndicatorCollectionDisaggregation = Pick<
   | 'collects_by_location'
   | 'collects_by_disability'
   | 'collects_by_religion'
+  | 'collects_by_others'
   | 'collection_by_year'
   | 'disaggregation'
 >
@@ -39,9 +38,32 @@ export function indicatorCollectionDisaggregationFromApi(
     collects_by_location: ind.collects_by_location,
     collects_by_disability: ind.collects_by_disability,
     collects_by_religion: ind.collects_by_religion,
+    collects_by_others: ind.collects_by_others,
     collection_by_year: ind.collection_by_year,
     disaggregation: ind.disaggregation,
   }
+}
+
+/** All configured dimension names (Gender included) — no sub-column names. */
+export function indicatorAllDimensionLabelNames(
+  ind: Pick<
+    HrRequestIssueIndicator,
+    | 'collects_by_gender'
+    | 'collects_by_age'
+    | 'collects_by_location'
+    | 'collects_by_disability'
+    | 'collects_by_religion'
+    | 'collects_by_others'
+  >,
+): string[] {
+  const labels: string[] = []
+  if (ind.collects_by_gender) labels.push('Gender')
+  if (ind.collects_by_age) labels.push('Age')
+  if (ind.collects_by_location) labels.push('Location')
+  if (ind.collects_by_disability) labels.push('Disability')
+  if (ind.collects_by_religion) labels.push('Religion')
+  if (ind.collects_by_others) labels.push('Others')
+  return labels
 }
 
 export function indicatorCollectionLines(
@@ -53,20 +75,19 @@ export function indicatorCollectionLines(
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
+    | 'collects_by_others'
     | 'collection_by_year'
   >,
 ): IndicatorCollectionLine[] {
   if (!ind.collects_by_year || !ind.collection_by_year?.length) {
     return []
   }
-  return ind.collection_by_year.map((y) => ({
-    year_id: y.year_id,
-    label: y.label,
-    genders: ind.collects_by_gender
-      ? (y.genders ?? []).map((g) => g.name).filter((name) => Boolean(name) && isSelectableCollectionGender(name))
-      : [],
-    religions: ind.collects_by_religion ? [] : [],
-  }))
+  return sortCollectionYearsByLabelValue(
+    ind.collection_by_year.map((y) => ({
+      year_id: y.year_id,
+      label: y.label,
+    })),
+  )
 }
 
 export function formatIndicatorCollectionSummary(
@@ -78,6 +99,7 @@ export function formatIndicatorCollectionSummary(
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
+    | 'collects_by_others'
     | 'collection_by_year'
     | 'disaggregation'
   >,
@@ -87,16 +109,10 @@ export function formatIndicatorCollectionSummary(
     const text = ind.disaggregation?.trim()
     return text || null
   }
-  const dims: string[] = []
-  if (ind.collects_by_gender) dims.push('Gender')
-  if (ind.collects_by_age) dims.push('Age')
-  if (ind.collects_by_location) dims.push('Location')
-  if (ind.collects_by_disability) dims.push('Disability')
-  if (ind.collects_by_religion) dims.push('Religion')
-  if (dims.length === 0) {
-    return lines.map((line) => line.label).join('; ')
-  }
-  return `${lines.map((line) => line.label).join('; ')} (${dims.join(', ')})`
+  const dims = indicatorAllDimensionLabelNames(ind)
+  const yearPart = sortCollectionYearLabels(lines.map((line) => line.label)).join('; ')
+  if (dims.length === 0) return yearPart
+  return `${yearPart} (${dims.join(', ')})`
 }
 
 /** @deprecated use indicatorCollectionLines */
@@ -116,6 +132,7 @@ export function formatIndicatorYearGenderSummary(
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
+    | 'collects_by_others'
     | 'collection_by_year'
     | 'disaggregation'
   >,
@@ -123,18 +140,19 @@ export function formatIndicatorYearGenderSummary(
   return formatIndicatorCollectionSummary(ind)
 }
 
+/** @deprecated Prefer indicatorAllDimensionLabelNames (includes Gender). */
 export function indicatorDimensionLabelNames(
   ind: Pick<
     HrRequestIssueIndicator,
-    'collects_by_age' | 'collects_by_location' | 'collects_by_disability' | 'collects_by_religion'
+    | 'collects_by_gender'
+    | 'collects_by_age'
+    | 'collects_by_location'
+    | 'collects_by_disability'
+    | 'collects_by_religion'
+    | 'collects_by_others'
   >,
 ): string[] {
-  const labels: string[] = []
-  if (ind.collects_by_age) labels.push('Age')
-  if (ind.collects_by_location) labels.push('Location')
-  if (ind.collects_by_disability) labels.push('Disability')
-  if (ind.collects_by_religion) labels.push('Religion')
-  return labels
+  return indicatorAllDimensionLabelNames(ind)
 }
 
 /** Detailed option labels — for department data-entry contexts only (matrix tables). */
@@ -151,6 +169,9 @@ export function indicatorDimensionHints(ind: HrRequestIssueIndicator): string[] 
   }
   if (ind.collects_by_religion) {
     hints.push('Religion: full catalog (all options)')
+  }
+  if (ind.collects_by_others) {
+    hints.push('Others: Total count only')
   }
   return hints
 }

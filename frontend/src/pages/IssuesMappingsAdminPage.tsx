@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   adminCreateArticle,
@@ -56,8 +56,9 @@ import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import { reorderList } from '../lib/reorderList'
 import { derivePaginatedRows, useClientTableState, type SortDirection } from '../hooks/useClientTableState'
-import { compareNumberValues, compareStringValues } from '../lib/tableRowSort'
+import { compareNumberValues, compareStringValues, compareTimestampValues, pickActivityTimestamp } from '../lib/tableRowSort'
 import { filterSelectableCollectionGenders } from '../lib/collectionGenderOptions'
+import { sortCollectionYearsByLabelValue } from '../lib/collectionYearSort'
 import {
   coerceIssueEntryKind,
   issueEntrySaveBlocked,
@@ -189,7 +190,10 @@ export function IssuesMappingsAdminPage() {
 
   const activeCategories = useMemo(() => categories.filter(catalogIsActive), [categories])
   const activeArticles = useMemo(() => articles.filter(catalogIsActive), [articles])
-  const activeCollectionYears = useMemo(() => collectionYears.filter(catalogIsActive), [collectionYears])
+  const activeCollectionYears = useMemo(
+    () => sortCollectionYearsByLabelValue(collectionYears.filter(catalogIsActive)),
+    [collectionYears],
+  )
   const activeCollectionGenders = useMemo(() => collectionGenders.filter(catalogIsActive), [collectionGenders])
 
   if (!user || !isSuperAdmin(user)) {
@@ -402,19 +406,27 @@ function catalogStatusLabel(row: CatalogRow): string {
   return catalogIsActive(row) ? 'Active' : 'Inactive'
 }
 
-type CatalogIdNameSortKey = 'id' | 'name' | 'status'
-type ArticleCatalogSortKey = 'id' | 'convention' | 'article_name' | 'status'
-type YearCatalogSortKey = 'id' | 'label' | 'status'
-type IssuesListSortKey = 'convention' | 'articles' | 'category' | 'issue_title' | 'status'
+type CatalogIdNameSortKey = 'updated_at' | 'id' | 'name' | 'status'
+type ArticleCatalogSortKey = 'updated_at' | 'id' | 'convention' | 'article_name' | 'status'
+type YearCatalogSortKey = 'updated_at' | 'id' | 'label' | 'status'
+type IssuesListSortKey = 'updated_at' | 'id' | 'convention' | 'articles' | 'category' | 'issue_title' | 'status'
 
-function sortCatalogIdNameRows<T extends { id: number; name: string } & CatalogRow>(
+function sortCatalogIdNameRows<
+  T extends { id: number; name: string; created_at?: string | null; updated_at?: string | null } & CatalogRow,
+>(
   rows: T[],
   sortKey: CatalogIdNameSortKey | undefined,
   sortDir: SortDirection,
 ): T[] {
-  const key = sortKey ?? 'id'
+  const key = sortKey ?? 'updated_at'
   return [...rows].sort((a, b) => {
     switch (key) {
+      case 'updated_at':
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          sortDir,
+        )
       case 'id':
         return compareNumberValues(a.id, b.id, sortDir)
       case 'name':
@@ -422,7 +434,11 @@ function sortCatalogIdNameRows<T extends { id: number; name: string } & CatalogR
       case 'status':
         return compareStringValues(catalogStatusLabel(a), catalogStatusLabel(b), sortDir)
       default:
-        return 0
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          'desc',
+        )
     }
   })
 }
@@ -432,9 +448,15 @@ function sortYearCatalogRows(
   sortKey: YearCatalogSortKey | undefined,
   sortDir: SortDirection,
 ): AdminCollectionYear[] {
-  const key = sortKey ?? 'id'
+  const key = sortKey ?? 'updated_at'
   return [...rows].sort((a, b) => {
     switch (key) {
+      case 'updated_at':
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          sortDir,
+        )
       case 'id':
         return compareNumberValues(a.id, b.id, sortDir)
       case 'label':
@@ -442,7 +464,11 @@ function sortYearCatalogRows(
       case 'status':
         return compareStringValues(catalogStatusLabel(a), catalogStatusLabel(b), sortDir)
       default:
-        return 0
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          'desc',
+        )
     }
   })
 }
@@ -456,9 +482,17 @@ function sortIssueListRows(
   sortKey: IssuesListSortKey | undefined,
   sortDir: SortDirection,
 ): AdminIssue[] {
-  const key = sortKey ?? 'convention'
+  const key = sortKey ?? 'updated_at'
   return [...rows].sort((a, b) => {
     switch (key) {
+      case 'updated_at':
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          sortDir,
+        )
+      case 'id':
+        return compareNumberValues(a.id, b.id, sortDir)
       case 'convention':
         return compareStringValues(issueConventionLabel(a), issueConventionLabel(b), sortDir)
       case 'articles':
@@ -474,7 +508,11 @@ function sortIssueListRows(
       case 'status':
         return compareStringValues(issueStatusLabel(a), issueStatusLabel(b), sortDir)
       default:
-        return 0
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          'desc',
+        )
     }
   })
 }
@@ -513,7 +551,11 @@ function IssuesListSection({
 }) {
   const navigate = useNavigate()
   const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
-    useClientTableState<IssuesListSortKey>({ pageSize: ISSUES_PAGE_SIZE })
+    useClientTableState<IssuesListSortKey>({
+      pageSize: ISSUES_PAGE_SIZE,
+      initialSortKey: 'updated_at',
+      initialSortDir: 'desc',
+    })
   const [listEntryKind, setListEntryKind] = useState<IssueEntryKind>('issue')
 
   const kindFilteredIssues = useMemo(
@@ -709,7 +751,7 @@ function IssuesCategoriesSection({
   const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
     useClientTableState<CatalogIdNameSortKey>({
       pageSize: ISSUES_PAGE_SIZE,
-      initialSortKey: 'id',
+      initialSortKey: 'updated_at',
       initialSortDir: 'desc',
     })
 
@@ -936,7 +978,7 @@ function IssuesArticlesSection({
   const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
     useClientTableState<ArticleCatalogSortKey>({
       pageSize: ISSUES_PAGE_SIZE,
-      initialSortKey: 'id',
+      initialSortKey: 'updated_at',
       initialSortDir: 'desc',
     })
 
@@ -995,7 +1037,7 @@ function IssuesArticlesSection({
               rows={5}
               value={newArticleDescription}
               onChange={(e) => setNewArticleDescription(e.target.value)}
-              placeholder="Optional description shown on federal and other portals…"
+              placeholder="Optional description shown on federal and other portalsâ€¦"
               disabled={busy}
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
@@ -1249,7 +1291,7 @@ function IssuesCollectionYearsSection({
   const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
     useClientTableState<YearCatalogSortKey>({
       pageSize: ISSUES_PAGE_SIZE,
-      initialSortKey: 'id',
+      initialSortKey: 'updated_at',
       initialSortDir: 'desc',
     })
 
@@ -1463,7 +1505,7 @@ function IssuesCollectionGendersSection({
   const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
     useClientTableState<CatalogIdNameSortKey>({
       pageSize: ISSUES_PAGE_SIZE,
-      initialSortKey: 'id',
+      initialSortKey: 'updated_at',
       initialSortDir: 'desc',
     })
 
@@ -1674,7 +1716,7 @@ function IssuesCollectionReligionsSection({
   const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
     useClientTableState<CatalogIdNameSortKey>({
       pageSize: ISSUES_PAGE_SIZE,
-      initialSortKey: 'id',
+      initialSortKey: 'updated_at',
       initialSortDir: 'desc',
     })
 
@@ -1856,7 +1898,7 @@ function articleConventionLabel(
     return article.convention.code
   }
   const match = conventions.find((c) => c.id === article.convention_id)
-  return match?.code ?? (article.convention_id ? String(article.convention_id) : '—')
+  return match?.code ?? (article.convention_id ? String(article.convention_id) : 'â€”')
 }
 
 function sortArticleCatalogRows(
@@ -1865,9 +1907,15 @@ function sortArticleCatalogRows(
   sortKey: ArticleCatalogSortKey | undefined,
   sortDir: SortDirection,
 ): AdminArticleRow[] {
-  const key = sortKey ?? 'id'
+  const key = sortKey ?? 'updated_at'
   return [...rows].sort((a, b) => {
     switch (key) {
+      case 'updated_at':
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          sortDir,
+        )
       case 'id':
         return compareNumberValues(a.id, b.id, sortDir)
       case 'convention':
@@ -1881,7 +1929,11 @@ function sortArticleCatalogRows(
       case 'status':
         return compareStringValues(catalogStatusLabel(a), catalogStatusLabel(b), sortDir)
       default:
-        return 0
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          'desc',
+        )
     }
   })
 }
@@ -1903,29 +1955,38 @@ function indicatorDataTypeLabel(ind: AdminIssue['indicators'][number], issue: Ad
   const parts: string[] = []
   if (quantitative) parts.push('Quantitative')
   if (qualitative) parts.push('Qualitative')
-  return parts.length > 0 ? parts.join(' · ') : '—'
+  return parts.length > 0 ? parts.join(' Â· ') : 'â€”'
 }
 
 /** Year collection and disaggregation dimensions summary. */
 function indicatorDisaggregationLabel(ind: AdminIssue['indicators'][number]): string {
   const parts: string[] = []
   if (ind.has_quantitative && ind.collects_by_year && (ind.collection_by_year?.length ?? 0) > 0) {
-    const years = ind.collection_by_year.map((y) => y.label).join('; ')
+    const years = [...ind.collection_by_year]
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+      .map((y) => y.label)
+      .join('; ')
     const dims: string[] = []
     if (ind.collects_by_gender) dims.push('Gender')
     if (ind.collects_by_age) dims.push('Age')
     if (ind.collects_by_location) dims.push('Location')
     if (ind.collects_by_disability) dims.push('Disability')
     if (ind.collects_by_religion) dims.push('Religion')
+    if (ind.collects_by_others) dims.push('Others')
     parts.push(dims.length > 0 ? `Q: ${years} (${dims.join(', ')})` : `Q: ${years}`)
   }
   const qualYears = ind.qualitative_collection_by_year ?? []
   if (ind.has_qualitative && qualYears.length > 0) {
-    parts.push(`L: ${qualYears.map((y) => y.label).join('; ')}`)
+    parts.push(
+      `L: ${[...qualYears]
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+        .map((y) => y.label)
+        .join('; ')}`,
+    )
   }
-  if (parts.length > 0) return parts.join(' · ')
+  if (parts.length > 0) return parts.join(' Â· ')
   const text = ind.disaggregation?.trim()
-  return text || '—'
+  return text || 'â€”'
 }
 
 function CatalogInlineEditActions({
@@ -1994,13 +2055,14 @@ type IndicatorDraft = {
   collects_qualitative: boolean
   /** Quantitative disaggregation years (with genders). */
   disaggregated_years: IndicatorDisaggregatedYearRow[]
-  /** Qualitative years only — independent of quantitative years. */
+  /** Qualitative years only â€” independent of quantitative years. */
   qualitative_year_ids: number[]
   collects_by_gender: boolean
   collects_by_age: boolean
   collects_by_location: boolean
   collects_by_disability: boolean
   collects_by_religion: boolean
+  collects_by_others: boolean
 }
 
 let indicatorClientKeyCounter = 0
@@ -2024,6 +2086,7 @@ function emptyIndicator(): IndicatorDraft {
     collects_by_location: false,
     collects_by_disability: false,
     collects_by_religion: false,
+    collects_by_others: false,
   }
 }
 
@@ -2070,6 +2133,7 @@ function indicatorFromAdmin(ind: AdminIssueIndicator): IndicatorDraft {
     collects_by_location: false,
     collects_by_disability: quantitative,
     collects_by_religion: quantitative,
+    collects_by_others: quantitative,
   }
 }
 
@@ -2094,6 +2158,7 @@ function indicatorToPayload(x: IndicatorDraft, fallbackGenderIds: number[] = [])
     collects_by_location: false,
     collects_by_disability: x.collects_quantitative && quantYears.length > 0,
     collects_by_religion: x.collects_quantitative && quantYears.length > 0,
+    collects_by_others: x.collects_quantitative && quantYears.length > 0,
     collection_by_year: quantYears.map((row) => ({
       collection_year_id: row.year_id,
       collection_gender_ids: row.gender_ids.length > 0 ? row.gender_ids : fallbackGenderIds,
@@ -2117,14 +2182,14 @@ function IndicatorYearOnlyPicker({
   disabled?: boolean
 }) {
   const sortedYears = useMemo(
-    () => [...collectionYears].sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)),
+    () => sortCollectionYearsByLabelValue(collectionYears),
     [collectionYears],
   )
 
   if (sortedYears.length === 0) {
     return (
       <p className="text-muted text-compact" style={{ margin: 0 }}>
-        No years in catalog — add entries under Year list.
+        No years in catalog â€” add entries under Year list.
       </p>
     )
   }
@@ -2159,7 +2224,7 @@ function CatalogIdCheckboxList({
   if (items.length === 0) {
     return (
       <p className="text-muted text-compact" style={{ margin: '4px 0 0' }}>
-        No {label.toLowerCase()} in catalog — add entries under {label} list.
+        No {label.toLowerCase()} in catalog â€” add entries under {label} list.
       </p>
     )
   }
@@ -2308,7 +2373,7 @@ function IssueIndicatorsEditor({
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const sortedYears = useMemo(
-    () => [...collectionYears].sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)),
+    () => sortCollectionYearsByLabelValue(collectionYears),
     [collectionYears],
   )
   const allSelectableGenderIds = useMemo(
@@ -2353,6 +2418,7 @@ function IssueIndicatorsEditor({
         collects_by_location: false,
         collects_by_disability: true,
         collects_by_religion: true,
+        collects_by_others: true,
       })
       return
     }
@@ -2364,6 +2430,7 @@ function IssueIndicatorsEditor({
       collects_by_location: false,
       collects_by_disability: false,
       collects_by_religion: false,
+      collects_by_others: false,
     })
   }
 
@@ -2390,6 +2457,7 @@ function IssueIndicatorsEditor({
       collects_by_location: false,
       collects_by_disability: true,
       collects_by_religion: true,
+      collects_by_others: true,
     })
   }
 
@@ -2483,6 +2551,7 @@ function IssueIndicatorsEditor({
                     'Age (Under 18, 18 - 60, Above 60 for respondents)',
                     'Disability (Persons with disability count for respondents)',
                     'Religion (full list for respondents)',
+                    'Others (Total count only for respondents)',
                   ] as const
                 ).map((label) => (
                   <label key={label} className="checkbox-label issue-indicator-dimension-checks__item">
@@ -2793,7 +2862,7 @@ function IssuesIssueEditPage({
           {error}
         </Alert>
       )}
-      {loading && <p className="muted">Loading…</p>}
+      {loading && <p className="muted">Loadingâ€¦</p>}
       {!loading && !issue && <p className="login-error">Entry not found.</p>}
       {issue && (
         <TableCard padded>
@@ -2935,7 +3004,7 @@ function IssuesIssueViewPage({
           {error}
         </Alert>
       )}
-      {loading && <p className="muted">Loading…</p>}
+      {loading && <p className="muted">Loadingâ€¦</p>}
       {!loading && !issue && <p className="login-error">Entry not found.</p>}
       {issue && (
         <TableCard padded>
@@ -3084,13 +3153,13 @@ function IssueDetailReadOnlyPanel({
         ) : null}
         <div className="issue-detail-readonly__full">
           <dt>{issueEntryDescriptionFieldLabel(kind)}</dt>
-          <dd style={{ whiteSpace: 'pre-wrap' }}>{issue.description?.trim() || '—'}</dd>
+          <dd style={{ whiteSpace: 'pre-wrap' }}>{issue.description?.trim() || 'â€”'}</dd>
         </div>
         <div className="issue-detail-readonly__full">
           <dt>Articles</dt>
           <dd>
             {issue.articles.length === 0 ? (
-              '—'
+              'â€”'
             ) : (
               <ul className="issues-mapping-indicator-list issues-article-detail-list">
                 {issue.articles.map((a) => (
@@ -3113,7 +3182,7 @@ function IssueDetailReadOnlyPanel({
       </h4>
       {reorderIndicators && issue.indicators.length > 1 ? (
         <p className="text-muted text-compact" style={{ margin: '0 0 10px' }}>
-          Drag rows to set indicator order.{reorderBusy ? ' Saving…' : ''}
+          Drag rows to set indicator order.{reorderBusy ? ' Savingâ€¦' : ''}
         </p>
       ) : null}
       {issue.indicators.length === 0 ? (
@@ -3176,13 +3245,13 @@ function IssuesArticleViewPage({
             <div className="form-row">
               <span className="issue-detail-readonly__label">Convention</span>
               <p style={{ margin: 0 }}>
-                {article ? articleConventionLabel(article, conventions) : '—'}
+                {article ? articleConventionLabel(article, conventions) : 'â€”'}
               </p>
             </div>
             <div className="form-row">
               <span className="issue-detail-readonly__label">Description</span>
               <p className="issue-detail-readonly__prose" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                {article.description?.trim() || '—'}
+                {article.description?.trim() || 'â€”'}
               </p>
             </div>
           </div>

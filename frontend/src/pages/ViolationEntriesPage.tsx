@@ -10,7 +10,7 @@ import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { formatAppDate } from '../lib/dateFormat'
-import { sortRowsLatestFirst } from '../lib/tableRowSort'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import {
   VIOLATION_STATUS_FILTER_OPTIONS,
   violationStatusPresentation,
@@ -41,7 +41,9 @@ export function ViolationEntriesPage() {
         v.monitoring_status.toLowerCase().includes(q)
       )
     })
-    return sortRowsLatestFirst(matched, (v) => v.event_date || v.id)
+    return sortRowsLatestFirst(matched, (v) =>
+      pickActivityTimestamp(v.event_date, v.id),
+    )
   }, [rows, search, statusFilter])
 
   const { pageRows } = useMemo(

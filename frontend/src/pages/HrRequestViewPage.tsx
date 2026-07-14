@@ -64,6 +64,7 @@ import {
   forEachCatalogMatrixCell,
   forEachFixedKeyMatrixCell,
   forEachReligionMatrixCell,
+  indicatorConfiguredYears,
   indicatorIsYearOnly,
   indicatorRequiresQuantitativeMatrixPayload,
 } from '../lib/indicatorDisaggregation'
@@ -154,6 +155,8 @@ function clearDraftDimensionValues(
       return { ...draft, yearDistrictValues: {} }
     case 'religion':
       return { ...draft, yearReligionValues: {} }
+    case 'others':
+      return { ...draft, yearOthersValues: {} }
     default:
       return draft
   }
@@ -410,6 +413,7 @@ export function HrRequestViewPage() {
         let yearRegionValues: Record<string, string> = {}
         let yearDistrictValues: Record<string, string> = {}
         let yearReligionValues: Record<string, string> = {}
+        let yearOthersValues: Record<string, string> = {}
         let matrixRowEnabled = {}
         if (parsed.kind === 'structured') {
           const b = parsed.payload.by_indicator[String(ind.id)]
@@ -433,6 +437,9 @@ export function HrRequestViewPage() {
           if (b?.quantitative?.by_year_religion) {
             yearReligionValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_religion, true)
           }
+          if (b?.quantitative?.by_year_others) {
+            yearOthersValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_others, false)
+          }
           if (b?.quantitative?.comment) comment = b.quantitative.comment
           if (b?.qualitative?.text) qualText = b.qualitative.text
           matrixRowEnabled = parseMatrixRowEnabled(b?.quantitative?.matrix_row_enabled ?? undefined)
@@ -448,6 +455,7 @@ export function HrRequestViewPage() {
           yearRegionValues,
           yearDistrictValues,
           yearReligionValues,
+          yearOthersValues,
           matrixRowEnabled,
         }
       }
@@ -519,6 +527,13 @@ export function HrRequestViewPage() {
           forEachReligionMatrixCell(ind, religionCatalog, (yearId, religionId) => {
             if (!matrixValueReady(d.yearReligionValues, matrixCellKey(yearId, religionId))) matrixReady = false
           })
+          if (!matrixReady) return false
+        }
+        if (ind.collects_by_others && isMatrixRowEnabled(d.matrixRowEnabled, 'others')) {
+          let matrixReady = true
+          for (const y of indicatorConfiguredYears(ind)) {
+            if (!matrixValueReady(d.yearOthersValues, genderTotalCellKey(y.year_id))) matrixReady = false
+          }
           if (!matrixReady) return false
         }
       } else if (ind.has_quantitative) {
@@ -668,7 +683,7 @@ export function HrRequestViewPage() {
             const quantitative: {
               comment: string
               matrix_row_enabled?: Partial<
-                Record<'gender' | 'age' | 'disability' | 'district' | 'religion', boolean>
+                Record<'gender' | 'age' | 'disability' | 'district' | 'religion' | 'others', boolean>
               >
               by_year_gender?: Record<string, Record<string, { value: string }>>
               by_year_age?: Record<string, Record<string, { value: string }>>
@@ -676,6 +691,7 @@ export function HrRequestViewPage() {
               by_year_region?: Record<string, Record<string, { value: string }>>
               by_year_district?: Record<string, Record<string, { value: string }>>
               by_year_religion?: Record<string, Record<string, { value: string }>>
+              by_year_others?: Record<string, Record<string, { value: string }>>
             } = { comment: d.comment.trim() }
             const matrixRowEnabled = serializeMatrixRowEnabled(d.matrixRowEnabled)
             if (matrixRowEnabled) {
@@ -708,11 +724,13 @@ export function HrRequestViewPage() {
 
             if (ind.collects_by_age && isMatrixRowEnabled(d.matrixRowEnabled, 'age')) {
               const by_year_age: Record<string, Record<string, { value: string }>> = {}
+              const years = new Set<number>()
               forEachFixedKeyMatrixCell(
                 ind,
                 (i) => Boolean(i.collects_by_age),
                 AGE_KEYS,
                 (yearId, key) => {
+                  years.add(yearId)
                   const yearKey = String(yearId)
                   if (!by_year_age[yearKey]) by_year_age[yearKey] = {}
                   by_year_age[yearKey][key] = {
@@ -720,16 +738,25 @@ export function HrRequestViewPage() {
                   }
                 },
               )
+              for (const yearId of years) {
+                const yearKey = String(yearId)
+                if (!by_year_age[yearKey]) by_year_age[yearKey] = {}
+                by_year_age[yearKey].total = {
+                  value: matrixCellNumericValue(d.yearAgeValues[genderTotalCellKey(yearId)]),
+                }
+              }
               quantitative.by_year_age = by_year_age
             }
 
             if (ind.collects_by_disability && isMatrixRowEnabled(d.matrixRowEnabled, 'disability')) {
               const by_year_disability: Record<string, Record<string, { value: string }>> = {}
+              const years = new Set<number>()
               forEachFixedKeyMatrixCell(
                 ind,
                 (i) => Boolean(i.collects_by_disability),
                 DISABILITY_KEYS,
                 (yearId, key) => {
+                  years.add(yearId)
                   const yearKey = String(yearId)
                   if (!by_year_disability[yearKey]) by_year_disability[yearKey] = {}
                   by_year_disability[yearKey][key] = {
@@ -737,17 +764,26 @@ export function HrRequestViewPage() {
                   }
                 },
               )
+              for (const yearId of years) {
+                const yearKey = String(yearId)
+                if (!by_year_disability[yearKey]) by_year_disability[yearKey] = {}
+                by_year_disability[yearKey].total = {
+                  value: matrixCellNumericValue(d.yearDisabilityValues[genderTotalCellKey(yearId)]),
+                }
+              }
               quantitative.by_year_disability = by_year_disability
             }
 
             if (ind.collects_by_location && isMatrixRowEnabled(d.matrixRowEnabled, 'district')) {
               const by_year_district: Record<string, Record<string, { value: string }>> = {}
               const districtCatalog = deptLocationCatalog.districts.map((x) => ({ id: x.id, name: x.name }))
+              const years = new Set<number>()
               forEachCatalogMatrixCell(
                 ind,
                 (i) => Boolean(i.collects_by_location),
                 districtCatalog,
                 (yearId, districtId) => {
+                  years.add(yearId)
                   const yearKey = String(yearId)
                   if (!by_year_district[yearKey]) by_year_district[yearKey] = {}
                   by_year_district[yearKey][String(districtId)] = {
@@ -755,20 +791,49 @@ export function HrRequestViewPage() {
                   }
                 },
               )
+              for (const yearId of years) {
+                const yearKey = String(yearId)
+                if (!by_year_district[yearKey]) by_year_district[yearKey] = {}
+                by_year_district[yearKey].total = {
+                  value: matrixCellNumericValue(d.yearDistrictValues[genderTotalCellKey(yearId)]),
+                }
+              }
               quantitative.by_year_district = by_year_district
             }
 
             if (ind.collects_by_religion && isMatrixRowEnabled(d.matrixRowEnabled, 'religion')) {
               const by_year_religion: Record<string, Record<string, { value: string }>> = {}
               const religionCatalog = religions.map((r) => ({ id: r.id, name: r.name }))
+              const years = new Set<number>()
               forEachReligionMatrixCell(ind, religionCatalog, (yearId, religionId) => {
+                years.add(yearId)
                 const yearKey = String(yearId)
                 if (!by_year_religion[yearKey]) by_year_religion[yearKey] = {}
                 by_year_religion[yearKey][String(religionId)] = {
                   value: matrixCellNumericValue(d.yearReligionValues[matrixCellKey(yearId, religionId)]),
                 }
               })
+              for (const yearId of years) {
+                const yearKey = String(yearId)
+                if (!by_year_religion[yearKey]) by_year_religion[yearKey] = {}
+                by_year_religion[yearKey].total = {
+                  value: matrixCellNumericValue(d.yearReligionValues[genderTotalCellKey(yearId)]),
+                }
+              }
               quantitative.by_year_religion = by_year_religion
+            }
+
+            if (ind.collects_by_others && isMatrixRowEnabled(d.matrixRowEnabled, 'others')) {
+              const by_year_others: Record<string, Record<string, { value: string }>> = {}
+              for (const y of indicatorConfiguredYears(ind)) {
+                const yearKey = String(y.year_id)
+                by_year_others[yearKey] = {
+                  total: {
+                    value: matrixCellNumericValue(d.yearOthersValues[genderTotalCellKey(y.year_id)]),
+                  },
+                }
+              }
+              quantitative.by_year_others = by_year_others
             }
 
             entry.quantitative = quantitative
@@ -1430,6 +1495,12 @@ export function HrRequestViewPage() {
                         indicatorDrafts[ind.id]?.yearReligionValues ?? {},
                       ]),
                     )}
+                    othersValues={Object.fromEntries(
+                      deptIndicatorsForForm.map((ind) => [
+                        ind.id,
+                        indicatorDrafts[ind.id]?.yearOthersValues ?? {},
+                      ]),
+                    )}
                     onGenderChange={(indicatorId, yearId, columnId, value, autoTotalValue) => {
                       const key =
                         typeof columnId === 'string'
@@ -1450,54 +1521,98 @@ export function HrRequestViewPage() {
                         }
                       })
                     }}
-                    onAgeChange={(indicatorId, yearId, columnId, value) => {
-                      const key = fixedKeyMatrixCellKey(yearId, String(columnId))
+                    onAgeChange={(indicatorId, yearId, columnId, value, autoTotalValue) => {
+                      const key =
+                        typeof columnId === 'string'
+                          ? `${yearId}-${columnId}`
+                          : fixedKeyMatrixCellKey(yearId, String(columnId))
                       setIndicatorDrafts((prev) => {
                         const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        const yearAgeValues = { ...cur.yearAgeValues, [key]: value }
+                        if (autoTotalValue != null) {
+                          yearAgeValues[genderTotalCellKey(yearId)] = autoTotalValue
+                        }
                         return {
                           ...prev,
                           [indicatorId]: {
                             ...cur,
-                            yearAgeValues: { ...cur.yearAgeValues, [key]: value },
+                            yearAgeValues,
                           },
                         }
                       })
                     }}
-                    onDisabilityChange={(indicatorId, yearId, columnId, value) => {
-                      const key = fixedKeyMatrixCellKey(yearId, String(columnId))
+                    onDisabilityChange={(indicatorId, yearId, columnId, value, autoTotalValue) => {
+                      const key =
+                        typeof columnId === 'string'
+                          ? `${yearId}-${columnId}`
+                          : fixedKeyMatrixCellKey(yearId, String(columnId))
                       setIndicatorDrafts((prev) => {
                         const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        const yearDisabilityValues = { ...cur.yearDisabilityValues, [key]: value }
+                        if (autoTotalValue != null) {
+                          yearDisabilityValues[genderTotalCellKey(yearId)] = autoTotalValue
+                        }
                         return {
                           ...prev,
                           [indicatorId]: {
                             ...cur,
-                            yearDisabilityValues: { ...cur.yearDisabilityValues, [key]: value },
+                            yearDisabilityValues,
                           },
                         }
                       })
                     }}
-                    onDistrictChange={(indicatorId, yearId, columnId, value) => {
-                      const key = matrixCellKey(yearId, Number(columnId))
+                    onDistrictChange={(indicatorId, yearId, columnId, value, autoTotalValue) => {
+                      const key =
+                        typeof columnId === 'string'
+                          ? `${yearId}-${columnId}`
+                          : matrixCellKey(yearId, Number(columnId))
                       setIndicatorDrafts((prev) => {
                         const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        const yearDistrictValues = { ...cur.yearDistrictValues, [key]: value }
+                        if (autoTotalValue != null) {
+                          yearDistrictValues[genderTotalCellKey(yearId)] = autoTotalValue
+                        }
                         return {
                           ...prev,
                           [indicatorId]: {
                             ...cur,
-                            yearDistrictValues: { ...cur.yearDistrictValues, [key]: value },
+                            yearDistrictValues,
                           },
                         }
                       })
                     }}
-                    onReligionChange={(indicatorId, yearId, columnId, value) => {
-                      const key = matrixCellKey(yearId, Number(columnId))
+                    onReligionChange={(indicatorId, yearId, columnId, value, autoTotalValue) => {
+                      const key =
+                        typeof columnId === 'string'
+                          ? `${yearId}-${columnId}`
+                          : matrixCellKey(yearId, Number(columnId))
+                      setIndicatorDrafts((prev) => {
+                        const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
+                        const yearReligionValues = { ...cur.yearReligionValues, [key]: value }
+                        if (autoTotalValue != null) {
+                          yearReligionValues[genderTotalCellKey(yearId)] = autoTotalValue
+                        }
+                        return {
+                          ...prev,
+                          [indicatorId]: {
+                            ...cur,
+                            yearReligionValues,
+                          },
+                        }
+                      })
+                    }}
+                    onOthersChange={(indicatorId, yearId, columnId, value) => {
+                      const key =
+                        typeof columnId === 'string'
+                          ? `${yearId}-${columnId}`
+                          : `${yearId}-${columnId}`
                       setIndicatorDrafts((prev) => {
                         const cur = prev[indicatorId] ?? emptyDeptIndicatorDraft()
                         return {
                           ...prev,
                           [indicatorId]: {
                             ...cur,
-                            yearReligionValues: { ...cur.yearReligionValues, [key]: value },
+                            yearOthersValues: { ...cur.yearOthersValues, [key]: value },
                           },
                         }
                       })

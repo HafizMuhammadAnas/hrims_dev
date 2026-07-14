@@ -68,13 +68,17 @@ function indicatorDataTypeLabel(
 
 function indicatorDisaggregationLabel(ind: KnowledgeConventionIssueDetail['indicators'][number]): string {
   if (ind.collects_by_year && (ind.collection_by_year?.length ?? 0) > 0) {
-    const years = (ind.collection_by_year ?? []).map((y) => y.label).join('; ')
+    const years = [...(ind.collection_by_year ?? [])]
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+      .map((y) => y.label)
+      .join('; ')
     const dims: string[] = []
     if (ind.collects_by_gender) dims.push('Gender')
     if (ind.collects_by_age) dims.push('Age')
     if (ind.collects_by_location) dims.push('Location')
     if (ind.collects_by_disability) dims.push('Disability')
     if (ind.collects_by_religion) dims.push('Religion')
+    if (ind.collects_by_others) dims.push('Others')
     return dims.length === 0 ? years : `${years} (${dims.join(', ')})`
   }
   return ind.disaggregation?.trim() || '—'

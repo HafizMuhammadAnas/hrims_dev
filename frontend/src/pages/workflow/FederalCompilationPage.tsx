@@ -24,6 +24,7 @@ import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
 import { LABEL_COMPILATION_CENTER, LABEL_DEPARTMENTAL_RESPONSES, LABEL_REGIONAL_RESPONSES } from '../../lib/uiLabels'
+import { pickActivityTimestamp, sortRowsLatestFirst } from '../../lib/tableRowSort'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
@@ -93,7 +94,7 @@ export function FederalCompilationPage() {
     for (const t of deptTasks) {
       if (isIctLineTask(t) && hasDepartmentResponse(t)) s.add(t.req_id)
     }
-    return [...s].sort((a, b) => a.localeCompare(b))
+    return [...s].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
   }, [responses, deptTasks])
 
   /** Requests already submitted from this center — hide from the picker. */
@@ -107,9 +108,10 @@ export function FederalCompilationPage() {
 
   const requestsForSelect = useMemo(() => {
     const allowed = new Set(reqIdsForPicker)
-    return requests
-      .filter((r) => allowed.has(r.id) && !reqIdsNationallySubmitted.has(r.id))
-      .sort((a, b) => a.id.localeCompare(b.id))
+    return sortRowsLatestFirst(
+      requests.filter((r) => allowed.has(r.id) && !reqIdsNationallySubmitted.has(r.id)),
+      (r) => pickActivityTimestamp(r.updated_at, r.created_at, r.date, r.id),
+    )
   }, [requests, reqIdsForPicker, reqIdsNationallySubmitted])
 
   useEffect(() => {

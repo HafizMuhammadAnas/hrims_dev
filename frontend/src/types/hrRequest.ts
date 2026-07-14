@@ -28,6 +28,7 @@ export type HrRequestIssueIndicator = {
   collects_by_location?: boolean
   collects_by_disability?: boolean
   collects_by_religion?: boolean
+  collects_by_others?: boolean
   collection_by_year?: Array<{
     year_id: number
     label: string
@@ -83,6 +84,9 @@ export interface HrRequestRow {
   date: string
   status: HrRequestStatus
   details?: string | null
+  /** ISO timestamps from API — use for newest-first table ordering. */
+  created_at?: string | null
+  updated_at?: string | null
   attachment_file_name?: string | null
   region_id?: number | null
   category_id?: string | null

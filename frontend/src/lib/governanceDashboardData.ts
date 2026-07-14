@@ -71,8 +71,8 @@ function sortYearIds(yearIds: string[], labels: Map<string, string>): string[] {
 }
 
 /**
- * Aggregate gender totals by year across department task responses for the selected indicators.
- * Totals from multiple departments/tasks are summed per year.
+ * Aggregate year totals across department task responses for the selected indicators.
+ * Prefers gender Total (or sum of genders); falls back to other dimension year Totals when gender is absent.
  */
 export function buildIndicatorGenderTrendSeries(
   tasks: DepartmentTaskRow[],
@@ -90,26 +90,47 @@ export function buildIndicatorGenderTrendSeries(
     if (parsed.kind !== 'structured') continue
 
     for (const [indicatorId, bundle] of Object.entries(parsed.payload.by_indicator)) {
-      if (!selected.has(indicatorId)) continue
-      const byYear = bundle.quantitative?.by_year_gender
-      if (!byYear) continue
+      if (!selected.has(String(indicatorId))) continue
+      const quantitative = bundle.quantitative
+      if (!quantitative) continue
 
-      let yearMap = totals.get(indicatorId)
+      let yearMap = totals.get(String(indicatorId))
       if (!yearMap) {
         yearMap = new Map()
-        totals.set(indicatorId, yearMap)
+        totals.set(String(indicatorId), yearMap)
       }
 
-      for (const [yearId, genders] of Object.entries(byYear)) {
-        const n = genderTotalFromYearCells(genders)
-        if (n == null) continue
-        yearMap.set(yearId, (yearMap.get(yearId) ?? 0) + n)
+      const byYearGender = quantitative.by_year_gender
+      if (byYearGender) {
+        for (const [yearId, genders] of Object.entries(byYearGender)) {
+          const n = genderTotalFromYearCells(genders)
+          if (n == null) continue
+          yearMap.set(String(yearId), (yearMap.get(String(yearId)) ?? 0) + n)
+        }
+        continue
+      }
+
+      // Fallback: use explicit Total cells from other year-keyed dimensions.
+      for (const keyed of [
+        quantitative.by_year_others,
+        quantitative.by_year_age,
+        quantitative.by_year_disability,
+        quantitative.by_year_religion,
+        quantitative.by_year_district,
+      ]) {
+        if (!keyed) continue
+        for (const [yearId, cells] of Object.entries(keyed)) {
+          const n = genderTotalFromYearCells(cells)
+          if (n == null) continue
+          yearMap.set(String(yearId), (yearMap.get(String(yearId)) ?? 0) + n)
+        }
+        break
       }
     }
   }
 
   const series: IndicatorTrendSeries[] = []
-  for (const indicatorId of selectedIndicatorIds) {
+  for (const indicatorId of selectedIndicatorIds.map(String)) {
     const ind = byId.get(indicatorId)
     const yearMap = totals.get(indicatorId) ?? new Map<string, number>()
     const configuredYears = (ind?.collection_years ?? []).map((y) => String(y.id))

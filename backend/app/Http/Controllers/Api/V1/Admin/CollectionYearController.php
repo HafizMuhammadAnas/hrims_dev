@@ -12,7 +12,7 @@ class CollectionYearController extends Controller
     public function index(): JsonResponse
     {
         $rows = CollectionYear::query()
-            ->orderBy('sort_order')
+            ->orderByRaw('CAST(label AS UNSIGNED)')
             ->orderBy('label')
             ->get();
 
@@ -82,6 +82,8 @@ class CollectionYearController extends Controller
             'label' => $row->label,
             'sort_order' => $row->sort_order,
             'is_active' => (bool) ($row->is_active ?? true),
+            'created_at' => optional($row->created_at)?->toIso8601String(),
+            'updated_at' => optional($row->updated_at)?->toIso8601String(),
         ];
     }
 }

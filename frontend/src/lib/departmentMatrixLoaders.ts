@@ -1,6 +1,6 @@
 import type { DepartmentQuantitativeByYearKeyed } from '../lib/departmentTaskResponseFormat'
 import { fixedKeyMatrixCellKey } from '../lib/indicatorDisaggregation'
-import { matrixCellKey } from '../lib/indicatorMatrixColumns'
+import { DIMENSION_TOTAL_COLUMN_ID, dimensionTotalCellKey, matrixCellKey } from '../lib/indicatorMatrixColumns'
 
 /** Blank matrix inputs are stored and submitted as zero. */
 export function matrixCellNumericValue(raw: string | undefined | null): string {
@@ -26,6 +26,11 @@ export function loadYearKeyedValuesFromBundle(
     for (const [cellKey, cell] of Object.entries(cells)) {
       if (cell?.value == null || Number.isNaN(cell.value)) continue
       const yearId = Number(yearKey)
+      if (!Number.isFinite(yearId)) continue
+      if (cellKey === DIMENSION_TOTAL_COLUMN_ID) {
+        out[dimensionTotalCellKey(yearId)] = String(cell.value)
+        continue
+      }
       if (useNumericGenderIds && Number.isFinite(Number(cellKey))) {
         out[matrixCellKey(yearId, Number(cellKey))] = String(cell.value)
       } else {

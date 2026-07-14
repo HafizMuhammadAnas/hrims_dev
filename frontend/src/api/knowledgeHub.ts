@@ -69,6 +69,7 @@ export type KnowledgeConventionIssueDetail = KnowledgeConventionIssueRow & {
     collects_by_location?: boolean
     collects_by_disability?: boolean
     collects_by_religion?: boolean
+    collects_by_others?: boolean
     disaggregation?: string | null
     collection_by_year?: Array<{ year_id: number; label: string }>
   }>

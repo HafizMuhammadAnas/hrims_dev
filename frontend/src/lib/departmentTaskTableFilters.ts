@@ -3,7 +3,7 @@ import {
   departmentTaskWorkflowBucket,
   type DepartmentTaskWorkflowBucket,
 } from './departmentTaskWorkflow'
-import { sortRowsLatestFirst } from './tableRowSort'
+import { pickActivityTimestamp, sortRowsLatestFirst } from './tableRowSort'
 
 export const WORKFLOW_BUCKET_FILTER_OPTIONS: { value: DepartmentTaskWorkflowBucket | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
@@ -37,5 +37,7 @@ export function filterDepartmentTasks(
       (t.region_name ?? '').toLowerCase().includes(q)
     )
   })
-  return sortRowsLatestFirst(filtered, (t) => t.submission_date ?? t.assigned_date ?? t.id)
+  return sortRowsLatestFirst(filtered, (t) =>
+    pickActivityTimestamp(t.assigned_date, t.submission_date, t.id),
+  )
 }

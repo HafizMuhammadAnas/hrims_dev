@@ -44,6 +44,7 @@ class IssueIndicator extends Model
         'collects_by_location',
         'collects_by_disability',
         'collects_by_religion',
+        'collects_by_others',
         'sort_order',
     ];
 
@@ -58,6 +59,7 @@ class IssueIndicator extends Model
             'collects_by_location' => 'boolean',
             'collects_by_disability' => 'boolean',
             'collects_by_religion' => 'boolean',
+            'collects_by_others' => 'boolean',
         ];
     }
 
@@ -87,7 +89,8 @@ class IssueIndicator extends Model
             || (bool) $this->collects_by_age
             || (bool) $this->collects_by_location
             || (bool) $this->collects_by_disability
-            || (bool) $this->collects_by_religion;
+            || (bool) $this->collects_by_religion
+            || (bool) $this->collects_by_others;
     }
 
     public function isYearOnlyCollection(): bool
@@ -217,6 +220,7 @@ class IssueIndicator extends Model
             'collects_by_location' => (bool) $this->collects_by_location,
             'collects_by_disability' => (bool) $this->collects_by_disability,
             'collects_by_religion' => (bool) $this->collects_by_religion,
+            'collects_by_others' => (bool) $this->collects_by_others,
             'collection_by_year' => $this->buildCollectionByYearPayload(),
             'qualitative_collection_by_year' => $this->buildQualitativeCollectionByYearPayload(),
         ];
@@ -240,6 +244,7 @@ class IssueIndicator extends Model
             'collects_by_location' => (bool) $this->collects_by_location,
             'collects_by_disability' => (bool) $this->collects_by_disability,
             'collects_by_religion' => (bool) $this->collects_by_religion,
+            'collects_by_others' => (bool) $this->collects_by_others,
         ];
 
         if (! $this->collects_by_year && ! (bool) $this->has_qualitative) {
@@ -309,7 +314,10 @@ class IssueIndicator extends Model
                     'religions' => [],
                 ];
             })
-            ->sortBy(fn (array $row) => $row['label'])
+            ->sortBy(fn (array $row) => [
+                is_numeric($row['label']) ? (int) $row['label'] : PHP_INT_MAX,
+                $row['label'],
+            ])
             ->values()
             ->all();
     }
@@ -363,7 +371,10 @@ class IssueIndicator extends Model
 
         return $byYear
             ->values()
-            ->sortBy(fn (array $row) => $row['label'])
+            ->sortBy(fn (array $row) => [
+                is_numeric($row['label']) ? (int) $row['label'] : PHP_INT_MAX,
+                $row['label'],
+            ])
             ->values()
             ->all();
     }
@@ -407,7 +418,10 @@ class IssueIndicator extends Model
                     'label' => $year?->label ?? '',
                 ];
             })
-            ->sortBy(fn (array $row) => $row['label'])
+            ->sortBy(fn (array $row) => [
+                is_numeric($row['label']) ? (int) $row['label'] : PHP_INT_MAX,
+                $row['label'],
+            ])
             ->values()
             ->all();
     }

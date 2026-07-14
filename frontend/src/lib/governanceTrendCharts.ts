@@ -1,22 +1,22 @@
 import type { IndicatorTrendPoint, IndicatorTrendSeries } from './governanceDashboardData'
 
-/** Fixed sequence of trend chart shapes (loops by indicator index). */
+/**
+ * Fixed sequence of trend chart shapes.
+ * Third chart (index 2) is always Pie; each chart is half-width (2 per row).
+ */
 export const GOVERNANCE_TREND_CHART_SHAPES = [
-  { id: 'line', label: 'Line', span: 6 },
-  { id: 'bar', label: 'Bar', span: 6 },
-  { id: 'area', label: 'Area', span: 12 },
-  { id: 'step', label: 'Step', span: 4 },
-  { id: 'composed', label: 'Composed', span: 12 },
+  { id: 'line', label: 'Line' },
+  { id: 'bar', label: 'Bar' },
+  { id: 'pie', label: 'Pie' },
+  { id: 'area', label: 'Area' },
+  { id: 'step', label: 'Step' },
+  { id: 'composed', label: 'Composed' },
 ] as const
 
 export type GovernanceTrendChartShapeId = (typeof GOVERNANCE_TREND_CHART_SHAPES)[number]['id']
 
 export type GovernanceTrendChartItem = IndicatorTrendSeries & {
   shapeId: GovernanceTrendChartShapeId
-  /** Base span on a 12-column grid before row balancing. */
-  span: number
-  /** Final span after stretching the row to fill 12 columns (symmetry). */
-  renderSpan: number
   colorIndex: number
 }
 
@@ -29,59 +29,28 @@ export function chartShapeForIndex(index: number): (typeof GOVERNANCE_TREND_CHAR
   return GOVERNANCE_TREND_CHART_SHAPES[index % GOVERNANCE_TREND_CHART_SHAPES.length]
 }
 
-/**
- * Assign chart shapes in sequence (loop), pack into 12-col rows, then stretch
- * each row so columns fill evenly for visual symmetry.
- */
+/** Pack indicators into rows of exactly two equal charts. */
 export function buildGovernanceTrendChartRows(
   series: IndicatorTrendSeries[],
 ): GovernanceTrendChartRow[] {
-  const assigned: Omit<GovernanceTrendChartItem, 'renderSpan'>[] = series.map((s, index) => {
+  const assigned: GovernanceTrendChartItem[] = series.map((s, index) => {
     const shape = chartShapeForIndex(index)
     return {
       ...s,
       shapeId: shape.id,
-      span: shape.span,
       colorIndex: index,
     }
   })
 
-  const rows: Omit<GovernanceTrendChartItem, 'renderSpan'>[][] = []
-  let current: Omit<GovernanceTrendChartItem, 'renderSpan'>[] = []
-  let used = 0
-
-  for (const item of assigned) {
-    if (current.length > 0 && used + item.span > 12) {
-      rows.push(current)
-      current = []
-      used = 0
-    }
-    current.push(item)
-    used += item.span
-    if (used >= 12) {
-      rows.push(current)
-      current = []
-      used = 0
-    }
-  }
-  if (current.length > 0) rows.push(current)
-
-  return rows.map((rowItems, rowIndex) => {
-    const raw = rowItems.reduce((sum, i) => sum + i.span, 0)
-    const items: GovernanceTrendChartItem[] =
-      raw >= 12
-        ? rowItems.map((i) => ({ ...i, renderSpan: i.span }))
-        : // Stretch evenly across the row for symmetry when under-filled.
-          rowItems.map((i) => ({
-            ...i,
-            renderSpan: 12 / rowItems.length,
-          }))
-
-    return {
-      key: `row-${rowIndex}-${items.map((i) => i.indicatorId).join('-')}`,
+  const rows: GovernanceTrendChartRow[] = []
+  for (let i = 0; i < assigned.length; i += 2) {
+    const items = assigned.slice(i, i + 2)
+    rows.push({
+      key: `row-${i / 2}-${items.map((item) => item.indicatorId).join('-')}`,
       items,
-    }
-  })
+    })
+  }
+  return rows
 }
 
 export type { IndicatorTrendPoint }

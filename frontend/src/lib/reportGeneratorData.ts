@@ -1,6 +1,7 @@
 import type { CompiledRecordRow, RegionalResponseRow } from '../api/lists'
 import type { ReportLookupArticle, ReportLookupCategory, ReportLookupConvention, ReportLookupIndicator } from '../api/reports'
 import type { RegionRow } from '../api/regions'
+import { sortCollectionYearsByLabelValue } from './collectionYearSort'
 import {
   CONCLUDING_OBSERVATIONS_LABEL,
   LOI_LABEL,
@@ -180,7 +181,7 @@ function buildIssueYearMap(indicators: ReportLookupIndicator[]): Map<number, Set
   return map
 }
 
-/** Distinct collection years across indicators, sorted by label descending. */
+/** Distinct collection years across indicators, sorted by year value ascending. */
 export function collectionYearOptionsFromIndicators(
   indicators: ReportLookupIndicator[],
 ): Array<{ id: number; label: string }> {
@@ -190,9 +191,9 @@ export function collectionYearOptionsFromIndicators(
       if (!byId.has(y.id)) byId.set(y.id, y.label)
     }
   }
-  return [...byId.entries()]
-    .map(([id, label]) => ({ id, label }))
-    .sort((a, b) => b.label.localeCompare(a.label, undefined, { numeric: true }))
+  return sortCollectionYearsByLabelValue(
+    [...byId.entries()].map(([id, label]) => ({ id, label })),
+  )
 }
 
 function matchesYear(

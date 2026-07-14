@@ -116,7 +116,7 @@ class HrRequestController extends Controller
         HrimsAccess::applyHrRequestScope($query, $request->user());
 
         return HrRequestResource::collection(
-            $query->orderByDesc('created_at')->orderByDesc('id')->get()
+            $query->orderByDesc('updated_at')->orderByDesc('created_at')->orderByDesc('id')->get()
         );
     }
 
@@ -273,7 +273,7 @@ class HrRequestController extends Controller
             $data['indicator_responses'] = $this->decodeIndicatorResponses($data['indicator_responses']);
         }
 
-        DB::transaction(function () use ($model, $data, $request) {
+        DB::transaction(function () use ($model, $data, $request, $previousStatus) {
             if (isset($data['date'])) {
                 $model->due_date = $data['date'];
             }
@@ -309,8 +309,25 @@ class HrRequestController extends Controller
 
             if (array_key_exists('region_ids', $data)) {
                 $this->applyRegionIdsForUser($request->user(), $data['region_ids']);
+                if ($data['region_ids'] === []) {
+                    throw ValidationException::withMessages([
+                        'region_ids' => ['Select at least one region.'],
+                    ]);
+                }
                 $model->regions()->sync($data['region_ids']);
                 $model->region_id = $data['region_ids'][0] ?? null;
+            }
+
+            $nextStatus = array_key_exists('status', $data) ? $data['status'] : $previousStatus;
+            if ($previousStatus === 'draft' && $nextStatus === 'active') {
+                $effectiveRegionIds = array_key_exists('region_ids', $data)
+                    ? $data['region_ids']
+                    : $model->regions()->pluck('id')->map(fn ($id) => (int) $id)->all();
+                if ($effectiveRegionIds === []) {
+                    throw ValidationException::withMessages([
+                        'region_ids' => ['Select at least one region before activating this request.'],
+                    ]);
+                }
             }
 
             if (array_key_exists('department_ids', $data)) {
@@ -518,6 +535,11 @@ class HrRequestController extends Controller
         $regionIds = $data['region_ids'] ?? [];
         $this->applyRegionIdsForUser($request->user(), $regionIds);
         $data['region_ids'] = $regionIds;
+        if ($regionIds === []) {
+            throw ValidationException::withMessages([
+                'region_ids' => ['Select at least one region.'],
+            ]);
+        }
 
         $departmentIds = array_values(array_unique(array_map('intval', $data['department_ids'] ?? [])));
         if ($departmentIds !== []) {

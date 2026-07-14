@@ -691,6 +691,9 @@ export function HrRequestModal({
     ) {
       fe.indicator_ids = selectIndicatorForLoiMessage()
     }
+    if (issueForm.region_ids.length === 0) {
+      fe.region_ids = 'Select at least one region.'
+    }
     const ictOnly =
       issueForm.region_ids.length > 0 && issueForm.region_ids.every((id) => ictRegionIdSet.has(id))
     if (ictOnly && issueForm.department_ids.length === 0) {
@@ -791,7 +794,10 @@ export function HrRequestModal({
     if (readOnly) return
 
     if (issueForm && usesIssueFlow) {
-      await persistIssueRequest(mode === 'create' ? 'active' : issueForm.status)
+      // Create Submit and edit Enter→Activate both publish as active; draft saves use handleSaveDraft.
+      const nextStatus: HrRequestStatus =
+        mode === 'create' || issueForm.status === 'draft' ? 'active' : issueForm.status
+      await persistIssueRequest(nextStatus)
       return
     }
 
@@ -836,6 +842,17 @@ export function HrRequestModal({
     if (readOnly || !issueForm || !usesIssueFlow) return
     await persistIssueRequest('draft')
   }
+
+  async function handleActivate() {
+    if (readOnly || !issueForm || !usesIssueFlow) return
+    await persistIssueRequest('active')
+  }
+
+  const showSaveAsDraft =
+    !readOnly && usesIssueFlow && (mode === 'create' || issueForm?.status === 'draft')
+  const showActivate =
+    !readOnly && usesIssueFlow && mode === 'edit' && issueForm?.status === 'draft'
+  const showPrimarySubmit = !readOnly && usesIssueFlow && mode === 'create'
 
   const showLoading = mode !== 'create' && detailLoading
   const showMissing = mode !== 'create' && !detailLoading && !detail
@@ -1342,11 +1359,11 @@ export function HrRequestModal({
 
               {!hideRegionsInRegionalView && (
                 <FormField
-                  label="Regions (optional)"
+                  label="Regions"
                   hint={
                     readOnly
                       ? undefined
-                      : 'Include ICT when this request applies at national level. ICT national-line departments can be linked after ICT is selected.'
+                      : 'Select at least one region. Include ICT when this request applies at national level. ICT national-line departments can be linked after ICT is selected.'
                   }
                 >
                   {readOnly ? (
@@ -1362,7 +1379,13 @@ export function HrRequestModal({
                       </p>
                     )
                   ) : (
-                    <div className="checkbox-grid" role="group" aria-label="Regions (optional)">
+                    <div
+                      className="checkbox-grid"
+                      role="group"
+                      aria-label="Regions"
+                      aria-invalid={Boolean(fieldErrors.region_ids)}
+                      aria-describedby={fieldErrors.region_ids ? 'hr-regions-err' : undefined}
+                    >
                       {assignableRegions.map((r) => (
                         <label key={r.id} className="checkbox-label">
                           <input
@@ -1464,7 +1487,7 @@ export function HrRequestModal({
                   />
                   <FieldError id="hr-date-err" message={fieldErrors.date} />
                 </FormControl>
-                {mode !== 'create' ? (
+                {mode !== 'create' && !showActivate ? (
                   <FormControl label="Request status" htmlFor="hr-status">
                     <select
                       id="hr-status"
@@ -1482,6 +1505,17 @@ export function HrRequestModal({
                         </option>
                       ))}
                     </select>
+                  </FormControl>
+                ) : null}
+                {showActivate ? (
+                  <FormControl label="Request status" htmlFor="hr-status-readonly">
+                    <input
+                      id="hr-status-readonly"
+                      type="text"
+                      value={HR_REQUEST_STATUS_LABELS.draft}
+                      readOnly
+                      disabled
+                    />
                   </FormControl>
                 ) : null}
               </FormRow>
@@ -1596,7 +1630,7 @@ export function HrRequestModal({
               <Button variant="secondary" compact type="button" onClick={onClose}>
                 {readOnlyCloseLabel}
               </Button>
-              {!readOnly && mode === 'create' ? (
+              {showSaveAsDraft ? (
                 <Button
                   variant="secondary"
                   compact
@@ -1607,11 +1641,22 @@ export function HrRequestModal({
                   {saving ? 'Saving…' : 'Save as Draft'}
                 </Button>
               ) : null}
-              {!readOnly && (
+              {showPrimarySubmit ? (
                 <Button variant="primary" compact type="submit" disabled={saving}>
                   {saving ? 'Submitting…' : 'Submit'}
                 </Button>
-              )}
+              ) : null}
+              {showActivate ? (
+                <Button
+                  variant="primary"
+                  compact
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void handleActivate()}
+                >
+                  {saving ? 'Activating…' : 'Activate'}
+                </Button>
+              ) : null}
             </ModalActions>
           </form>
         )}

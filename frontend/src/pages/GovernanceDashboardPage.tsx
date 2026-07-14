@@ -14,6 +14,7 @@ import {
   type ReportLookupIndicator,
 } from '../api/reports'
 import { useAuth } from '../auth/AuthContext'
+import { GovernancePrefixedChartsSection } from '../components/governance/GovernancePrefixedChartsSection'
 import { GovernanceTrendChartPanel } from '../components/governance/GovernanceTrendChartPanel'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
@@ -24,6 +25,10 @@ import {
   type GovernanceFilters,
   type IndicatorTrendSeries,
 } from '../lib/governanceDashboardData'
+import {
+  prefixedIndicatorIds,
+  resolvePrefixedCharts,
+} from '../lib/governancePrefixedCharts'
 import { buildGovernanceTrendChartRows } from '../lib/governanceTrendCharts'
 import {
   CONCLUDING_OBSERVATIONS_LABEL,
@@ -69,15 +74,23 @@ export function GovernanceDashboardPage() {
     Awaited<ReturnType<typeof fetchReportIssueCategories>>
   >([])
   const [indicators, setIndicators] = useState<ReportLookupIndicator[]>([])
+  const [allIndicators, setAllIndicators] = useState<ReportLookupIndicator[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [chartLoading, setChartLoading] = useState(false)
+  const [defaultLoading, setDefaultLoading] = useState(true)
   const [trendSeries, setTrendSeries] = useState<IndicatorTrendSeries[] | null>(null)
+  const [prefixedSeries, setPrefixedSeries] = useState<IndicatorTrendSeries[]>([])
 
   useEffect(() => {
-    void Promise.all([fetchReportConventions(), fetchReportIssueCategories()])
-      .then(([conv, cats]) => {
+    void Promise.all([
+      fetchReportConventions(),
+      fetchReportIssueCategories(),
+      fetchReportIndicators({}),
+    ])
+      .then(([conv, cats, inds]) => {
         setConventions(conv)
         setCategories(cats)
+        setAllIndicators(inds)
       })
       .catch((e: unknown) => {
         setLoadError(e instanceof Error ? e.message : 'Failed to load data')
@@ -123,6 +136,63 @@ export function GovernanceDashboardPage() {
     setFilters((prev) => ({ ...prev, categoryId: '', indicatorIds: [] }))
   }, [categorySelectOptions, filters.categoryId])
 
+  const prefixedCharts = useMemo(
+    () => resolvePrefixedCharts(allIndicators),
+    [allIndicators],
+  )
+
+  const prefixedSeriesById = useMemo(() => {
+    const map = new Map<string, IndicatorTrendSeries>()
+    for (const s of prefixedSeries) map.set(String(s.indicatorId), s)
+    return map
+  }, [prefixedSeries])
+
+  /** Mode 1 = filters applied; Mode 2 = default prefixed charts. */
+  const showDynamicMode = trendSeries != null
+
+  useEffect(() => {
+    if (allIndicators.length === 0) return
+
+    let cancelled = false
+    setDefaultLoading(true)
+
+    void (async () => {
+      try {
+        const resolved = resolvePrefixedCharts(allIndicators)
+        const ids = prefixedIndicatorIds(resolved)
+        if (ids.length === 0) {
+          if (!cancelled) setPrefixedSeries([])
+          return
+        }
+
+        const deptTasks = await fetchDepartmentTasks(
+          federalPortal ? { scope: 'all' } : undefined,
+        )
+        if (cancelled) return
+
+        const scopedTasks =
+          lockedRegionalId == null
+            ? deptTasks
+            : deptTasks.filter((t) => Number(t.region_id) === Number(lockedRegionalId))
+
+        const meta = allIndicators.filter((i) => ids.includes(String(i.id)))
+        const series = buildIndicatorGenderTrendSeries(scopedTasks, meta, ids)
+        if (!cancelled) setPrefixedSeries(series)
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : 'Failed to load default trend charts')
+          setPrefixedSeries([])
+        }
+      } finally {
+        if (!cancelled) setDefaultLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [allIndicators, federalPortal, lockedRegionalId])
+
   const dirty = filtersAreDirty(filters, defaults)
   const canApply = filters.indicatorIds.length > 0
 
@@ -142,11 +212,13 @@ export function GovernanceDashboardPage() {
     setChartLoading(true)
     setLoadError(null)
     try {
-      const deptTasks = await fetchDepartmentTasks()
+      const deptTasks = await fetchDepartmentTasks(
+        federalPortal ? { scope: 'all' } : undefined,
+      )
       const scopedTasks =
         lockedRegionalId == null
           ? deptTasks
-          : deptTasks.filter((t) => t.region_id === lockedRegionalId)
+          : deptTasks.filter((t) => Number(t.region_id) === Number(lockedRegionalId))
 
       const selectedMeta = indicators.filter((i) =>
         filters.indicatorIds.includes(String(i.id)),
@@ -299,16 +371,17 @@ export function GovernanceDashboardPage() {
             </div>
             {!conventionSelected ? (
               <p className="muted report-generator__hint">
-                Select a convention to enable the other filters.
+                Default CAT indicator trends are shown below. Select a convention and indicators,
+                then Apply filters for a custom view.
               </p>
             ) : !canApply ? (
               <p className="muted report-generator__hint">
-                Select at least one indicator to enable Apply filters and load trend charts.
+                Select at least one indicator to enable Apply filters and load custom trend charts.
               </p>
             ) : null}
           </div>
 
-          {trendSeries ? (
+          {showDynamicMode ? (
             <div className="report-generator__results report-generator__results--full reporting-dashboard">
               <h3 className="cat-static-trend-dashboard__title">Indicator Trends</h3>
               {trendSeries.length === 0 ? (
@@ -326,16 +399,11 @@ export function GovernanceDashboardPage() {
               )}
             </div>
           ) : (
-            <div className="report-generator__empty">
-              {chartLoading ? (
-                <p className="muted">Building trend charts…</p>
-              ) : (
-                <p className="muted">
-                  Choose filters and select indicators, then Apply filters to view gender-total
-                  trends by year.
-                </p>
-              )}
-            </div>
+            <GovernancePrefixedChartsSection
+              charts={prefixedCharts}
+              seriesById={prefixedSeriesById}
+              loading={defaultLoading || chartLoading}
+            />
           )}
         </div>
       </div>

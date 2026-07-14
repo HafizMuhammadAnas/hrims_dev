@@ -23,7 +23,7 @@ class ViolationEntryController extends Controller
             $query->whereRaw('1 = 0');
         }
 
-        $rows = $query->orderByDesc('event_date')->get();
+        $rows = $query->orderByDesc('event_date')->orderByDesc('id')->get();
 
         return response()->json([
             'data' => $rows->map(fn (ViolationEntry $v) => [
