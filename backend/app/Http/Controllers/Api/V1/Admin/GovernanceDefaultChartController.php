@@ -29,7 +29,7 @@ class GovernanceDefaultChartController extends Controller
     {
         $data = $request->validate([
             'charts' => ['required', 'array', 'max:40'],
-            'charts.*.kind' => ['required', 'string', Rule::in(['trend', 'comparison'])],
+            'charts.*.kind' => ['required', 'string', Rule::in(['trend', 'comparison', 'dimension_totals'])],
             'charts.*.title' => ['required', 'string', 'max:500'],
             'charts.*.shape' => ['required', 'string', Rule::in(['line', 'bar', 'area', 'step', 'pie', 'composed'])],
             'charts.*.series_a_key' => ['nullable', 'string', 'max:64'],
@@ -57,17 +57,18 @@ class GovernanceDefaultChartController extends Controller
 
             foreach (array_values($data['charts']) as $index => $chart) {
                 $kind = $chart['kind'];
+                $isComparison = $kind === 'comparison';
                 GovernanceDefaultChart::query()->create([
                     'sort_order' => $index,
                     'kind' => $kind,
                     'title' => $chart['title'],
                     'shape' => $chart['shape'],
-                    'series_a_key' => $chart['series_a_key'] ?? ($kind === 'comparison' ? 'series_a' : 'total'),
+                    'series_a_key' => $chart['series_a_key'] ?? ($isComparison ? 'series_a' : ($kind === 'dimension_totals' ? 'dimensions' : 'total')),
                     'series_a_label' => $chart['series_a_label'],
                     'series_a_indicator_id' => $chart['series_a_indicator_id'] ?? null,
-                    'series_b_key' => $kind === 'comparison' ? ($chart['series_b_key'] ?? 'series_b') : null,
-                    'series_b_label' => $kind === 'comparison' ? ($chart['series_b_label'] ?? null) : null,
-                    'series_b_indicator_id' => $kind === 'comparison' ? ($chart['series_b_indicator_id'] ?? null) : null,
+                    'series_b_key' => $isComparison ? ($chart['series_b_key'] ?? 'series_b') : null,
+                    'series_b_label' => $isComparison ? ($chart['series_b_label'] ?? null) : null,
+                    'series_b_indicator_id' => $isComparison ? ($chart['series_b_indicator_id'] ?? null) : null,
                     'is_active' => array_key_exists('is_active', $chart) ? (bool) $chart['is_active'] : true,
                 ]);
             }

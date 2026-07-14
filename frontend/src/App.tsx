@@ -25,6 +25,7 @@ import { RegionalResponsesPage } from './pages/RegionalResponsesPage'
 import { ReportGeneratorPage } from './pages/ReportGeneratorPage'
 import { GovernanceDashboardPage } from './pages/GovernanceDashboardPage'
 import { GovernanceDefaultChartsAdminPage } from './pages/GovernanceDefaultChartsAdminPage'
+import { IndicatorWiseDataAdminPage } from './pages/IndicatorWiseDataAdminPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { IssuesMappingsAdminPage } from './pages/IssuesMappingsAdminPage'
 import { RegionsDistrictsAdminPage } from './pages/RegionsDistrictsAdminPage'
@@ -170,6 +171,9 @@ function App() {
               <Route path="admin/regions-districts" element={<RegionsDistrictsAdminPage />} />
               <Route path="admin/regions-districts/:geoView" element={<RegionsDistrictsAdminPage />} />
               <Route path="admin/governance-charts" element={<GovernanceDefaultChartsAdminPage />} />
+              <Route path="admin/indicator-wise-data" element={<IndicatorWiseDataAdminPage />} />
+              <Route path="admin/indicator-wise-data/create" element={<IndicatorWiseDataAdminPage />} />
+              <Route path="admin/indicator-wise-data/view/:recordId" element={<IndicatorWiseDataAdminPage />} />
               <Route path="admin/:section" element={<SuperAdminConsolePage />} />
             </Route>
           </Route>

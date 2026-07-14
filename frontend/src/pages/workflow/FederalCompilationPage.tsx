@@ -338,7 +338,7 @@ export function FederalCompilationPage() {
               <option key={r.id} value={r.id}>
                 {r.id} — {r.title}
                 {suffix}
-              </option>
+            </option>
             )
           })}
         </select>
@@ -348,7 +348,7 @@ export function FederalCompilationPage() {
               Included in national compile: {selectedRegionNames.length}
             </StatusBadge>
             {selectedRegionNames.map((name) => (
-              <StatusBadge key={name}>{name}</StatusBadge>
+                <StatusBadge key={name}>{name}</StatusBadge>
             ))}
           </div>
         ) : null}

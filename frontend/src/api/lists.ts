@@ -83,7 +83,7 @@ export async function fetchDepartmentTasks(options?: {
 export type GovernanceDefaultChartRow = {
   id: number
   sort_order: number
-  kind: 'trend' | 'comparison'
+  kind: 'trend' | 'comparison' | 'dimension_totals'
   title: string
   shape: 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
   series_a_key: string

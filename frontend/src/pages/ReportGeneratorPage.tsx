@@ -58,7 +58,6 @@ import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { LABEL_REPORTING_DASHBOARD } from '../lib/uiLabels'
 import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
 import { ReportingIndicatorCompiledFocus } from '../components/ReportingIndicatorCompiledFocus'
-import { CatStaticTrendDashboard } from '../components/reporting/CatStaticTrendDashboard'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
@@ -407,11 +406,6 @@ export function ReportGeneratorPage() {
   )
 
   const conventionSelected = Boolean(filters.convention)
-  const selectedConvention = useMemo(
-    () => conventions.find((c) => String(c.id) === filters.convention) ?? null,
-    [conventions, filters.convention],
-  )
-  const showCatStaticTrendCharts = selectedConvention?.code.trim().toUpperCase() === 'CAT'
 
   const collectionYearOptions = useMemo(
     () => collectionYearOptionsFromIndicators(indicators),
@@ -709,8 +703,6 @@ export function ReportGeneratorPage() {
                       <ReportingRankPanel title="Indicators — top 10" rows={dashboardResult.topIndicators} />
                     </div>
                   </div>
-
-                  {showCatStaticTrendCharts ? <CatStaticTrendDashboard /> : null}
                 </>
               )}
             </div>

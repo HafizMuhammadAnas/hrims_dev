@@ -50,6 +50,7 @@ import {
   LABEL_DASHBOARDS,
   LABEL_GOVERNANCE_DASHBOARD,
   LABEL_GOVERNANCE_DEFAULT_CHARTS,
+  LABEL_INDICATOR_WISE_DATA,
   LABEL_REPORTING_DASHBOARD,
   LABEL_REQUEST_MANAGEMENT,
   LABEL_RESPONSE_COMPILATION,
@@ -134,6 +135,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/admin/sdg-nodes" icon={Layers} label="SDGs" onPick={onPick} />
               <NavItem to="/admin/upr-recommendations" icon={ScrollText} label="UPR Recommendations" onPick={onPick} />
               <NavItem to="/admin/governance-charts" icon={BarChart2} label={LABEL_GOVERNANCE_DEFAULT_CHARTS} onPick={onPick} />
+              <NavItem to="/admin/indicator-wise-data" icon={ClipboardList} label={LABEL_INDICATOR_WISE_DATA} onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
             </div>
             <div className="nav-section-title">{LABEL_DASHBOARDS}</div>

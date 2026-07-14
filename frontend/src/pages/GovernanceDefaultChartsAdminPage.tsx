@@ -24,7 +24,7 @@ import { SearchableSelect, type SearchableSelectOption } from '../components/ui/
 import { isSuperAdmin } from '../lib/roles'
 import { LABEL_GOVERNANCE_DASHBOARD, LABEL_GOVERNANCE_DEFAULT_CHARTS } from '../lib/uiLabels'
 
-type ChartKind = 'trend' | 'comparison'
+type ChartKind = 'trend' | 'comparison' | 'dimension_totals'
 type ChartShape = 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
 
 type ChartDraft = {
@@ -56,6 +56,13 @@ const COMPARISON_SHAPES: { value: ChartShape; label: string }[] = [
   { value: 'line', label: 'Line' },
   { value: 'bar', label: 'Bar' },
   { value: 'composed', label: 'Composed (bar + line)' },
+]
+
+/** Multi-series over years (one series per dimension Total). */
+const DIMENSION_TOTALS_SHAPES: { value: ChartShape; label: string }[] = [
+  { value: 'bar', label: 'Grouped bar' },
+  { value: 'line', label: 'Multi-line' },
+  { value: 'composed', label: 'Composed' },
 ]
 
 function newClientKey(): string {
@@ -102,21 +109,32 @@ function slugKey(label: string, fallback: string): string {
 
 function toPayload(drafts: ChartDraft[]): AdminGovernanceDefaultChartPayload[] {
   return drafts.map((d) => {
+    const isComparison = d.kind === 'comparison'
     const base: AdminGovernanceDefaultChartPayload = {
       kind: d.kind,
       title: d.title.trim(),
       shape: d.shape,
-      series_a_key: d.kind === 'comparison' ? slugKey(d.series_a_label, 'series_a') : 'total',
-      series_a_label: d.series_a_label.trim() || 'Total',
+      series_a_key: isComparison
+        ? slugKey(d.series_a_label, 'series_a')
+        : d.kind === 'dimension_totals'
+          ? 'dimensions'
+          : 'total',
+      series_a_label:
+        d.series_a_label.trim() ||
+        (d.kind === 'dimension_totals' ? 'Dimension totals' : isComparison ? 'Series A' : 'Total'),
       series_a_indicator_id: d.series_a_indicator_id ? Number(d.series_a_indicator_id) : null,
       is_active: d.is_active,
     }
-    if (d.kind === 'comparison') {
+    if (isComparison) {
       base.series_b_key = slugKey(d.series_b_label, 'series_b')
       base.series_b_label = d.series_b_label.trim() || 'Series B'
       base.series_b_indicator_id = d.series_b_indicator_id ? Number(d.series_b_indicator_id) : null
       if (base.shape !== 'line' && base.shape !== 'bar' && base.shape !== 'composed') {
         base.shape = 'line'
+      }
+    } else if (d.kind === 'dimension_totals') {
+      if (base.shape !== 'line' && base.shape !== 'bar' && base.shape !== 'composed') {
+        base.shape = 'bar'
       }
     }
     return base
@@ -297,8 +315,11 @@ export function GovernanceDefaultChartsAdminPage() {
 
       <div className="report-generator__card" style={{ marginBottom: '1rem' }}>
         <p className="muted" style={{ margin: 0 }}>
-          Each row is one default graph. Use category to narrow the indicator list, then pick the
-          indicator and chart shape. Inactive rows stay saved but are hidden on the dashboard.
+          Each row is one default graph. Use <strong>Add graph</strong> to create more, or{' '}
+          <strong>Remove</strong> on a card to delete one. Use category to narrow the indicator
+          list, then pick the indicator and chart shape. Choose multi-dimension totals to chart
+          every dimension’s year Total for one indicator. Inactive rows stay saved but are hidden
+          on the dashboard.
         </p>
         <div
           style={{
@@ -329,11 +350,30 @@ export function GovernanceDefaultChartsAdminPage() {
       {loading ? (
         <p className="muted">Loading configuration…</p>
       ) : drafts.length === 0 ? (
-        <p className="muted">No default graphs yet. Add a graph to get started.</p>
+        <div className="report-generator__card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+          <p className="muted" style={{ marginTop: 0 }}>
+            No default graphs yet. Add a graph to configure the Governance Dashboard view.
+          </p>
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setDrafts([emptyDraft()])
+              setSuccess(null)
+            }}
+          >
+            <Plus size={16} aria-hidden /> Add graph
+          </Button>
+        </div>
       ) : (
         <div className="governance-charts-admin__list">
           {drafts.map((draft, index) => {
-            const shapes = draft.kind === 'comparison' ? COMPARISON_SHAPES : TREND_SHAPES
+            const shapes =
+              draft.kind === 'comparison'
+                ? COMPARISON_SHAPES
+                : draft.kind === 'dimension_totals'
+                  ? DIMENSION_TOTALS_SHAPES
+                  : TREND_SHAPES
             return (
               <div
                 key={draft.clientKey}
@@ -403,19 +443,33 @@ export function GovernanceDefaultChartsAdminPage() {
                         value={draft.kind}
                         onChange={(e) => {
                           const kind = e.target.value as ChartKind
+                          const multiSeriesShape =
+                            draft.shape === 'line' ||
+                            draft.shape === 'bar' ||
+                            draft.shape === 'composed'
                           updateDraft(draft.clientKey, {
                             kind,
                             shape:
-                              kind === 'comparison' &&
-                              draft.shape !== 'line' &&
-                              draft.shape !== 'bar' &&
-                              draft.shape !== 'composed'
-                                ? 'line'
-                                : draft.shape,
+                              kind === 'dimension_totals'
+                                ? multiSeriesShape
+                                  ? draft.shape
+                                  : 'bar'
+                                : kind === 'comparison'
+                                  ? multiSeriesShape
+                                    ? draft.shape
+                                    : 'line'
+                                  : draft.shape,
                             series_a_label:
-                              kind === 'comparison' && draft.series_a_label === 'Total'
-                                ? 'Series A'
-                                : draft.series_a_label,
+                              kind === 'dimension_totals'
+                                ? draft.series_a_label === 'Total' ||
+                                  draft.series_a_label === 'Series A'
+                                  ? 'Dimension totals'
+                                  : draft.series_a_label
+                                : kind === 'comparison' &&
+                                    (draft.series_a_label === 'Total' ||
+                                      draft.series_a_label === 'Dimension totals')
+                                  ? 'Series A'
+                                  : draft.series_a_label,
                             series_b_label:
                               kind === 'comparison' && !draft.series_b_label
                                 ? 'Series B'
@@ -423,8 +477,11 @@ export function GovernanceDefaultChartsAdminPage() {
                           })
                         }}
                       >
-                        <option value="trend">Single indicator (trend)</option>
+                        <option value="trend">Single indicator (gender / year total)</option>
                         <option value="comparison">Two indicators (comparison)</option>
+                        <option value="dimension_totals">
+                          Multi-dimension totals (years × dimensions)
+                        </option>
                       </select>
                     </FormControl>
                   </FormRow>
@@ -457,9 +514,22 @@ export function GovernanceDefaultChartsAdminPage() {
                       </label>
                     </FormControl>
                   </FormRow>
+                  {draft.kind === 'dimension_totals' ? (
+                    <p className="muted" style={{ margin: '0 0 8px' }}>
+                      Plots each disaggregation dimension’s year Total (Gender, Age, Disability,
+                      District, Religion, Others) as separate series. Does not use gender-only total
+                      like other graphs.
+                    </p>
+                  ) : null}
                   <FormRow twoCol>
                     <FormControl
-                      label={draft.kind === 'comparison' ? 'Series A label' : 'Series label'}
+                      label={
+                        draft.kind === 'comparison'
+                          ? 'Series A label'
+                          : draft.kind === 'dimension_totals'
+                            ? 'Legend title'
+                            : 'Series label'
+                      }
                       htmlFor={`gdc-a-label-${draft.clientKey}`}
                     >
                       <input
@@ -487,7 +557,11 @@ export function GovernanceDefaultChartsAdminPage() {
                   </FormRow>
                   <FormRow>
                     <FormControl
-                      label={draft.kind === 'comparison' ? 'Series A indicator' : 'Indicator'}
+                      label={
+                        draft.kind === 'comparison'
+                          ? 'Series A indicator'
+                          : 'Indicator'
+                      }
                       htmlFor={`gdc-a-ind-${draft.clientKey}`}
                     >
                       <SearchableSelect
@@ -581,6 +655,32 @@ export function GovernanceDefaultChartsAdminPage() {
               </div>
             )
           })}
+          <div
+            className="report-generator__card"
+            style={{
+              marginTop: '0.5rem',
+              display: 'flex',
+              gap: 8,
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy}
+              onClick={() => {
+                setDrafts((prev) => [...prev, emptyDraft()])
+                setSuccess(null)
+              }}
+            >
+              <Plus size={16} aria-hidden /> Add another graph
+            </Button>
+            <Button type="button" disabled={busy} onClick={() => void handleSave()}>
+              {busy ? 'Saving…' : 'Save graphs'}
+            </Button>
+          </div>
         </div>
       )}
     </PageSection>

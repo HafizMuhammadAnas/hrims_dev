@@ -699,7 +699,7 @@ export async function adminDeleteIssue(id: number): Promise<void> {
 export type AdminGovernanceDefaultChart = {
   id: number
   sort_order: number
-  kind: 'trend' | 'comparison'
+  kind: 'trend' | 'comparison' | 'dimension_totals'
   title: string
   shape: 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
   series_a_key: string
@@ -714,7 +714,7 @@ export type AdminGovernanceDefaultChart = {
 }
 
 export type AdminGovernanceDefaultChartPayload = {
-  kind: 'trend' | 'comparison'
+  kind: 'trend' | 'comparison' | 'dimension_totals'
   title: string
   shape: 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
   series_a_key?: string | null

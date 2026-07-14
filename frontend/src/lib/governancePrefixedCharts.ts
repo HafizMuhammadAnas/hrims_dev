@@ -234,6 +234,13 @@ export type ResolvedPrefixedChart =
       shape: GovernanceTrendChartShapeId
       series: [ResolvedPrefixedSeries]
     }
+  | {
+      key: string
+      kind: 'dimension_totals'
+      title: string
+      shape: 'line' | 'bar' | 'composed'
+      series: [ResolvedPrefixedSeries]
+    }
 
 export function resolvePrefixedCharts(
   indicators: ReportLookupIndicator[],
@@ -308,7 +315,7 @@ export function prefixedIndicatorIds(resolved: ResolvedPrefixedChart[]): string[
 
 export type SavedGovernanceChartConfig = {
   id: number
-  kind: 'trend' | 'comparison'
+  kind: 'trend' | 'comparison' | 'dimension_totals'
   title: string
   shape: string
   series_a_key: string
@@ -372,6 +379,23 @@ export function resolveChartsFromSavedConfig(
       }
     }
 
+    if (cfg.kind === 'dimension_totals') {
+      return {
+        key: `saved-${cfg.id}`,
+        kind: 'dimension_totals' as const,
+        title: cfg.title,
+        shape: asComparisonShape(cfg.shape),
+        series: [
+          {
+            key: cfg.series_a_key || 'dimensions',
+            label: cfg.series_a_label || 'Dimension totals',
+            includes: [],
+            indicator: a,
+          },
+        ],
+      }
+    }
+
     return {
       key: `saved-${cfg.id}`,
       kind: 'trend' as const,
@@ -387,4 +411,16 @@ export function resolveChartsFromSavedConfig(
       ],
     }
   })
+}
+
+/** Indicator ids needed only for dimension-totals charts. */
+export function dimensionTotalsIndicatorIds(resolved: ResolvedPrefixedChart[]): string[] {
+  const ids: string[] = []
+  for (const chart of resolved) {
+    if (chart.kind !== 'dimension_totals') continue
+    for (const s of chart.series) {
+      if (s.indicator) ids.push(String(s.indicator.id))
+    }
+  }
+  return [...new Set(ids)]
 }

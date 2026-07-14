@@ -21,11 +21,14 @@ import { PageSection } from '../components/ui/PageSection'
 import { SearchableMultiSelect } from '../components/ui/SearchableMultiSelect'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
 import {
+  buildIndicatorDimensionTotalsSeries,
   buildIndicatorGenderTrendSeries,
   type GovernanceFilters,
+  type IndicatorDimensionTotalsSeries,
   type IndicatorTrendSeries,
 } from '../lib/governanceDashboardData'
 import {
+  dimensionTotalsIndicatorIds,
   prefixedIndicatorIds,
   resolveChartsFromSavedConfig,
   type SavedGovernanceChartConfig,
@@ -81,6 +84,7 @@ export function GovernanceDashboardPage() {
   const [defaultLoading, setDefaultLoading] = useState(true)
   const [trendSeries, setTrendSeries] = useState<IndicatorTrendSeries[] | null>(null)
   const [prefixedSeries, setPrefixedSeries] = useState<IndicatorTrendSeries[]>([])
+  const [dimensionSeries, setDimensionSeries] = useState<IndicatorDimensionTotalsSeries[]>([])
   const [savedDefaultCharts, setSavedDefaultCharts] = useState<SavedGovernanceChartConfig[]>([])
 
   useEffect(() => {
@@ -151,6 +155,12 @@ export function GovernanceDashboardPage() {
     return map
   }, [prefixedSeries])
 
+  const dimensionSeriesById = useMemo(() => {
+    const map = new Map<string, IndicatorDimensionTotalsSeries>()
+    for (const s of dimensionSeries) map.set(String(s.indicatorId), s)
+    return map
+  }, [dimensionSeries])
+
   /** Mode 1 = filters applied; Mode 2 = default prefixed charts. */
   const showDynamicMode = trendSeries != null
 
@@ -164,8 +174,20 @@ export function GovernanceDashboardPage() {
       try {
         const resolved = resolveChartsFromSavedConfig(savedDefaultCharts, allIndicators)
         const ids = prefixedIndicatorIds(resolved)
+        const dimIds = dimensionTotalsIndicatorIds(resolved)
+        const genderOnlyIds = ids.filter((id) =>
+          resolved.some(
+            (c) =>
+              (c.kind === 'trend' || c.kind === 'comparison') &&
+              c.series.some((s) => s.indicator && String(s.indicator.id) === id),
+          ),
+        )
+
         if (ids.length === 0) {
-          if (!cancelled) setPrefixedSeries([])
+          if (!cancelled) {
+            setPrefixedSeries([])
+            setDimensionSeries([])
+          }
           return
         }
 
@@ -179,13 +201,23 @@ export function GovernanceDashboardPage() {
             ? deptTasks
             : deptTasks.filter((t) => Number(t.region_id) === Number(lockedRegionalId))
 
-        const meta = allIndicators.filter((i) => ids.includes(String(i.id)))
-        const series = buildIndicatorGenderTrendSeries(scopedTasks, meta, ids)
-        if (!cancelled) setPrefixedSeries(series)
+        const genderMeta = allIndicators.filter((i) => genderOnlyIds.includes(String(i.id)))
+        const dimMeta = allIndicators.filter((i) => dimIds.includes(String(i.id)))
+        const genderSeries = buildIndicatorGenderTrendSeries(
+          scopedTasks,
+          genderMeta,
+          genderOnlyIds,
+        )
+        const dimSeries = buildIndicatorDimensionTotalsSeries(scopedTasks, dimMeta, dimIds)
+        if (!cancelled) {
+          setPrefixedSeries(genderSeries)
+          setDimensionSeries(dimSeries)
+        }
       } catch (e: unknown) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : 'Failed to load default trend charts')
           setPrefixedSeries([])
+          setDimensionSeries([])
         }
       } finally {
         if (!cancelled) setDefaultLoading(false)
@@ -406,6 +438,7 @@ export function GovernanceDashboardPage() {
             <GovernancePrefixedChartsSection
               charts={prefixedCharts}
               seriesById={prefixedSeriesById}
+              dimensionSeriesById={dimensionSeriesById}
               loading={defaultLoading || chartLoading}
             />
           )}

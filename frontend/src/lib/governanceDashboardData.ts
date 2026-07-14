@@ -46,6 +46,122 @@ export function genderTotalFromYearCells(
   return any ? sum : null
 }
 
+/** Alias — same Total-cell rules apply to every year-keyed dimension matrix. */
+export const dimensionTotalFromYearCells = genderTotalFromYearCells
+
+export const GOVERNANCE_DIMENSION_SERIES = [
+  { key: 'gender', label: 'Gender', field: 'by_year_gender' as const },
+  { key: 'age', label: 'Age', field: 'by_year_age' as const },
+  { key: 'disability', label: 'Disability', field: 'by_year_disability' as const },
+  { key: 'district', label: 'District', field: 'by_year_district' as const },
+  { key: 'religion', label: 'Religion', field: 'by_year_religion' as const },
+  { key: 'others', label: 'Others', field: 'by_year_others' as const },
+] as const
+
+export type GovernanceDimensionKey = (typeof GOVERNANCE_DIMENSION_SERIES)[number]['key']
+
+export type DimensionTotalsPoint = {
+  yearId: string
+  year: string
+} & Partial<Record<GovernanceDimensionKey, number>>
+
+export type IndicatorDimensionTotalsSeries = {
+  indicatorId: string
+  indicatorLabel: string
+  /** Dimension keys that have at least one non-null year total in the data. */
+  dimensions: Array<{ key: GovernanceDimensionKey; label: string }>
+  points: DimensionTotalsPoint[]
+}
+
+/**
+ * Aggregate each dimension’s year Total across department tasks for one or more indicators.
+ * Dimensions stay parallel (gender Total vs age Total are not summed together).
+ */
+export function buildIndicatorDimensionTotalsSeries(
+  tasks: DepartmentTaskRow[],
+  indicators: ReportLookupIndicator[],
+  selectedIndicatorIds: string[],
+): IndicatorDimensionTotalsSeries[] {
+  const selected = new Set(selectedIndicatorIds.map(String))
+  const byId = new Map(indicators.map((i) => [String(i.id), i]))
+  const labels = yearLabelMap(indicators)
+
+  // indicatorId -> yearId -> dimensionKey -> sum
+  const totals = new Map<string, Map<string, Map<GovernanceDimensionKey, number>>>()
+
+  for (const task of tasks) {
+    const parsed = parseDepartmentTaskResponseData(task.response_data, task.attachment_url)
+    if (parsed.kind !== 'structured') continue
+
+    for (const [indicatorId, bundle] of Object.entries(parsed.payload.by_indicator)) {
+      if (!selected.has(String(indicatorId))) continue
+      const quantitative = bundle.quantitative
+      if (!quantitative) continue
+
+      let yearMap = totals.get(String(indicatorId))
+      if (!yearMap) {
+        yearMap = new Map()
+        totals.set(String(indicatorId), yearMap)
+      }
+
+      for (const dim of GOVERNANCE_DIMENSION_SERIES) {
+        const keyed = quantitative[dim.field]
+        if (!keyed) continue
+        for (const [yearId, cells] of Object.entries(keyed)) {
+          const n = dimensionTotalFromYearCells(cells)
+          if (n == null) continue
+          const yid = String(yearId)
+          let dimMap = yearMap.get(yid)
+          if (!dimMap) {
+            dimMap = new Map()
+            yearMap.set(yid, dimMap)
+          }
+          dimMap.set(dim.key, (dimMap.get(dim.key) ?? 0) + n)
+        }
+      }
+    }
+  }
+
+  const series: IndicatorDimensionTotalsSeries[] = []
+  for (const indicatorId of selectedIndicatorIds.map(String)) {
+    const ind = byId.get(indicatorId)
+    const yearMap = totals.get(indicatorId) ?? new Map<string, Map<GovernanceDimensionKey, number>>()
+    const configuredYears = (ind?.collection_years ?? []).map((y) => String(y.id))
+    const dataYears = [...yearMap.keys()]
+    const yearIds = sortYearIds([...new Set([...configuredYears, ...dataYears])], labels)
+
+    const presentKeys = new Set<GovernanceDimensionKey>()
+    for (const dimMap of yearMap.values()) {
+      for (const [key, value] of dimMap.entries()) {
+        if (value != null && Number.isFinite(value)) presentKeys.add(key)
+      }
+    }
+
+    const dimensions = GOVERNANCE_DIMENSION_SERIES.filter((d) => presentKeys.has(d.key)).map(
+      (d) => ({ key: d.key, label: d.label }),
+    )
+
+    series.push({
+      indicatorId,
+      indicatorLabel: ind?.indicator_text?.trim() || `Indicator #${indicatorId}`,
+      dimensions,
+      points: yearIds.map((yearId) => {
+        const dimMap = yearMap.get(yearId)
+        const point: DimensionTotalsPoint = {
+          yearId,
+          year: labels.get(yearId) ?? yearId,
+        }
+        for (const dim of dimensions) {
+          point[dim.key] = dimMap?.get(dim.key) ?? 0
+        }
+        return point
+      }),
+    })
+  }
+
+  return series
+}
+
 function yearLabelMap(indicators: ReportLookupIndicator[]): Map<string, string> {
   const map = new Map<string, string>()
   for (const ind of indicators) {
