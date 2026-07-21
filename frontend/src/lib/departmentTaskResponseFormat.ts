@@ -18,7 +18,7 @@ export type DepartmentIndicatorQuantitative = {
   attachment_url: string | null
   /** Per-dimension row inclusion toggles (false = department excluded this metric row). */
   matrix_row_enabled?: Partial<
-    Record<'gender' | 'age' | 'disability' | 'district' | 'religion' | 'others', boolean>
+    Record<'gender' | 'age' | 'disability' | 'district' | 'religion' | 'consolidated', boolean>
   > | null
   by_year_gender?: DepartmentQuantitativeByYearGender | null
   by_year_age?: DepartmentQuantitativeByYearKeyed | null
@@ -26,6 +26,8 @@ export type DepartmentIndicatorQuantitative = {
   by_year_region?: DepartmentQuantitativeByYearKeyed | null
   by_year_district?: DepartmentQuantitativeByYearKeyed | null
   by_year_religion?: DepartmentQuantitativeByYearKeyed | null
+  by_year_consolidated?: DepartmentQuantitativeByYearKeyed | null
+  /** @deprecated Read-only compatibility for responses saved before the rename. */
   by_year_others?: DepartmentQuantitativeByYearKeyed | null
 }
 
@@ -79,6 +81,37 @@ export function parseDepartmentTaskResponseData(
   }
 }
 
+function appendQuantitativeYearTotalLines(
+  lines: string[],
+  q: DepartmentIndicatorQuantitative,
+): void {
+  const consolidated = q.by_year_consolidated ?? q.by_year_others
+  if (consolidated && Object.keys(consolidated).length > 0) {
+    for (const [yearId, cells] of Object.entries(consolidated)) {
+      const total = cells?.total?.value
+      if (total == null || Number.isNaN(total)) continue
+      lines.push(`  Year total (${yearId}): ${total}`)
+    }
+    return
+  }
+  if (q.by_year_gender && Object.keys(q.by_year_gender).length > 0) {
+    for (const [yearId, genders] of Object.entries(q.by_year_gender)) {
+      for (const [genderId, cell] of Object.entries(genders)) {
+        if (cell?.value == null || Number.isNaN(cell.value)) continue
+        lines.push(
+          genderId === '0'
+            ? `  ${yearId}: ${cell.value}`
+            : `  ${yearId}/${genderId}: ${cell.value}`,
+        )
+      }
+    }
+    return
+  }
+  if (q.value != null && !Number.isNaN(q.value)) {
+    lines.push(`  Quantitative: ${q.value}`)
+  }
+}
+
 /** Plain text for compilation prefill and simple previews. */
 export function formatDepartmentResponseAsPlaintext(
   responseData: string | null | undefined,
@@ -97,20 +130,7 @@ export function formatDepartmentResponseAsPlaintext(
     lines.push(`— ${title} —`)
     if (bundle.quantitative) {
       const q = bundle.quantitative
-      if (q.by_year_gender && Object.keys(q.by_year_gender).length > 0) {
-        for (const [yearId, genders] of Object.entries(q.by_year_gender)) {
-          for (const [genderId, cell] of Object.entries(genders)) {
-            if (cell?.value == null || Number.isNaN(cell.value)) continue
-            lines.push(
-              genderId === '0'
-                ? `  ${yearId}: ${cell.value}`
-                : `  ${yearId}/${genderId}: ${cell.value}`,
-            )
-          }
-        }
-      } else if (q.value != null && !Number.isNaN(q.value)) {
-        lines.push(`  Quantitative: ${q.value}`)
-      }
+      appendQuantitativeYearTotalLines(lines, q)
       if (q.comment) lines.push(`  Comment: ${q.comment}`)
       if (q.attachment_url) lines.push(`  Quant attachment: ${q.attachment_url}`)
     }
@@ -148,20 +168,7 @@ export function formatDepartmentResponseTextOnly(
     lines.push(`— ${title} —`)
     if (bundle.quantitative) {
       const q = bundle.quantitative
-      if (q.by_year_gender && Object.keys(q.by_year_gender).length > 0) {
-        for (const [yearId, genders] of Object.entries(q.by_year_gender)) {
-          for (const [genderId, cell] of Object.entries(genders)) {
-            if (cell?.value == null || Number.isNaN(cell.value)) continue
-            lines.push(
-              genderId === '0'
-                ? `  ${yearId}: ${cell.value}`
-                : `  ${yearId}/${genderId}: ${cell.value}`,
-            )
-          }
-        }
-      } else if (q.value != null && !Number.isNaN(q.value)) {
-        lines.push(`  Quantitative: ${q.value}`)
-      }
+      appendQuantitativeYearTotalLines(lines, q)
       if (q.comment) lines.push(`  Comment: ${q.comment}`)
     }
     if (bundle.qualitative) {

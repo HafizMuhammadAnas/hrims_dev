@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Download } from 'lucide-react'
 import { fetchHrRequest } from '../api/hrRequests'
 import type { DepartmentTaskRow, RegionalResponseRow } from '../api/lists'
 import { updateRegionalReview } from '../api/workflows'
+import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
+import { downloadElementAsWord } from '../lib/downloadElementAsWord'
 import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import { regionalResponseFederalReviewPath } from '../lib/workflowNavigation'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
@@ -46,12 +49,19 @@ export function RegionalResponseFederalReviewView({
   const [reviewComments, setReviewComments] = useState(viewing.comments ?? '')
   const [actionFeedback, setActionFeedback] = useState<WorkflowActionFeedback | null>(null)
   const [saving, setSaving] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [wordLoading, setWordLoading] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const isUnderReview = viewingRow.review_status === 'pending'
 
   useEffect(() => {
     setViewingRow(viewing)
     setReviewComments(viewing.comments ?? '')
     setTab('responses')
     setActionFeedback(null)
+    setExportError(null)
   }, [viewing.id])
 
   useEffect(() => {
@@ -129,6 +139,50 @@ export function RegionalResponseFederalReviewView({
     navigate(regionalResponseFederalReviewPath(resp.id, fromPath))
   }
 
+  function exportFilenameBase(): string {
+    return [
+      viewingRow.req_id,
+      viewingRow.region_name?.trim() || 'region',
+      viewingRow.title?.trim() || viewingRow.id,
+    ]
+      .filter(Boolean)
+      .join(' — ')
+  }
+
+  async function handleDownloadPdf() {
+    const el = exportRef.current
+    if (!el) return
+    setPdfLoading(true)
+    setExportError(null)
+    try {
+      await downloadElementAsPdf(el, exportFilenameBase(), {
+        captureClass: 'regional-response-export-capture',
+        marginMm: 12,
+      })
+    } catch (e: unknown) {
+      setExportError(e instanceof Error ? e.message : 'Could not generate PDF.')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
+  async function handleDownloadWord() {
+    const el = exportRef.current
+    if (!el) return
+    setWordLoading(true)
+    setExportError(null)
+    try {
+      await downloadElementAsWord(el, exportFilenameBase(), {
+        captureClass: 'regional-response-export-capture',
+        documentTitle: exportFilenameBase(),
+      })
+    } catch (e: unknown) {
+      setExportError(e instanceof Error ? e.message : 'Could not generate Word document.')
+    } finally {
+      setWordLoading(false)
+    }
+  }
+
   return (
     <div className="modal-card modal-card-wide regional-responses-full-modal regional-response-detail-modal hr-request-dept-portal-tabs workflow-tabbed-card">
       <WorkflowModalHero
@@ -165,25 +219,53 @@ export function RegionalResponseFederalReviewView({
       <div className="modal-form regional-response-detail-modal__form dept-task-response-modal__body regional-response-detail-modal__form--flat">
         {tab === 'responses' ? (
           <>
-            <h2 className="card-section-heading">Department submissions</h2>
-            <DepartmentSubmissionsForRequest
-              tasksForDetail={tasksForViewing}
-              reqId={viewingRow.req_id}
-              issueIndicators={hrDetail?.issue?.indicators}
-              filterByRegionId={viewingRow.region_id ?? undefined}
-              omitHeading
-              showCardMeta
-            />
+            {isUnderReview ? (
+              <div className="compiled-record-pdf-toolbar regional-response-detail-modal__download-toolbar">
+                <Button
+                  variant="secondary"
+                  compact
+                  type="button"
+                  disabled={pdfLoading || wordLoading || hrLoading}
+                  onClick={() => void handleDownloadPdf()}
+                >
+                  <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
+                  {pdfLoading ? 'Generating PDF…' : 'Download PDF'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  compact
+                  type="button"
+                  disabled={pdfLoading || wordLoading || hrLoading}
+                  onClick={() => void handleDownloadWord()}
+                >
+                  <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
+                  {wordLoading ? 'Generating Word…' : 'Download Word'}
+                </Button>
+                {exportError ? <span className="login-error small">{exportError}</span> : null}
+              </div>
+            ) : null}
 
-            <h2 className="card-section-heading">Summary</h2>
-            <div className="hr-request-view-template__prose-box">
-              {viewingRow.content?.trim() ? (
-                <p className="hr-request-view-template__prose regional-response-detail-modal__summary">
-                  {viewingRow.content.trim()}
-                </p>
-              ) : (
-                <p className="muted regional-response-detail-modal__summary-empty">—</p>
-              )}
+            <div ref={exportRef} className="regional-response-detail-modal__export-body">
+              <h2 className="card-section-heading">Department submissions</h2>
+              <DepartmentSubmissionsForRequest
+                tasksForDetail={tasksForViewing}
+                reqId={viewingRow.req_id}
+                issueIndicators={hrDetail?.issue?.indicators}
+                filterByRegionId={viewingRow.region_id ?? undefined}
+                omitHeading
+                showCardMeta
+              />
+
+              <h2 className="card-section-heading">Summary</h2>
+              <div className="hr-request-view-template__prose-box">
+                {viewingRow.content?.trim() ? (
+                  <p className="hr-request-view-template__prose regional-response-detail-modal__summary">
+                    {viewingRow.content.trim()}
+                  </p>
+                ) : (
+                  <p className="muted regional-response-detail-modal__summary-empty">—</p>
+                )}
+              </div>
             </div>
 
             {canReviewFederal && viewingRow.review_status !== 'accepted' ? (

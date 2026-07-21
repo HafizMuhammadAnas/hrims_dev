@@ -9,6 +9,9 @@ type Props = {
   /** departmentId → issue indicator ids assigned to that department */
   departmentIndicators: Record<number, number[]>
   onChangeDepartmentIndicators: (next: Record<number, number[]>) => void
+  /** Department-only selection for Other Issues requests, which have no indicators. */
+  selectedDepartmentIds?: number[]
+  onChangeSelectedDepartmentIds?: (next: number[]) => void
   notes: string
   onChangeNotes: (value: string) => void
   assigning: boolean
@@ -48,6 +51,8 @@ export function RegionalAssignDepartmentsPanel({
   departments,
   departmentIndicators,
   onChangeDepartmentIndicators,
+  selectedDepartmentIds = [],
+  onChangeSelectedDepartmentIds,
   notes,
   onChangeNotes,
   assigning,
@@ -57,8 +62,9 @@ export function RegionalAssignDepartmentsPanel({
   showBackLink = true,
 }: Props) {
   const byDepartment = assignedDepartmentIndicatorMap(departmentIndicators)
-  const mappedDeptCount = byDepartment.size
-  const canAssign = mappedDeptCount > 0 && indicators.length > 0 && departments.length > 0
+  const noIndicatorMode = indicators.length === 0
+  const mappedDeptCount = noIndicatorMode ? selectedDepartmentIds.length : byDepartment.size
+  const canAssign = mappedDeptCount > 0 && departments.length > 0
 
   function toggleIndicator(departmentId: number, indicatorId: number, checked: boolean) {
     const current = departmentIndicators[departmentId] ?? []
@@ -82,18 +88,36 @@ export function RegionalAssignDepartmentsPanel({
         Assign to departments ({regionName})
       </h4>
       <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-        Open a department to select the indicators they should respond to. Leave a department empty to skip it.
+        {noIndicatorMode
+          ? 'Select the departments that should provide a written response and attachment.'
+          : 'Open a department to select the indicators they should respond to. Leave a department empty to skip it.'}
       </p>
 
-      {indicators.length === 0 ? (
-        <p className="login-error" style={{ marginTop: 0 }}>
-          This request has no indicators to distribute.
-        </p>
-      ) : departments.length === 0 ? (
+      {departments.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
           No departments are mapped to your region. Add departments under <strong>Manage departments</strong> before
           assigning tasks.
         </p>
+      ) : noIndicatorMode ? (
+        <div className="regional-assign-dept-list">
+          {departments.map((d) => (
+            <label key={d.id} className="checkbox-label regional-assign-dept-card__indicator">
+              <input
+                type="checkbox"
+                checked={selectedDepartmentIds.includes(d.id)}
+                onChange={(e) => {
+                  const next = e.target.checked
+                    ? [...selectedDepartmentIds, d.id]
+                    : selectedDepartmentIds.filter((id) => id !== d.id)
+                  onChangeSelectedDepartmentIds?.([...new Set(next)])
+                }}
+              />
+              <span>
+                {d.name} {d.code ? <span className="muted small">({d.code})</span> : null}
+              </span>
+            </label>
+          ))}
+        </div>
       ) : (
         <div className="regional-assign-dept-list">
           {departments.map((d) => {

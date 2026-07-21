@@ -81,7 +81,7 @@ class IssueController extends Controller
                 'is_active' => true,
             ]);
             $this->syncArticles($issue, $data['articles']);
-            $this->replaceIndicators($issue, $data['indicators'] ?? []);
+            $this->syncIndicators($issue, $data['indicators'] ?? []);
 
             return $issue->fresh(array_merge(
                 [
@@ -122,9 +122,98 @@ class IssueController extends Controller
                 $this->syncArticles($issue, $data['articles']);
             }
             if (array_key_exists('indicators', $data)) {
-                $this->replaceIndicators($issue, $data['indicators']);
+                $this->syncIndicators($issue, $data['indicators']);
             }
         });
+
+        $issue->load(array_merge(
+            [
+                'convention:id,code,name',
+                'category:id,name',
+                'articles:id,article_name',
+            ],
+            $this->indicatorRelations(),
+        ));
+
+        return response()->json(['data' => $this->serializeDetail($issue)]);
+    }
+
+    /**
+     * Reorder indicators by stable id — updates sort_order only (never recreates rows).
+     */
+    public function reorderIndicators(Request $request, Issue $issue): JsonResponse
+    {
+        $data = $request->validate([
+            'ordered_ids' => ['required', 'array', 'min:1'],
+            'ordered_ids.*' => ['integer', 'distinct'],
+        ]);
+
+        $orderedIds = array_values(array_map('intval', $data['ordered_ids']));
+        $existingQuery = $issue->indicators();
+        if (IssueIndicator::hasIsActiveColumn()) {
+            $existingQuery->where('is_active', true);
+        }
+        $existingIds = $existingQuery
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+        $incomingSorted = collect($orderedIds)->sort()->values()->all();
+
+        if ($existingIds !== $incomingSorted) {
+            throw ValidationException::withMessages([
+                'ordered_ids' => ['The list must include every active indicator for this entry exactly once.'],
+            ]);
+        }
+
+        if (! IssueIndicator::hasSortOrderColumn()) {
+            throw ValidationException::withMessages([
+                'ordered_ids' => ['Indicator ordering is not available until the sort_order migration has been applied.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($issue, $orderedIds) {
+            foreach ($orderedIds as $sortOrder => $id) {
+                IssueIndicator::query()
+                    ->where('issue_id', $issue->id)
+                    ->where('id', $id)
+                    ->update(['sort_order' => (int) $sortOrder]);
+            }
+        });
+
+        $issue->load(array_merge(
+            [
+                'convention:id,code,name',
+                'category:id,name',
+                'articles:id,article_name',
+            ],
+            $this->indicatorRelations(),
+        ));
+
+        return response()->json(['data' => $this->serializeDetail($issue)]);
+    }
+
+    /**
+     * Activate or deactivate an indicator without deleting it (preserves request/response links).
+     */
+    public function setIndicatorActive(Request $request, Issue $issue, IssueIndicator $indicator): JsonResponse
+    {
+        if ((int) $indicator->issue_id !== (int) $issue->id) {
+            abort(404);
+        }
+        if (! IssueIndicator::hasIsActiveColumn()) {
+            throw ValidationException::withMessages([
+                'is_active' => ['Indicator activation is not available until the is_active migration has been applied.'],
+            ]);
+        }
+
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $indicator->is_active = (bool) $data['is_active'];
+        $indicator->save();
 
         $issue->load(array_merge(
             [
@@ -165,6 +254,8 @@ class IssueController extends Controller
             'articles.*.article_id' => ['required', 'integer'],
             'articles.*.relevant_paragraph' => ['nullable', 'string'],
             'indicators' => ['sometimes', 'array'],
+            'indicators.*.id' => ['sometimes', 'nullable', 'integer', 'distinct'],
+            'indicators.*.is_active' => ['sometimes', 'boolean'],
             'indicators.*.indicator_text' => ['required_with:indicators', 'string'],
             'indicators.*.disaggregation' => ['nullable', 'string'],
             'indicators.*.has_quantitative' => ['sometimes', 'boolean'],
@@ -175,6 +266,8 @@ class IssueController extends Controller
             'indicators.*.collects_by_location' => ['sometimes', 'boolean'],
             'indicators.*.collects_by_disability' => ['sometimes', 'boolean'],
             'indicators.*.collects_by_religion' => ['sometimes', 'boolean'],
+            'indicators.*.collects_by_consolidated' => ['sometimes', 'boolean'],
+            // Temporary input alias for clients deployed before the dimension rename.
             'indicators.*.collects_by_others' => ['sometimes', 'boolean'],
             'indicators.*.collection_by_year' => ['sometimes', 'array'],
             'indicators.*.collection_by_year.*.collection_year_id' => ['required', 'integer', Rule::exists('collection_years', 'id')->where('is_active', true)],
@@ -279,29 +372,57 @@ class IssueController extends Controller
     }
 
     /**
+     * Upsert indicators by stable id. Array index becomes sort_order.
+     * Existing ids keep their primary keys so HR requests / responses stay linked.
+     *
      * @param  list<array<string, mixed>>  $rows
      */
-    private function replaceIndicators(Issue $issue, array $rows): void
+    private function syncIndicators(Issue $issue, array $rows): void
     {
-        $issue->indicators()->delete();
-        foreach ($rows as $sortOrder => $row) {
+        $existingById = $issue->indicators()->get()->keyBy(
+            static fn (IssueIndicator $ind): int => (int) $ind->id,
+        );
+
+        $keepIds = [];
+        $sortOrder = 0;
+
+        foreach ($rows as $row) {
             $text = trim((string) ($row['indicator_text'] ?? ''));
             if ($text === '') {
                 continue;
             }
+
+            $incomingId = isset($row['id']) ? (int) $row['id'] : 0;
+            $existing = $incomingId > 0 ? ($existingById->get($incomingId) ?? null) : null;
+            if ($incomingId > 0 && $existing === null) {
+                throw ValidationException::withMessages([
+                    'indicators' => ['One or more indicator ids do not belong to this entry.'],
+                ]);
+            }
+
             $collectsByYear = (bool) ($row['collects_by_year'] ?? false);
             $collectsByGender = (bool) ($row['collects_by_gender'] ?? false);
             $collectsByAge = (bool) ($row['collects_by_age'] ?? false);
             $collectsByLocation = (bool) ($row['collects_by_location'] ?? false);
             $collectsByDisability = (bool) ($row['collects_by_disability'] ?? false);
             $collectsByReligion = (bool) ($row['collects_by_religion'] ?? false);
-            $collectsByOthers = (bool) ($row['collects_by_others'] ?? false);
+            $collectsByConsolidated = (bool) (
+                $row['collects_by_consolidated']
+                ?? $row['collects_by_others']
+                ?? false
+            );
             $hasQuantitative = (bool) ($row['has_quantitative'] ?? false);
             $hasQualitative = (bool) ($row['has_qualitative'] ?? false);
-            $collectionByYear = $this->normalizeCollectionByYear($row['collection_by_year'] ?? []);
-            $qualitativeYearIds = $this->normalizeQualitativeYearIds($row['qualitative_collection_by_year'] ?? []);
+            $hasYearPayload = array_key_exists('collection_by_year', $row)
+                || array_key_exists('qualitative_collection_by_year', $row);
+            $collectionByYear = $hasYearPayload
+                ? $this->normalizeCollectionByYear($row['collection_by_year'] ?? [])
+                : [];
+            $qualitativeYearIds = $hasYearPayload
+                ? $this->normalizeQualitativeYearIds($row['qualitative_collection_by_year'] ?? [])
+                : [];
             $usesDisaggregation = $collectsByGender || $collectsByAge || $collectsByLocation
-                || $collectsByDisability || $collectsByReligion || $collectsByOthers;
+                || $collectsByDisability || $collectsByReligion || $collectsByConsolidated;
 
             // Year-only qualitative uses qualitative_collection_by_year; also accept collection_by_year.
             if ($hasQualitative && ! $hasQuantitative && $qualitativeYearIds === [] && $collectionByYear !== []) {
@@ -311,37 +432,21 @@ class IssueController extends Controller
                 ));
             }
 
-            if ($hasQualitative && $qualitativeYearIds === []) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'indicators' => ['Each qualitative indicator must include at least one year.'],
+            // Years are selected by Federal Admin per request. Super Admin only sets Q/L + dimensions.
+            // Keep optional catalog years for legacy rows; do not require them here.
+            $collectsByYear = $hasQuantitative || $collectsByYear || $collectionByYear !== [] || $qualitativeYearIds !== [];
+
+            if ($hasQuantitative && $usesDisaggregation && ! $collectsByGender && ! $collectsByAge
+                && ! $collectsByLocation && ! $collectsByDisability && ! $collectsByReligion && ! $collectsByConsolidated) {
+                throw ValidationException::withMessages([
+                    'indicators' => ['Select at least one disaggregation dimension when collecting quantitative data.'],
                 ]);
             }
 
-            if ($hasQuantitative && $collectionByYear === []) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'indicators' => ['Each quantitative indicator must include at least one year.'],
-                ]);
-            }
-
-            $collectsByYear = $collectsByYear || $collectionByYear !== [] || $qualitativeYearIds !== [];
-
-            if ($collectsByYear && $collectionByYear === [] && $qualitativeYearIds === []) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'indicators' => ['Each indicator with year collection must include at least one year.'],
-                ]);
-            }
-
-            if ($collectsByYear && $usesDisaggregation && ! $collectsByGender && ! $collectsByAge
-                && ! $collectsByLocation && ! $collectsByDisability && ! $collectsByReligion && ! $collectsByOthers) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'indicators' => ['Select at least one disaggregation dimension when collecting by year and disaggregated data.'],
-                ]);
-            }
-
-            if ($collectsByYear && $collectsByGender) {
+            if ($collectsByYear && $collectsByGender && $collectionByYear !== []) {
                 foreach ($collectionByYear as $yearRow) {
                     if ($yearRow['collection_gender_ids'] === []) {
-                        throw \Illuminate\Validation\ValidationException::withMessages([
+                        throw ValidationException::withMessages([
                             'indicators' => ['Each selected year must include at least one gender when the gender dimension is enabled.'],
                         ]);
                     }
@@ -356,27 +461,61 @@ class IssueController extends Controller
                     : null,
                 'has_quantitative' => $hasQuantitative,
                 'has_qualitative' => $hasQualitative,
-                'collects_by_year' => $collectsByYear,
-                'collects_by_gender' => $hasQuantitative && $collectsByYear && $collectsByGender,
-                'collects_by_age' => $hasQuantitative && $collectsByYear && $collectsByAge,
-                'collects_by_location' => $hasQuantitative && $collectsByYear && $collectsByLocation,
-                'collects_by_disability' => $hasQuantitative && $collectsByYear && $collectsByDisability,
-                'collects_by_religion' => $hasQuantitative && $collectsByYear && $collectsByReligion,
-                'collects_by_others' => $hasQuantitative && $collectsByYear && $collectsByOthers,
+                'collects_by_year' => $hasQuantitative || $collectsByYear,
+                'collects_by_gender' => $hasQuantitative && $collectsByGender,
+                'collects_by_age' => $hasQuantitative && $collectsByAge,
+                'collects_by_location' => $hasQuantitative && $collectsByLocation,
+                'collects_by_disability' => $hasQuantitative && $collectsByDisability,
+                'collects_by_religion' => $hasQuantitative && $collectsByReligion,
+                'collects_by_consolidated' => $hasQuantitative && $collectsByConsolidated,
             ];
             if (IssueIndicator::hasSortOrderColumn()) {
-                $indicatorAttributes['sort_order'] = (int) $sortOrder;
+                $indicatorAttributes['sort_order'] = $sortOrder;
+            }
+            if (IssueIndicator::hasIsActiveColumn()) {
+                $indicatorAttributes['is_active'] = array_key_exists('is_active', $row)
+                    ? (bool) $row['is_active']
+                    : true;
             }
 
-            $indicator = IssueIndicator::query()->create($indicatorAttributes);
+            if ($existing !== null) {
+                $existing->fill($indicatorAttributes);
+                $existing->save();
+                $indicator = $existing;
+                $keepIds[] = (int) $existing->id;
+            } else {
+                $indicator = IssueIndicator::query()->create($indicatorAttributes);
+                $keepIds[] = (int) $indicator->id;
+            }
 
-            if ($collectsByYear || $qualitativeYearIds !== []) {
+            // Only touch catalog years when the client explicitly sent year payloads.
+            if ($hasYearPayload) {
                 $indicator->syncCollectionByYear(
                     $hasQuantitative ? $collectionByYear : [],
                     (bool) $indicatorAttributes['collects_by_gender'],
                     $hasQualitative ? $qualitativeYearIds : [],
                 );
             }
+
+            $sortOrder++;
+        }
+
+        // Never hard-delete: indicators omitted from the payload are deactivated so
+        // existing HR requests / department responses keep stable indicator ids.
+        $toDeactivate = $existingById->keys()
+            ->map(static fn ($id): int => (int) $id)
+            ->diff($keepIds)
+            ->values()
+            ->all();
+        if ($toDeactivate !== [] && IssueIndicator::hasIsActiveColumn()) {
+            IssueIndicator::query()
+                ->where('issue_id', $issue->id)
+                ->whereIn('id', $toDeactivate)
+                ->update(['is_active' => false]);
+        } elseif ($toDeactivate !== []) {
+            throw ValidationException::withMessages([
+                'indicators' => ['Cannot remove indicators until the is_active migration has been applied. Reactivate/deactivate is required instead of delete.'],
+            ]);
         }
     }
 

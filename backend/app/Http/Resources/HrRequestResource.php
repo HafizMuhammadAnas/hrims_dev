@@ -4,8 +4,10 @@ namespace App\Http\Resources;
 
 use App\Models\HrRequest;
 use App\Models\HrRequestAttachment;
+use App\Models\HrRequestIndicatorYear;
 use App\Models\Issue;
 use App\Models\IssueIndicator;
+use App\Support\RequestIndicatorYears;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +26,8 @@ class HrRequestResource extends JsonResource
             'conv' => $this->conv,
             'convention_id' => $this->convention_id,
             'issue_id' => $this->issue_id,
+            'request_type' => $this->request_type,
+            'other_issue_text' => $this->other_issue_text,
             'date' => $this->due_date?->format('Y-m-d') ?? '',
             'status' => $this->status,
             'details' => $this->details,
@@ -90,11 +94,36 @@ class HrRequestResource extends JsonResource
                 'size' => $a->size,
                 'url' => $this->attachmentViewUrl($a),
             ])->values()->all()),
-            'indicator_responses' => $this->whenLoaded('indicatorResponses', fn () => $this->indicatorResponses->map(fn ($r) => [
-                'issue_indicator_id' => $r->issue_indicator_id,
-                'quantitative_value' => $r->quantitative_value,
-                'qualitative_text' => $r->qualitative_text,
-            ])->values()->all()),
+            'indicator_responses' => $this->whenLoaded('indicatorResponses', function () {
+                $this->resource->loadMissing('indicatorYears');
+                $yearsByIndicator = $this->indicatorYears
+                    ->groupBy(fn (HrRequestIndicatorYear $y) => (int) $y->issue_indicator_id);
+
+                return $this->indicatorResponses->map(function ($r) use ($yearsByIndicator) {
+                    $iid = (int) $r->issue_indicator_id;
+                    $rows = $yearsByIndicator->get($iid, collect());
+                    $quant = $rows
+                        ->where('kind', HrRequestIndicatorYear::KIND_QUANTITATIVE)
+                        ->pluck('collection_year_id')
+                        ->map(fn ($id) => (int) $id)
+                        ->values()
+                        ->all();
+                    $qual = $rows
+                        ->where('kind', HrRequestIndicatorYear::KIND_QUALITATIVE)
+                        ->pluck('collection_year_id')
+                        ->map(fn ($id) => (int) $id)
+                        ->values()
+                        ->all();
+
+                    return [
+                        'issue_indicator_id' => $iid,
+                        'quantitative_value' => $r->quantitative_value,
+                        'qualitative_text' => $r->qualitative_text,
+                        'quantitative_year_ids' => $quant,
+                        'qualitative_year_ids' => $qual,
+                    ];
+                })->values()->all();
+            }),
         ];
     }
 
@@ -128,6 +157,7 @@ class HrRequestResource extends JsonResource
             'indicators.yearGenderCells.collectionGender:id,name,sort_order',
             'indicators.collectionYearRows.collectionYear:id,label,sort_order',
         ]);
+        $this->resource->loadMissing('indicatorYears');
 
         return [
             'id' => $i->id,
@@ -145,10 +175,25 @@ class HrRequestResource extends JsonResource
                 'description' => $a->description,
                 'relevant_paragraph' => $a->pivot->relevant_paragraph ?? null,
             ])->values()->all(),
-            'indicators' => $i->indicators
-                ->map(fn (IssueIndicator $ind) => $ind->toHrApiArray($i))
-                ->values()
-                ->all(),
+            'indicators' => (function () use ($i) {
+                $this->resource->loadMissing('indicatorResponses');
+                $selectedIds = $this->resource->indicatorResponses
+                    ->pluck('issue_indicator_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                return $i->indicators
+                    ->filter(function (IssueIndicator $ind) use ($selectedIds) {
+                        return $ind->isActive() || in_array((int) $ind->id, $selectedIds, true);
+                    })
+                    ->map(function (IssueIndicator $ind) use ($i) {
+                        $api = $ind->toHrApiArray($i);
+
+                        return RequestIndicatorYears::applyToIndicatorApi($api, $ind, $this->resource);
+                    })
+                    ->values()
+                    ->all();
+            })(),
         ];
     }
 }

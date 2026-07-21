@@ -55,7 +55,11 @@ export const GOVERNANCE_DIMENSION_SERIES = [
   { key: 'disability', label: 'Disability', field: 'by_year_disability' as const },
   { key: 'district', label: 'District', field: 'by_year_district' as const },
   { key: 'religion', label: 'Religion', field: 'by_year_religion' as const },
-  { key: 'others', label: 'Others', field: 'by_year_others' as const },
+  {
+    key: 'consolidated',
+    label: 'Consolidated Data',
+    field: 'by_year_consolidated' as const,
+  },
 ] as const
 
 export type GovernanceDimensionKey = (typeof GOVERNANCE_DIMENSION_SERIES)[number]['key']
@@ -105,7 +109,10 @@ export function buildIndicatorDimensionTotalsSeries(
       }
 
       for (const dim of GOVERNANCE_DIMENSION_SERIES) {
-        const keyed = quantitative[dim.field]
+        const keyed =
+          dim.key === 'consolidated'
+            ? quantitative.by_year_consolidated ?? quantitative.by_year_others
+            : quantitative[dim.field]
         if (!keyed) continue
         for (const [yearId, cells] of Object.entries(keyed)) {
           const n = dimensionTotalFromYearCells(cells)
@@ -188,7 +195,8 @@ function sortYearIds(yearIds: string[], labels: Map<string, string>): string[] {
 
 /**
  * Aggregate year totals across department task responses for the selected indicators.
- * Prefers gender Total (or sum of genders); falls back to other dimension year Totals when gender is absent.
+ * Uses Consolidated Data / Year totals only (the Year totals bar on department entry).
+ * Does not use Gender (or other dimension) Totals for these graphs.
  */
 export function buildIndicatorGenderTrendSeries(
   tasks: DepartmentTaskRow[],
@@ -216,31 +224,14 @@ export function buildIndicatorGenderTrendSeries(
         totals.set(String(indicatorId), yearMap)
       }
 
-      const byYearGender = quantitative.by_year_gender
-      if (byYearGender) {
-        for (const [yearId, genders] of Object.entries(byYearGender)) {
-          const n = genderTotalFromYearCells(genders)
-          if (n == null) continue
-          yearMap.set(String(yearId), (yearMap.get(String(yearId)) ?? 0) + n)
-        }
-        continue
-      }
+      const byYearConsolidated =
+        quantitative.by_year_consolidated ?? quantitative.by_year_others
+      if (!byYearConsolidated) continue
 
-      // Fallback: use explicit Total cells from other year-keyed dimensions.
-      for (const keyed of [
-        quantitative.by_year_others,
-        quantitative.by_year_age,
-        quantitative.by_year_disability,
-        quantitative.by_year_religion,
-        quantitative.by_year_district,
-      ]) {
-        if (!keyed) continue
-        for (const [yearId, cells] of Object.entries(keyed)) {
-          const n = genderTotalFromYearCells(cells)
-          if (n == null) continue
-          yearMap.set(String(yearId), (yearMap.get(String(yearId)) ?? 0) + n)
-        }
-        break
+      for (const [yearId, cells] of Object.entries(byYearConsolidated)) {
+        const n = dimensionTotalFromYearCells(cells)
+        if (n == null) continue
+        yearMap.set(String(yearId), (yearMap.get(String(yearId)) ?? 0) + n)
       }
     }
   }

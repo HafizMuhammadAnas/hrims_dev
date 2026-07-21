@@ -79,7 +79,7 @@ function indicatorDisaggregationLabel(ind: KnowledgeConventionIssueDetail['indic
     if (ind.collects_by_location) dims.push('Location')
     if (ind.collects_by_disability) dims.push('Disability')
     if (ind.collects_by_religion) dims.push('Religion')
-    if (ind.collects_by_others) dims.push('Others')
+    if (ind.collects_by_consolidated) dims.push('Consolidated Data')
     parts.push(dims.length === 0 ? `${years} (Quantitative)` : `${years} (${dims.join(', ')})`)
   }
   const qualYears = ind.qualitative_collection_by_year ?? []

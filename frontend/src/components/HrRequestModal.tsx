@@ -9,12 +9,13 @@ import {
   updateHrRequest,
   updateHrRequestFromIssueForm,
   type FederalDepartmentOption,
+  type HrRequestFormCollectionYear,
   type HrRequestIndicatorResponseInput,
   type KnowledgeConventionRow,
 } from '../api/hrRequests'
 import type { RegionRow } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
-import { isDepartmentAdmin, isViewer } from '../lib/roles'
+import { isDepartmentAdmin, isFederalAdmin, isViewer } from '../lib/roles'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import {
   coerceIssueEntryKind,
@@ -38,7 +39,12 @@ import {
   LABEL_NEW_REQUEST,
   LABEL_REQUEST_DETAILS,
 } from '../lib/uiLabels'
-import type { HrRequestIssueDetail, HrRequestRow, HrRequestStatus } from '../types/hrRequest'
+import type {
+  HrRequestIssueDetail,
+  HrRequestRow,
+  HrRequestStatus,
+  HrRequestType,
+} from '../types/hrRequest'
 import { IndicatorYearGenderHint } from './IndicatorYearGenderHint'
 import { PendingFileAttachmentListItem } from './PendingFileAttachmentRow'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
@@ -107,11 +113,14 @@ function issueMatchesEntryKindFilters(
 }
 
 type IndicatorValues = Record<number, { quantitative: string; qualitative: string }>
+type IndicatorYearSelections = Record<number, { quantitative: number[]; qualitative: number[] }>
 
 type IssueFormState = {
   title: string
   convention_id: number | ''
   issue_id: number | ''
+  request_type: HrRequestType
+  other_issue_text: string
   region_ids: number[]
   department_ids: number[]
   date: string
@@ -120,6 +129,8 @@ type IssueFormState = {
   /** Indicators included in this request (subset of the issue’s indicators). */
   selectedIndicatorIds: number[]
   indicatorValues: IndicatorValues
+  /** Per-indicator year picks (Federal Admin). */
+  indicatorYearIds: IndicatorYearSelections
   attachmentFiles: File[]
 }
 
@@ -129,6 +140,8 @@ function emptyIssueForm(lockedRegionId: number | null): IssueFormState {
     title: '',
     convention_id: '',
     issue_id: '',
+    request_type: 'loi',
+    other_issue_text: '',
     region_ids,
     department_ids: [],
     date: todayIso(),
@@ -136,6 +149,7 @@ function emptyIssueForm(lockedRegionId: number | null): IssueFormState {
     details: '',
     selectedIndicatorIds: [],
     indicatorValues: {},
+    indicatorYearIds: {},
     attachmentFiles: [],
   }
 }
@@ -150,6 +164,7 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
           ? [lockedRegionId]
           : []
   const ind: IndicatorValues = {}
+  const yearSel: IndicatorYearSelections = {}
   for (const r of row.indicator_responses ?? []) {
     ind[r.issue_indicator_id] = {
       quantitative:
@@ -157,6 +172,20 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
           ? String(r.quantitative_value)
           : '',
       qualitative: r.qualitative_text ?? '',
+    }
+    const quantFromResponse = r.quantitative_year_ids ?? []
+    const qualFromResponse = r.qualitative_year_ids ?? []
+    // Legacy fallback: catalog years on the issue indicator when request years were never stored.
+    const catalogInd = row.issue?.indicators?.find((i) => i.id === r.issue_indicator_id)
+    yearSel[r.issue_indicator_id] = {
+      quantitative:
+        quantFromResponse.length > 0
+          ? quantFromResponse
+          : (catalogInd?.collection_by_year ?? []).map((y) => y.year_id),
+      qualitative:
+        qualFromResponse.length > 0
+          ? qualFromResponse
+          : (catalogInd?.qualitative_collection_by_year ?? []).map((y) => y.year_id),
     }
   }
   const selectedIndicatorIds = [
@@ -166,6 +195,10 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
     title: row.title,
     convention_id: row.convention_id ?? '',
     issue_id: row.issue_id ?? '',
+    request_type:
+      row.request_type ??
+      (row.issue?.entry_kind === 'recommendation' ? 'concluding_observation' : 'loi'),
+    other_issue_text: row.other_issue_text ?? '',
     region_ids,
     department_ids: row.departments?.map((d) => d.id) ?? [],
     date: row.date,
@@ -173,6 +206,7 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
     details: row.details ?? '',
     selectedIndicatorIds,
     indicatorValues: ind,
+    indicatorYearIds: yearSel,
     attachmentFiles: [],
   }
 }
@@ -221,12 +255,14 @@ function buildIndicatorPayload(
   issue: HrRequestIssueDetail,
   values: IndicatorValues,
   selectedIds: number[],
+  yearIds: IndicatorYearSelections,
 ): HrRequestIndicatorResponseInput[] {
   const selected = new Set(selectedIds)
   const out: HrRequestIndicatorResponseInput[] = []
   for (const ind of issue.indicators) {
     if (!selected.has(ind.id)) continue
     const v = values[ind.id] ?? { quantitative: '', qualitative: '' }
+    const years = yearIds[ind.id] ?? { quantitative: [], qualitative: [] }
     const qRaw = v.quantitative.trim()
     const lRaw = v.qualitative.trim()
     const entry: HrRequestIndicatorResponseInput = { issue_indicator_id: ind.id }
@@ -235,6 +271,12 @@ function buildIndicatorPayload(
       entry.quantitative_value = Number.isFinite(n) ? n : null
     }
     if (lRaw !== '') entry.qualitative_text = lRaw
+    if (indicatorAllowsQuantitative(ind, issue)) {
+      entry.quantitative_year_ids = years.quantitative
+    }
+    if (indicatorAllowsQualitative(ind, issue)) {
+      entry.qualitative_year_ids = years.qualitative
+    }
     out.push(entry)
   }
   return out
@@ -296,6 +338,7 @@ export function HrRequestModal({
       (isDepartmentAdmin(authUser) || isViewer(authUser)) &&
       authUser.department != null,
   )
+  const canUseOtherIssues = isFederalAdmin(authUser)
 
   const assignableRegions = useMemo(() => {
     const base = regions.filter((r) => r.slug !== 'federal')
@@ -313,10 +356,16 @@ export function HrRequestModal({
     return s
   }, [regions])
 
-  const usesIssueFlow = mode === 'create' || Boolean(detail?.convention_id && detail?.issue_id)
+  const usesIssueFlow =
+    mode === 'create' ||
+    Boolean(
+      detail?.convention_id &&
+        (detail?.issue_id || detail?.request_type === 'other_issue'),
+    )
 
   const [conventions, setConventions] = useState<KnowledgeConventionRow[]>([])
   const [issues, setIssues] = useState<HrRequestIssueDetail[]>([])
+  const [collectionYears, setCollectionYears] = useState<HrRequestFormCollectionYear[]>([])
   const [federalDepts, setFederalDepts] = useState<FederalDepartmentOption[]>([])
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [issuesLoading, setIssuesLoading] = useState(false)
@@ -394,8 +443,9 @@ export function HrRequestModal({
   const loadIssues = useCallback(async (conventionId: number, fallback: HrRequestIssueDetail[] = []) => {
     setIssuesLoading(true)
     try {
-      const rows = await fetchHrRequestFormIssues(conventionId)
-      setIssues(rows)
+      const result = await fetchHrRequestFormIssues(conventionId)
+      setIssues(result.issues)
+      setCollectionYears(result.collectionYears)
     } catch {
       setIssues(fallback)
       if (fallback.length === 0) {
@@ -419,10 +469,17 @@ export function HrRequestModal({
       return
     }
     if (!detailLoading && detail) {
-      if (detail.convention_id && detail.issue_id) {
+      if (
+        detail.convention_id &&
+        (detail.issue_id || detail.request_type === 'other_issue')
+      ) {
         setLegacyForm(null)
         setIssueForm(issueFormFromDetail(detail, lockedRegionId))
-        setEntryKindFilters(entryKindFiltersForIssue(detail.issue))
+        setEntryKindFilters(
+          detail.request_type === 'other_issue'
+            ? { issue: false, recommendation: false }
+            : entryKindFiltersForIssue(detail.issue),
+        )
         if (detail.issue) {
           setIssues([detail.issue])
         } else {
@@ -521,13 +578,17 @@ export function HrRequestModal({
 
   useEffect(() => {
     if (mode !== 'create' || !issueForm) return
+    if (issueForm.request_type === 'other_issue') {
+      setIssues([])
+      return
+    }
     const cid = issueForm.convention_id
     if (cid === '') {
       setIssues([])
       return
     }
     void loadIssues(cid)
-  }, [mode, issueForm?.convention_id, loadIssues])
+  }, [mode, issueForm?.convention_id, issueForm?.request_type, loadIssues])
 
   useEffect(() => {
     if (!issueForm || issueForm.issue_id === '') return
@@ -587,6 +648,7 @@ export function HrRequestModal({
             issue_id: '',
             selectedIndicatorIds: [],
             indicatorValues: {},
+            indicatorYearIds: {},
           }
         : f,
     )
@@ -680,16 +742,40 @@ export function HrRequestModal({
   function runIssueValidation(): boolean {
     if (!issueForm) return false
     const fe: Record<string, string> = {}
+    const otherIssue = issueForm.request_type === 'other_issue'
     if (!issueForm.title.trim()) fe.title = 'Title is required.'
     if (issueForm.convention_id === '') fe.convention_id = 'Convention is required.'
-    if (issueForm.issue_id === '') fe.issue_id = loiRequiredMessage()
+    if (otherIssue) {
+      if (!issueForm.other_issue_text.trim()) {
+        fe.other_issue_text = 'Other issue details are required.'
+      }
+    } else if (issueForm.issue_id === '') {
+      fe.issue_id = loiRequiredMessage()
+    }
     if (!issueForm.date) fe.date = 'Due date is required.'
     if (
+      !otherIssue &&
       selectedIssue &&
       selectedIssue.indicators.length > 0 &&
       issueForm.selectedIndicatorIds.length === 0
     ) {
       fe.indicator_ids = selectIndicatorForLoiMessage()
+    }
+    if (!otherIssue && selectedIssue && issueForm.selectedIndicatorIds.length > 0) {
+      for (const ind of selectedIssue.indicators) {
+        if (!issueForm.selectedIndicatorIds.includes(ind.id)) continue
+        const years = issueForm.indicatorYearIds[ind.id] ?? { quantitative: [], qualitative: [] }
+        const allowQ = indicatorAllowsQuantitative(ind, selectedIssue)
+        const allowL = indicatorAllowsQualitative(ind, selectedIssue)
+        if (allowQ && years.quantitative.length === 0) {
+          fe.indicator_ids = `Select at least one quantitative year for: ${ind.indicator_text}`
+          break
+        }
+        if (allowL && years.qualitative.length === 0) {
+          fe.indicator_ids = `Select at least one qualitative year for: ${ind.indicator_text}`
+          break
+        }
+      }
     }
     if (issueForm.region_ids.length === 0) {
       fe.region_ids = 'Select at least one region.'
@@ -729,43 +815,58 @@ export function HrRequestModal({
     if (readOnly || !issueForm || !usesIssueFlow) return
     setFormBanner(null)
     setFieldErrors({})
-    if (!runIssueValidation() || !selectedIssue) return
+    if (!runIssueValidation()) return
+    const otherIssue = issueForm.request_type === 'other_issue'
+    if (!otherIssue && !selectedIssue) return
     const ictInPayload = issueForm.region_ids.some((id) => ictRegionIdSet.has(id))
     setSaving(true)
     try {
       if (mode === 'create') {
-        if (issueForm.convention_id === '' || issueForm.issue_id === '') return
+        if (issueForm.convention_id === '') return
+        if (!otherIssue && issueForm.issue_id === '') return
         await createHrRequestFromIssueForm({
           title: issueForm.title.trim(),
           convention_id: issueForm.convention_id,
-          issue_id: issueForm.issue_id,
+          request_type: issueForm.request_type,
+          issue_id: otherIssue ? null : (issueForm.issue_id as number),
+          other_issue_text: otherIssue ? issueForm.other_issue_text.trim() : null,
           date: issueForm.date,
           status,
           details: issueForm.details.trim() || null,
           region_ids: issueForm.region_ids,
           department_ids: ictInPayload ? issueForm.department_ids : [],
-          indicator_responses: buildIndicatorPayload(
-            selectedIssue,
-            issueForm.indicatorValues,
-            issueForm.selectedIndicatorIds,
-          ),
+          indicator_responses:
+            !otherIssue && selectedIssue
+              ? buildIndicatorPayload(
+                  selectedIssue,
+                  issueForm.indicatorValues,
+                  issueForm.selectedIndicatorIds,
+                  issueForm.indicatorYearIds,
+                )
+              : [],
           attachments: issueForm.attachmentFiles,
         })
       } else if (mode === 'edit' && detail) {
         await updateHrRequestFromIssueForm(detail.id, {
           title: issueForm.title.trim(),
           convention_id: issueForm.convention_id as number,
-          issue_id: issueForm.issue_id as number,
+          request_type: issueForm.request_type,
+          issue_id: otherIssue ? null : (issueForm.issue_id as number),
+          other_issue_text: otherIssue ? issueForm.other_issue_text.trim() : null,
           region_ids: issueForm.region_ids,
           department_ids: ictInPayload ? issueForm.department_ids : [],
           date: issueForm.date,
           status,
           details: issueForm.details.trim() || null,
-          indicator_responses: buildIndicatorPayload(
-            selectedIssue,
-            issueForm.indicatorValues,
-            issueForm.selectedIndicatorIds,
-          ),
+          indicator_responses:
+            !otherIssue && selectedIssue
+              ? buildIndicatorPayload(
+                  selectedIssue,
+                  issueForm.indicatorValues,
+                  issueForm.selectedIndicatorIds,
+                  issueForm.indicatorYearIds,
+                )
+              : [],
           attachments: issueForm.attachmentFiles,
         })
       }
@@ -931,7 +1032,7 @@ export function HrRequestModal({
               {(catalogLoading || issuesLoading) && (
                 <p className="muted">Loading reference data…</p>
               )}
-              {selectedIssue ? (
+              {selectedIssue || issueForm.request_type === 'other_issue' ? (
                 <HrRequestViewTemplate
                   className={useWorkflowHero ? 'hr-request-view-template--external-hero' : undefined}
                   requestId={detail?.id ?? requestIdHint}
@@ -942,17 +1043,21 @@ export function HrRequestModal({
                   ictDepartmentNames={viewTemplateIctDepartmentNames}
                   assignedDepartmentNames={viewTemplateAssignedDepartmentNames}
                   conventionLabel={conventionDisplayLabel}
-                  issueTitle={issueEntryPrimaryText(selectedIssue)}
-                  issueEntryKind={selectedIssue.entry_kind === 'recommendation' ? 'recommendation' : 'issue'}
-                  categoryName={selectedIssue.category?.name ?? '—'}
-                  issueDescription={selectedIssue.description ?? null}
+                  requestType={issueForm.request_type}
+                  otherIssueText={issueForm.other_issue_text}
+                  issueTitle={selectedIssue ? issueEntryPrimaryText(selectedIssue) : 'Other Issues'}
+                  issueEntryKind={
+                    selectedIssue?.entry_kind === 'recommendation' ? 'recommendation' : 'issue'
+                  }
+                  categoryName={selectedIssue?.category?.name ?? '—'}
+                  issueDescription={selectedIssue?.description ?? null}
                   description={issueForm.details}
                   regionalInstructionsOnly={departmentPortalRegionalNotes !== undefined}
                   regionalInstructionsText={
                     departmentPortalRegionalNotes !== undefined ? departmentPortalRegionalNotes : null
                   }
-                  articles={selectedIssue.articles}
-                  indicators={indicatorsForMappingUi.map((ind) => {
+                  articles={selectedIssue?.articles ?? []}
+                  indicators={selectedIssue ? indicatorsForMappingUi.map((ind) => {
                     const resp = detail?.indicator_responses?.find(
                       (r) => r.issue_indicator_id === ind.id,
                     )
@@ -966,7 +1071,7 @@ export function HrRequestModal({
                       quantitative_value: resp?.quantitative_value,
                       qualitative_text: resp?.qualitative_text,
                     }
-                  })}
+                  }) : []}
                   attachments={detail?.attachments}
                 />
               ) : (
@@ -1026,7 +1131,9 @@ export function HrRequestModal({
                   value={issueForm.convention_id === '' ? '' : String(issueForm.convention_id)}
                   onChange={(e) => {
                     const v = e.target.value === '' ? '' : Number(e.target.value)
-                    setEntryKindFilters(defaultEntryKindFilters())
+                    if (issueForm.request_type !== 'other_issue') {
+                      setEntryKindFilters(defaultEntryKindFilters())
+                    }
                     setIssueForm((f) =>
                       f
                         ? {
@@ -1035,6 +1142,7 @@ export function HrRequestModal({
                             issue_id: '',
                             selectedIndicatorIds: [],
                             indicatorValues: {},
+                            indicatorYearIds: {},
                           }
                         : f,
                     )
@@ -1060,12 +1168,20 @@ export function HrRequestModal({
                     role="radiogroup"
                     aria-label={issueEntryKindToggleAriaLabel()}
                   >
-                    {(['issue', 'recommendation'] as const).map((kind) => (
+                    {(
+                      canUseOtherIssues
+                        ? (['issue', 'recommendation', 'other_issue'] as const)
+                        : (['issue', 'recommendation'] as const)
+                    ).map((kind) => (
                       <label key={kind} className="checkbox-label">
                         <input
                           type="radio"
                           name="hr-entry-kind"
-                          checked={entryKindFilters[kind]}
+                          checked={
+                            kind === 'other_issue'
+                              ? issueForm.request_type === 'other_issue'
+                              : entryKindFilters[kind]
+                          }
                           onChange={() => {
                             setEntryKindFilters({
                               issue: kind === 'issue',
@@ -1075,59 +1191,99 @@ export function HrRequestModal({
                               f
                                 ? {
                                     ...f,
+                                    request_type:
+                                      kind === 'issue'
+                                        ? 'loi'
+                                        : kind === 'recommendation'
+                                          ? 'concluding_observation'
+                                          : 'other_issue',
                                     issue_id: '',
+                                    other_issue_text:
+                                      kind === 'other_issue' ? f.other_issue_text : '',
                                     selectedIndicatorIds: [],
                                     indicatorValues: {},
+                                    indicatorYearIds: {},
                                   }
                                 : f,
                             )
                           }}
                         />
-                        <span>{issueEntryKindBadgeLabel(kind)}</span>
+                        <span>
+                          {kind === 'other_issue'
+                            ? 'Other Issues'
+                            : issueEntryKindBadgeLabel(kind)}
+                        </span>
                       </label>
                     ))}
                   </div>
                 </FormField>
               )}
 
-              <FormField label={hrIssueSelectFieldLabel(entryKindFilters)} htmlFor="hr-issue">
-                <SearchableSelect
-                  id="hr-issue"
-                  value={issueForm.issue_id === '' ? '' : String(issueForm.issue_id)}
-                  onChange={(v) => {
-                    const next = v === '' ? '' : Number(v)
-                    setIssueForm((f) =>
-                      f
-                        ? {
-                            ...f,
-                            issue_id: next === '' ? '' : next,
-                            selectedIndicatorIds: [],
-                          }
-                        : f,
-                    )
-                  }}
-                  options={issueSelectOptions}
-                  disabled={
-                    readOnly ||
-                    issueForm.convention_id === '' ||
-                    (!readOnly && issuesLoading) ||
-                    (!entryKindFilters.issue && !entryKindFilters.recommendation)
-                  }
-                  placeholder={
-                    issueForm.convention_id === ''
-                      ? 'Select a convention first'
-                      : !entryKindFilters.issue && !entryKindFilters.recommendation
-                        ? 'Select LOI or Concluding Observations'
-                        : issuesLoading
-                          ? loiLoadingPlaceholder()
-                          : hrIssueSelectPlaceholder(entryKindFilters)
-                  }
-                  emptyFilterMessage={loiEmptyFilterMessage()}
-                  aria-invalid={Boolean(fieldErrors.issue_id)}
-                  aria-describedby={fieldErrors.issue_id ? 'hr-issue-err' : undefined}
-                />
-                <FieldError id="hr-issue-err" message={fieldErrors.issue_id} />
-              </FormField>
+              {issueForm.request_type === 'other_issue' ? (
+                <FormField label="Other issue details" htmlFor="hr-other-issue">
+                  <textarea
+                    id="hr-other-issue"
+                    rows={6}
+                    value={issueForm.other_issue_text}
+                    onChange={(e) =>
+                      setIssueForm((f) =>
+                        f ? { ...f, other_issue_text: e.target.value } : f,
+                      )
+                    }
+                    placeholder="Describe the other issue requiring a departmental response…"
+                    aria-invalid={Boolean(fieldErrors.other_issue_text)}
+                    aria-describedby={
+                      fieldErrors.other_issue_text ? 'hr-other-issue-err' : undefined
+                    }
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                  <FieldError
+                    id="hr-other-issue-err"
+                    message={fieldErrors.other_issue_text}
+                  />
+                </FormField>
+              ) : (
+                <FormField label={hrIssueSelectFieldLabel(entryKindFilters)} htmlFor="hr-issue">
+                  <SearchableSelect
+                    id="hr-issue"
+                    value={issueForm.issue_id === '' ? '' : String(issueForm.issue_id)}
+                    onChange={(v) => {
+                      const next = v === '' ? '' : Number(v)
+                      setIssueForm((f) =>
+                        f
+                          ? {
+                              ...f,
+                              issue_id: next === '' ? '' : next,
+                              selectedIndicatorIds: [],
+                              indicatorValues: {},
+                              indicatorYearIds: {},
+                            }
+                          : f,
+                      )
+                    }}
+                    options={issueSelectOptions}
+                    disabled={
+                      readOnly ||
+                      issueForm.convention_id === '' ||
+                      (!readOnly && issuesLoading) ||
+                      (!entryKindFilters.issue && !entryKindFilters.recommendation)
+                    }
+                    placeholder={
+                      issueForm.convention_id === ''
+                        ? 'Select a convention first'
+                        : !entryKindFilters.issue && !entryKindFilters.recommendation
+                          ? 'Select LOI or Concluding Observations'
+                          : issuesLoading
+                            ? loiLoadingPlaceholder()
+                            : hrIssueSelectPlaceholder(entryKindFilters)
+                    }
+                    emptyFilterMessage={loiEmptyFilterMessage()}
+                    aria-invalid={Boolean(fieldErrors.issue_id)}
+                    aria-describedby={fieldErrors.issue_id ? 'hr-issue-err' : undefined}
+                  />
+                  <FieldError id="hr-issue-err" message={fieldErrors.issue_id} />
+                </FormField>
+              )}
 
               {readOnly && (
                 <FormField label="Request description" htmlFor="hr-details-summary">
@@ -1252,13 +1408,16 @@ export function HrRequestModal({
                               setIssueForm((f) => {
                                 if (!f) return f
                                 const nextVals = { ...f.indicatorValues }
+                                const nextYears = { ...f.indicatorYearIds }
                                 for (const id of f.selectedIndicatorIds) {
                                   nextVals[id] = { quantitative: '', qualitative: '' }
+                                  delete nextYears[id]
                                 }
                                 return {
                                   ...f,
                                   selectedIndicatorIds: [],
                                   indicatorValues: nextVals,
+                                  indicatorYearIds: nextYears,
                                 }
                               })
                             }}
@@ -1296,13 +1455,18 @@ export function HrRequestModal({
                                         if (on) set.add(ind.id)
                                         else set.delete(ind.id)
                                         const nextVals = { ...f.indicatorValues }
+                                        const nextYears = { ...f.indicatorYearIds }
                                         if (!on) {
                                           nextVals[ind.id] = { quantitative: '', qualitative: '' }
+                                          delete nextYears[ind.id]
+                                        } else if (!nextYears[ind.id]) {
+                                          nextYears[ind.id] = { quantitative: [], qualitative: [] }
                                         }
                                         return {
                                           ...f,
                                           selectedIndicatorIds: [...set].sort((a, b) => a - b),
                                           indicatorValues: nextVals,
+                                          indicatorYearIds: nextYears,
                                         }
                                       })
                                     }}
@@ -1316,10 +1480,139 @@ export function HrRequestModal({
                                     ) : null}
                                   </span>
                                 </label>
-                                <IndicatorYearGenderHint
-                                  indicator={ind}
-                                  style={{ marginLeft: 28, marginTop: 4 }}
-                                />
+                                {checked ? (
+                                  readOnly ? (
+                                    <IndicatorYearGenderHint
+                                      indicator={ind}
+                                      style={{ marginLeft: 28, marginTop: 4 }}
+                                    />
+                                  ) : (
+                                  <div style={{ marginLeft: 28, marginTop: 8 }}>
+                                    {allowQ ? (
+                                      <div className="issue-indicator-mapping-block" style={{ marginBottom: 8 }}>
+                                        <div className="issue-indicator-mapping-block__label text-compact font-semibold">
+                                          Quantitative years
+                                        </div>
+                                        {collectionYears.length === 0 ? (
+                                          <p className="muted text-compact" style={{ margin: 0 }}>
+                                            No years in catalog. Ask Super Admin to add years under Year list.
+                                          </p>
+                                        ) : (
+                                          <div
+                                            className="issue-indicator-catalog-checks"
+                                            role="group"
+                                            aria-label="Quantitative years"
+                                          >
+                                            {collectionYears.map((y) => {
+                                              const years =
+                                                issueForm.indicatorYearIds[ind.id] ?? {
+                                                  quantitative: [],
+                                                  qualitative: [],
+                                                }
+                                              const on = years.quantitative.includes(y.id)
+                                              return (
+                                                <label
+                                                  key={`q-${ind.id}-${y.id}`}
+                                                  className="checkbox-label issue-indicator-catalog-checks__item"
+                                                >
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={on}
+                                                    onChange={() => {
+                                                      setIssueForm((f) => {
+                                                        if (!f) return f
+                                                        const cur = f.indicatorYearIds[ind.id] ?? {
+                                                          quantitative: [],
+                                                          qualitative: [],
+                                                        }
+                                                        const nextQ = on
+                                                          ? cur.quantitative.filter((id) => id !== y.id)
+                                                          : [...cur.quantitative, y.id]
+                                                        return {
+                                                          ...f,
+                                                          indicatorYearIds: {
+                                                            ...f.indicatorYearIds,
+                                                            [ind.id]: {
+                                                              ...cur,
+                                                              quantitative: nextQ,
+                                                            },
+                                                          },
+                                                        }
+                                                      })
+                                                    }}
+                                                  />
+                                                  <span>{y.label}</span>
+                                                </label>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : null}
+                                    {allowL ? (
+                                      <div className="issue-indicator-mapping-block">
+                                        <div className="issue-indicator-mapping-block__label text-compact font-semibold">
+                                          Qualitative years
+                                        </div>
+                                        {collectionYears.length === 0 ? (
+                                          <p className="muted text-compact" style={{ margin: 0 }}>
+                                            No years in catalog. Ask Super Admin to add years under Year list.
+                                          </p>
+                                        ) : (
+                                          <div
+                                            className="issue-indicator-catalog-checks"
+                                            role="group"
+                                            aria-label="Qualitative years"
+                                          >
+                                            {collectionYears.map((y) => {
+                                              const years =
+                                                issueForm.indicatorYearIds[ind.id] ?? {
+                                                  quantitative: [],
+                                                  qualitative: [],
+                                                }
+                                              const on = years.qualitative.includes(y.id)
+                                              return (
+                                                <label
+                                                  key={`l-${ind.id}-${y.id}`}
+                                                  className="checkbox-label issue-indicator-catalog-checks__item"
+                                                >
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={on}
+                                                    onChange={() => {
+                                                      setIssueForm((f) => {
+                                                        if (!f) return f
+                                                        const cur = f.indicatorYearIds[ind.id] ?? {
+                                                          quantitative: [],
+                                                          qualitative: [],
+                                                        }
+                                                        const nextL = on
+                                                          ? cur.qualitative.filter((id) => id !== y.id)
+                                                          : [...cur.qualitative, y.id]
+                                                        return {
+                                                          ...f,
+                                                          indicatorYearIds: {
+                                                            ...f.indicatorYearIds,
+                                                            [ind.id]: {
+                                                              ...cur,
+                                                              qualitative: nextL,
+                                                            },
+                                                          },
+                                                        }
+                                                      })
+                                                    }}
+                                                  />
+                                                  <span>{y.label}</span>
+                                                </label>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                  )
+                                ) : null}
                                 {checked &&
                                   readOnly &&
                                   (() => {

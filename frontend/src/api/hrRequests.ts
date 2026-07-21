@@ -1,6 +1,6 @@
 import { apiJsonHeaders, apiMultipartHeaders, ensureCsrfCookie } from './client'
 import { ApiError, parseApiErrorResponse } from './apiError'
-import type { HrRequestIssueDetail, HrRequestRow } from '../types/hrRequest'
+import type { HrRequestIssueDetail, HrRequestRow, HrRequestType } from '../types/hrRequest'
 import { coerceHrRequestStatus } from '../types/hrRequest'
 
 async function throwIfNotOk(res: Response): Promise<void> {
@@ -38,15 +38,23 @@ export async function fetchHrRequestFormConventions(): Promise<KnowledgeConventi
   return json.data
 }
 
-export async function fetchHrRequestFormIssues(conventionId: number): Promise<HrRequestIssueDetail[]> {
+export async function fetchHrRequestFormIssues(
+  conventionId: number,
+): Promise<HrRequestFormIssuesResult> {
   const q = new URLSearchParams({ convention_id: String(conventionId) })
   const res = await fetch(`/api/v1/hr-request-form/issues?${q}`, {
     credentials: 'include',
     headers: { Accept: 'application/json' },
   })
   await throwIfNotOk(res)
-  const json = (await res.json()) as { data: HrRequestIssueDetail[] }
-  return json.data
+  const json = (await res.json()) as {
+    data: HrRequestIssueDetail[]
+    meta?: { collection_years?: HrRequestFormCollectionYear[] }
+  }
+  return {
+    issues: json.data,
+    collectionYears: json.meta?.collection_years ?? [],
+  }
 }
 
 export type FederalDepartmentOption = {
@@ -89,12 +97,26 @@ export type HrRequestIndicatorResponseInput = {
   issue_indicator_id: number
   quantitative_value?: number | null
   qualitative_text?: string | null
+  quantitative_year_ids?: number[]
+  qualitative_year_ids?: number[]
+}
+
+export type HrRequestFormCollectionYear = {
+  id: number
+  label: string
+}
+
+export type HrRequestFormIssuesResult = {
+  issues: HrRequestIssueDetail[]
+  collectionYears: HrRequestFormCollectionYear[]
 }
 
 export type HrRequestCreateFromIssueFormInput = {
   title: string
   convention_id: number
-  issue_id: number
+  request_type: HrRequestType
+  issue_id?: number | null
+  other_issue_text?: string | null
   date: string
   status: HrRequestRow['status']
   details?: string | null
@@ -111,7 +133,9 @@ export async function createHrRequestFromIssueForm(
   const fd = new FormData()
   fd.append('title', input.title)
   fd.append('convention_id', String(input.convention_id))
-  fd.append('issue_id', String(input.issue_id))
+  fd.append('request_type', input.request_type)
+  if (input.issue_id != null) fd.append('issue_id', String(input.issue_id))
+  if (input.other_issue_text?.trim()) fd.append('other_issue_text', input.other_issue_text.trim())
   fd.append('date', input.date)
   fd.append('status', input.status)
   if (input.details != null && input.details !== '') {
@@ -185,7 +209,9 @@ export type HrRequestPatchBody = {
   title?: string
   conv?: string
   convention_id?: number
-  issue_id?: number
+  request_type?: HrRequestType
+  issue_id?: number | null
+  other_issue_text?: string | null
   region_id?: number | null
   region_ids?: number[]
   department_ids?: number[]
@@ -227,7 +253,9 @@ export async function updateHrRequestFromIssueForm(
   const fd = new FormData()
   fd.append('title', input.title)
   fd.append('convention_id', String(input.convention_id))
-  fd.append('issue_id', String(input.issue_id))
+  fd.append('request_type', input.request_type)
+  if (input.issue_id != null) fd.append('issue_id', String(input.issue_id))
+  if (input.other_issue_text?.trim()) fd.append('other_issue_text', input.other_issue_text.trim())
   fd.append('date', input.date)
   fd.append('status', input.status)
   if (input.details != null && input.details !== '') {

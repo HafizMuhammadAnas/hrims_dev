@@ -16,7 +16,7 @@ type Props = {
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
-    | 'collects_by_others'
+    | 'collects_by_consolidated'
     | 'collection_by_year'
     | 'qualitative_collection_by_year'
     | 'disaggregation'

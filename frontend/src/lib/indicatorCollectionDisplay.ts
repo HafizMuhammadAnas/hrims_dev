@@ -23,7 +23,7 @@ export type IndicatorCollectionDisaggregation = Pick<
   | 'collects_by_location'
   | 'collects_by_disability'
   | 'collects_by_religion'
-  | 'collects_by_others'
+  | 'collects_by_consolidated'
   | 'collection_by_year'
   | 'disaggregation'
 >
@@ -38,7 +38,7 @@ export function indicatorCollectionDisaggregationFromApi(
     collects_by_location: ind.collects_by_location,
     collects_by_disability: ind.collects_by_disability,
     collects_by_religion: ind.collects_by_religion,
-    collects_by_others: ind.collects_by_others,
+    collects_by_consolidated: ind.collects_by_consolidated,
     collection_by_year: ind.collection_by_year,
     disaggregation: ind.disaggregation,
   }
@@ -53,7 +53,7 @@ export function indicatorAllDimensionLabelNames(
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
-    | 'collects_by_others'
+    | 'collects_by_consolidated'
   >,
 ): string[] {
   const labels: string[] = []
@@ -62,7 +62,7 @@ export function indicatorAllDimensionLabelNames(
   if (ind.collects_by_location) labels.push('Location')
   if (ind.collects_by_disability) labels.push('Disability')
   if (ind.collects_by_religion) labels.push('Religion')
-  if (ind.collects_by_others) labels.push('Others')
+  if (ind.collects_by_consolidated) labels.push('Consolidated Data')
   return labels
 }
 
@@ -75,7 +75,7 @@ export function indicatorCollectionLines(
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
-    | 'collects_by_others'
+    | 'collects_by_consolidated'
     | 'collection_by_year'
     | 'has_quantitative'
   >,
@@ -116,7 +116,7 @@ export function formatIndicatorCollectionSummary(
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
-    | 'collects_by_others'
+    | 'collects_by_consolidated'
     | 'collection_by_year'
     | 'disaggregation'
   >,
@@ -149,7 +149,7 @@ export function formatIndicatorYearGenderSummary(
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
-    | 'collects_by_others'
+    | 'collects_by_consolidated'
     | 'collection_by_year'
     | 'disaggregation'
   >,
@@ -166,7 +166,7 @@ export function indicatorDimensionLabelNames(
     | 'collects_by_location'
     | 'collects_by_disability'
     | 'collects_by_religion'
-    | 'collects_by_others'
+    | 'collects_by_consolidated'
   >,
 ): string[] {
   return indicatorAllDimensionLabelNames(ind)
@@ -187,8 +187,8 @@ export function indicatorDimensionHints(ind: HrRequestIssueIndicator): string[] 
   if (ind.collects_by_religion) {
     hints.push('Religion: full catalog (all options)')
   }
-  if (ind.collects_by_others) {
-    hints.push('Others: Total count only')
+  if (ind.collects_by_consolidated) {
+    hints.push('Consolidated Data: Total count only')
   }
   return hints
 }

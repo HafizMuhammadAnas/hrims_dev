@@ -5,7 +5,12 @@ import {
   hrViewIssueDescriptionLabel,
   hrViewIssueTitleLabel,
 } from '../lib/issueEntryKind'
-import type { HrRequestAttachmentRow, HrRequestIssueArticle, HrRequestStatus } from '../types/hrRequest'
+import type {
+  HrRequestAttachmentRow,
+  HrRequestIssueArticle,
+  HrRequestStatus,
+  HrRequestType,
+} from '../types/hrRequest'
 import type { IssueEntryKind } from '../lib/issueEntryKind'
 import type { StatusBadgeTone } from '../lib/statusBadgeTone'
 import { formatAppDate } from '../lib/dateFormat'
@@ -42,6 +47,8 @@ type Props = {
   issueTitle: string
   /** Issue vs recommendation (from issue catalog). */
   issueEntryKind?: IssueEntryKind | null
+  requestType?: HrRequestType | null
+  otherIssueText?: string | null
   categoryName: string
   issueDescription?: string | null
   description: string
@@ -89,6 +96,8 @@ export function HrRequestViewTemplate({
   conventionLabel,
   issueTitle,
   issueEntryKind = null,
+  requestType = null,
+  otherIssueText = null,
   categoryName,
   issueDescription = null,
   description,
@@ -102,6 +111,7 @@ export function HrRequestViewTemplate({
 }: Props) {
   const metaIconSize = 18
   const isRecommendation = coerceIssueEntryKind(issueEntryKind) === 'recommendation'
+  const isOtherIssue = requestType === 'other_issue'
   const ictDepts = (ictDepartmentNames ?? []).filter((n) => n.trim().length > 0)
   const assignedDepts = (assignedDepartmentNames ?? []).filter((n) => n.trim().length > 0)
   const showIctDeptRow = ictDepts.length > 0 && assignedDepts.length === 0
@@ -187,14 +197,14 @@ export function HrRequestViewTemplate({
 
       <section className="hr-request-view-template__card" aria-labelledby="hr-vt-conv-issue">
         <h2 id="hr-vt-conv-issue" className="card-section-heading">
-          Convention &amp; {hrViewIssueTitleLabel(issueEntryKind)}
+          Convention &amp; {isOtherIssue ? 'Other Issues' : hrViewIssueTitleLabel(issueEntryKind)}
         </h2>
         <div className="hr-request-view-template__grid2">
           <div>
             <div className="hr-request-view-template__field-label">Convention</div>
             <p className="hr-request-view-template__field-value">{conventionLabel}</p>
           </div>
-          {isRecommendation ? (
+          {isOtherIssue ? null : isRecommendation ? (
             /* Concluding observations have no title — category is the identifying field. */
             <div>
               <div className="hr-request-view-template__field-label">Category</div>
@@ -216,14 +226,14 @@ export function HrRequestViewTemplate({
           )}
           <div className="hr-request-view-template__grid2-full">
             <div className="hr-request-view-template__field-label">
-              {hrViewIssueDescriptionLabel(issueEntryKind)}
+              {isOtherIssue ? 'Other issue details' : hrViewIssueDescriptionLabel(issueEntryKind)}
             </div>
-            {issueDescription?.trim() ? (
+            {(isOtherIssue ? otherIssueText : issueDescription)?.trim() ? (
               <p
                 className="hr-request-view-template__field-value"
                 style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}
               >
-                {issueDescription.trim()}
+                {(isOtherIssue ? otherIssueText : issueDescription)!.trim()}
               </p>
             ) : (
               <p className="muted" style={{ margin: 0 }}>
@@ -235,13 +245,15 @@ export function HrRequestViewTemplate({
       </section>
 
       <section className="hr-request-view-template__card" aria-labelledby="hr-vt-art-ind">
-        <h2 id="hr-vt-art-ind" className="card-section-heading">
-          Articles &amp; indicators
-        </h2>
-        <div className="hr-request-view-template__field-label" style={{ marginBottom: 10 }}>
-          Relevant articles
-        </div>
-        {articles.length === 0 ? (
+        {!isOtherIssue ? (
+          <>
+            <h2 id="hr-vt-art-ind" className="card-section-heading">
+              Articles &amp; indicators
+            </h2>
+            <div className="hr-request-view-template__field-label" style={{ marginBottom: 10 }}>
+              Relevant articles
+            </div>
+            {articles.length === 0 ? (
           <p className="muted" style={{ marginTop: 0 }}>
             —
           </p>
@@ -256,13 +268,13 @@ export function HrRequestViewTemplate({
               </li>
             ))}
           </ul>
-        )}
+            )}
 
-        <div className="hr-request-view-template__field-label" style={{ margin: '18px 0 10px' }}>
-          Indicators for this request
-        </div>
-        <div className="hr-request-view-template__indicators-box">
-          {indicators.length === 0 ? (
+            <div className="hr-request-view-template__field-label" style={{ margin: '18px 0 10px' }}>
+              Indicators for this request
+            </div>
+            <div className="hr-request-view-template__indicators-box">
+              {indicators.length === 0 ? (
             <p className="muted" style={{ margin: 0 }}>
               —
             </p>
@@ -320,8 +332,14 @@ export function HrRequestViewTemplate({
                 )
               })}
             </ul>
-          )}
-        </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <h2 id="hr-vt-art-ind" className="card-section-heading">
+            Request information
+          </h2>
+        )}
 
         <div className="hr-request-view-template__field-label" style={{ margin: '22px 0 10px' }}>
           {regionalInstructionsOnly

@@ -80,8 +80,19 @@ class ReportLookupController extends Controller
                 'issue_indicators.id',
                 'issue_indicators.issue_id',
                 'issue_indicators.indicator_text',
-            ])
-            ->orderBy('issue_indicators.indicator_text');
+            ]);
+
+        if (Schema::hasColumn('issue_indicators', 'is_active')) {
+            $q->where('issue_indicators.is_active', true);
+        }
+
+        if (Schema::hasColumn('issue_indicators', 'sort_order')) {
+            $q->orderBy('issues.id')
+                ->orderBy('issue_indicators.sort_order')
+                ->orderBy('issue_indicators.id');
+        } else {
+            $q->orderBy('issue_indicators.indicator_text');
+        }
 
         if (Schema::hasColumn('issues', 'is_active')) {
             $q->where('issues.is_active', true);
@@ -273,6 +284,9 @@ class ReportLookupController extends Controller
         $q = DB::table('issue_indicators')
             ->join('issues', 'issues.id', '=', 'issue_indicators.issue_id')
             ->where('issues.entry_kind', $entryKind);
+        if (Schema::hasColumn('issue_indicators', 'is_active')) {
+            $q->where('issue_indicators.is_active', true);
+        }
         if (Schema::hasColumn('issues', 'is_active')) {
             $q->where('issues.is_active', true);
         }

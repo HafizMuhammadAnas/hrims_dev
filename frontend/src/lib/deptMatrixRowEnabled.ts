@@ -1,7 +1,13 @@
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import { indicatorIsYearOnly } from './indicatorDisaggregation'
 
-export type MatrixDimensionKey = 'gender' | 'age' | 'disability' | 'district' | 'religion' | 'others'
+export type MatrixDimensionKey =
+  | 'gender'
+  | 'age'
+  | 'disability'
+  | 'district'
+  | 'religion'
+  | 'consolidated'
 
 export const MATRIX_DIMENSION_KEYS: MatrixDimensionKey[] = [
   'gender',
@@ -9,7 +15,7 @@ export const MATRIX_DIMENSION_KEYS: MatrixDimensionKey[] = [
   'disability',
   'district',
   'religion',
-  'others',
+  'consolidated',
 ]
 
 export type MatrixRowEnabledMap = Partial<Record<MatrixDimensionKey, boolean>>
@@ -38,15 +44,15 @@ export function indicatorAppliesToMatrixDimension(
       return Boolean(ind.collects_by_location)
     case 'religion':
       return Boolean(ind.collects_by_religion)
-    case 'others':
-      return Boolean(ind.collects_by_others)
+    case 'consolidated':
+      return Boolean(ind.collects_by_consolidated)
     default:
       return false
   }
 }
 
 export function parseMatrixRowEnabled(
-  raw: MatrixRowEnabledMap | null | undefined,
+  raw: Partial<Record<MatrixDimensionKey | 'others', boolean>> | null | undefined,
 ): MatrixRowEnabledMap {
   if (!raw || typeof raw !== 'object') return {}
   const out: MatrixRowEnabledMap = {}
@@ -54,6 +60,9 @@ export function parseMatrixRowEnabled(
     if (typeof raw[key] === 'boolean') {
       out[key] = raw[key]
     }
+  }
+  if (out.consolidated == null && typeof raw.others === 'boolean') {
+    out.consolidated = raw.others
   }
   return out
 }

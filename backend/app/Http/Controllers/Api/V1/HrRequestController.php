@@ -80,6 +80,9 @@ class HrRequestController extends Controller
 
         return response()->json([
             'data' => $issues->map(fn (Issue $i) => $this->serializeIssueForForm($i)),
+            'meta' => [
+                'collection_years' => \App\Support\RequestIndicatorYears::activeYearsList(),
+            ],
         ]);
     }
 
@@ -133,6 +136,7 @@ class HrRequestController extends Controller
                 'departments',
                 'attachments',
                 'indicatorResponses',
+                'indicatorYears',
             ])
             ->find($hrRequest);
         if (! $model) {
@@ -243,7 +247,9 @@ class HrRequestController extends Controller
             'title' => ['sometimes', 'string', 'max:500'],
             'conv' => ['sometimes', 'string', 'max:64'],
             'convention_id' => ['sometimes', 'integer', 'exists:conventions,id'],
-            'issue_id' => ['sometimes', 'integer', 'exists:issues,id'],
+            'request_type' => ['sometimes', Rule::in(['loi', 'concluding_observation', 'other_issue'])],
+            'issue_id' => ['sometimes', 'nullable', 'integer', 'exists:issues,id'],
+            'other_issue_text' => ['sometimes', 'nullable', 'string', 'max:200000'],
             'region_id' => ['sometimes', 'nullable', 'exists:regions,id'],
             'region_ids' => ['sometimes', 'array'],
             'region_ids.*' => ['integer', 'exists:regions,id'],
@@ -263,6 +269,45 @@ class HrRequestController extends Controller
             'status.in' => 'Status must be draft or active.',
         ]);
 
+        $requestType = (string) (
+            $data['request_type']
+            ?? $model->request_type
+            ?? ($model->issue_id ? 'loi' : '')
+        );
+        if ($requestType === 'other_issue') {
+            if (! $request->user()->hasRole('federal_admin')) {
+                return response()->json([
+                    'message' => 'Only federal administrators may edit Other Issues requests.',
+                ], 403);
+            }
+            $otherIssueText = trim((string) ($data['other_issue_text'] ?? $model->other_issue_text ?? ''));
+            if ($otherIssueText === '') {
+                throw ValidationException::withMessages([
+                    'other_issue_text' => ['Other issue details are required.'],
+                ]);
+            }
+            if (! empty($data['issue_id'])) {
+                throw ValidationException::withMessages([
+                    'issue_id' => ['Other Issues requests cannot use a catalog LOI or concluding observation.'],
+                ]);
+            }
+            if (array_key_exists('indicator_responses', $data) && $data['indicator_responses'] !== null) {
+                $incomingIndicators = $this->decodeIndicatorResponses($data['indicator_responses']);
+                if ($incomingIndicators !== []) {
+                    throw ValidationException::withMessages([
+                        'indicator_responses' => ['Other Issues requests cannot include indicators.'],
+                    ]);
+                }
+            }
+            $data['request_type'] = 'other_issue';
+            $data['issue_id'] = null;
+            $data['other_issue_text'] = $otherIssueText;
+            $data['indicator_responses'] = [];
+        } elseif ($requestType !== '') {
+            $data['request_type'] = $requestType;
+            $data['other_issue_text'] = null;
+        }
+
         if (! HrimsAccess::seesAllRegions($request->user())) {
             unset($data['region_id']);
         }
@@ -279,23 +324,44 @@ class HrRequestController extends Controller
             }
             unset($data['date']);
 
-            if (array_key_exists('convention_id', $data) || array_key_exists('issue_id', $data)) {
+            if (
+                ($data['request_type'] ?? $model->request_type) !== 'other_issue'
+                && (
+                    array_key_exists('convention_id', $data)
+                    || array_key_exists('issue_id', $data)
+                    || array_key_exists('request_type', $data)
+                )
+            ) {
                 $conventionId = $data['convention_id'] ?? $model->convention_id;
                 $issueId = $data['issue_id'] ?? $model->issue_id;
                 if ($conventionId && $issueId) {
+                    $requestType = $data['request_type'] ?? $model->request_type ?? 'loi';
+                    $expectedEntryKind =
+                        $requestType === 'concluding_observation' ? 'recommendation' : 'issue';
                     $issue = Issue::query()
                         ->whereKey($issueId)
                         ->where('convention_id', $conventionId)
+                        ->where('entry_kind', $expectedEntryKind)
                         ->first();
                     if (! $issue) {
                         throw ValidationException::withMessages([
-                            'issue_id' => ['LOI must belong to the selected convention.'],
+                            'issue_id' => ['The selected item must match the convention and request type.'],
                         ]);
                     }
                 }
             }
 
-            $scalar = collect($data)->only(['title', 'conv', 'convention_id', 'issue_id', 'status', 'details', 'region_id'])->all();
+            $scalar = collect($data)->only([
+                'title',
+                'conv',
+                'convention_id',
+                'issue_id',
+                'request_type',
+                'other_issue_text',
+                'status',
+                'details',
+                'region_id',
+            ])->all();
             if ($scalar !== []) {
                 $model->fill($scalar);
             }
@@ -347,6 +413,9 @@ class HrRequestController extends Controller
             if (array_key_exists('indicator_responses', $data) && $model->issue_id) {
                 $issue = Issue::query()->findOrFail($model->issue_id);
                 $this->syncIndicatorResponses($model, $issue, $data['indicator_responses']);
+            } elseif (($data['request_type'] ?? $model->request_type) === 'other_issue') {
+                HrRequestIndicatorResponse::query()->where('hr_request_id', $model->id)->delete();
+                \App\Models\HrRequestIndicatorYear::query()->where('hr_request_id', $model->id)->delete();
             }
 
             if ($request->hasFile('attachments')) {
@@ -501,7 +570,9 @@ class HrRequestController extends Controller
         $rules = [
             'title' => ['required', 'string', 'max:500'],
             'convention_id' => ['required', 'integer', 'exists:conventions,id'],
-            'issue_id' => ['required', 'integer', 'exists:issues,id'],
+            'request_type' => ['nullable', Rule::in(['loi', 'concluding_observation', 'other_issue'])],
+            'issue_id' => ['nullable', 'integer', 'exists:issues,id'],
+            'other_issue_text' => ['nullable', 'string', 'max:200000'],
             'date' => ['required', 'date'],
             'status' => ['required', Rule::in(['draft', 'active'])],
             'details' => ['nullable', 'string'],
@@ -517,20 +588,68 @@ class HrRequestController extends Controller
         $data = $request->validate($rules, [
             'title.required' => 'Title is required.',
             'convention_id.required' => 'Convention is required.',
-            'issue_id.required' => 'LOI is required.',
             'date.required' => 'Due date is required.',
             'status.required' => 'Status is required.',
         ]);
 
-        $issue = Issue::query()
-            ->whereKey($data['issue_id'])
-            ->where('convention_id', $data['convention_id'])
-            ->first();
-        if (! $issue) {
-            return response()->json(['message' => 'LOI must belong to the selected convention.'], 422);
+        $requestType = (string) ($data['request_type'] ?? '');
+        if ($requestType === '' && ! empty($data['issue_id'])) {
+            $entryKind = Issue::query()->whereKey($data['issue_id'])->value('entry_kind');
+            $requestType =
+                $entryKind === 'recommendation' ? 'concluding_observation' : 'loi';
+            $data['request_type'] = $requestType;
         }
-
-        $indicatorPayload = $this->decodeIndicatorResponses($request->input('indicator_responses'));
+        if ($requestType === '') {
+            throw ValidationException::withMessages([
+                'request_type' => ['Select LOI, Concluding Observation, or Other Issues.'],
+            ]);
+        }
+        $issue = null;
+        $indicatorPayload = [];
+        if ($requestType === 'other_issue') {
+            if (! $request->user()->hasRole('federal_admin')) {
+                return response()->json([
+                    'message' => 'Only federal administrators may create Other Issues requests.',
+                ], 403);
+            }
+            $otherIssueText = trim((string) ($data['other_issue_text'] ?? ''));
+            if ($otherIssueText === '') {
+                throw ValidationException::withMessages([
+                    'other_issue_text' => ['Other issue details are required.'],
+                ]);
+            }
+            if (! empty($data['issue_id'])) {
+                throw ValidationException::withMessages([
+                    'issue_id' => ['Other Issues requests cannot use a catalog LOI or concluding observation.'],
+                ]);
+            }
+            if ($request->filled('indicator_responses')) {
+                throw ValidationException::withMessages([
+                    'indicator_responses' => ['Other Issues requests cannot include indicators.'],
+                ]);
+            }
+            $data['issue_id'] = null;
+            $data['other_issue_text'] = $otherIssueText;
+        } else {
+            if (empty($data['issue_id'])) {
+                throw ValidationException::withMessages([
+                    'issue_id' => ['Select an LOI or concluding observation.'],
+                ]);
+            }
+            $expectedEntryKind = $requestType === 'concluding_observation' ? 'recommendation' : 'issue';
+            $issue = Issue::query()
+                ->whereKey($data['issue_id'])
+                ->where('convention_id', $data['convention_id'])
+                ->where('entry_kind', $expectedEntryKind)
+                ->first();
+            if (! $issue) {
+                throw ValidationException::withMessages([
+                    'issue_id' => ['The selected item must match the convention and request type.'],
+                ]);
+            }
+            $data['other_issue_text'] = null;
+            $indicatorPayload = $this->decodeIndicatorResponses($request->input('indicator_responses'));
+        }
 
         $regionIds = $data['region_ids'] ?? [];
         $this->applyRegionIdsForUser($request->user(), $regionIds);
@@ -561,7 +680,9 @@ class HrRequestController extends Controller
                 'title' => $data['title'],
                 'conv' => $code,
                 'convention_id' => $data['convention_id'],
-                'issue_id' => $data['issue_id'],
+                'issue_id' => $data['issue_id'] ?? null,
+                'request_type' => $data['request_type'],
+                'other_issue_text' => $data['other_issue_text'] ?? null,
                 'region_id' => $data['region_ids'][0] ?? null,
                 'due_date' => $data['date'],
                 'status' => $data['status'],
@@ -574,7 +695,7 @@ class HrRequestController extends Controller
                 $row->departments()->sync($departmentIds);
             }
 
-            if ($indicatorPayload !== []) {
+            if ($issue && $indicatorPayload !== []) {
                 $this->syncIndicatorResponses($row, $issue, $indicatorPayload);
             }
 
@@ -699,8 +820,27 @@ class HrRequestController extends Controller
      */
     private function syncIndicatorResponses(HrRequest $row, Issue $issue, array $responses): void
     {
-        $allowed = $issue->indicators()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $allowedQuery = $issue->indicators();
+        if (IssueIndicator::hasIsActiveColumn()) {
+            // New selections must be active; already-linked inactive indicators remain allowed on update.
+            $alreadyLinked = HrRequestIndicatorResponse::query()
+                ->where('hr_request_id', $row->id)
+                ->pluck('issue_indicator_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $allowedQuery->where(function ($q) use ($alreadyLinked) {
+                $q->where('is_active', true);
+                if ($alreadyLinked !== []) {
+                    $q->orWhereIn('id', $alreadyLinked);
+                }
+            });
+        }
+        $allowed = $allowedQuery->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $allowedYearIds = \App\Support\RequestIndicatorYears::activeYearsById()->keys()->map(fn ($id) => (int) $id)->all();
+
         HrRequestIndicatorResponse::query()->where('hr_request_id', $row->id)->delete();
+        \App\Models\HrRequestIndicatorYear::query()->where('hr_request_id', $row->id)->delete();
+
         foreach ($responses as $r) {
             $iid = (int) ($r['issue_indicator_id'] ?? 0);
             if (! in_array($iid, $allowed, true)) {
@@ -735,13 +875,87 @@ class HrRequestController extends Controller
                     'indicator_responses' => ['Qualitative text is not enabled for this indicator.'],
                 ]);
             }
+
+            $quantYearIds = $this->normalizeRequestYearIds($r['quantitative_year_ids'] ?? []);
+            $qualYearIds = $this->normalizeRequestYearIds($r['qualitative_year_ids'] ?? []);
+
+            foreach (array_merge($quantYearIds, $qualYearIds) as $yearId) {
+                if (! in_array($yearId, $allowedYearIds, true)) {
+                    throw ValidationException::withMessages([
+                        'indicator_responses' => ['One or more selected years are invalid.'],
+                    ]);
+                }
+            }
+
+            if ($allowsQ && (bool) $indicatorRow->collects_by_year && $quantYearIds === []) {
+                throw ValidationException::withMessages([
+                    'indicator_responses' => [
+                        'Select at least one quantitative year for indicator: '.$indicatorRow->indicator_text,
+                    ],
+                ]);
+            }
+            if ($allowsL && $qualYearIds === []) {
+                throw ValidationException::withMessages([
+                    'indicator_responses' => [
+                        'Select at least one qualitative year for indicator: '.$indicatorRow->indicator_text,
+                    ],
+                ]);
+            }
+            if (! $allowsQ && $quantYearIds !== []) {
+                throw ValidationException::withMessages([
+                    'indicator_responses' => ['Quantitative years are not enabled for this indicator.'],
+                ]);
+            }
+            if (! $allowsL && $qualYearIds !== []) {
+                throw ValidationException::withMessages([
+                    'indicator_responses' => ['Qualitative years are not enabled for this indicator.'],
+                ]);
+            }
+
             HrRequestIndicatorResponse::query()->create([
                 'hr_request_id' => $row->id,
                 'issue_indicator_id' => $iid,
                 'quantitative_value' => $hasQv ? (float) $qv : null,
                 'qualitative_text' => $hasQt ? (string) $qt : null,
             ]);
+
+            foreach ($quantYearIds as $yearId) {
+                \App\Models\HrRequestIndicatorYear::query()->create([
+                    'hr_request_id' => $row->id,
+                    'issue_indicator_id' => $iid,
+                    'collection_year_id' => $yearId,
+                    'kind' => \App\Models\HrRequestIndicatorYear::KIND_QUANTITATIVE,
+                ]);
+            }
+            foreach ($qualYearIds as $yearId) {
+                \App\Models\HrRequestIndicatorYear::query()->create([
+                    'hr_request_id' => $row->id,
+                    'issue_indicator_id' => $iid,
+                    'collection_year_id' => $yearId,
+                    'kind' => \App\Models\HrRequestIndicatorYear::KIND_QUALITATIVE,
+                ]);
+            }
         }
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<int>
+     */
+    private function normalizeRequestYearIds(mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $out[] = $n;
+            }
+        }
+
+        return array_values(array_unique($out));
     }
 
     /**
@@ -854,6 +1068,7 @@ class HrRequestController extends Controller
                 'relevant_paragraph' => $a->pivot->relevant_paragraph ?? null,
             ])->values()->all(),
             'indicators' => $i->indicators
+                ->filter(fn (IssueIndicator $ind) => $ind->isActive())
                 ->map(fn (IssueIndicator $ind) => $ind->toHrApiArray($i))
                 ->values()
                 ->all(),

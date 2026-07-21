@@ -73,6 +73,8 @@ export function buildDepartmentForwardedViewTemplateProps(
   conventionLabel: string
   issueTitle: string
   issueEntryKind: ReturnType<typeof coerceIssueEntryKind>
+  requestType: HrRequestRow['request_type']
+  otherIssueText: string | null
   categoryName: string
   issueDescription: string | null
   description: string
@@ -84,11 +86,14 @@ export function buildDepartmentForwardedViewTemplateProps(
   indicators: HrRequestViewIndicatorRow[]
   attachments: HrRequestRow['attachments']
 } | null {
-  if (!detail.convention_id || !detail.issue_id || !detail.issue) return null
+  const isOtherIssue = detail.request_type === 'other_issue'
+  if (!detail.convention_id || (!isOtherIssue && (!detail.issue_id || !detail.issue))) return null
 
   const selectedIssue = detail.issue
   const selectedIds = new Set((detail.indicator_responses ?? []).map((r) => r.issue_indicator_id))
-  const indicatorsForView = selectedIssue.indicators.filter((ind) => selectedIds.has(ind.id))
+  const indicatorsForView = selectedIssue
+    ? selectedIssue.indicators.filter((ind) => selectedIds.has(ind.id))
+    : []
 
   const conventionLabel = detail.convention
     ? conventionOptionLabel(detail.convention)
@@ -100,8 +105,8 @@ export function buildDepartmentForwardedViewTemplateProps(
       id: ind.id,
       indicator_text: ind.indicator_text,
       disaggregation: ind.disaggregation,
-      hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
-      hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
+      hasQuantitative: selectedIssue ? indicatorAllowsQuantitative(ind, selectedIssue) : false,
+      hasQualitative: selectedIssue ? indicatorAllowsQualitative(ind, selectedIssue) : false,
       collectionDisaggregation: indicatorCollectionDisaggregationFromApi(ind),
       quantitative_value: resp?.quantitative_value,
       qualitative_text: resp?.qualitative_text,
@@ -123,15 +128,17 @@ export function buildDepartmentForwardedViewTemplateProps(
     ictDepartmentNames: null,
     assignedDepartmentNames: assignedDepartmentNames?.length ? assignedDepartmentNames : null,
     conventionLabel,
-    issueTitle: issueEntryPrimaryText(selectedIssue),
-    issueEntryKind: coerceIssueEntryKind(selectedIssue.entry_kind),
-    categoryName: selectedIssue.category?.name ?? '—',
-    issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,
+    issueTitle: selectedIssue ? issueEntryPrimaryText(selectedIssue) : 'Other Issues',
+    issueEntryKind: coerceIssueEntryKind(selectedIssue?.entry_kind),
+    requestType: detail.request_type,
+    otherIssueText: detail.other_issue_text?.trim() || null,
+    categoryName: selectedIssue?.category?.name ?? '—',
+    issueDescription: selectedIssue?.description?.trim() ? selectedIssue.description.trim() : null,
     description: detail.details ?? '',
     regionalInstructionsOnly: useRegionalInstructions,
     regionalInstructionsText: useRegionalInstructions ? assignmentNotes || null : null,
     instructionsHeading: ictTask && assignmentNotes ? 'Federal assignment instructions' : null,
-    articles: selectedIssue.articles,
+    articles: selectedIssue?.articles ?? [],
     indicators,
     attachments: detail.attachments,
   }
@@ -196,6 +203,8 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
   conventionLabel: string
   issueTitle: string
   issueEntryKind: ReturnType<typeof coerceIssueEntryKind>
+  requestType: HrRequestRow['request_type']
+  otherIssueText: string | null
   categoryName: string
   issueDescription: string | null
   description: string
@@ -207,11 +216,14 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
   indicators: HrRequestViewIndicatorRow[]
   attachments: HrRequestRow['attachments']
 } | null {
-  if (!detail.convention_id || !detail.issue_id || !detail.issue) return null
+  const isOtherIssue = detail.request_type === 'other_issue'
+  if (!detail.convention_id || (!isOtherIssue && (!detail.issue_id || !detail.issue))) return null
 
   const selectedIssue = detail.issue
   const selectedIds = new Set((detail.indicator_responses ?? []).map((r) => r.issue_indicator_id))
-  const indicatorsForView = selectedIssue.indicators.filter((ind) => selectedIds.has(ind.id))
+  const indicatorsForView = selectedIssue
+    ? selectedIssue.indicators.filter((ind) => selectedIds.has(ind.id))
+    : []
 
   const conventionLabel = detail.convention ? conventionOptionLabel(detail.convention) : '—'
 
@@ -221,8 +233,8 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
       id: ind.id,
       indicator_text: ind.indicator_text,
       disaggregation: ind.disaggregation,
-      hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
-      hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
+      hasQuantitative: selectedIssue ? indicatorAllowsQuantitative(ind, selectedIssue) : false,
+      hasQualitative: selectedIssue ? indicatorAllowsQualitative(ind, selectedIssue) : false,
       collectionDisaggregation: indicatorCollectionDisaggregationFromApi(ind),
       quantitative_value: resp?.quantitative_value,
       qualitative_text: resp?.qualitative_text,
@@ -239,15 +251,17 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
     ictDepartmentNames: ictDepartmentNamesForRequest(detail),
     assignedDepartmentNames: null,
     conventionLabel,
-    issueTitle: issueEntryPrimaryText(selectedIssue),
-    issueEntryKind: coerceIssueEntryKind(selectedIssue.entry_kind),
-    categoryName: selectedIssue.category?.name ?? '—',
-    issueDescription: selectedIssue.description?.trim() ? selectedIssue.description.trim() : null,
+    issueTitle: selectedIssue ? issueEntryPrimaryText(selectedIssue) : 'Other Issues',
+    issueEntryKind: coerceIssueEntryKind(selectedIssue?.entry_kind),
+    requestType: detail.request_type,
+    otherIssueText: detail.other_issue_text?.trim() || null,
+    categoryName: selectedIssue?.category?.name ?? '—',
+    issueDescription: selectedIssue?.description?.trim() ? selectedIssue.description.trim() : null,
     description: detail.details ?? '',
     regionalInstructionsOnly: false,
     regionalInstructionsText: null,
     instructionsHeading: null,
-    articles: selectedIssue.articles,
+    articles: selectedIssue?.articles ?? [],
     indicators,
     attachments: detail.attachments,
   }

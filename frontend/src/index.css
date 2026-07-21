@@ -626,7 +626,8 @@ body:has(.modal-overlay) {
 
 /* Later siblings (pagination toolbars, footers) paint after the card and cover absolutely
    positioned menus unless the card stacks above them while a menu is open. */
-.table-card:has(.row-actions-trigger[aria-expanded='true']) {
+.table-card:has(.row-actions-trigger[aria-expanded='true']),
+.table-card:has(.article-multi-dropdown__trigger[aria-expanded='true']) {
   position: relative;
   z-index: 200;
 }
@@ -1298,6 +1299,63 @@ button.compiled-record-modal-tab {
 
 .ministry-compiled-print-root {
   background: #fff;
+}
+
+/* Merge compiled records — Compilation Center */
+.merge-compiled-records-section {
+  position: relative;
+  overflow: visible;
+}
+
+.merge-compiled-records-section.table-card,
+.merge-compiled-records-section .table-card-scroll {
+  overflow: visible;
+}
+
+.merge-compiled-records-section__title {
+  margin: 0 0 8px;
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: 700;
+  color: #1e3a6e;
+}
+
+.merge-compiled-records-section__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: 4px;
+}
+
+.merge-compiled-records-section__capture-host {
+  position: absolute;
+  left: -12000px;
+  top: 0;
+  width: 794px;
+  pointer-events: none;
+}
+
+.merge-compiled-records-section__capture-root {
+  background: #fff;
+  width: 794px;
+}
+
+.merge-compiled-records-section__record {
+  background: #fff;
+}
+
+.merge-compiled-records-section__record--break {
+  margin-top: 28px;
+  padding-top: 28px;
+  border-top: 2px solid #c5d0e6;
+  page-break-before: always;
+  break-before: page;
+}
+
+.ministry-compiled-pdf-capture .merge-compiled-records-section__record--break {
+  margin-top: 36px;
+  padding-top: 36px;
+  border-top: 2px solid #94a3b8;
 }
 
 .ministry-compiled-single__toolbar {
@@ -3268,6 +3326,13 @@ textarea.hr-request-readonly-prose {
   overflow: hidden;
 }
 
+/* Portaled to document.body so parent cards with overflow cannot clip the menu. */
+.article-multi-dropdown__panel--portal {
+  left: auto;
+  right: auto;
+  box-sizing: border-box;
+}
+
 .article-multi-dropdown__filter {
   width: 100%;
   box-sizing: border-box;
@@ -4446,6 +4511,14 @@ textarea.hr-request-readonly-prose {
 
 .regional-response-detail-modal__summary-empty {
   margin: 0;
+}
+
+.regional-response-detail-modal__download-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
 }
 
 .regional-response-detail-modal__feedback-field textarea {
@@ -8523,22 +8596,61 @@ textarea.hr-request-readonly-prose {
   border-radius: 8px;
   background: #f8fafc;
 }
+.iwd-totals__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
 .iwd-totals__label {
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #64748b;
-  margin-bottom: 8px;
+  margin: 0;
+  margin-right: auto;
+}
+.iwd-totals__na-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.iwd-totals__na-msg {
+  margin: 0;
+}
+.dept-iwd-entry .iwd-dim__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dept-iwd-entry .iwd-dim__title {
+  margin: 0;
+  flex: 1 1 auto;
+}
+.dept-iwd-entry .iwd-dim--na {
+  background: #f8fafc;
+}
+.iwd-year-panel__scroll {
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 .iwd-totals__years {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
 }
-@media (max-width: 900px) {
+@media (max-width: 520px) {
   .iwd-totals__years {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 .iwd-totals__year {
@@ -8550,6 +8662,7 @@ textarea.hr-request-readonly-prose {
   border: 1px solid #e2e8f0;
   background: #fff;
   margin: 0;
+  min-width: 0;
 }
 .iwd-totals__year--grand {
   background: #ecfdf5;
@@ -8562,12 +8675,18 @@ textarea.hr-request-readonly-prose {
 }
 .iwd-totals__input {
   width: 100%;
+  min-width: 5.75rem;
+  min-height: 2.25rem;
   max-width: none;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
 }
 .iwd-totals__value {
   font-size: 1.15rem;
   font-weight: 700;
   color: #0f172a;
+  font-variant-numeric: tabular-nums;
 }
 .iwd-dim {
   margin: 14px 16px 0;
@@ -8587,24 +8706,18 @@ textarea.hr-request-readonly-prose {
 }
 .iwd-dim__years {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Wider cards so religion/gender columns stay readable; extra years wrap */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
   gap: 12px;
-}
-@media (max-width: 1100px) {
-  .iwd-dim__years {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 700px) {
-  .iwd-dim__years {
-    grid-template-columns: 1fr;
-  }
+  width: 100%;
 }
 .iwd-year-panel {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   overflow: hidden;
   background: #fff;
+  min-width: 0;
+  width: 100%;
 }
 .iwd-year-panel__head {
   background: #1e3a5f;
@@ -8615,14 +8728,16 @@ textarea.hr-request-readonly-prose {
   font-size: 0.85rem;
 }
 .iwd-year-panel__table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
-  font-size: 0.78rem;
+  table-layout: auto;
+  font-size: 0.8rem;
 }
 .iwd-year-panel__table th,
 .iwd-year-panel__table td {
   border: 1px solid #e2e8f0;
-  padding: 5px 4px;
+  padding: 8px;
   text-align: center;
   vertical-align: middle;
 }
@@ -8631,18 +8746,23 @@ textarea.hr-request-readonly-prose {
   color: #fff;
   font-weight: 600;
   white-space: nowrap;
+  line-height: 1.25;
+  min-width: 5.75rem;
 }
 .iwd-year-panel__ua-h {
   background: #475569 !important;
+  min-width: 6rem;
 }
 .iwd-year-panel__total-h {
   background: #0f766e !important;
+  min-width: 5.75rem;
 }
 .iwd-year-panel__ua {
   font-weight: 700;
   background: #f8fafc;
   color: #475569;
-  min-width: 3.25rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 5.75rem;
 }
 .iwd-year-panel__ua.is-over {
   background: #fef2f2;
@@ -8652,19 +8772,50 @@ textarea.hr-request-readonly-prose {
   font-weight: 700;
   background: #ccfbf1;
   color: #115e59;
-  min-width: 2.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 5.75rem;
 }
 .iwd-sheet__input {
-  width: 100%;
-  min-width: 3rem;
-  max-width: 5rem;
-  padding: 4px 6px;
+  /* Standard size: comfortably shows 6+ digit values across all dimensions */
+  width: 5.75rem;
+  min-width: 5.75rem;
+  max-width: 5.75rem;
+  min-height: 2.25rem;
+  padding: 6px 8px;
   border: 1px solid #94a3b8;
   border-radius: 4px;
   text-align: center;
   box-sizing: border-box;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
 }
 .iwd-sheet__num {
   display: inline-block;
-  min-width: 1.5rem;
+  min-width: 4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Department data entry: stretch year/dimension panels to the available page width */
+.dept-iwd-entry {
+  width: 100%;
+  max-width: 100%;
+}
+.dept-iwd-entry .iwd-card,
+.dept-iwd-entry .iwd-card__body,
+.dept-iwd-entry .iwd-totals,
+.dept-iwd-entry .iwd-dim {
+  width: auto;
+  max-width: none;
+  box-sizing: border-box;
+}
+.dept-iwd-entry .iwd-totals__years {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.dept-iwd-entry .iwd-dim__years {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+}
+.dept-iwd-entry .iwd-totals__input {
+  width: 100%;
+  min-width: 5.75rem;
+  min-height: 2.25rem;
 }

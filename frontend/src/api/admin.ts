@@ -141,6 +141,7 @@ export type AdminCollectionReligion = {
 export type AdminIssueIndicator = {
   id: number
   sort_order?: number
+  is_active?: boolean
   indicator_text: string
   disaggregation: string | null
   has_quantitative: boolean
@@ -151,7 +152,7 @@ export type AdminIssueIndicator = {
   collects_by_location: boolean
   collects_by_disability: boolean
   collects_by_religion: boolean
-  collects_by_others: boolean
+  collects_by_consolidated: boolean
   collection_by_year: AdminIssueIndicatorYearRow[]
   /** Years for qualitative data gathering (separate from quantitative disaggregation years). */
   qualitative_collection_by_year?: Array<{ year_id: number; label: string }>
@@ -660,15 +661,26 @@ export type AdminIssuePayload = {
   has_qualitative: boolean
   articles: AdminIssueArticlePayload[]
   indicators?: Array<{
+    /** Stable DB id — required on update/reorder so existing requests keep their links. */
+    id?: number
+    is_active?: boolean
     indicator_text: string
     disaggregation?: string | null
     has_quantitative?: boolean
     has_qualitative?: boolean
     collects_by_year?: boolean
+    collects_by_gender?: boolean
+    collects_by_age?: boolean
+    collects_by_location?: boolean
+    collects_by_disability?: boolean
+    collects_by_religion?: boolean
+    collects_by_consolidated?: boolean
     collection_by_year?: Array<{
       collection_year_id: number
       collection_gender_ids: number[]
+      collection_religion_ids?: number[]
     }>
+    qualitative_collection_by_year?: Array<{ collection_year_id: number }>
   }>
 }
 
@@ -683,6 +695,31 @@ export async function adminUpdateIssue(
   body: Partial<AdminIssuePayload> & { is_active?: boolean },
 ): Promise<AdminIssue> {
   const res = await adminSend('PATCH', `/issues/${id}`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminIssue
+}
+
+/** Drag-and-drop only: updates sort_order, never recreates indicator rows / ids. */
+export async function adminReorderIssueIndicators(
+  issueId: number,
+  orderedIds: number[],
+): Promise<AdminIssue> {
+  const res = await adminSend('PATCH', `/issues/${issueId}/indicators/reorder`, {
+    ordered_ids: orderedIds,
+  })
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminIssue
+}
+
+/** Activate or deactivate an indicator without deleting it. */
+export async function adminSetIssueIndicatorActive(
+  issueId: number,
+  indicatorId: number,
+  is_active: boolean,
+): Promise<AdminIssue> {
+  const res = await adminSend('PATCH', `/issues/${issueId}/indicators/${indicatorId}/active`, {
+    is_active,
+  })
   await throwIfNotOk(res)
   return (await res.json()).data as AdminIssue
 }

@@ -35,6 +35,8 @@ class HrRequest extends Model
         'issue_cards',
         'convention_id',
         'issue_id',
+        'request_type',
+        'other_issue_text',
     ];
 
     protected function casts(): array
@@ -78,6 +80,11 @@ class HrRequest extends Model
     public function indicatorResponses(): HasMany
     {
         return $this->hasMany(HrRequestIndicatorResponse::class, 'hr_request_id', 'id');
+    }
+
+    public function indicatorYears(): HasMany
+    {
+        return $this->hasMany(HrRequestIndicatorYear::class, 'hr_request_id', 'id');
     }
 
     public function regionalResponses(): HasMany

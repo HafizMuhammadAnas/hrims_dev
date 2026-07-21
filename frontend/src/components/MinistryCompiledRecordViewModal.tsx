@@ -12,6 +12,7 @@ import {
 import { updateCompiledRecord } from '../api/workflows'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { downloadElementAsWord } from '../lib/downloadElementAsWord'
+import { downloadElementTablesAsExcel } from '../lib/downloadElementTablesAsExcel'
 import { LABEL_COMPILATION_CENTER } from '../lib/uiLabels'
 import { loadDepartmentTasksForRegion } from '../lib/compiledRecordDepartmentTasks'
 import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
@@ -75,6 +76,8 @@ export function MinistryCompiledRecordViewModal({
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [wordLoading, setWordLoading] = useState(false)
   const [wordError, setWordError] = useState<string | null>(null)
+  const [excelLoading, setExcelLoading] = useState(false)
+  const [excelError, setExcelError] = useState<string | null>(null)
 
   const regions = record.region_names ?? []
   const regionKey = regions.join('\u0001')
@@ -83,6 +86,7 @@ export function MinistryCompiledRecordViewModal({
     setFinalizeError(null)
     setPdfError(null)
     setWordError(null)
+    setExcelError(null)
   }, [record.id])
 
   useEffect(() => {
@@ -204,6 +208,24 @@ export function MinistryCompiledRecordViewModal({
       setWordError(e instanceof Error ? e.message : 'Could not generate Word document.')
     } finally {
       setWordLoading(false)
+    }
+  }
+
+  async function handleDownloadExcel() {
+    const el = printRef.current
+    if (!el) return
+    setExcelLoading(true)
+    setExcelError(null)
+    try {
+      const base = [record.req_id, record.title?.trim() || record.id].filter(Boolean).join(' — ')
+      downloadElementTablesAsExcel(el, base, {
+        sheetName: 'Compiled record',
+        documentTitle: record.title?.trim() || 'Compiled record',
+      })
+    } catch (e: unknown) {
+      setExcelError(e instanceof Error ? e.message : 'Could not generate Excel file.')
+    } finally {
+      setExcelLoading(false)
     }
   }
 
@@ -339,7 +361,7 @@ export function MinistryCompiledRecordViewModal({
             variant="secondary"
             compact
             type="button"
-            disabled={pdfLoading || wordLoading || responsesLoading || hrLoading}
+            disabled={pdfLoading || wordLoading || excelLoading || responsesLoading || hrLoading}
             onClick={() => void handleDownloadPdf()}
           >
             <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
@@ -349,14 +371,25 @@ export function MinistryCompiledRecordViewModal({
             variant="secondary"
             compact
             type="button"
-            disabled={pdfLoading || wordLoading || responsesLoading || hrLoading}
+            disabled={pdfLoading || wordLoading || excelLoading || responsesLoading || hrLoading}
             onClick={() => void handleDownloadWord()}
           >
             <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
             {wordLoading ? 'Generating Word…' : 'Download Word'}
           </Button>
+          <Button
+            variant="secondary"
+            compact
+            type="button"
+            disabled={pdfLoading || wordLoading || excelLoading || responsesLoading || hrLoading}
+            onClick={() => void handleDownloadExcel()}
+          >
+            <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
+            {excelLoading ? 'Generating Excel…' : 'Download Excel'}
+          </Button>
           {pdfError ? <span className="login-error small">{pdfError}</span> : null}
           {wordError ? <span className="login-error small">{wordError}</span> : null}
+          {excelError ? <span className="login-error small">{excelError}</span> : null}
         </div>
       ) : null}
 

@@ -1,5 +1,6 @@
 /** Publication lifecycle for an HR request (not department/regional workflow). */
 export type HrRequestStatus = 'draft' | 'active'
+export type HrRequestType = 'loi' | 'concluding_observation' | 'other_issue'
 
 /** Map legacy API values after deploy before migration runs, or old cached rows. */
 export function coerceHrRequestStatus(raw: string | undefined | null): HrRequestStatus {
@@ -28,7 +29,7 @@ export type HrRequestIssueIndicator = {
   collects_by_location?: boolean
   collects_by_disability?: boolean
   collects_by_religion?: boolean
-  collects_by_others?: boolean
+  collects_by_consolidated?: boolean
   collection_by_year?: Array<{
     year_id: number
     label: string
@@ -73,6 +74,8 @@ export type HrRequestIndicatorResponseRow = {
   issue_indicator_id: number
   quantitative_value: number | null
   qualitative_text: string | null
+  quantitative_year_ids?: number[]
+  qualitative_year_ids?: number[]
 }
 
 export interface HrRequestRow {
@@ -81,6 +84,8 @@ export interface HrRequestRow {
   conv: string
   convention_id?: number | null
   issue_id?: number | null
+  request_type?: HrRequestType | null
+  other_issue_text?: string | null
   date: string
   status: HrRequestStatus
   details?: string | null

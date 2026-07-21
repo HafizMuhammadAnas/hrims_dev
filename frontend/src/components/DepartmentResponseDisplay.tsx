@@ -25,7 +25,8 @@ function quantitativeHasMatrixData(bundle: DepartmentIndicatorBundle): boolean {
       (q.by_year_disability && Object.keys(q.by_year_disability).length > 0) ||
       (q.by_year_district && Object.keys(q.by_year_district).length > 0) ||
       (q.by_year_religion && Object.keys(q.by_year_religion).length > 0) ||
-      (q.by_year_others && Object.keys(q.by_year_others).length > 0),
+      ((q.by_year_consolidated ?? q.by_year_others) &&
+        Object.keys(q.by_year_consolidated ?? q.by_year_others ?? {}).length > 0),
   )
 }
 
@@ -138,7 +139,7 @@ export function DepartmentResponseDisplay({
     const disability: Record<number, Record<string, string>> = {}
     const district: Record<number, Record<string, string>> = {}
     const religion: Record<number, Record<string, string>> = {}
-    const others: Record<number, Record<string, string>> = {}
+    const consolidated: Record<number, Record<string, string>> = {}
     for (const [id, bundle] of entries) {
       const indicatorId = Number(id)
       const q = bundle.quantitative
@@ -148,9 +149,12 @@ export function DepartmentResponseDisplay({
       if (q.by_year_disability) disability[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_disability, false)
       if (q.by_year_district) district[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_district, true)
       if (q.by_year_religion) religion[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_religion, true)
-      if (q.by_year_others) others[indicatorId] = loadYearKeyedValuesFromBundle(q.by_year_others, false)
+      const consolidatedBundle = q.by_year_consolidated ?? q.by_year_others
+      if (consolidatedBundle) {
+        consolidated[indicatorId] = loadYearKeyedValuesFromBundle(consolidatedBundle, false)
+      }
     }
-    return { gender, age, disability, district, religion, others }
+    return { gender, age, disability, district, religion, consolidated }
   }, [entries])
 
   const rowEnabledByIndicator = useMemo(() => {
@@ -214,14 +218,14 @@ export function DepartmentResponseDisplay({
           disabilityValues={{}}
           districtValues={{}}
           religionValues={{}}
-          othersValues={{}}
+          consolidatedValues={{}}
           readOnly
           savedGenderByIndicator={matrixValues.gender}
           savedAgeByIndicator={matrixValues.age}
           savedDisabilityByIndicator={matrixValues.disability}
           savedDistrictByIndicator={matrixValues.district}
           savedReligionByIndicator={matrixValues.religion}
-          savedOthersByIndicator={matrixValues.others}
+          savedConsolidatedByIndicator={matrixValues.consolidated}
           rowEnabledByIndicator={rowEnabledByIndicator}
         />
       ) : null}

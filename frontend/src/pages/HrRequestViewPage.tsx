@@ -156,8 +156,8 @@ function clearDraftDimensionValues(
       return { ...draft, yearDistrictValues: {} }
     case 'religion':
       return { ...draft, yearReligionValues: {} }
-    case 'others':
-      return { ...draft, yearOthersValues: {} }
+    case 'consolidated':
+      return { ...draft, yearConsolidatedValues: {} }
     default:
       return draft
   }
@@ -191,6 +191,7 @@ export function HrRequestViewPage() {
   const [departments, setDepartments] = useState<DepartmentRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [assignDepartmentIndicators, setAssignDepartmentIndicators] = useState<Record<number, number[]>>({})
+  const [assignOtherDepartmentIds, setAssignOtherDepartmentIds] = useState<number[]>([])
   const [assignRegionalNotes, setAssignRegionalNotes] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
@@ -415,7 +416,7 @@ export function HrRequestViewPage() {
         let yearRegionValues: Record<string, string> = {}
         let yearDistrictValues: Record<string, string> = {}
         let yearReligionValues: Record<string, string> = {}
-        let yearOthersValues: Record<string, string> = {}
+        let yearConsolidatedValues: Record<string, string> = {}
         let matrixRowEnabled = {}
         if (parsed.kind === 'structured') {
           const b = parsed.payload.by_indicator[String(ind.id)]
@@ -439,8 +440,10 @@ export function HrRequestViewPage() {
           if (b?.quantitative?.by_year_religion) {
             yearReligionValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_religion, true)
           }
-          if (b?.quantitative?.by_year_others) {
-            yearOthersValues = loadYearKeyedValuesFromBundle(b.quantitative.by_year_others, false)
+          const consolidatedBundle =
+            b?.quantitative?.by_year_consolidated ?? b?.quantitative?.by_year_others
+          if (consolidatedBundle) {
+            yearConsolidatedValues = loadYearKeyedValuesFromBundle(consolidatedBundle, false)
           }
           if (b?.quantitative?.comment) comment = b.quantitative.comment
           if (b?.qualitative?.by_year) {
@@ -469,7 +472,7 @@ export function HrRequestViewPage() {
           yearRegionValues,
           yearDistrictValues,
           yearReligionValues,
-          yearOthersValues,
+          yearConsolidatedValues,
           matrixRowEnabled,
         }
       }
@@ -543,10 +546,15 @@ export function HrRequestViewPage() {
           })
           if (!matrixReady) return false
         }
-        if (ind.collects_by_others && isMatrixRowEnabled(d.matrixRowEnabled, 'others')) {
+        if (
+          ind.collects_by_consolidated &&
+          isMatrixRowEnabled(d.matrixRowEnabled, 'consolidated')
+        ) {
           let matrixReady = true
           for (const y of indicatorConfiguredYears(ind)) {
-            if (!matrixValueReady(d.yearOthersValues, genderTotalCellKey(y.year_id))) matrixReady = false
+            if (!matrixValueReady(d.yearConsolidatedValues, genderTotalCellKey(y.year_id))) {
+              matrixReady = false
+            }
           }
           if (!matrixReady) return false
         }
@@ -643,7 +651,12 @@ export function HrRequestViewPage() {
   async function assignSelectedDepartments() {
     if (!detail) return
     const byDepartment = assignedDepartmentIndicatorMap(assignDepartmentIndicators)
-    if (byDepartment.size === 0) {
+    const otherIssue = detail.request_type === 'other_issue'
+    if (otherIssue && assignOtherDepartmentIds.length === 0) {
+      setAssignError('Select at least one department.')
+      return
+    }
+    if (!otherIssue && byDepartment.size === 0) {
       setAssignError('Select at least one indicator for a department.')
       return
     }
@@ -651,13 +664,22 @@ export function HrRequestViewPage() {
     setAssignError(null)
     try {
       const notes = assignRegionalNotes.trim() || null
-      for (const [departmentId, indicatorIds] of byDepartment) {
-        await createDepartmentTask(detail.id, departmentId, {
-          assignment_instructions: notes,
-          issue_indicator_ids: indicatorIds,
-        })
+      if (otherIssue) {
+        for (const departmentId of assignOtherDepartmentIds) {
+          await createDepartmentTask(detail.id, departmentId, {
+            assignment_instructions: notes,
+          })
+        }
+      } else {
+        for (const [departmentId, indicatorIds] of byDepartment) {
+          await createDepartmentTask(detail.id, departmentId, {
+            assignment_instructions: notes,
+            issue_indicator_ids: indicatorIds,
+          })
+        }
       }
       setAssignDepartmentIndicators({})
+      setAssignOtherDepartmentIds([])
       setAssignRegionalNotes('')
       setRegionalPathChoice(null)
       await reloadTasksAndDepartments()
@@ -704,7 +726,10 @@ export function HrRequestViewPage() {
             const quantitative: {
               comment: string
               matrix_row_enabled?: Partial<
-                Record<'gender' | 'age' | 'disability' | 'district' | 'religion' | 'others', boolean>
+                Record<
+                  'gender' | 'age' | 'disability' | 'district' | 'religion' | 'consolidated',
+                  boolean
+                >
               >
               by_year_gender?: Record<string, Record<string, { value: string }>>
               by_year_age?: Record<string, Record<string, { value: string }>>
@@ -712,7 +737,7 @@ export function HrRequestViewPage() {
               by_year_region?: Record<string, Record<string, { value: string }>>
               by_year_district?: Record<string, Record<string, { value: string }>>
               by_year_religion?: Record<string, Record<string, { value: string }>>
-              by_year_others?: Record<string, Record<string, { value: string }>>
+              by_year_consolidated?: Record<string, Record<string, { value: string }>>
             } = { comment: d.comment.trim() }
             const matrixRowEnabled = serializeMatrixRowEnabled(d.matrixRowEnabled)
             if (matrixRowEnabled) {
@@ -844,17 +869,22 @@ export function HrRequestViewPage() {
               quantitative.by_year_religion = by_year_religion
             }
 
-            if (ind.collects_by_others && isMatrixRowEnabled(d.matrixRowEnabled, 'others')) {
-              const by_year_others: Record<string, Record<string, { value: string }>> = {}
+            if (
+              ind.collects_by_consolidated &&
+              isMatrixRowEnabled(d.matrixRowEnabled, 'consolidated')
+            ) {
+              const by_year_consolidated: Record<string, Record<string, { value: string }>> = {}
               for (const y of indicatorConfiguredYears(ind)) {
                 const yearKey = String(y.year_id)
-                by_year_others[yearKey] = {
+                by_year_consolidated[yearKey] = {
                   total: {
-                    value: matrixCellNumericValue(d.yearOthersValues[genderTotalCellKey(y.year_id)]),
+                    value: matrixCellNumericValue(
+                      d.yearConsolidatedValues[genderTotalCellKey(y.year_id)],
+                    ),
                   },
                 }
               }
-              quantitative.by_year_others = by_year_others
+              quantitative.by_year_consolidated = by_year_consolidated
             }
 
             entry.quantitative = quantitative
@@ -1164,6 +1194,8 @@ export function HrRequestViewPage() {
             departments={regionDepartments}
             departmentIndicators={assignDepartmentIndicators}
             onChangeDepartmentIndicators={setAssignDepartmentIndicators}
+            selectedDepartmentIds={assignOtherDepartmentIds}
+            onChangeSelectedDepartmentIds={setAssignOtherDepartmentIds}
             notes={assignRegionalNotes}
             onChangeNotes={setAssignRegionalNotes}
             assigning={assigning}
@@ -1486,11 +1518,6 @@ export function HrRequestViewPage() {
             ) : null}
             {deptIndicatorsForForm.length > 0 ? (
               <>
-                <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-                  Complete each indicator required for this request. Use the data tables for year-based and
-                  disaggregated breakdowns where configured; add comments, narrative responses, and attachments
-                  as needed.
-                </p>
                 {deptFormUsesIndicatorMatrix(deptIndicatorsForForm) ? (
                   <DepartmentIndicatorDisaggregationMatrices
                     indicators={deptIndicatorsForForm}
@@ -1526,10 +1553,10 @@ export function HrRequestViewPage() {
                         indicatorDrafts[ind.id]?.yearReligionValues ?? {},
                       ]),
                     )}
-                    othersValues={Object.fromEntries(
+                    consolidatedValues={Object.fromEntries(
                       deptIndicatorsForForm.map((ind) => [
                         ind.id,
-                        indicatorDrafts[ind.id]?.yearOthersValues ?? {},
+                        indicatorDrafts[ind.id]?.yearConsolidatedValues ?? {},
                       ]),
                     )}
                     onGenderChange={(indicatorId, yearId, columnId, value, autoTotalValue) => {
@@ -1632,7 +1659,7 @@ export function HrRequestViewPage() {
                         }
                       })
                     }}
-                    onOthersChange={(indicatorId, yearId, columnId, value) => {
+                    onConsolidatedChange={(indicatorId, yearId, columnId, value) => {
                       const key =
                         typeof columnId === 'string'
                           ? `${yearId}-${columnId}`
@@ -1643,7 +1670,10 @@ export function HrRequestViewPage() {
                           ...prev,
                           [indicatorId]: {
                             ...cur,
-                            yearOthersValues: { ...cur.yearOthersValues, [key]: value },
+                            yearConsolidatedValues: {
+                              ...cur.yearConsolidatedValues,
+                              [key]: value,
+                            },
                           },
                         }
                       })
@@ -1855,6 +1885,8 @@ export function HrRequestViewPage() {
             departments={regionDepartments}
             departmentIndicators={assignDepartmentIndicators}
             onChangeDepartmentIndicators={setAssignDepartmentIndicators}
+            selectedDepartmentIds={assignOtherDepartmentIds}
+            onChangeSelectedDepartmentIds={setAssignOtherDepartmentIds}
             notes={assignRegionalNotes}
             onChangeNotes={setAssignRegionalNotes}
             assigning={assigning}

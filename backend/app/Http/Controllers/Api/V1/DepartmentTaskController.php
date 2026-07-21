@@ -277,6 +277,14 @@ class DepartmentTaskController extends Controller
     private function isMatrixDimensionEnabled(array $qIn, string $dimension): bool
     {
         $enabled = $qIn['matrix_row_enabled'] ?? null;
+        if (
+            $dimension === 'consolidated'
+            && is_array($enabled)
+            && ! array_key_exists('consolidated', $enabled)
+            && array_key_exists('others', $enabled)
+        ) {
+            return (bool) $enabled['others'];
+        }
         if (! is_array($enabled) || ! array_key_exists($dimension, $enabled)) {
             return true;
         }
@@ -296,10 +304,17 @@ class DepartmentTaskController extends Controller
         }
 
         $out = [];
-        foreach (['gender', 'age', 'disability', 'district', 'religion', 'others'] as $dimension) {
+        foreach (['gender', 'age', 'disability', 'district', 'religion', 'consolidated'] as $dimension) {
             if (array_key_exists($dimension, $enabled) && $enabled[$dimension] === false) {
                 $out[$dimension] = false;
             }
+        }
+        if (
+            ! array_key_exists('consolidated', $out)
+            && array_key_exists('others', $enabled)
+            && $enabled['others'] === false
+        ) {
+            $out['consolidated'] = false;
         }
 
         return $out === [] ? null : $out;
@@ -543,11 +558,11 @@ class DepartmentTaskController extends Controller
     }
 
     /**
-     * Others dimension: Total only per configured year (no breakdown columns).
+     * Consolidated Data dimension: Total only per configured year (no breakdown columns).
      *
      * @return array<string, array<string, array{value: float}>>|JsonResponse
      */
-    private function normalizeQuantitativeByYearOthers(IssueIndicator $indicator, mixed $raw): array|JsonResponse
+    private function normalizeQuantitativeByYearConsolidated(IssueIndicator $indicator, mixed $raw): array|JsonResponse
     {
         $yearIds = $this->configuredCollectionYearIds($indicator);
         if ($yearIds === []) {
@@ -558,7 +573,7 @@ class DepartmentTaskController extends Controller
 
         if (! is_array($raw)) {
             return response()->json([
-                'message' => 'Indicator '.$indicator->id.': others values are required.',
+                'message' => 'Indicator '.$indicator->id.': consolidated data values are required.',
             ], 422);
         }
 
@@ -568,7 +583,7 @@ class DepartmentTaskController extends Controller
             $yearIn = $raw[$yearKey] ?? $raw[$yearId] ?? null;
             if (! is_array($yearIn)) {
                 return response()->json([
-                    'message' => 'Indicator '.$indicator->id.': missing others values for year '.$yearId.'.',
+                    'message' => 'Indicator '.$indicator->id.': missing consolidated data values for year '.$yearId.'.',
                 ], 422);
             }
             $totalIn = $yearIn['total'] ?? null;
@@ -578,7 +593,7 @@ class DepartmentTaskController extends Controller
             }
             if (! is_numeric($totalRaw)) {
                 return response()->json([
-                    'message' => 'Indicator '.$indicator->id.': others year total must be numeric.',
+                    'message' => 'Indicator '.$indicator->id.': consolidated data year total must be numeric.',
                 ], 422);
             }
             $out[$yearKey] = [
@@ -626,6 +641,9 @@ class DepartmentTaskController extends Controller
 
     private function departmentTaskUsesIndicatorBundles(?HrRequest $hrRequest): bool
     {
+        if ($hrRequest?->request_type === 'other_issue') {
+            return false;
+        }
         if (! $hrRequest || ! $hrRequest->issue) {
             return false;
         }
@@ -710,10 +728,11 @@ class DepartmentTaskController extends Controller
         if (! $issue) {
             return response()->json(['message' => 'Request has no issue for indicator responses.'], 422);
         }
-        $hrRequest->loadMissing('indicatorResponses');
+        $hrRequest->loadMissing(['indicatorResponses', 'indicatorYears']);
         $issue->loadMissing([
             'indicators.yearGenderCells.collectionYear',
             'indicators.yearGenderCells.collectionGender',
+            'indicators.collectionYearRows.collectionYear',
         ]);
         $selectedIds = $hrRequest->indicatorResponses->pluck('issue_indicator_id')->map(fn ($id) => (int) $id)->all();
 
@@ -761,6 +780,7 @@ class DepartmentTaskController extends Controller
         });
 
         foreach ($scopedIndicators as $indicator) {
+            \App\Support\RequestIndicatorYears::hydrateIndicatorRelations($indicator, $hrRequest);
             $flags = $issue->effectiveIndicatorFlags($indicator);
             $idKey = (string) $indicator->id;
             $entry = $submitted[$idKey] ?? $submitted[$indicator->id] ?? null;
@@ -863,12 +883,18 @@ class DepartmentTaskController extends Controller
                         $quantitative['by_year_religion'] = $normalized;
                     }
 
-                    if ((bool) $indicator->collects_by_others && $this->isMatrixDimensionEnabled($qIn, 'others')) {
-                        $normalized = $this->normalizeQuantitativeByYearOthers($indicator, $qIn['by_year_others'] ?? null);
+                    if (
+                        (bool) $indicator->collects_by_consolidated
+                        && $this->isMatrixDimensionEnabled($qIn, 'consolidated')
+                    ) {
+                        $normalized = $this->normalizeQuantitativeByYearConsolidated(
+                            $indicator,
+                            $qIn['by_year_consolidated'] ?? $qIn['by_year_others'] ?? null,
+                        );
                         if ($normalized instanceof JsonResponse) {
                             return $normalized;
                         }
-                        $quantitative['by_year_others'] = $normalized;
+                        $quantitative['by_year_consolidated'] = $normalized;
                     }
 
                     $row['quantitative'] = $quantitative;

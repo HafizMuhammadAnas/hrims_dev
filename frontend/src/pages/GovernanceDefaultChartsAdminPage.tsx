@@ -472,7 +472,7 @@ export function GovernanceDefaultChartsAdminPage() {
                           })
                         }}
                       >
-                        <option value="trend">Single indicator (gender / year total)</option>
+                        <option value="trend">Single indicator (year total)</option>
                         <option value="comparison">Two indicators (comparison)</option>
                         <option value="dimension_totals">
                           Multi-dimension totals (years × dimensions)
@@ -512,8 +512,8 @@ export function GovernanceDefaultChartsAdminPage() {
                   {draft.kind === 'dimension_totals' ? (
                     <p className="muted" style={{ margin: '0 0 8px' }}>
                       Plots each disaggregation dimension’s year Total (Gender, Age, Disability,
-                      District, Religion, Others) as separate series. Does not use gender-only total
-                      like other graphs.
+                      District, Religion, Consolidated Data) as separate series. Single-indicator
+                      trend charts use Year totals (Consolidated Data) only — not Gender Total.
                     </p>
                   ) : null}
                   <FormRow twoCol>

@@ -11,6 +11,7 @@ import {
   type RegionalResponseRow,
 } from '../../api/lists'
 import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../../components/CompiledRecordsWorkflowNav'
+import { MergeCompiledRecordsSection } from '../../components/MergeCompiledRecordsSection'
 import { RegionalSubmissionCoverageBar } from '../../components/RegionalSubmissionCoverageBar'
 import { regionalResponseFederalReviewPath } from '../../lib/workflowNavigation'
 import { hasDepartmentResponse } from '../../lib/departmentTaskWorkflow'
@@ -593,6 +594,9 @@ export function FederalCompilationPage() {
         </div>
       </TableCard>
 
+      <div style={{ marginTop: 20 }}>
+        <MergeCompiledRecordsSection records={compiledRecords} />
+      </div>
     </PageSection>
   )
 }

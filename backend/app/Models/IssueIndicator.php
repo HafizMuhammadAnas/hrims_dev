@@ -15,6 +15,8 @@ class IssueIndicator extends Model
 
     private static ?bool $hasSortOrderColumn = null;
 
+    private static ?bool $hasIsActiveColumn = null;
+
     public static function hasSortOrderColumn(): bool
     {
         if (self::$hasSortOrderColumn === null) {
@@ -22,6 +24,24 @@ class IssueIndicator extends Model
         }
 
         return self::$hasSortOrderColumn;
+    }
+
+    public static function hasIsActiveColumn(): bool
+    {
+        if (self::$hasIsActiveColumn === null) {
+            self::$hasIsActiveColumn = Schema::hasColumn((new self)->getTable(), 'is_active');
+        }
+
+        return self::$hasIsActiveColumn;
+    }
+
+    public function isActive(): bool
+    {
+        if (! self::hasIsActiveColumn()) {
+            return true;
+        }
+
+        return (bool) ($this->is_active ?? true);
     }
 
     public const AGE_UNDER_18 = 'under_18';
@@ -44,8 +64,9 @@ class IssueIndicator extends Model
         'collects_by_location',
         'collects_by_disability',
         'collects_by_religion',
-        'collects_by_others',
+        'collects_by_consolidated',
         'sort_order',
+        'is_active',
     ];
 
     protected function casts(): array
@@ -59,7 +80,8 @@ class IssueIndicator extends Model
             'collects_by_location' => 'boolean',
             'collects_by_disability' => 'boolean',
             'collects_by_religion' => 'boolean',
-            'collects_by_others' => 'boolean',
+            'collects_by_consolidated' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -90,7 +112,7 @@ class IssueIndicator extends Model
             || (bool) $this->collects_by_location
             || (bool) $this->collects_by_disability
             || (bool) $this->collects_by_religion
-            || (bool) $this->collects_by_others;
+            || (bool) $this->collects_by_consolidated;
     }
 
     public function isYearOnlyCollection(): bool
@@ -264,6 +286,7 @@ class IssueIndicator extends Model
         return [
             'id' => $this->id,
             'sort_order' => (int) ($this->sort_order ?? 0),
+            'is_active' => $this->isActive(),
             'indicator_text' => $this->indicator_text,
             'disaggregation' => $this->disaggregation,
             'has_quantitative' => (bool) $this->has_quantitative,
@@ -274,7 +297,7 @@ class IssueIndicator extends Model
             'collects_by_location' => (bool) $this->collects_by_location,
             'collects_by_disability' => (bool) $this->collects_by_disability,
             'collects_by_religion' => (bool) $this->collects_by_religion,
-            'collects_by_others' => (bool) $this->collects_by_others,
+            'collects_by_consolidated' => (bool) $this->collects_by_consolidated,
             'collection_by_year' => $this->buildCollectionByYearPayload(),
             'qualitative_collection_by_year' => $this->buildQualitativeCollectionByYearPayload(),
         ];
@@ -298,7 +321,8 @@ class IssueIndicator extends Model
             'collects_by_location' => (bool) $this->collects_by_location,
             'collects_by_disability' => (bool) $this->collects_by_disability,
             'collects_by_religion' => (bool) $this->collects_by_religion,
-            'collects_by_others' => (bool) $this->collects_by_others,
+            'collects_by_consolidated' => (bool) $this->collects_by_consolidated,
+            'is_active' => $this->isActive(),
         ];
 
         if (! $this->collects_by_year && ! (bool) $this->has_qualitative) {

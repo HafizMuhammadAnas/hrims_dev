@@ -89,7 +89,7 @@ export type DisaggregationDimension =
 
   | 'religion'
 
-  | 'others'
+  | 'consolidated'
 
 
 
@@ -111,7 +111,7 @@ export function indicatorUsesDisaggregatedDimensions(ind: HrRequestIssueIndicato
 
       ind.collects_by_religion ||
 
-      ind.collects_by_others,
+      ind.collects_by_consolidated,
 
   )
 
@@ -602,7 +602,7 @@ export function indicatorUsesAnyDataMatrix(ind: HrRequestIssueIndicator): boolea
 
     Boolean(ind.collects_by_religion) ||
 
-    Boolean(ind.collects_by_others)
+    Boolean(ind.collects_by_consolidated)
 
   )
 
@@ -626,7 +626,7 @@ export function deptFormUsesAnyIndicatorMatrix(indicators: HrRequestIssueIndicat
 
 
 
-/** Year groups with no breakdown columns — used for Others (Total-only per year). */
+/** Year groups with no breakdown columns — used for Consolidated Data (Total-only per year). */
 
 export function buildYearTotalOnlyMatrixGroups(
 

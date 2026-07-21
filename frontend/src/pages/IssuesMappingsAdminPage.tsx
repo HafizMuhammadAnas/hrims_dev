@@ -27,6 +27,8 @@ import {
   adminUpdateCollectionYear,
   adminUpdateIssue,
   adminUpdateIssueCategory,
+  adminReorderIssueIndicators,
+  adminSetIssueIndicatorActive,
   type AdminArticleRow,
   type AdminCollectionGender,
   type AdminCollectionReligion,
@@ -210,7 +212,6 @@ export function IssuesMappingsAdminPage() {
         issueId={viewIssueId}
         user={user}
         issues={issues}
-        collectionGenders={activeCollectionGenders}
         error={error}
         setError={setError}
         onRefreshIssues={refreshIssues}
@@ -1972,7 +1973,7 @@ function indicatorDisaggregationLabel(ind: AdminIssue['indicators'][number]): st
     if (ind.collects_by_location) dims.push('Location')
     if (ind.collects_by_disability) dims.push('Disability')
     if (ind.collects_by_religion) dims.push('Religion')
-    if (ind.collects_by_others) dims.push('Others')
+    if (ind.collects_by_consolidated) dims.push('Consolidated Data')
     parts.push(dims.length > 0 ? `Q: ${years} (${dims.join(', ')})` : `Q: ${years}`)
   }
   const qualYears = ind.qualitative_collection_by_year ?? []
@@ -2049,6 +2050,8 @@ type IndicatorDisaggregatedYearRow = {
 }
 
 type IndicatorDraft = {
+  /** Stable server id when editing an existing indicator — never changed by drag-and-drop. */
+  id?: number
   client_key: string
   indicator_text: string
   collects_quantitative: boolean
@@ -2062,7 +2065,7 @@ type IndicatorDraft = {
   collects_by_location: boolean
   collects_by_disability: boolean
   collects_by_religion: boolean
-  collects_by_others: boolean
+  collects_by_consolidated: boolean
 }
 
 let indicatorClientKeyCounter = 0
@@ -2086,7 +2089,7 @@ function emptyIndicator(): IndicatorDraft {
     collects_by_location: false,
     collects_by_disability: false,
     collects_by_religion: false,
-    collects_by_others: false,
+    collects_by_consolidated: false,
   }
 }
 
@@ -2095,12 +2098,6 @@ function validateIndicatorDataTypes(rows: IndicatorDraft[]): string | null {
   for (const x of filled) {
     if (!x.collects_quantitative && !x.collects_qualitative) {
       return 'Each indicator must have Quantitative and/or Qualitative selected.'
-    }
-    if (x.collects_quantitative && x.disaggregated_years.length === 0) {
-      return 'Select at least one year for each quantitative indicator.'
-    }
-    if (x.collects_qualitative && x.qualitative_year_ids.length === 0) {
-      return 'Select at least one year for each qualitative indicator.'
     }
   }
   return null
@@ -2122,6 +2119,7 @@ function indicatorFromAdmin(ind: AdminIssueIndicator): IndicatorDraft {
     qualitative_year_ids = (ind.collection_by_year ?? []).map((y) => y.year_id)
   }
   return {
+    id: ind.id,
     client_key: nextIndicatorClientKey(ind.id),
     indicator_text: ind.indicator_text,
     collects_quantitative: quantitative,
@@ -2133,124 +2131,33 @@ function indicatorFromAdmin(ind: AdminIssueIndicator): IndicatorDraft {
     collects_by_location: false,
     collects_by_disability: quantitative,
     collects_by_religion: quantitative,
-    collects_by_others: quantitative,
+    collects_by_consolidated: quantitative,
   }
 }
 
-function indicatorAdminToPayload(ind: AdminIssueIndicator, fallbackGenderIds: number[] = []) {
-  return indicatorToPayload(indicatorFromAdmin(ind), fallbackGenderIds)
-}
-
-/** Quantitative: years + fixed dimensions. Qualitative: separate year list only. */
-function indicatorToPayload(x: IndicatorDraft, fallbackGenderIds: number[] = []) {
-  const quantYears = x.collects_quantitative ? x.disaggregated_years : []
-  const qualYears = x.collects_qualitative ? x.qualitative_year_ids : []
-  const collectsByYear = quantYears.length > 0 || qualYears.length > 0
-
+/** Quantitative: dimensions only. Years are selected by Federal Admin on each HR request. */
+function indicatorToPayload(x: IndicatorDraft, _fallbackGenderIds: number[] = []) {
   return {
+    ...(x.id != null ? { id: x.id } : {}),
     indicator_text: x.indicator_text.trim(),
-    disaggregation: null,
+    disaggregation: null as string | null,
     has_quantitative: x.collects_quantitative,
     has_qualitative: x.collects_qualitative,
-    collects_by_year: collectsByYear,
-    collects_by_gender: x.collects_quantitative && quantYears.length > 0,
-    collects_by_age: x.collects_quantitative && quantYears.length > 0,
+    collects_by_year: x.collects_quantitative,
+    collects_by_gender: x.collects_quantitative,
+    collects_by_age: x.collects_quantitative,
     collects_by_location: false,
-    collects_by_disability: x.collects_quantitative && quantYears.length > 0,
-    collects_by_religion: x.collects_quantitative && quantYears.length > 0,
-    collects_by_others: x.collects_quantitative && quantYears.length > 0,
-    collection_by_year: quantYears.map((row) => ({
-      collection_year_id: row.year_id,
-      collection_gender_ids: row.gender_ids.length > 0 ? row.gender_ids : fallbackGenderIds,
-      collection_religion_ids: [] as number[],
-    })),
-    qualitative_collection_by_year: qualYears.map((yearId) => ({
-      collection_year_id: yearId,
-    })),
+    collects_by_disability: x.collects_quantitative,
+    collects_by_religion: x.collects_quantitative,
+    collects_by_consolidated: x.collects_quantitative,
+    // Years are request-scoped (Federal Admin); clear catalog years on save.
+    collection_by_year: [] as Array<{
+      collection_year_id: number
+      collection_gender_ids: number[]
+      collection_religion_ids: number[]
+    }>,
+    qualitative_collection_by_year: [] as Array<{ collection_year_id: number }>,
   }
-}
-
-function IndicatorYearOnlyPicker({
-  yearIds,
-  onChange,
-  collectionYears,
-  disabled,
-}: {
-  yearIds: number[]
-  onChange: (ids: number[]) => void
-  collectionYears: AdminCollectionYear[]
-  disabled?: boolean
-}) {
-  const sortedYears = useMemo(
-    () => sortCollectionYearsByLabelValue(collectionYears),
-    [collectionYears],
-  )
-
-  if (sortedYears.length === 0) {
-    return (
-      <p className="text-muted text-compact" style={{ margin: 0 }}>
-        No years in catalog â€” add entries under Year list.
-      </p>
-    )
-  }
-
-  return (
-    <CatalogIdCheckboxList
-      label="Years"
-      items={sortedYears}
-      labelKey="label"
-      selectedIds={yearIds}
-      disabled={disabled}
-      onChange={onChange}
-    />
-  )
-}
-
-function CatalogIdCheckboxList({
-  label,
-  items,
-  labelKey,
-  selectedIds,
-  onChange,
-  disabled,
-}: {
-  label: string
-  items: { id: number; label?: string; name?: string }[]
-  labelKey: 'label' | 'name'
-  selectedIds: number[]
-  onChange: (ids: number[]) => void
-  disabled?: boolean
-}) {
-  if (items.length === 0) {
-    return (
-      <p className="text-muted text-compact" style={{ margin: '4px 0 0' }}>
-        No {label.toLowerCase()} in catalog â€” add entries under {label} list.
-      </p>
-    )
-  }
-  return (
-    <div className="issue-indicator-catalog-checks" role="group" aria-label={label}>
-      {items.map((item) => {
-        const text = labelKey === 'label' ? item.label : item.name
-        const checked = selectedIds.includes(item.id)
-        return (
-          <label key={item.id} className="checkbox-label issue-indicator-catalog-checks__item">
-            <input
-              type="checkbox"
-              checked={checked}
-              disabled={disabled}
-              onChange={() => {
-                onChange(
-                  checked ? selectedIds.filter((id) => id !== item.id) : [...selectedIds, item.id],
-                )
-              }}
-            />
-            <span>{text}</span>
-          </label>
-        )
-      })}
-    </div>
-  )
 }
 
 function ArticleMultiSelectDropdown({
@@ -2360,7 +2267,7 @@ function ArticleMultiSelectDropdown({
 function IssueIndicatorsEditor({
   rows,
   onChange,
-  collectionYears,
+  collectionYears: _collectionYears,
   collectionGenders,
   disabled,
 }: {
@@ -2372,10 +2279,6 @@ function IssueIndicatorsEditor({
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
-  const sortedYears = useMemo(
-    () => sortCollectionYearsByLabelValue(collectionYears),
-    [collectionYears],
-  )
   const allSelectableGenderIds = useMemo(
     () =>
       filterSelectableCollectionGenders([...collectionGenders])
@@ -2418,7 +2321,7 @@ function IssueIndicatorsEditor({
         collects_by_location: false,
         collects_by_disability: true,
         collects_by_religion: true,
-        collects_by_others: true,
+        collects_by_consolidated: true,
       })
       return
     }
@@ -2430,7 +2333,7 @@ function IssueIndicatorsEditor({
       collects_by_location: false,
       collects_by_disability: false,
       collects_by_religion: false,
-      collects_by_others: false,
+      collects_by_consolidated: false,
     })
   }
 
@@ -2438,26 +2341,6 @@ function IssueIndicatorsEditor({
     patchRow(idx, {
       collects_qualitative: checked,
       qualitative_year_ids: checked ? row.qualitative_year_ids : [],
-    })
-  }
-
-  function setQuantitativeYears(idx: number, row: IndicatorDraft, yearIds: number[]) {
-    const existing = new Map(row.disaggregated_years.map((y) => [y.year_id, y]))
-    patchRow(idx, {
-      disaggregated_years: yearIds.map((year_id) => {
-        const prev = existing.get(year_id)
-        return {
-          year_id,
-          gender_ids:
-            prev && prev.gender_ids.length > 0 ? prev.gender_ids : allSelectableGenderIds,
-        }
-      }),
-      collects_by_gender: true,
-      collects_by_age: true,
-      collects_by_location: false,
-      collects_by_disability: true,
-      collects_by_religion: true,
-      collects_by_others: true,
     })
   }
 
@@ -2535,15 +2418,6 @@ function IssueIndicatorsEditor({
           </FormRow>
           {row.collects_quantitative ? (
             <div className="issue-indicator-mapping-block">
-              <div className="issue-indicator-mapping-block__label text-compact font-semibold">
-                Quantitative years
-              </div>
-              <IndicatorYearOnlyPicker
-                yearIds={row.disaggregated_years.map((y) => y.year_id)}
-                collectionYears={sortedYears}
-                disabled={disabled}
-                onChange={(yearIds) => setQuantitativeYears(idx, row, yearIds)}
-              />
               <div className="issue-indicator-dimension-checks" role="group" aria-label="Disaggregation dimensions">
                 {(
                   [
@@ -2551,7 +2425,7 @@ function IssueIndicatorsEditor({
                     'Age (Under 18, 18 - 60, Above 60 for respondents)',
                     'Disability (Persons with disability count for respondents)',
                     'Religion (full list for respondents)',
-                    'Others (Total count only for respondents)',
+                    'Consolidated Data (Total count only for respondents)',
                   ] as const
                 ).map((label) => (
                   <label key={label} className="checkbox-label issue-indicator-dimension-checks__item">
@@ -2562,22 +2436,15 @@ function IssueIndicatorsEditor({
               </div>
             </div>
           ) : null}
-          {row.collects_qualitative ? (
-            <div className="issue-indicator-mapping-block">
-              <div className="issue-indicator-mapping-block__label text-compact font-semibold">
-                Qualitative years
-              </div>
-              <IndicatorYearOnlyPicker
-                yearIds={row.qualitative_year_ids}
-                collectionYears={sortedYears}
-                disabled={disabled}
-                onChange={(yearIds) => patchRow(idx, { qualitative_year_ids: yearIds })}
-              />
-            </div>
-          ) : null}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="link" compact dangerLink disabled={disabled} onClick={() => onChange(rows.filter((_, i) => i !== idx))}>
-              Remove indicator
+            <Button
+              variant="link"
+              compact
+              dangerLink
+              disabled={disabled}
+              onClick={() => onChange(rows.filter((_, i) => i !== idx))}
+            >
+              {row.id != null ? 'Deactivate indicator' : 'Remove indicator'}
             </Button>
           </div>
         </div>
@@ -2642,7 +2509,9 @@ function IssuesCreateForm({
         ? editIssue.article_ids
         : editIssue.articles.map((a) => a.id),
     )
-    setIndicators(editIssue.indicators.map(indicatorFromAdmin))
+    setIndicators(
+      editIssue.indicators.filter((ind) => ind.is_active !== false).map(indicatorFromAdmin),
+    )
   }, [editIssue])
 
   return (
@@ -2925,7 +2794,6 @@ function IssuesIssueViewPage({
   issueId,
   user,
   issues,
-  collectionGenders,
   error,
   setError,
   onRefreshIssues,
@@ -2933,7 +2801,6 @@ function IssuesIssueViewPage({
   issueId: number
   user: AuthUser
   issues: AdminIssue[]
-  collectionGenders: AdminCollectionGender[]
   error: string | null
   setError: (s: string | null) => void
   onRefreshIssues: () => Promise<void>
@@ -2942,23 +2809,39 @@ function IssuesIssueViewPage({
   const [issue, setIssue] = useState<AdminIssue | null>(null)
   const [loading, setLoading] = useState(true)
   const [reorderBusy, setReorderBusy] = useState(false)
-  const fallbackGenderIds = useMemo(
-    () => filterSelectableCollectionGenders(collectionGenders).map((g) => g.id),
-    [collectionGenders],
-  )
 
   async function saveIndicatorOrder(next: AdminIssueIndicator[]) {
     if (!issue) return
     setReorderBusy(true)
     setError(null)
     try {
-      const updated = await adminUpdateIssue(issue.id, {
-        indicators: next.map((ind) => indicatorAdminToPayload(ind, fallbackGenderIds)),
-      })
+      const updated = await adminReorderIssueIndicators(
+        issue.id,
+        next.map((ind) => ind.id),
+      )
       setIssue(updated)
       await onRefreshIssues()
     } catch (e: unknown) {
       setError(isApiError(e) ? e.message : e instanceof Error ? e.message : 'Could not save indicator order')
+    } finally {
+      setReorderBusy(false)
+    }
+  }
+
+  async function setIndicatorActive(indicatorId: number, nextActive: boolean) {
+    if (!issue) return
+    const label = nextActive ? 'Activate' : 'Deactivate'
+    if (!window.confirm(`${label} this indicator? Existing requests keep their data; deactivated indicators are hidden from new requests.`)) {
+      return
+    }
+    setReorderBusy(true)
+    setError(null)
+    try {
+      const updated = await adminSetIssueIndicatorActive(issue.id, indicatorId, nextActive)
+      setIssue(updated)
+      await onRefreshIssues()
+    } catch (e: unknown) {
+      setError(isApiError(e) ? e.message : e instanceof Error ? e.message : `${label} failed`)
     } finally {
       setReorderBusy(false)
     }
@@ -3013,6 +2896,7 @@ function IssuesIssueViewPage({
             reorderIndicators
             onReorderIndicators={(next) => void saveIndicatorOrder(next)}
             reorderBusy={reorderBusy}
+            onSetIndicatorActive={(id, next) => void setIndicatorActive(id, next)}
           />
           <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button variant="secondary" compact onClick={() => navigate('/admin/issues')}>
@@ -3041,12 +2925,14 @@ function IssueIndicatorsDisplayTable({
   reorderable,
   onReorder,
   reorderBusy,
+  onSetActive,
 }: {
   issue: AdminIssue
   indicators: AdminIssueIndicator[]
   reorderable?: boolean
   onReorder?: (next: AdminIssueIndicator[]) => void
   reorderBusy?: boolean
+  onSetActive?: (indicatorId: number, isActive: boolean) => void
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -3073,42 +2959,62 @@ function IssueIndicatorsDisplayTable({
           <th>Indicator</th>
           <th>Data types</th>
           <th>Disaggregation</th>
+          <th>Status</th>
+          {onSetActive ? <th>Actions</th> : null}
         </tr>
       </thead>
       <tbody>
-        {indicators.map((ind, idx) => (
-          <tr
-            key={ind.id}
-            className={
-              (dropIndex === idx ? ' issue-indicator-row--drop-target' : '') +
-              (dragIndex === idx ? ' issue-indicator-row--dragging' : '')
-            }
-            draggable={Boolean(reorderable && !reorderBusy)}
-            onDragStart={() => {
-              if (!reorderable || reorderBusy) return
-              setDragIndex(idx)
-            }}
-            onDragEnd={finishDrag}
-            onDragOver={(e) => {
-              if (!reorderable || reorderBusy || dragIndex == null) return
-              e.preventDefault()
-              setDropIndex(idx)
-            }}
-            onDrop={(e) => {
-              e.preventDefault()
-              handleDrop(idx)
-            }}
-          >
-            {reorderable ? (
-              <td className="issue-indicator-order-col">
-                <DragHandle disabled={reorderBusy} />
-              </td>
-            ) : null}
-            <td>{ind.indicator_text}</td>
-            <td>{indicatorDataTypeLabel(ind, issue)}</td>
-            <td>{indicatorDisaggregationLabel(ind)}</td>
-          </tr>
-        ))}
+        {indicators.map((ind, idx) => {
+          const active = ind.is_active !== false
+          return (
+            <tr
+              key={ind.id}
+              className={
+                (dropIndex === idx ? ' issue-indicator-row--drop-target' : '') +
+                (dragIndex === idx ? ' issue-indicator-row--dragging' : '') +
+                (!active ? ' issue-indicator-row--inactive' : '')
+              }
+              draggable={Boolean(reorderable && !reorderBusy && active)}
+              onDragStart={() => {
+                if (!reorderable || reorderBusy || !active) return
+                setDragIndex(idx)
+              }}
+              onDragEnd={finishDrag}
+              onDragOver={(e) => {
+                if (!reorderable || reorderBusy || dragIndex == null) return
+                e.preventDefault()
+                setDropIndex(idx)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                handleDrop(idx)
+              }}
+            >
+              {reorderable ? (
+                <td className="issue-indicator-order-col">
+                  {active ? <DragHandle disabled={reorderBusy} /> : null}
+                </td>
+              ) : null}
+              <td>{ind.indicator_text}</td>
+              <td>{indicatorDataTypeLabel(ind, issue)}</td>
+              <td>{indicatorDisaggregationLabel(ind)}</td>
+              <td>{active ? 'Active' : 'Inactive'}</td>
+              {onSetActive ? (
+                <td>
+                  <Button
+                    variant="link"
+                    compact
+                    dangerLink={active}
+                    disabled={reorderBusy}
+                    onClick={() => onSetActive(ind.id, !active)}
+                  >
+                    {active ? 'Deactivate' : 'Activate'}
+                  </Button>
+                </td>
+              ) : null}
+            </tr>
+          )
+        })}
       </tbody>
     </table>
   )
@@ -3119,13 +3025,17 @@ function IssueDetailReadOnlyPanel({
   reorderIndicators,
   onReorderIndicators,
   reorderBusy,
+  onSetIndicatorActive,
 }: {
   issue: AdminIssue
   reorderIndicators?: boolean
   onReorderIndicators?: (next: AdminIssueIndicator[]) => void
   reorderBusy?: boolean
+  onSetIndicatorActive?: (indicatorId: number, isActive: boolean) => void
 }) {
   const kind = coerceIssueEntryKind(issue.entry_kind)
+  const activeIndicators = issue.indicators.filter((ind) => ind.is_active !== false)
+  const inactiveIndicators = issue.indicators.filter((ind) => ind.is_active === false)
   return (
     <div className="issue-detail-readonly">
       <dl className="issue-detail-readonly__grid">
@@ -3153,13 +3063,13 @@ function IssueDetailReadOnlyPanel({
         ) : null}
         <div className="issue-detail-readonly__full">
           <dt>{issueEntryDescriptionFieldLabel(kind)}</dt>
-          <dd style={{ whiteSpace: 'pre-wrap' }}>{issue.description?.trim() || 'â€”'}</dd>
+          <dd style={{ whiteSpace: 'pre-wrap' }}>{issue.description?.trim() || '—'}</dd>
         </div>
         <div className="issue-detail-readonly__full">
           <dt>Articles</dt>
           <dd>
             {issue.articles.length === 0 ? (
-              'â€”'
+              '—'
             ) : (
               <ul className="issues-mapping-indicator-list issues-article-detail-list">
                 {issue.articles.map((a) => (
@@ -3180,22 +3090,40 @@ function IssueDetailReadOnlyPanel({
       <h4 className="font-semibold text-compact" style={{ margin: '20px 0 10px' }}>
         Indicators
       </h4>
-      {reorderIndicators && issue.indicators.length > 1 ? (
+      {reorderIndicators && activeIndicators.length > 1 ? (
         <p className="text-muted text-compact" style={{ margin: '0 0 10px' }}>
-          Drag rows to set indicator order.{reorderBusy ? ' Savingâ€¦' : ''}
+          Drag rows to set indicator order.{reorderBusy ? ' Saving…' : ''}
         </p>
       ) : null}
-      {issue.indicators.length === 0 ? (
-        <p className="muted text-compact">None</p>
+      {activeIndicators.length === 0 ? (
+        <p className="muted text-compact">No active indicators</p>
       ) : (
         <IssueIndicatorsDisplayTable
           issue={issue}
-          indicators={issue.indicators}
+          indicators={activeIndicators}
           reorderable={reorderIndicators}
           onReorder={onReorderIndicators}
           reorderBusy={reorderBusy}
+          onSetActive={onSetIndicatorActive}
         />
       )}
+      {inactiveIndicators.length > 0 ? (
+        <>
+          <h4 className="font-semibold text-compact" style={{ margin: '20px 0 10px' }}>
+            Inactive indicators
+          </h4>
+          <p className="text-muted text-compact" style={{ margin: '0 0 10px' }}>
+            Hidden from new requests. Existing request and response data is preserved.
+          </p>
+          <IssueIndicatorsDisplayTable
+            issue={issue}
+            indicators={inactiveIndicators}
+            reorderable={false}
+            reorderBusy={reorderBusy}
+            onSetActive={onSetIndicatorActive}
+          />
+        </>
+      ) : null}
     </div>
   )
 }
