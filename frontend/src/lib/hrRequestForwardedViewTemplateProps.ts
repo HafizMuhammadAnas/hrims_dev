@@ -91,8 +91,13 @@ export function buildDepartmentForwardedViewTemplateProps(
 
   const selectedIssue = detail.issue
   const selectedIds = new Set((detail.indicator_responses ?? []).map((r) => r.issue_indicator_id))
+  const assignedIds = task.assigned_indicator_ids
   const indicatorsForView = selectedIssue
-    ? selectedIssue.indicators.filter((ind) => selectedIds.has(ind.id))
+    ? selectedIssue.indicators.filter((ind) => {
+        if (!selectedIds.has(ind.id)) return false
+        if (assignedIds && assignedIds.length > 0) return assignedIds.includes(ind.id)
+        return true
+      })
     : []
 
   const conventionLabel = detail.convention

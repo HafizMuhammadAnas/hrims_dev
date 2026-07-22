@@ -101,7 +101,7 @@ import {
 } from '../lib/departmentTaskWorkflow'
 import { loiMetadataLoadErrorPageMessage } from '../lib/issueEntryKind'
 import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isViewer } from '../lib/roles'
-import { indicatorsScopedToDepartmentTask, indicatorsScopedToRequest } from '../lib/hrRequestIndicatorScope'
+import { indicatorsScopedToDepartmentTask, indicatorsScopedToRequest, indicatorOrdinalsForRequest } from '../lib/hrRequestIndicatorScope'
 import { reviewFeedbackLabelForTask } from '../lib/ictRegion'
 import type { AuthUser } from '../types/auth'
 import type { HrRequestRow } from '../types/hrRequest'
@@ -371,6 +371,8 @@ export function HrRequestViewPage() {
     () => indicatorsScopedToDepartmentTask(detail, activeTask?.assigned_indicator_ids),
     [detail, activeTask?.assigned_indicator_ids],
   )
+
+  const deptIndicatorOrdinals = useMemo(() => indicatorOrdinalsForRequest(detail), [detail])
 
   const deptResponseDisplayScopeIds = useMemo(() => {
     const scoped = indicatorsScopedToDepartmentTask(detail, activeTask?.assigned_indicator_ids)
@@ -1521,6 +1523,7 @@ export function HrRequestViewPage() {
                 {deptFormUsesIndicatorMatrix(deptIndicatorsForForm) ? (
                   <DepartmentIndicatorDisaggregationMatrices
                     indicators={deptIndicatorsForForm}
+                    indicatorOrdinals={deptIndicatorOrdinals}
                     districts={deptLocationCatalog.districts}
                     religions={religions}
                     genderValues={Object.fromEntries(
@@ -1729,7 +1732,9 @@ export function HrRequestViewPage() {
                         }}
                       >
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-                          <strong className="text-sm font-semibold">{ind.indicator_text}</strong>
+                          <strong className="text-sm font-semibold">
+                            #{deptIndicatorOrdinals[ind.id] ?? '—'} {ind.indicator_text}
+                          </strong>
                           {typeBits.map((t) => (
                             <span key={t} className="dept-data-matrix-block__type-pill">
                               {t}

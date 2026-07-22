@@ -33,6 +33,11 @@ type DimColumn = { id: number | string; label: string }
 
 type Props = {
   indicators: HrRequestIssueIndicator[]
+  /**
+   * 1-based ordinals from the full request (or assign UI) list, keyed by indicator id.
+   * Keeps labels like #1 / #3 stable — not renumbered among quantitative-only cards.
+   */
+  indicatorOrdinals?: Record<number, number>
   genderValues: MatrixValues
   ageValues: MatrixValues
   disabilityValues: MatrixValues
@@ -189,7 +194,7 @@ type DimDef = {
 }
 
 function DepartmentIndicatorDataCard({
-  index,
+  ordinal,
   indicator,
   districts,
   religions,
@@ -215,7 +220,8 @@ function DepartmentIndicatorDataCard({
   savedReligionByIndicator,
   savedConsolidatedByIndicator,
 }: {
-  index: number
+  /** 1-based number from the request indicator list (matches regional assign #N). */
+  ordinal: number
   indicator: HrRequestIssueIndicator
   districts: DistrictRow[]
   religions: CollectionReligionRow[]
@@ -426,7 +432,9 @@ function DepartmentIndicatorDataCard({
   return (
     <article className="iwd-card">
       <header className="iwd-card__toolbar">
-        <strong className="iwd-card__toolbar-title">Indicator {index + 1}</strong>
+        <strong className="iwd-card__toolbar-title">
+          #{ordinal} {title}
+        </strong>
       </header>
 
       <div className="iwd-card__body">
@@ -648,6 +656,7 @@ function DimensionYearPanels({
 
 export function DepartmentIndicatorDisaggregationMatrices({
   indicators,
+  indicatorOrdinals,
   genderValues,
   ageValues,
   disabilityValues,
@@ -693,7 +702,7 @@ export function DepartmentIndicatorDisaggregationMatrices({
       {matrixIndicators.map((ind, index) => (
         <DepartmentIndicatorDataCard
           key={ind.id}
-          index={index}
+          ordinal={indicatorOrdinals?.[ind.id] ?? index + 1}
           indicator={ind}
           districts={districts}
           religions={religions}

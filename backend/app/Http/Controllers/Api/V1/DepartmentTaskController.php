@@ -767,13 +767,21 @@ class DepartmentTaskController extends Controller
 
         $outBy = [];
 
-        $scopedIndicators = $issue->indicators->filter(function (IssueIndicator $indicator) use ($issue, $selectedIds) {
+        $assignedOnTask = self::normalizeAssignedIndicatorIds($departmentTask->assigned_indicator_ids);
+
+        $scopedIndicators = $issue->indicators->filter(function (IssueIndicator $indicator) use ($issue, $selectedIds, $assignedOnTask) {
             $flags = $issue->effectiveIndicatorFlags($indicator);
             if (! $flags['has_quantitative'] && ! $flags['has_qualitative']) {
                 return false;
             }
             if ($selectedIds !== []) {
-                return in_array((int) $indicator->id, $selectedIds, true);
+                if (! in_array((int) $indicator->id, $selectedIds, true)) {
+                    return false;
+                }
+            }
+            // Honor per-department assignment from regional distribution.
+            if ($assignedOnTask !== null) {
+                return in_array((int) $indicator->id, $assignedOnTask, true);
             }
 
             return true;

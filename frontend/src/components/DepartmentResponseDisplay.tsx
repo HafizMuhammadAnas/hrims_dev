@@ -211,6 +211,9 @@ export function DepartmentResponseDisplay({
       {showMatrix ? (
         <DepartmentIndicatorDisaggregationMatrices
           indicators={matrixIndicators}
+          indicatorOrdinals={Object.fromEntries(
+            scopedIndicators.map((ind, index) => [ind.id, index + 1]),
+          )}
           districts={scopedLocationCatalog.districts}
           religions={religions}
           genderValues={{}}

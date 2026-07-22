@@ -29,3 +29,15 @@ export function indicatorsScopedToDepartmentTask(
   const allowed = new Set(assignedIndicatorIds)
   return scoped.filter((i) => allowed.has(i.id))
 }
+
+/** 1-based ordinals matching regional assign UI (#1, #2, …) for the request indicator list. */
+export function indicatorOrdinalsForRequest(
+  detail: HrRequestRow | null | undefined,
+): Record<number, number> {
+  const scoped = indicatorsScopedToRequest(detail)
+  const out: Record<number, number> = {}
+  scoped.forEach((ind, index) => {
+    out[ind.id] = index + 1
+  })
+  return out
+}
