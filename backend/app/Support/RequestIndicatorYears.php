@@ -228,8 +228,9 @@ final class RequestIndicatorYears
     {
         return CollectionYear::query()
             ->where('is_active', true)
-            ->orderBy('sort_order')
+            ->orderByRaw('CAST(label AS UNSIGNED)')
             ->orderBy('label')
+            ->orderBy('sort_order')
             ->get(['id', 'label', 'sort_order'])
             ->keyBy('id');
     }
@@ -241,8 +242,9 @@ final class RequestIndicatorYears
     {
         return CollectionYear::query()
             ->where('is_active', true)
-            ->orderBy('sort_order')
+            ->orderByRaw('CAST(label AS UNSIGNED)')
             ->orderBy('label')
+            ->orderBy('sort_order')
             ->get(['id', 'label'])
             ->map(fn (CollectionYear $y) => [
                 'id' => (int) $y->id,

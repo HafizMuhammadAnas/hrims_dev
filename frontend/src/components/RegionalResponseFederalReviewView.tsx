@@ -157,7 +157,8 @@ export function RegionalResponseFederalReviewView({
     try {
       await downloadElementAsPdf(el, exportFilenameBase(), {
         captureClass: 'regional-response-export-capture',
-        marginMm: 12,
+        marginMm: 10,
+        headerTitle: exportFilenameBase(),
       })
     } catch (e: unknown) {
       setExportError(e instanceof Error ? e.message : 'Could not generate PDF.')

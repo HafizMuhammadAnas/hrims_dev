@@ -93,7 +93,8 @@ export function MergeCompiledRecordsSection({ records }: Props) {
     try {
       await downloadElementAsPdf(el, exportBaseName(), {
         captureClass: 'ministry-compiled-pdf-capture',
-        marginMm: 12,
+        marginMm: 10,
+        headerTitle: exportBaseName(),
       })
     } catch (e: unknown) {
       setExportError(e instanceof Error ? e.message : 'Could not generate PDF.')

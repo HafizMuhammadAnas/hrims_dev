@@ -185,7 +185,11 @@ export function MinistryCompiledRecordViewModal({
     setPdfError(null)
     try {
       const base = [record.req_id, record.title?.trim() || record.id].filter(Boolean).join(' — ')
-      await downloadElementAsPdf(el, base, { captureClass: 'ministry-compiled-pdf-capture', marginMm: 12 })
+      await downloadElementAsPdf(el, base, {
+        captureClass: 'ministry-compiled-pdf-capture',
+        marginMm: 10,
+        headerTitle: base,
+      })
     } catch (e: unknown) {
       setPdfError(e instanceof Error ? e.message : 'Could not generate PDF.')
     } finally {

@@ -16,6 +16,7 @@ import {
 import type { RegionRow } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
 import { isDepartmentAdmin, isFederalAdmin, isViewer } from '../lib/roles'
+import { sortCollectionYearsByLabelValue } from '../lib/collectionYearSort'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import {
   coerceIssueEntryKind,
@@ -445,7 +446,7 @@ export function HrRequestModal({
     try {
       const result = await fetchHrRequestFormIssues(conventionId)
       setIssues(result.issues)
-      setCollectionYears(result.collectionYears)
+      setCollectionYears(sortCollectionYearsByLabelValue(result.collectionYears))
     } catch {
       setIssues(fallback)
       if (fallback.length === 0) {

@@ -1471,6 +1471,16 @@ button.compiled-record-modal-tab {
   margin-bottom: 16px;
 }
 
+.ministry-compiled-pdf-capture .iwd-card,
+.ministry-compiled-pdf-capture .iwd-year-panel,
+.ministry-compiled-pdf-capture .iwd-totals,
+.ministry-compiled-pdf-capture .iwd-dimension,
+.ministry-compiled-pdf-capture .ministry-compiled-dept-response-item,
+.ministry-compiled-pdf-capture .dept-indicator-response-card {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 .ministry-compiled-pdf-capture .ministry-compiled-draft-alert {
   display: none !important;
 }

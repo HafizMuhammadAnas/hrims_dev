@@ -30,11 +30,7 @@ import type {
   UrgentDepartmentTaskRow,
   UrgentRequestRow,
 } from '../api/dashboard'
-import {
-  clarificationStatusPresentation,
-  fetchClarifications,
-  type HrRequestClarificationRow,
-} from '../api/clarifications'
+import { fetchRegionalResponses, type RegionalResponseRow } from '../api/lists'
 import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
 import { StatsCards } from '../components/ui/StatsCards'
@@ -47,6 +43,8 @@ import {
 } from '../lib/roles'
 import { formatAccountDisplayName } from '../lib/userDisplayLabels'
 import { formatAppDate, formatAppTodayLong } from '../lib/dateFormat'
+import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
+import { regionalResponseFederalReviewPath } from '../lib/workflowNavigation'
 import {
   LABEL_ACCEPTED_RATE,
   LABEL_ACTIVE_REQUESTS,
@@ -59,6 +57,7 @@ import {
   LABEL_OPEN_TASKS,
   LABEL_PENDING_REQUESTS,
   LABEL_PERFORMANCE_OVERVIEW,
+  LABEL_REGIONAL_RESPONSES,
   LABEL_REPORTING_DASHBOARD,
   LABEL_REQUEST_MANAGEMENT,
   LABEL_REQUEST_STATUS_DISTRIBUTION,
@@ -151,8 +150,8 @@ export function DashboardPage() {
   const variant = dashboardVariant(user)
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [recentClarifications, setRecentClarifications] = useState<HrRequestClarificationRow[]>([])
-  const [clarificationsLoading, setClarificationsLoading] = useState(false)
+  const [recentResponses, setRecentResponses] = useState<RegionalResponseRow[]>([])
+  const [responsesLoading, setResponsesLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -170,33 +169,34 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (variant !== 'federal') {
-      setRecentClarifications([])
+      setRecentResponses([])
       return
     }
     let cancelled = false
-    setClarificationsLoading(true)
-    void fetchClarifications()
+    setResponsesLoading(true)
+    void fetchRegionalResponses()
       .then((rows) => {
         if (cancelled) return
         const statusRank: Record<string, number> = {
-          pending_federal: 0,
-          pending_region: 1,
-          closed: 2,
+          pending: 0,
+          'needs-modification': 1,
+          accepted: 2,
+          rejected: 3,
         }
         const sorted = [...rows].sort((a, b) => {
-          const rankDiff = (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
+          const rankDiff = (statusRank[a.review_status] ?? 9) - (statusRank[b.review_status] ?? 9)
           if (rankDiff !== 0) return rankDiff
-          const aTime = Date.parse(a.region_submitted_at ?? a.updated_at ?? a.created_at ?? '') || 0
-          const bTime = Date.parse(b.region_submitted_at ?? b.updated_at ?? b.created_at ?? '') || 0
+          const aTime = Date.parse(a.submission_date ?? '') || 0
+          const bTime = Date.parse(b.submission_date ?? '') || 0
           return bTime - aTime
         })
-        setRecentClarifications(sorted.slice(0, 8))
+        setRecentResponses(sorted.slice(0, 8))
       })
       .catch(() => {
-        if (!cancelled) setRecentClarifications([])
+        if (!cancelled) setRecentResponses([])
       })
       .finally(() => {
-        if (!cancelled) setClarificationsLoading(false)
+        if (!cancelled) setResponsesLoading(false)
       })
     return () => {
       cancelled = true
@@ -495,7 +495,7 @@ export function DashboardPage() {
                 <h3 className="dashboard-panel-title">
                   {variant === 'federal' ? <Bell size={20} /> : <Clock size={20} />}
                   {variant === 'federal'
-                    ? 'Recent Clarifications'
+                    ? 'Recent Responses'
                     : variant === 'department' || variant === 'viewer'
                       ? 'Recent Tasks'
                       : 'Recent Requests'}
@@ -505,7 +505,7 @@ export function DashboardPage() {
                   className="btn btn-secondary btn-compact"
                   onClick={() => {
                     if (variant === 'federal') {
-                      navigate('/requests/clarifications')
+                      navigate('/responses')
                       return
                     }
                     if (variant === 'regional') {
@@ -524,30 +524,32 @@ export function DashboardPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {variant === 'federal' ? (
-                  recentClarifications.length > 0 ? (
-                    recentClarifications.map((c) => {
-                      const clarStatus = clarificationStatusPresentation(c.status)
-                      const preview = c.region_message.trim()
+                  recentResponses.length > 0 ? (
+                    recentResponses.map((r) => {
+                      const review = regionalResponseReviewPresentation(r.review_status)
+                      const preview = (r.comments ?? r.content ?? '').trim()
                       return (
                         <button
-                          key={c.id}
+                          key={r.id}
                           type="button"
-                          onClick={() =>
-                            navigate(`/requests/clarifications?id=${encodeURIComponent(String(c.id))}`)
-                          }
+                          onClick={() => navigate(regionalResponseFederalReviewPath(r.id, '/'))}
                           style={{
                             textAlign: 'left',
                             cursor: 'pointer',
                             padding: 12,
-                            background: c.status === 'pending_federal' ? '#e8eefb' : '#f5f7fb',
+                            background: r.review_status === 'pending' ? '#e8eefb' : '#f5f7fb',
                             borderRadius: 8,
                             border: 'none',
                             borderLeft: `4px solid ${
-                              c.status === 'pending_federal'
+                              r.review_status === 'pending'
                                 ? '#2e4fa3'
-                                : c.status === 'pending_region'
+                                : r.review_status === 'needs-modification'
                                   ? '#00bcd4'
-                                  : '#c5d0e6'
+                                  : r.review_status === 'accepted'
+                                    ? '#4caf50'
+                                    : r.review_status === 'rejected'
+                                      ? '#f44336'
+                                      : '#c5d0e6'
                             }`,
                             display: 'flex',
                             justifyContent: 'space-between',
@@ -559,10 +561,11 @@ export function DashboardPage() {
                         >
                           <div style={{ minWidth: 0 }}>
                             <div className="font-semibold text-sm">
-                              {c.hr_request?.title?.trim() || c.hr_request_id}
+                              {r.title?.trim() || r.req_id}
                             </div>
                             <div className="muted small" style={{ marginTop: 2 }}>
-                              {c.region_name ?? `Region #${c.region_id}`}
+                              {r.region_name ?? '—'}
+                              {r.submission_date ? ` · ${formatAppDate(r.submission_date)}` : ''}
                               {preview
                                 ? ` · ${preview.length > 100 ? `${preview.slice(0, 100)}…` : preview}`
                                 : ''}
@@ -570,15 +573,17 @@ export function DashboardPage() {
                           </div>
                           <span
                             className={`status-badge ${
-                              clarStatus.tone === 'success'
+                              review.tone === 'success'
                                 ? 'success'
-                                : clarStatus.tone === 'warning'
+                                : review.tone === 'warning'
                                   ? 'warning'
-                                  : 'default'
+                                  : review.tone === 'danger'
+                                    ? 'danger'
+                                    : 'default'
                             }`}
                             style={{ fontSize: 'var(--font-size-micro)', flexShrink: 0 }}
                           >
-                            {clarStatus.label}
+                            {review.label}
                           </span>
                         </button>
                       )
@@ -586,7 +591,9 @@ export function DashboardPage() {
                   ) : (
                     <div className="empty-state">
                       <CheckCircle size={32} style={{ margin: '0 auto 10px', display: 'block' }} />
-                      {clarificationsLoading ? 'Loading clarifications…' : 'No clarifications yet.'}
+                      {responsesLoading
+                        ? `Loading ${LABEL_REGIONAL_RESPONSES.toLowerCase()}…`
+                        : 'No regional responses yet.'}
                     </div>
                   )
                 ) : requestsPanelRows.length > 0 ? (

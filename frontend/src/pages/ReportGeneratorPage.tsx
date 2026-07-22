@@ -475,6 +475,7 @@ export function ReportGeneratorPage() {
       await downloadElementAsPdf(exportRef.current, 'reporting-dashboard', {
         captureClass: 'report-generator-pdf-capture',
         marginMm: 10,
+        headerTitle: 'Reporting dashboard',
       })
     } catch (e: unknown) {
       setLoadError(e instanceof Error ? e.message : 'PDF export failed')
