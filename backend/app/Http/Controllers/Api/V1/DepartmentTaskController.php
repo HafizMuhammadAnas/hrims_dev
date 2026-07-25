@@ -1065,12 +1065,19 @@ class DepartmentTaskController extends Controller
     public function updateReview(Request $request, DepartmentTask $departmentTask): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('regional_admin') && ! $user->hasRole('federal_admin')) {
+        if (! $user->hasRole('regional_admin') && ! $user->hasRole('federal_admin') && ! HrimsAccess::isConventionAdmin($user)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
         if ($user->hasRole('regional_admin')) {
             if ($user->region_id === null || (int) $user->region_id !== (int) $departmentTask->region_id) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+        }
+
+        if (HrimsAccess::isConventionAdmin($user)) {
+            $departmentTask->loadMissing('hrRequest');
+            if (! $departmentTask->hrRequest || ! HrimsAccess::userMayViewHrRequest($user, $departmentTask->hrRequest)) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         }
@@ -1111,10 +1118,14 @@ class DepartmentTaskController extends Controller
         if (HrimsAccess::isSuperAdmin($user)) {
             // no filter
         }
-        // Federal admin: ICT/Federal line by default; all regions when national scope requested
-        elseif ($user->hasRole('federal_admin')) {
+        // Federal / convention admin: ICT/Federal line by default; all regions when national scope requested
+        elseif ($user->hasRole('federal_admin') || HrimsAccess::isConventionAdmin($user)) {
             if (! $nationalScope) {
                 $query->whereHas('region', fn ($q) => $q->whereIn('slug', ['ict', 'federal']));
+            }
+            $cid = HrimsAccess::conventionId($user);
+            if ($cid !== null) {
+                $query->whereHas('hrRequest', fn ($q) => $q->where('convention_id', $cid));
             }
         }
         // Department admin/viewer see only their department tasks

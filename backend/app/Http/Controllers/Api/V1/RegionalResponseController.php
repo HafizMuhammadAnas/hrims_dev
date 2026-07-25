@@ -78,13 +78,16 @@ class RegionalResponseController extends Controller
     public function review(Request $request, string $regionalResponse): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('super_admin') && ! $user->hasRole('federal_admin')) {
+        if (! $user->hasRole('super_admin') && ! $user->hasRole('federal_admin') && ! HrimsAccess::isConventionAdmin($user)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
         $model = RegionalResponse::query()->with(['region', 'hrRequest'])->find($regionalResponse);
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
+        }
+        if ($model->hrRequest && ! HrimsAccess::userMayViewHrRequest($user, $model->hrRequest)) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
 
         $data = $request->validate([
@@ -155,6 +158,13 @@ class RegionalResponseController extends Controller
 
         if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
             // no filter
+        } elseif (HrimsAccess::isConventionAdmin($user)) {
+            $cid = HrimsAccess::conventionId($user);
+            if ($cid === null) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereHas('hrRequest', fn ($q) => $q->where('convention_id', $cid));
+            }
         } elseif ($user->hasRole('regional_admin') && $user->region_id !== null) {
             $query->where('region_id', $user->region_id);
         } elseif (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
@@ -201,7 +211,7 @@ class RegionalResponseController extends Controller
     public function departmentTasks(Request $request, string $regionalResponse): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('super_admin') && ! $user->hasRole('federal_admin')) {
+        if (! $user->hasRole('super_admin') && ! $user->hasRole('federal_admin') && ! HrimsAccess::isConventionAdmin($user)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -234,6 +244,14 @@ class RegionalResponseController extends Controller
     {
         if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
             return true;
+        }
+
+        if (HrimsAccess::isConventionAdmin($user)) {
+            $model->loadMissing('hrRequest');
+
+            return $model->hrRequest
+                ? HrimsAccess::userMayViewHrRequest($user, $model->hrRequest)
+                : false;
         }
 
         if ($user->hasRole('regional_admin') && $user->region_id !== null) {

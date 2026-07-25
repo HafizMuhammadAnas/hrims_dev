@@ -3,7 +3,10 @@ import type { AuthUser } from '../types/auth'
 export function canManageHrRequests(user: AuthUser | null): boolean {
   if (!user) return false
   return user.roles.some(
-    (r) => r.slug === 'federal_admin' || r.slug === 'regional_admin',
+    (r) =>
+      r.slug === 'federal_admin' ||
+      r.slug === 'convention_admin' ||
+      r.slug === 'regional_admin',
   )
 }
 

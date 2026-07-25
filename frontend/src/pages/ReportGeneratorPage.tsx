@@ -56,7 +56,7 @@ import {
 import { reportColorForLabel, reportDashboardChartColor } from '../lib/reportChartTheme'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { LABEL_REPORTING_DASHBOARD } from '../lib/uiLabels'
-import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
+import { isConventionAdmin, isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
 import { ReportingIndicatorCompiledFocus } from '../components/ReportingIndicatorCompiledFocus'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
@@ -65,11 +65,11 @@ import { StatsCards } from '../components/ui/StatsCards'
 
 const COMPILED_DATA_SOURCE: ReportFilters['dataSource'] = 'consolidated'
 
-function createDefaultReportFilters(lockedRegionalId: string): ReportFilters {
+function createDefaultReportFilters(lockedRegionalId: string, lockedConventionId = ''): ReportFilters {
   return {
     dataSource: COMPILED_DATA_SOURCE,
     regionId: lockedRegionalId,
-    convention: '',
+    convention: lockedConventionId,
     articleId: '',
     entryKind: '',
     categoryId: '',
@@ -266,7 +266,7 @@ function ReportingSummaryCards({ cards }: { cards: ReportingDashboardSummaryCard
 
 export function ReportGeneratorPage() {
   const { user } = useAuth()
-  const federalPortal = isFederalAdmin(user) || isSuperAdmin(user)
+  const federalPortal = isFederalAdmin(user) || isConventionAdmin(user) || isSuperAdmin(user)
   const regionalPortal = isRegionalAdmin(user)
   const canAccessReportGenerator = federalPortal || regionalPortal
 
@@ -276,6 +276,8 @@ export function ReportGeneratorPage() {
 
   const lockedRegionalId =
     regionalPortal && user.region?.id != null ? String(user.region.id) : ''
+  const lockedConventionId =
+    isConventionAdmin(user) && user.convention?.id != null ? String(user.convention.id) : ''
 
   const exportRef = useRef<HTMLDivElement>(null)
 
@@ -293,10 +295,12 @@ export function ReportGeneratorPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const defaultFilters = useMemo(
-    () => createDefaultReportFilters(lockedRegionalId),
-    [lockedRegionalId],
+    () => createDefaultReportFilters(lockedRegionalId, lockedConventionId),
+    [lockedRegionalId, lockedConventionId],
   )
-  const [filters, setFilters] = useState<ReportFilters>(() => createDefaultReportFilters(lockedRegionalId))
+  const [filters, setFilters] = useState<ReportFilters>(() =>
+    createDefaultReportFilters(lockedRegionalId, lockedConventionId),
+  )
 
   const [reportLoading, setReportLoading] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -419,7 +423,7 @@ export function ReportGeneratorPage() {
   }, [collectionYearOptions, filters.collectionYearId])
 
   function handleResetFilters() {
-    setFilters(createDefaultReportFilters(lockedRegionalId))
+    setFilters(createDefaultReportFilters(lockedRegionalId, lockedConventionId))
     setDashboardResult(null)
   }
 
@@ -503,6 +507,7 @@ export function ReportGeneratorPage() {
                 <select
                   id="rg-convention"
                   value={filters.convention}
+                  disabled={Boolean(lockedConventionId)}
                   onChange={(e) =>
                     setFilters({
                       ...filters,

@@ -100,7 +100,7 @@ import {
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
 import { loiMetadataLoadErrorPageMessage } from '../lib/issueEntryKind'
-import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isViewer } from '../lib/roles'
+import { isDepartmentAdmin, isNationalWorkflowAdmin, isRegionalAdmin, isViewer } from '../lib/roles'
 import { indicatorsScopedToDepartmentTask, indicatorsScopedToRequest, indicatorOrdinalsForRequest } from '../lib/hrRequestIndicatorScope'
 import { reviewFeedbackLabelForTask } from '../lib/ictRegion'
 import type { AuthUser } from '../types/auth'
@@ -123,7 +123,7 @@ function pageBackLabel(from: string): string {
 
 function userMayReviewDepartmentTask(user: AuthUser | null, t: DepartmentTaskRow): boolean {
   if (!user) return false
-  if (isFederalAdmin(user)) return true
+  if (isNationalWorkflowAdmin(user)) return true
   if (isRegionalAdmin(user) && user.region && user.region.id === t.region_id) return true
   return false
 }
@@ -955,9 +955,9 @@ export function HrRequestViewPage() {
     taskIdFromUrl &&
       activeTask &&
       ((deptUser && (fromDepartmentTasks || fromDepartmentHistory)) ||
-        (fromFederalDeptResponses && isFederalAdmin(user)) ||
+        (fromFederalDeptResponses && isNationalWorkflowAdmin(user)) ||
         (fromRegionalMonitoring && userMayReviewDepartmentTask(user, activeTask)) ||
-        (fromFederalCompilation && isFederalAdmin(user)) ||
+        (fromFederalCompilation && isNationalWorkflowAdmin(user)) ||
         (fromRegionalCompilation && userMayReviewDepartmentTask(user, activeTask))),
   )
   const embeddedRequestPage = Boolean(

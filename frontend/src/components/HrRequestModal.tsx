@@ -15,7 +15,7 @@ import {
 } from '../api/hrRequests'
 import type { RegionRow } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
-import { isDepartmentAdmin, isFederalAdmin, isViewer } from '../lib/roles'
+import { isConventionAdmin, isDepartmentAdmin, isFederalAdmin, isViewer } from '../lib/roles'
 import { sortCollectionYearsByLabelValue } from '../lib/collectionYearSort'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import {
@@ -135,11 +135,14 @@ type IssueFormState = {
   attachmentFiles: File[]
 }
 
-function emptyIssueForm(lockedRegionId: number | null): IssueFormState {
+function emptyIssueForm(
+  lockedRegionId: number | null,
+  lockedConventionId: number | null = null,
+): IssueFormState {
   const region_ids = lockedRegionId != null ? [lockedRegionId] : []
   return {
     title: '',
-    convention_id: '',
+    convention_id: lockedConventionId ?? '',
     issue_id: '',
     request_type: 'loi',
     other_issue_text: '',
@@ -340,6 +343,10 @@ export function HrRequestModal({
       authUser.department != null,
   )
   const canUseOtherIssues = isFederalAdmin(authUser)
+  const lockedConventionId =
+    isConventionAdmin(authUser) && authUser?.convention?.id != null
+      ? authUser.convention.id
+      : null
 
   const assignableRegions = useMemo(() => {
     const base = regions.filter((r) => r.slug !== 'federal')
@@ -395,7 +402,7 @@ export function HrRequestModal({
     for (const c of conventions) {
       byId.set(c.id, c)
     }
-    const conv = detail?.convention
+    const conv = detail?.convention ?? authUser?.convention ?? null
     if (conv && typeof conv.id === 'number' && !byId.has(conv.id)) {
       byId.set(conv.id, { id: conv.id, code: conv.code, name: conv.name })
     }
@@ -405,7 +412,7 @@ export function HrRequestModal({
         sensitivity: 'base',
       }),
     )
-  }, [conventions, detail?.convention])
+  }, [conventions, detail?.convention, authUser?.convention])
 
   const readOnly = mode === 'view' || !canManage
   const hideRegionsInRegionalView = readOnly && lockedRegionId != null
@@ -463,7 +470,7 @@ export function HrRequestModal({
     setAttachmentRemoveError(null)
     if (mode === 'create') {
       setLegacyForm(null)
-      setIssueForm(emptyIssueForm(lockedRegionId))
+      setIssueForm(emptyIssueForm(lockedRegionId, lockedConventionId))
       setEntryKindFilters(defaultEntryKindFilters())
       setIssues([])
       setConventions([])
@@ -511,7 +518,7 @@ export function HrRequestModal({
       setIssueForm(null)
       setLegacyForm(null)
     }
-  }, [mode, detail, detailLoading, assignableRegions, lockedRegionId, loadIssues])
+  }, [mode, detail, detailLoading, assignableRegions, lockedRegionId, lockedConventionId, loadIssues])
 
   useEffect(() => {
     if (mode !== 'create') return
@@ -1148,7 +1155,7 @@ export function HrRequestModal({
                         : f,
                     )
                   }}
-                  disabled={readOnly || mode !== 'create'}
+                  disabled={readOnly || mode !== 'create' || lockedConventionId != null}
                   aria-invalid={Boolean(fieldErrors.convention_id)}
                   aria-describedby={fieldErrors.convention_id ? 'hr-conv-err' : undefined}
                 >

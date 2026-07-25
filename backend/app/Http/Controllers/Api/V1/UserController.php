@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Convention;
 use App\Models\Department;
 use App\Models\RbacRole;
 use App\Models\Region;
@@ -22,17 +23,25 @@ class UserController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $query = User::query()->with(['roles.permissions', 'region', 'department'])->orderByDesc('updated_at')->orderByDesc('created_at')->orderByDesc('id');
+        $query = User::query()
+            ->with(['roles.permissions', 'region', 'department', 'convention'])
+            ->orderByDesc('updated_at')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
 
         if ($creator->hasRole('super_admin')) {
             $rows = $query
-                ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['federal_admin', 'regional_admin']))
+                ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['federal_admin', 'regional_admin', 'convention_admin']))
                 ->get();
         } elseif ($creator->hasRole('federal_admin')) {
-            $rows = $query
+            $deptUsers = (clone $query)
                 ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
                 ->whereHas('department.regions', fn ($r) => $r->where('slug', 'ict'))
                 ->get();
+            $conventionUsers = (clone $query)
+                ->whereHas('roles', fn ($r) => $r->where('slug', 'convention_admin'))
+                ->get();
+            $rows = $deptUsers->concat($conventionUsers)->unique('id')->values();
         } else {
             if ($creator->region_id === null) {
                 return response()->json(['message' => 'Forbidden'], 403);
@@ -57,8 +66,10 @@ class UserController extends Controller
         }
 
         $roleSlugsAllowed = $creator->hasRole('super_admin')
-            ? ['federal_admin', 'regional_admin']
-            : ['department_admin', 'viewer'];
+            ? ['federal_admin', 'regional_admin', 'convention_admin']
+            : ($creator->hasRole('federal_admin')
+                ? ['department_admin', 'viewer', 'convention_admin']
+                : ['department_admin', 'viewer']);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -68,6 +79,7 @@ class UserController extends Controller
             'role_slug' => ['required', Rule::in($roleSlugsAllowed)],
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'convention_id' => ['nullable', 'integer', 'exists:conventions,id'],
             'is_active' => ['sometimes', 'boolean'],
         ], [
             'name.required' => 'Full name is required.',
@@ -80,17 +92,29 @@ class UserController extends Controller
             'role_slug.required' => 'Select a role.',
             'role_slug.in' => 'Select a valid role.',
             'department_id.exists' => 'Select a valid department.',
+            'convention_id.exists' => 'Select a valid convention.',
         ]);
 
-        if ($creator->hasRole('super_admin')) {
+        if ($data['role_slug'] === 'convention_admin') {
+            if (empty($data['convention_id'])) {
+                return response()->json(['message' => 'convention_id is required for convention administrators.'], 422);
+            }
+            if (! Convention::query()->whereKey($data['convention_id'])->exists()) {
+                return response()->json(['message' => 'Select a valid convention.'], 422);
+            }
+            $data['region_id'] = null;
+            $data['department_id'] = null;
+        } elseif ($creator->hasRole('super_admin')) {
             if ($data['role_slug'] === 'federal_admin') {
                 $data['region_id'] = Region::query()->where('slug', 'ict')->value('id');
                 $data['department_id'] = null;
+                $data['convention_id'] = null;
             } else {
                 if (empty($data['region_id'])) {
                     return response()->json(['message' => 'region_id is required for regional administrators.'], 422);
                 }
                 $data['department_id'] = null;
+                $data['convention_id'] = null;
             }
         } else {
             $department = Department::query()->with('regions')->findOrFail($data['department_id']);
@@ -109,6 +133,7 @@ class UserController extends Controller
                 }
                 $data['region_id'] = (int) $creator->region_id;
             }
+            $data['convention_id'] = null;
         }
 
         $role = RbacRole::query()->where('slug', $data['role_slug'])->firstOrFail();
@@ -120,10 +145,11 @@ class UserController extends Controller
             'password' => Hash::make($data['password']),
             'region_id' => $data['region_id'] ?? null,
             'department_id' => $data['department_id'] ?? null,
+            'convention_id' => $data['convention_id'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ]);
         $user->roles()->sync([$role->id]);
-        $user->load(['roles.permissions', 'region', 'department']);
+        $user->load(['roles.permissions', 'region', 'department', 'convention']);
         app(NotificationService::class)->notifyUserManaged(
             $user,
             $creator,
@@ -154,11 +180,12 @@ class UserController extends Controller
         }
 
         if ($creator->hasRole('super_admin')) {
-            if (! $model->roles()->whereIn('slug', ['federal_admin', 'regional_admin'])->exists()) {
-                return response()->json(['message' => 'Only federal and regional administrator accounts can be managed here.'], 403);
+            if (! $model->roles()->whereIn('slug', ['federal_admin', 'regional_admin', 'convention_admin'])->exists()) {
+                return response()->json(['message' => 'Only federal, regional, and convention administrator accounts can be managed here.'], 403);
             }
         } elseif ($creator->hasRole('federal_admin')) {
-            if (! $model->department?->coversRegionSlug('ict')) {
+            $isConventionAdmin = $model->roles()->where('slug', 'convention_admin')->exists();
+            if (! $isConventionAdmin && ! $model->department?->coversRegionSlug('ict')) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         } elseif ($creator->hasRole('regional_admin')) {
@@ -173,6 +200,7 @@ class UserController extends Controller
             'email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'is_active' => ['sometimes', 'boolean'],
             'password' => ['sometimes', 'string', 'min:8'],
+            'convention_id' => ['sometimes', 'nullable', 'integer', 'exists:conventions,id'],
         ]);
 
         if (isset($data['email']) && $data['email'] !== null) {
@@ -186,10 +214,18 @@ class UserController extends Controller
             $data['password'] = Hash::make($data['password']);
         }
 
+        if (array_key_exists('convention_id', $data)) {
+            if (! $model->roles()->where('slug', 'convention_admin')->exists()) {
+                unset($data['convention_id']);
+            } elseif ($data['convention_id'] === null) {
+                return response()->json(['message' => 'convention_id is required for convention administrators.'], 422);
+            }
+        }
+
         $wasActive = (bool) $model->is_active;
         $model->fill($data);
         $model->save();
-        $model->load(['roles.permissions', 'region', 'department']);
+        $model->load(['roles.permissions', 'region', 'department', 'convention']);
         app(NotificationService::class)->notifyUserManaged(
             $model,
             $creator,
@@ -205,29 +241,29 @@ class UserController extends Controller
 
     public function destroy(Request $request, int $user): JsonResponse
     {
+        $creator = $request->user();
         if (! $request->user()->hasRole('super_admin') && ! $request->user()->hasRole('federal_admin') && ! $request->user()->hasRole('regional_admin')) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $model = User::query()->with(['roles', 'department'])->find($user);
+        $model = User::query()->find($user);
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
         }
-        if ((int) $model->id === (int) $request->user()->id) {
-            return response()->json(['message' => 'Cannot delete your own account'], 422);
+        if ((int) $model->id === (int) $creator->id) {
+            return response()->json(['message' => 'You cannot delete your own account.'], 422);
+        }
+        if ($model->roles()->where('slug', 'super_admin')->exists()) {
+            return response()->json(['message' => 'Super administrator accounts cannot be deleted here.'], 422);
         }
 
-        if ($model->roles->contains('slug', 'super_admin')) {
-            return response()->json(['message' => 'Super administrator accounts cannot be deleted.'], 422);
-        }
-
-        $creator = $request->user();
         if ($creator->hasRole('super_admin')) {
-            if (! $model->roles()->whereIn('slug', ['federal_admin', 'regional_admin'])->exists()) {
-                return response()->json(['message' => 'Only federal and regional administrator accounts can be managed here.'], 403);
+            if (! $model->roles()->whereIn('slug', ['federal_admin', 'regional_admin', 'convention_admin'])->exists()) {
+                return response()->json(['message' => 'Forbidden'], 403);
             }
         } elseif ($creator->hasRole('federal_admin')) {
-            if (! $model->department?->coversRegionSlug('ict')) {
+            $isConventionAdmin = $model->roles()->where('slug', 'convention_admin')->exists();
+            if (! $isConventionAdmin && ! $model->department?->coversRegionSlug('ict')) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         } elseif ($creator->hasRole('regional_admin')) {
@@ -272,6 +308,11 @@ class UserController extends Controller
             'department' => $user->department ? [
                 'id' => $user->department->id,
                 'name' => $user->department->name,
+            ] : null,
+            'convention' => $user->convention ? [
+                'id' => $user->convention->id,
+                'code' => $user->convention->code,
+                'name' => $user->convention->name,
             ] : null,
             'roles' => $user->roles->map(fn ($role) => [
                 'slug' => $role->slug,

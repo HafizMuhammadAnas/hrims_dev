@@ -18,7 +18,7 @@ import {
   workflowPresentation,
 } from '../../lib/departmentTaskWorkflow'
 import { isIctLineTask, isIctRegionalResponseRow, isIctRegionSlug } from '../../lib/ictRegion'
-import { isFederalAdmin, isRegionalAdmin } from '../../lib/roles'
+import { isNationalWorkflowAdmin, isRegionalAdmin } from '../../lib/roles'
 import { LABEL_DEPARTMENTAL_RESPONSES, LABEL_REQUEST_DISTRIBUTION } from '../../lib/uiLabels'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../../lib/tableRowSort'
 import type { HrRequestIssueIndicator, HrRequestRow } from '../../types/hrRequest'
@@ -158,7 +158,7 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
   }
 
   const showCompilationStats =
-    (ictScope && isFederalAdmin(user)) || (!ictScope && isRegionalAdmin(user))
+    (ictScope && isNationalWorkflowAdmin(user)) || (!ictScope && isRegionalAdmin(user))
 
   async function submit() {
     if (!selectedReq) {

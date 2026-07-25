@@ -35,6 +35,7 @@ import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
 import { StatsCards } from '../components/ui/StatsCards'
 import {
+  isConventionAdmin,
   isDepartmentAdmin,
   isFederalAdmin,
   isRegionalAdmin,
@@ -120,7 +121,7 @@ type DashboardVariant = 'federal' | 'regional' | 'department' | 'viewer' | 'mini
 
 function dashboardVariant(user: ReturnType<typeof useAuth>['user']): DashboardVariant {
   if (!user) return 'minimal'
-  if (isSuperAdmin(user) || isFederalAdmin(user)) return 'federal'
+  if (isSuperAdmin(user) || isFederalAdmin(user) || isConventionAdmin(user)) return 'federal'
   if (isRegionalAdmin(user)) return 'regional'
   if (isDepartmentAdmin(user)) return 'department'
   if (isViewer(user)) return 'viewer'

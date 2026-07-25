@@ -17,7 +17,7 @@ class CompiledRecordController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->hasRole('super_admin') && ! $request->user()->hasRole('federal_admin')) {
+        if (! HrimsAccess::isNationalWorkflowOperator($request->user())) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -30,6 +30,11 @@ class CompiledRecordController extends Controller
             'status' => ['required', Rule::in(['draft', 'submitted'])],
             'submitted_to' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $hrRequest = \App\Models\HrRequest::query()->find($data['hr_request_id']);
+        if (! $hrRequest || ! HrimsAccess::userMayViewHrRequest($request->user(), $hrRequest)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
         $row = CompiledRecord::query()->create([
             'id' => 'COMP-'.strtoupper(Str::random(10)),
@@ -51,13 +56,16 @@ class CompiledRecordController extends Controller
 
     public function update(Request $request, string $compiledRecord): JsonResponse
     {
-        if (! $request->user()->hasRole('super_admin') && ! $request->user()->hasRole('federal_admin')) {
+        if (! HrimsAccess::isNationalWorkflowOperator($request->user())) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $model = CompiledRecord::query()->find($compiledRecord);
+        $model = CompiledRecord::query()->with('hrRequest')->find($compiledRecord);
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
+        }
+        if ($model->hrRequest && ! HrimsAccess::userMayViewHrRequest($request->user(), $model->hrRequest)) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
 
         if ($model->status === 'submitted') {
@@ -101,13 +109,18 @@ class CompiledRecordController extends Controller
      */
     public function preview(Request $request): JsonResponse
     {
-        if (! $request->user()->hasRole('super_admin') && ! $request->user()->hasRole('federal_admin')) {
+        if (! HrimsAccess::isNationalWorkflowOperator($request->user())) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
         $data = $request->validate([
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
         ]);
+
+        $hrRequest = \App\Models\HrRequest::query()->find($data['hr_request_id']);
+        if (! $hrRequest || ! HrimsAccess::userMayViewHrRequest($request->user(), $hrRequest)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
         $responses = RegionalResponse::query()
             ->with('region')
@@ -149,9 +162,16 @@ class CompiledRecordController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = CompiledRecord::query();
+        $query = CompiledRecord::query()->with('hrRequest');
 
-        if (! HrimsAccess::seesAllRegions($request->user())) {
+        if (HrimsAccess::isConventionAdmin($request->user())) {
+            $cid = HrimsAccess::conventionId($request->user());
+            if ($cid === null) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereHas('hrRequest', fn ($q) => $q->where('convention_id', $cid));
+            }
+        } elseif (! HrimsAccess::seesAllRegions($request->user())) {
             $name = $request->user()->region?->name;
             if ($name) {
                 $query->whereJsonContains('region_names', $name);

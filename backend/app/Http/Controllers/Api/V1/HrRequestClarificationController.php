@@ -31,6 +31,7 @@ class HrRequestClarificationController extends Controller
             ->orderByDesc('id');
 
         if (HrimsAccess::seesAllRegions($user)) {
+            HrimsAccess::applyConventionScopeToRelated($query, $user);
             if ($request->filled('status')) {
                 $query->where('status', $request->string('status')->toString());
             }
@@ -54,9 +55,9 @@ class HrRequestClarificationController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $count = HrRequestClarification::query()
-            ->where('status', 'pending_federal')
-            ->count();
+        $countQ = HrRequestClarification::query()->where('status', 'pending_federal');
+        HrimsAccess::applyConventionScopeToRelated($countQ, $user);
+        $count = $countQ->count();
 
         return response()->json(['data' => ['count' => $count]]);
     }
@@ -271,7 +272,11 @@ class HrRequestClarificationController extends Controller
     private function userMayAccess(User $user, HrRequestClarification $row): bool
     {
         if (HrimsAccess::seesAllRegions($user)) {
-            return true;
+            $row->loadMissing('hrRequest');
+
+            return $row->hrRequest
+                ? HrimsAccess::userMayViewHrRequest($user, $row->hrRequest)
+                : false;
         }
         if ($user->hasRole('regional_admin') && $user->region_id) {
             return (int) $row->region_id === (int) $user->region_id;

@@ -6,7 +6,7 @@ import { MinistryCompiledRecordViewModal } from '../components/MinistryCompiledR
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { PageSection } from '../components/ui/PageSection'
 import { LABEL_COMPILED_RECORD } from '../lib/uiLabels'
-import { isFederalAdmin, isSuperAdmin } from '../lib/roles'
+import { isNationalWorkflowAdmin, isSuperAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 
 export function CompiledRecordViewPage() {
@@ -14,7 +14,7 @@ export function CompiledRecordViewPage() {
   const [searchParams] = useSearchParams()
   const from = searchParams.get('from') ?? '/compiled-records'
   const { user } = useAuth()
-  const canFinalize = isFederalAdmin(user) || isSuperAdmin(user)
+  const canFinalize = isNationalWorkflowAdmin(user) || isSuperAdmin(user)
 
   const [rows, setRows] = useState<CompiledRecordRow[]>([])
   const [loading, setLoading] = useState(true)

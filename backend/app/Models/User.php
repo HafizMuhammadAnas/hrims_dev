@@ -19,6 +19,7 @@ use Illuminate\Notifications\Notifiable;
     'password',
     'region_id',
     'department_id',
+    'convention_id',
     'is_active',
 ])]
 #[Hidden(['password', 'remember_token'])]
@@ -44,6 +45,11 @@ class User extends Authenticatable
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function convention(): BelongsTo
+    {
+        return $this->belongsTo(Convention::class);
     }
 
     public function roles(): BelongsToMany

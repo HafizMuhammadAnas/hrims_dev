@@ -39,6 +39,10 @@ class HrRequestController extends Controller
         }
 
         $q = Convention::query();
+        $cid = HrimsAccess::conventionId($request->user());
+        if ($cid !== null) {
+            $q->whereKey($cid);
+        }
         if (Schema::hasColumn('conventions', 'sort_order')) {
             $q->orderBy('sort_order');
         }
@@ -62,6 +66,11 @@ class HrRequestController extends Controller
         $data = $request->validate([
             'convention_id' => ['required', 'integer', 'exists:conventions,id'],
         ]);
+
+        $lockedConventionId = HrimsAccess::conventionId($request->user());
+        if ($lockedConventionId !== null && (int) $data['convention_id'] !== $lockedConventionId) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
         $issues = Issue::query()
             ->where('convention_id', $data['convention_id'])
@@ -230,6 +239,9 @@ class HrRequestController extends Controller
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
         }
+        if (! HrimsAccess::userMayViewHrRequest($request->user(), $model)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
         $previousStatus = $model->status;
 
         if ($previousStatus === 'active') {
@@ -268,6 +280,10 @@ class HrRequestController extends Controller
             'date.date' => 'Due date must be a valid date.',
             'status.in' => 'Status must be draft or active.',
         ]);
+
+        if (HrimsAccess::conventionId($request->user()) !== null) {
+            unset($data['convention_id'], $data['conv']);
+        }
 
         $requestType = (string) (
             $data['request_type']
@@ -463,6 +479,9 @@ class HrRequestController extends Controller
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
         }
+        if (! HrimsAccess::userMayViewHrRequest($request->user(), $model)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
         $regionIds = HrimsAccess::scopedRegionIds($request->user());
         if ($regionIds !== null && ! $this->requestTouchesAllowedRegions($model, $regionIds)) {
@@ -591,6 +610,11 @@ class HrRequestController extends Controller
             'date.required' => 'Due date is required.',
             'status.required' => 'Status is required.',
         ]);
+
+        $lockedConventionId = HrimsAccess::conventionId($request->user());
+        if ($lockedConventionId !== null) {
+            $data['convention_id'] = $lockedConventionId;
+        }
 
         $requestType = (string) ($data['request_type'] ?? '');
         if ($requestType === '' && ! empty($data['issue_id'])) {

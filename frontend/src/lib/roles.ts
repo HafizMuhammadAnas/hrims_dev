@@ -16,6 +16,15 @@ export function isFederalAdmin(user: AuthUser | null): boolean {
   return hasRole(user, 'federal_admin')
 }
 
+export function isConventionAdmin(user: AuthUser | null): boolean {
+  return hasRole(user, 'convention_admin')
+}
+
+/** Federal-style national workflow operators (federal + convention portals). */
+export function isNationalWorkflowAdmin(user: AuthUser | null): boolean {
+  return isFederalAdmin(user) || isConventionAdmin(user)
+}
+
 export function isRegionalAdmin(user: AuthUser | null): boolean {
   return hasRole(user, 'regional_admin')
 }

@@ -8,6 +8,7 @@ export interface AuthUser {
   updated_at?: string | null
   region: { id: number; name: string; slug: string } | null
   department: { id: number; name: string } | null
+  convention: { id: number; code: string; name: string } | null
   roles: Array<{
     slug: string
     name: string

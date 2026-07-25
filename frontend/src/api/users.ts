@@ -11,9 +11,10 @@ export type UserCreateInput = {
   username: string
   email?: string | null
   password: string
-  role_slug: 'federal_admin' | 'regional_admin' | 'department_admin' | 'viewer'
+  role_slug: 'federal_admin' | 'regional_admin' | 'convention_admin' | 'department_admin' | 'viewer'
   region_id?: number | null
   department_id?: number | null
+  convention_id?: number | null
 }
 
 export async function fetchUsers(): Promise<AuthUser[]> {

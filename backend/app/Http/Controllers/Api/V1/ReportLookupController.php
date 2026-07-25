@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Article;
 use App\Models\Convention;
 use App\Models\IssueCategory;
+use App\Support\HrimsAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,9 +14,13 @@ use Illuminate\Support\Facades\Schema;
 
 class ReportLookupController extends Controller
 {
-    public function conventions(): JsonResponse
+    public function conventions(Request $request): JsonResponse
     {
         $q = Convention::query();
+        $cid = HrimsAccess::conventionId($request->user());
+        if ($cid !== null) {
+            $q->whereKey($cid);
+        }
         if (Schema::hasColumn('conventions', 'sort_order')) {
             $q->orderBy('sort_order');
         }
@@ -49,6 +54,10 @@ class ReportLookupController extends Controller
     public function articles(Request $request): JsonResponse
     {
         $conventionId = $request->query('convention_id');
+        $locked = HrimsAccess::conventionId($request->user());
+        if ($locked !== null) {
+            $conventionId = $locked;
+        }
         $q = Article::query()->orderBy('article_name');
         if (Schema::hasColumn('articles', 'is_active')) {
             $q->where('is_active', true);
@@ -70,6 +79,10 @@ class ReportLookupController extends Controller
     public function indicators(Request $request): JsonResponse
     {
         $conventionId = $request->query('convention_id');
+        $locked = HrimsAccess::conventionId($request->user());
+        if ($locked !== null) {
+            $conventionId = $locked;
+        }
         $articleId = $request->query('article_id');
         $entryKind = $request->query('entry_kind');
         $categoryId = $request->query('category_id');
@@ -191,6 +204,10 @@ class ReportLookupController extends Controller
     public function summary(Request $request): JsonResponse
     {
         $conventionId = $this->intParam($request->query('convention_id'));
+        $locked = HrimsAccess::conventionId($request->user());
+        if ($locked !== null) {
+            $conventionId = $locked;
+        }
         $articleId = $this->intParam($request->query('article_id'));
         $categoryId = $this->intParam($request->query('category_id'));
         $yearId = $this->intParam($request->query('collection_year_id'));
@@ -331,6 +348,10 @@ class ReportLookupController extends Controller
     public function issueArticleLinks(Request $request): JsonResponse
     {
         $conventionId = $request->query('convention_id');
+        $locked = HrimsAccess::conventionId($request->user());
+        if ($locked !== null) {
+            $conventionId = $locked;
+        }
 
         $q = DB::table('issue_articles')
             ->join('issues', 'issues.id', '=', 'issue_articles.issue_id')

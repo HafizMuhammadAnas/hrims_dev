@@ -65,7 +65,7 @@ class DashboardController extends Controller
             'requests_created_by_month' => $createdTrend,
         ];
 
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin') || $user->hasRole('regional_admin')) {
+        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin') || HrimsAccess::isConventionAdmin($user) || $user->hasRole('regional_admin')) {
             $respQ = $this->scopedRegionalResponsesQuery($user);
             $data['regional_responses_total'] = (clone $respQ)->count();
             $data['regional_responses_by_review'] = (clone $respQ)
@@ -76,14 +76,19 @@ class DashboardController extends Controller
                 ->all();
         }
 
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
-            $compiledTotal = CompiledRecord::query()->count();
+        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin') || HrimsAccess::isConventionAdmin($user)) {
+            $compiledQ = CompiledRecord::query();
+            $clarQ = HrRequestClarification::query()->where('status', 'pending_federal');
+            $cid = HrimsAccess::conventionId($user);
+            if ($cid !== null) {
+                $compiledQ->whereHas('hrRequest', fn ($q) => $q->where('convention_id', $cid));
+                $clarQ->whereHas('hrRequest', fn ($q) => $q->where('convention_id', $cid));
+            }
+            $compiledTotal = $compiledQ->count();
             $activeCount = (int) ($byStatus['active'] ?? 0);
             $data['compiled_records_total'] = $compiledTotal;
             $data['hr_requests_pending_federal'] = max(0, $activeCount - $compiledTotal);
-            $data['clarifications_pending_federal'] = HrRequestClarification::query()
-                ->where('status', 'pending_federal')
-                ->count();
+            $data['clarifications_pending_federal'] = $clarQ->count();
         }
 
         if ($user->hasRole('regional_admin') && $user->region_id !== null) {
@@ -205,6 +210,15 @@ class DashboardController extends Controller
 
         if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
             return $query;
+        }
+
+        if (HrimsAccess::isConventionAdmin($user)) {
+            $cid = HrimsAccess::conventionId($user);
+            if ($cid === null) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->whereHas('hrRequest', fn ($q) => $q->where('convention_id', $cid));
         }
 
         if ($user->hasRole('regional_admin') && $user->region_id !== null) {

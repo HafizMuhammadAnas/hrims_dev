@@ -28,7 +28,7 @@ import {
 } from '../../lib/departmentTaskTableFilters'
 import { isIctRegionalResponseRow } from '../../lib/ictRegion'
 import { regionalResponseReviewPresentation } from '../../lib/regionalResponseReviewStatus'
-import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isViewer } from '../../lib/roles'
+import { isDepartmentAdmin, isNationalWorkflowAdmin, isRegionalAdmin, isViewer } from '../../lib/roles'
 import { regionalCompilationViewPath } from '../../lib/workflowNavigation'
 
 const REVIEW_STATUSES = ['pending', 'accepted', 'needs-modification', 'rejected'] as const
@@ -60,7 +60,7 @@ export function SubmissionHistoryPage({ title }: Props) {
       return
     }
     let respRows = await fetchRegionalResponses()
-    if (isFederalAdmin(user)) {
+    if (isNationalWorkflowAdmin(user)) {
       respRows = respRows.filter((r) => isIctRegionalResponseRow(r))
     }
     setRows(respRows.sort((a, b) => b.submission_date.localeCompare(a.submission_date)))

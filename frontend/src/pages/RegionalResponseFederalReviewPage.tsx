@@ -10,7 +10,7 @@ import { useAuth } from '../auth/AuthContext'
 import { RegionalResponseFederalReviewView } from '../components/RegionalResponseFederalReviewView'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { PageSection } from '../components/ui/PageSection'
-import { isFederalAdmin, isSuperAdmin } from '../lib/roles'
+import { isNationalWorkflowAdmin, isSuperAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 
 export function RegionalResponseFederalReviewPage() {
@@ -18,7 +18,7 @@ export function RegionalResponseFederalReviewPage() {
   const [searchParams] = useSearchParams()
   const from = searchParams.get('from') ?? '/responses'
   const { user } = useAuth()
-  const canReviewFederal = isFederalAdmin(user) || isSuperAdmin(user)
+  const canReviewFederal = isNationalWorkflowAdmin(user) || isSuperAdmin(user)
 
   const [responses, setResponses] = useState<RegionalResponseRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])

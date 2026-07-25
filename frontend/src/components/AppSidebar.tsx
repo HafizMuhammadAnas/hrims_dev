@@ -38,6 +38,7 @@ import {
   LABEL_DEPARTMENT_ACTIONS,
   LABEL_DEPARTMENTAL_RESPONSES,
   LABEL_FEDERAL_ACTIONS,
+  LABEL_CONVENTION_ACTIONS,
   LABEL_FEDERAL_DEPARTMENT_ACTIONS,
   LABEL_HUMAN_RIGHTS_INDICATORS,
   LABEL_KNOWLEDGE_HUB,
@@ -61,6 +62,7 @@ import {
   LABEL_USER_MANAGEMENT,
 } from '../lib/uiLabels'
 import {
+  isConventionAdmin,
   isDepartmentAdmin,
   isFederalAdmin,
   isRegionalAdmin,
@@ -104,6 +106,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
   const viewer = isViewer(user)
   const superAdmin = isSuperAdmin(user)
   const federal = isFederalAdmin(user)
+  const convention = isConventionAdmin(user)
   const regional = isRegionalAdmin(user)
   const dept = isDepartmentAdmin(user)
 
@@ -156,6 +159,29 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/compiled-records" icon={FileCheck} label={LABEL_COMPILED_RECORDS} onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
               <NavItem to="/federal-departments-mgmt" icon={Building2} label={LABEL_MANAGE_DEPARTMENTS} onPick={onPick} />
+            </div>
+            <div className="nav-section-title">{LABEL_FEDERAL_DEPARTMENT_ACTIONS}</div>
+            <div className="nav-sub">
+              <NavItem to="/federal-department-requests" icon={Activity} label={LABEL_DEPARTMENTAL_RESPONSES} onPick={onPick} />
+              <NavItem to="/federal-compilation" icon={FileText} label={LABEL_RESPONSE_COMPILATION} onPick={onPick} />
+              <NavItem to="/federal-history" icon={History} label={LABEL_COMPILED_RECORD} onPick={onPick} />
+            </div>
+            <div className="nav-section-title">{LABEL_DASHBOARDS}</div>
+            <div className="nav-sub">
+              <NavItem to="/report-generator" icon={PieChart} label={LABEL_REPORTING_DASHBOARD} onPick={onPick} />
+              <NavItem to="/governance-dashboard" icon={LayoutDashboard} label={LABEL_GOVERNANCE_DASHBOARD} onPick={onPick} />
+            </div>
+          </>
+        )}
+
+        {convention && (
+          <>
+            <div className="nav-section-title">{LABEL_CONVENTION_ACTIONS}</div>
+            <div className="nav-sub">
+              <NavItem to="/requests" icon={Send} label={LABEL_REQUEST_MANAGEMENT} onPick={onPick} />
+              <NavItem to="/responses" icon={Inbox} label={LABEL_REGIONAL_RESPONSES} onPick={onPick} />
+              <NavItem to="/compilation" icon={Layers} label={LABEL_COMPILATION_CENTER} onPick={onPick} />
+              <NavItem to="/compiled-records" icon={FileCheck} label={LABEL_COMPILED_RECORDS} onPick={onPick} />
             </div>
             <div className="nav-section-title">{LABEL_FEDERAL_DEPARTMENT_ACTIONS}</div>
             <div className="nav-sub">

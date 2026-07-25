@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             DepartmentCatalogSeeder::class,
             RbacSeeder::class,
             DevUserSeeder::class,
+            ConventionAdminSeeder::class,
             DepartmentUsersSeeder::class,
             ReferenceCatalogKnowledgeSeeder::class,
             HrimsDataSeeder::class,

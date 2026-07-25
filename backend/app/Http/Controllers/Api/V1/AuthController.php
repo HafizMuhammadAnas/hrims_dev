@@ -41,7 +41,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return response()->json([
-            'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
+            'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department', 'convention'])),
         ]);
     }
 
@@ -99,7 +99,7 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
+            'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department', 'convention'])),
         ]);
     }
 
@@ -124,6 +124,11 @@ class AuthController extends Controller
             'department' => $user->department ? [
                 'id' => $user->department->id,
                 'name' => $user->department->name,
+            ] : null,
+            'convention' => $user->convention ? [
+                'id' => $user->convention->id,
+                'code' => $user->convention->code,
+                'name' => $user->convention->name,
             ] : null,
             'roles' => $user->roles->map(fn ($role) => [
                 'slug' => $role->slug,

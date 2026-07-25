@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { isApiError } from '../api/apiError'
 import { fetchRegions } from '../api/regions'
+import { fetchReportConventions } from '../api/reports'
 import { createUser, deleteUser, fetchUsers, updateUser } from '../api/users'
 import { fetchDepartments } from '../api/workflows'
 import { useAuth } from '../auth/AuthContext'
@@ -24,7 +25,7 @@ import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { LABEL_CREATE_ADMIN, LABEL_CREATE_USER, LABEL_EDIT_USER, LABEL_USER_MANAGEMENT } from '../lib/uiLabels'
-import { isSuperAdmin } from '../lib/roles'
+import { isFederalAdmin, isSuperAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import {
   resolveUsersMgmtView,
@@ -35,9 +36,20 @@ import {
 } from '../lib/usersMgmtNavigation'
 import type { AuthUser } from '../types/auth'
 
-type RoleSlug = 'federal_admin' | 'regional_admin' | 'department_admin' | 'viewer'
+type RoleSlug =
+  | 'federal_admin'
+  | 'regional_admin'
+  | 'convention_admin'
+  | 'department_admin'
+  | 'viewer'
 
-const ADMIN_ROLE_SLUGS = ['federal_admin', 'regional_admin'] as const
+const ADMIN_ROLE_SLUGS = ['federal_admin', 'regional_admin', 'convention_admin'] as const
+
+function conventionLabel(u: AuthUser): string {
+  const c = u.convention
+  if (!c) return '-'
+  return c.code ? `${c.code} — ${c.name}` : c.name
+}
 
 export function UserManagementPage() {
   const location = useLocation()
@@ -45,6 +57,8 @@ export function UserManagementPage() {
   const { user } = useAuth()
   const notify = useNotify()
   const superUser = isSuperAdmin(user)
+  const federalCreator = isFederalAdmin(user)
+  const canCreateConventionAdmin = superUser || federalCreator
   const basePath = usersMgmtBasePath(location.pathname)
   const view = resolveUsersMgmtView(location.pathname)
   const editUserId = usersMgmtEditUserId(location.pathname)
@@ -53,6 +67,7 @@ export function UserManagementPage() {
   const [rows, setRows] = useState<AuthUser[]>([])
   const [regions, setRegions] = useState<Awaited<ReturnType<typeof fetchRegions>>>([])
   const [departments, setDepartments] = useState<Awaited<ReturnType<typeof fetchDepartments>>>([])
+  const [conventions, setConventions] = useState<Awaited<ReturnType<typeof fetchReportConventions>>>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [openActionId, setOpenActionId] = useState<number | null>(null)
@@ -64,6 +79,7 @@ export function UserManagementPage() {
     role_slug: 'department_admin' as RoleSlug,
     region_id: '',
     department_id: '',
+    convention_id: '',
   })
   const table = useClientTableState({ pageSize: 10 })
   const { search, setSearch, filters, setFilter, resetFilters, page, setPage, pageSize } = table
@@ -76,24 +92,33 @@ export function UserManagementPage() {
     } else {
       setDepartments(await fetchDepartments())
     }
+    if (canCreateConventionAdmin) {
+      setConventions(await fetchReportConventions())
+    }
   }
 
   useEffect(() => {
     if (superUser) {
       setForm((f) =>
-        f.role_slug === 'department_admin' || f.role_slug === 'viewer' ? { ...f, role_slug: 'federal_admin' } : f,
+        f.role_slug === 'department_admin' || f.role_slug === 'viewer'
+          ? { ...f, role_slug: 'federal_admin' }
+          : f,
       )
     }
   }, [superUser])
 
   useEffect(() => {
     void load().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when super flag from auth
-  }, [superUser])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when creator flags from auth
+  }, [superUser, canCreateConventionAdmin])
 
   async function submit() {
     if (!form.name || !form.username || !form.password) {
       setError('Name, username, and password are required.')
+      return
+    }
+    if (form.role_slug === 'convention_admin' && !form.convention_id) {
+      setError('Convention is required for convention administrators.')
       return
     }
     if (superUser) {
@@ -101,7 +126,7 @@ export function UserManagementPage() {
         setError('Region is required for regional administrators.')
         return
       }
-    } else {
+    } else if (form.role_slug !== 'convention_admin') {
       if (!form.department_id) {
         setError('Department is required.')
         return
@@ -111,7 +136,18 @@ export function UserManagementPage() {
     setError(null)
     const uname = form.username
     try {
-      if (superUser) {
+      if (form.role_slug === 'convention_admin') {
+        await createUser({
+          name: form.name,
+          username: form.username,
+          email: form.email || null,
+          password: form.password,
+          role_slug: 'convention_admin',
+          convention_id: Number(form.convention_id),
+          region_id: null,
+          department_id: null,
+        })
+      } else if (superUser) {
         if (form.role_slug === 'federal_admin') {
           await createUser({
             name: form.name,
@@ -151,6 +187,7 @@ export function UserManagementPage() {
         role_slug: superUser ? 'federal_admin' : 'department_admin',
         region_id: '',
         department_id: '',
+        convention_id: '',
       })
       await load()
       notify.success(`User "${uname}" was created.`)
@@ -200,7 +237,9 @@ export function UserManagementPage() {
         u.username.toLowerCase().includes(q) ||
         (u.email ?? '').toLowerCase().includes(q) ||
         (u.region?.name ?? '').toLowerCase().includes(q) ||
-        (u.department?.name ?? '').toLowerCase().includes(q)
+        (u.department?.name ?? '').toLowerCase().includes(q) ||
+        (u.convention?.name ?? '').toLowerCase().includes(q) ||
+        (u.convention?.code ?? '').toLowerCase().includes(q)
       )
     })
     return sortRowsLatestFirst(matched, (u) =>
@@ -211,6 +250,11 @@ export function UserManagementPage() {
     if (superUser) return [...ADMIN_ROLE_SLUGS]
     return Array.from(new Set(scopedRows.flatMap((u) => u.roles.map((r) => r.slug)))).sort()
   }, [scopedRows, superUser])
+  const showConventionColumn = useMemo(
+    () => scopedRows.some((u) => u.convention != null) || canCreateConventionAdmin,
+    [scopedRows, canCreateConventionAdmin],
+  )
+  const listColSpan = (superUser ? 6 : 7) + (showConventionColumn ? 1 : 0)
   const { pageRows } = useMemo(
     () => derivePaginatedRows(filteredRows, page, pageSize),
     [filteredRows, page, pageSize],
@@ -408,6 +452,7 @@ export function UserManagementPage() {
               <th>Username</th>
               <th>Role</th>
               <th>Region</th>
+              {showConventionColumn ? <th>Convention</th> : null}
               {!superUser ? <th>Department</th> : null}
               <th>Status</th>
               <th>Action</th>
@@ -420,6 +465,7 @@ export function UserManagementPage() {
                 <td>{u.username}</td>
                 <td>{u.roles.map((r) => r.slug).join(', ')}</td>
                 <td>{u.region?.name ?? '-'}</td>
+                {showConventionColumn ? <td>{conventionLabel(u)}</td> : null}
                 {!superUser ? <td>{u.department?.name ?? '-'}</td> : null}
                 <td>
                   <StatusBadge tone={u.is_active ? 'success' : 'default'}>
@@ -458,10 +504,10 @@ export function UserManagementPage() {
             ))}
             {pageRows.length === 0 && (
               <EmptyStateRow
-                colSpan={superUser ? 6 : 7}
+                colSpan={listColSpan}
                 message={
                   superUser
-                    ? 'No federal or regional administrators found.'
+                    ? 'No federal, regional, or convention administrators found.'
                     : 'No users found in current scope.'
                 }
               />
@@ -506,11 +552,15 @@ export function UserManagementPage() {
                       role_slug: e.target.value as RoleSlug,
                       region_id: '',
                       department_id: '',
+                      convention_id: '',
                     }))
                   }
                 >
                   {superUser && <option value="federal_admin">Federal admin</option>}
                   {superUser && <option value="regional_admin">Regional admin</option>}
+                  {canCreateConventionAdmin && (
+                    <option value="convention_admin">Convention admin</option>
+                  )}
                   {!superUser && <option value="department_admin">Department admin</option>}
                   {!superUser && <option value="viewer">Viewer</option>}
                 </select>
@@ -527,7 +577,22 @@ export function UserManagementPage() {
                   </select>
                 </FormControl>
               )}
-              {!superUser && (
+              {form.role_slug === 'convention_admin' && (
+                <FormControl label="Convention">
+                  <select
+                    value={form.convention_id}
+                    onChange={(e) => setForm((f) => ({ ...f, convention_id: e.target.value }))}
+                  >
+                    <option value="">Select convention...</option>
+                    {conventions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code ? `${c.code} — ${c.name}` : c.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormControl>
+              )}
+              {!superUser && form.role_slug !== 'convention_admin' && (
                 <FormControl label="Department">
                   <select
                     value={form.department_id}
