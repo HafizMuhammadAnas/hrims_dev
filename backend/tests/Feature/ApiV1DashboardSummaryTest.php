@@ -53,6 +53,7 @@ class ApiV1DashboardSummaryTest extends TestCase
                 'hr_requests_total',
                 'by_status',
                 'urgent_requests',
+                'recent_requests',
                 'requests_created_by_month',
                 'regional_responses_total',
                 'regional_responses_by_review',

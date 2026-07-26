@@ -8,6 +8,9 @@ import {
   AGE_LABELS,
   DISABILITY_KEYS,
   DISABILITY_LABELS,
+  DISABILITY_NO,
+  DISABILITY_PERSONS_WITH_DISABILITY,
+  DISABILITY_YES,
   indicatorCatalogCellAllowed,
   indicatorConfiguredYears,
   indicatorFixedKeyCellAllowed,
@@ -171,8 +174,30 @@ function ageColumns(): DimColumn[] {
   return AGE_KEYS.map((key) => ({ id: key, label: AGE_LABELS[key] ?? key }))
 }
 
-function disabilityColumns(): DimColumn[] {
-  return DISABILITY_KEYS.map((key) => ({ id: key, label: DISABILITY_LABELS[key] ?? key }))
+function disabilityColumns(saved?: MatrixValues): DimColumn[] {
+  const cols: DimColumn[] = DISABILITY_KEYS.map((key) => ({
+    id: key,
+    label: DISABILITY_LABELS[key] ?? key,
+  }))
+  if (!saved) return cols
+  const legacyKeys = [
+    DISABILITY_PERSONS_WITH_DISABILITY,
+    DISABILITY_YES,
+    DISABILITY_NO,
+  ] as const
+  const seen = new Set(cols.map((c) => String(c.id)))
+  for (const key of Object.keys(saved)) {
+    // Matrix keys are `${yearId}|${columnId}` — columnId is after the last '|'.
+    const columnId = key.includes('|') ? key.slice(key.lastIndexOf('|') + 1) : key
+    if (
+      (legacyKeys as readonly string[]).includes(columnId) &&
+      !seen.has(columnId)
+    ) {
+      seen.add(columnId)
+      cols.push({ id: columnId, label: DISABILITY_LABELS[columnId] ?? columnId })
+    }
+  }
+  return cols
 }
 
 function districtColumns(districts: DistrictRow[]): DimColumn[] {
@@ -360,7 +385,7 @@ function DepartmentIndicatorDataCard({
       dims.push({
         key: 'disability',
         title: 'PWDs Disaggregated',
-        columns: disabilityColumns(),
+        columns: disabilityColumns(savedDisabilityByIndicator),
         values: disabilityValues,
         saved: savedDisabilityByIndicator,
         onChange: onDisabilityChange,

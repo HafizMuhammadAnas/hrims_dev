@@ -265,6 +265,7 @@ export function DashboardPage() {
   }, [user, variant])
 
   const urgentList = summary?.urgent_requests ?? []
+  const recentRequestList = summary?.recent_requests ?? urgentList
   const urgentDeptTasks = summary?.urgent_department_tasks ?? []
   const urgentRequestCount = urgentList.length
   const compiledReportsTotal = summary?.compiled_records_total ?? 0
@@ -275,8 +276,8 @@ export function DashboardPage() {
     variant === 'department' || variant === 'viewer'
       ? urgentDeptTasks.length > 0
         ? urgentDeptTasks
-        : urgentList
-      : urgentList
+        : recentRequestList
+      : recentRequestList
 
   const pieTitle =
     variant === 'department' || variant === 'viewer'
@@ -495,10 +496,10 @@ export function DashboardPage() {
                 <h3 className="dashboard-panel-title">
                   {variant === 'federal' ? <Bell size={20} /> : <Clock size={20} />}
                   {variant === 'federal'
-                    ? 'Recent Responses'
+                    ? 'Recent Responses Received'
                     : variant === 'department' || variant === 'viewer'
                       ? 'Recent Tasks'
-                      : 'Recent Requests'}
+                      : 'Recent Requests Received'}
                 </h3>
                 <button
                   type="button"
@@ -654,7 +655,9 @@ export function DashboardPage() {
                 ) : (
                   <div className="empty-state">
                     <CheckCircle size={32} style={{ margin: '0 auto 10px', display: 'block' }} />
-                    No urgent actions in your current scope.
+                    {variant === 'department' || variant === 'viewer'
+                      ? 'No open tasks in your current scope.'
+                      : 'No recent requests received in your current scope.'}
                   </div>
                 )}
               </div>

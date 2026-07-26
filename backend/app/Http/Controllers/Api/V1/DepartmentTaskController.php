@@ -497,7 +497,7 @@ class DepartmentTaskController extends Controller
         return $this->normalizeQuantitativeByYearFixedKeys(
             $indicator,
             $raw,
-            [IssueIndicator::DISABILITY_PERSONS_WITH_DISABILITY],
+            IssueIndicator::DISABILITY_KEYS,
             'disability',
         );
     }

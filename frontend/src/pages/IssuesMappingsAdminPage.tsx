@@ -2423,7 +2423,7 @@ function IssueIndicatorsEditor({
                   [
                     'Gender',
                     'Age (Under 18, 18 - 60, Above 60 for respondents)',
-                    'Disability (Persons with disability count for respondents)',
+                    'Disability (Vision, Hearing, Cognition, Mobility, Self-care, Communication)',
                     'Religion (full list for respondents)',
                     'Consolidated Data (Total count only for respondents)',
                   ] as const

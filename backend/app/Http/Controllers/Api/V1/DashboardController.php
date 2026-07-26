@@ -34,6 +34,14 @@ class DashboardController extends Controller
         $total = (clone $query)->count();
 
         $today = Carbon::now()->toDateString();
+        $mapRequestRow = static fn (HrRequest $r) => [
+            'id' => $r->id,
+            'title' => $r->title,
+            'status' => $r->status,
+            'date' => $r->due_date?->format('Y-m-d'),
+            'region_name' => $r->region?->name,
+        ];
+
         $urgent = (clone $query)
             ->where(function ($q) use ($today): void {
                 $q->where('status', 'draft')
@@ -46,13 +54,17 @@ class DashboardController extends Controller
             ->limit(5)
             ->with(['region:id,name'])
             ->get(['id', 'title', 'status', 'due_date', 'region_id'])
-            ->map(fn (HrRequest $r) => [
-                'id' => $r->id,
-                'title' => $r->title,
-                'status' => $r->status,
-                'date' => $r->due_date?->format('Y-m-d'),
-                'region_name' => $r->region?->name,
-            ])
+            ->map($mapRequestRow)
+            ->values()
+            ->all();
+
+        // Recent received / in-scope requests for the dashboard list (not only overdue).
+        $recentRequests = (clone $query)
+            ->orderByDesc('updated_at')
+            ->limit(8)
+            ->with(['region:id,name'])
+            ->get(['id', 'title', 'status', 'due_date', 'region_id'])
+            ->map($mapRequestRow)
             ->values()
             ->all();
 
@@ -62,6 +74,7 @@ class DashboardController extends Controller
             'hr_requests_total' => $total,
             'by_status' => $byStatus,
             'urgent_requests' => $urgent,
+            'recent_requests' => $recentRequests,
             'requests_created_by_month' => $createdTrend,
         ];
 

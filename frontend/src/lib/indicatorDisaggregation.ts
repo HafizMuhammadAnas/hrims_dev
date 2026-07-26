@@ -33,44 +33,49 @@ export const AGE_OVER_18 = 'over_18' as const
 
 
 
+/** Disability type disaggregates (Washington Group / functional domains). */
+export const DISABILITY_VISION = 'vision' as const
+export const DISABILITY_HEARING = 'hearing' as const
+export const DISABILITY_COGNITION = 'cognition' as const
+export const DISABILITY_MOBILITY = 'mobility' as const
+export const DISABILITY_SELF_CARE = 'self_care' as const
+export const DISABILITY_COMMUNICATION = 'communication' as const
+
+export const DISABILITY_KEYS = [
+  DISABILITY_VISION,
+  DISABILITY_HEARING,
+  DISABILITY_COGNITION,
+  DISABILITY_MOBILITY,
+  DISABILITY_SELF_CARE,
+  DISABILITY_COMMUNICATION,
+] as const
+
+/** @deprecated Legacy key — kept for read-only display of older submissions. */
 export const DISABILITY_PERSONS_WITH_DISABILITY = 'persons_with_disability' as const
 
-export const DISABILITY_KEYS = [DISABILITY_PERSONS_WITH_DISABILITY] as const
-
-
-
 /** @deprecated Legacy keys — kept for read-only display of older submissions. */
-
 export const DISABILITY_YES = 'yes' as const
 
 /** @deprecated Legacy keys — kept for read-only display of older submissions. */
-
 export const DISABILITY_NO = 'no' as const
 
-
-
 export const AGE_LABELS: Record<string, string> = {
-
   [AGE_UNDER_18]: 'Under 18',
-
   [AGE_18_60]: '18 - 60',
-
   [AGE_ABOVE_60]: 'Above 60',
-
   [AGE_OVER_18]: '18+',
-
 }
 
-
-
 export const DISABILITY_LABELS: Record<string, string> = {
-
+  [DISABILITY_VISION]: 'Vision',
+  [DISABILITY_HEARING]: 'Hearing',
+  [DISABILITY_COGNITION]: 'Cognition',
+  [DISABILITY_MOBILITY]: 'Mobility',
+  [DISABILITY_SELF_CARE]: 'Self-care',
+  [DISABILITY_COMMUNICATION]: 'Communication',
   [DISABILITY_PERSONS_WITH_DISABILITY]: 'Persons with disability',
-
   [DISABILITY_YES]: 'Yes',
-
   [DISABILITY_NO]: 'No',
-
 }
 
 

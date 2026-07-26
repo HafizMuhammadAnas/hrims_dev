@@ -50,6 +50,32 @@ class IssueIndicator extends Model
 
     public const AGE_ABOVE_60 = 'above_60';
 
+    /** Disability type disaggregates (Washington Group / functional domains). */
+    public const DISABILITY_VISION = 'vision';
+
+    public const DISABILITY_HEARING = 'hearing';
+
+    public const DISABILITY_COGNITION = 'cognition';
+
+    public const DISABILITY_MOBILITY = 'mobility';
+
+    public const DISABILITY_SELF_CARE = 'self_care';
+
+    public const DISABILITY_COMMUNICATION = 'communication';
+
+    /**
+     * @var list<string>
+     */
+    public const DISABILITY_KEYS = [
+        self::DISABILITY_VISION,
+        self::DISABILITY_HEARING,
+        self::DISABILITY_COGNITION,
+        self::DISABILITY_MOBILITY,
+        self::DISABILITY_SELF_CARE,
+        self::DISABILITY_COMMUNICATION,
+    ];
+
+    /** @deprecated Legacy key — older submissions only. */
     public const DISABILITY_PERSONS_WITH_DISABILITY = 'persons_with_disability';
 
     protected $fillable = [

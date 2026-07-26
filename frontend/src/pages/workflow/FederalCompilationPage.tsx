@@ -12,6 +12,7 @@ import {
 } from '../../api/lists'
 import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../../components/CompiledRecordsWorkflowNav'
 import { MergeCompiledRecordsSection } from '../../components/MergeCompiledRecordsSection'
+import { TemporaryFederalCompilationPreviewCard } from '../../components/TemporaryFederalCompilationPreviewCard'
 import { RegionalSubmissionCoverageBar } from '../../components/RegionalSubmissionCoverageBar'
 import { regionalResponseFederalReviewPath } from '../../lib/workflowNavigation'
 import { hasDepartmentResponse } from '../../lib/departmentTaskWorkflow'
@@ -593,6 +594,14 @@ export function FederalCompilationPage() {
           ) : null}
         </div>
       </TableCard>
+
+      <div style={{ marginTop: 20 }}>
+        <TemporaryFederalCompilationPreviewCard
+          requests={requests}
+          responses={responses}
+          deptTasks={deptTasks}
+        />
+      </div>
 
       <div style={{ marginTop: 20 }}>
         <MergeCompiledRecordsSection records={compiledRecords} />
