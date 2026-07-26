@@ -71,6 +71,11 @@ import {
 } from '../lib/indicatorDisaggregation'
 import { scopeLocationCatalogToRegions } from '../lib/departmentLocationCatalog'
 import { loadYearKeyedValuesFromBundle, matrixCellInputReady, matrixCellNumericValue } from '../lib/departmentMatrixLoaders'
+import {
+  deptIndicatorYearTotalsWithinBudget,
+  findDeptIndicatorYearTotalOverruns,
+  formatDeptYearTotalOverrunMessage,
+} from '../lib/deptIndicatorYearTotalValidation'
 import { HrRequestModal } from '../components/HrRequestModal'
 import { HrRequestViewTemplate } from '../components/HrRequestViewTemplate'
 import { Alert } from '../components/ui/Alert'
@@ -580,8 +585,29 @@ export function HrRequestViewPage() {
         }
       }
     }
+    if (
+      !deptIndicatorYearTotalsWithinBudget(
+        deptIndicatorsForForm,
+        indicatorDrafts,
+        deptLocationCatalog.districts,
+        religions,
+      )
+    ) {
+      return false
+    }
     return true
   }, [deptIndicatorsForForm, indicatorDrafts, activeTask, deptParsedTaskResponse, deptLocationCatalog, religions])
+
+  const deptYearTotalOverruns = useMemo(
+    () =>
+      findDeptIndicatorYearTotalOverruns(
+        deptIndicatorsForForm,
+        indicatorDrafts,
+        deptLocationCatalog.districts,
+        religions,
+      ),
+    [deptIndicatorsForForm, indicatorDrafts, deptLocationCatalog.districts, religions],
+  )
 
   const deptLegacySubmitReady = useMemo(() => {
     if (!activeTask) return false
@@ -703,8 +729,10 @@ export function HrRequestViewPage() {
     try {
       if (deptIndicatorsForForm.length > 0) {
         if (!indicatorFormReady) {
+          const overrunMsg = formatDeptYearTotalOverrunMessage(deptYearTotalOverruns)
           setSubmitResponseError(
-            'Complete each indicator: a number where required, and qualitative text and/or an attachment where required.',
+            overrunMsg ||
+              'Complete each indicator: a number where required, and qualitative text and/or an attachment where required.',
           )
           return
         }
@@ -1826,6 +1854,12 @@ export function HrRequestViewPage() {
               </>
             )}
             {submitResponseError && <p className="login-error">{submitResponseError}</p>}
+            {deptYearTotalOverruns.length > 0 ? (
+              <p className="login-error" style={{ marginTop: 12, marginBottom: 0 }}>
+                {formatDeptYearTotalOverrunMessage(deptYearTotalOverruns)} Reduce breakdown values so
+                Unaccounted is not negative, then submit.
+              </p>
+            ) : null}
             <div style={{ marginTop: 16 }}>
               <Button
                 variant="primary"
