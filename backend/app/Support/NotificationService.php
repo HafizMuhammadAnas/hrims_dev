@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\DepartmentTask;
 use App\Models\HrRequest;
+use App\Models\HrRequestClarification;
 use App\Models\Notification;
 use App\Models\RegionalResponse;
 use App\Models\User;
@@ -21,10 +22,14 @@ class NotificationService
         $user->loadMissing('roles');
 
         if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
-            // Federal portal: regional responses only.
+            // Federal: regional submit/resubmit + clarifications + ICT department responses they review.
             return [
                 'regional_response.created',
+                'regional_response.resubmitted',
                 'regional_response.reviewed',
+                'hr_request_clarification.requested',
+                'department_task.submitted',
+                'department_task.resubmitted',
             ];
         }
 
@@ -34,17 +39,22 @@ class NotificationService
                 'hr_request.updated',
                 'regional_response.reviewed',
                 'department_task.assigned',
+                'department_task.submitted',
+                'department_task.resubmitted',
+                'hr_request_clarification.answered',
                 'user.created',
                 'user.updated',
                 'user.deactivated',
                 'user.activated',
                 'user.managed',
+                'user.deleted',
             ];
         }
 
         if ($user->hasRole('department_admin') || $user->hasRole('viewer')) {
             return [
                 'department_task.assigned',
+                'department_task.needs_modification',
                 'hr_request.created',
                 'hr_request.updated',
             ];
@@ -119,7 +129,7 @@ class NotificationService
         );
     }
 
-    public function notifyRegionalResponseCreated(RegionalResponse $response, User $actor): void
+    public function notifyRegionalResponseCreated(RegionalResponse $response, User $actor, bool $isResubmit = false): void
     {
         $response->loadMissing(['region:id,name']);
         $regionLabel = $response->region?->name ?: 'Region';
@@ -129,8 +139,8 @@ class NotificationService
         $this->notifyUsersWithRoutes(
             $this->federalAdmins(),
             $actor,
-            'regional_response.created',
-            'Regional response received',
+            $isResubmit ? 'regional_response.resubmitted' : 'regional_response.created',
+            $isResubmit ? 'Regional response resubmitted' : 'Regional response received',
             sprintf('%s · %s', $regionLabel, $reqId),
             'regional_response',
             $response->id,
@@ -139,6 +149,7 @@ class NotificationService
                 'review_status' => $response->review_status,
                 'hr_request_id' => $response->hr_request_id,
                 'region_name' => $response->region?->name,
+                'is_resubmit' => $isResubmit,
             ],
         );
     }
@@ -149,12 +160,13 @@ class NotificationService
         $regionLabel = $response->region?->name ?: 'Region';
         $reqId = (string) $response->hr_request_id;
         $statusLabel = $response->review_status ?: 'updated';
+        $needsModification = $response->review_status === 'needs-modification';
 
         $this->notifyUsersWithRoutes(
             $this->usersForRegionalResponseReview($response),
             $actor,
             'regional_response.reviewed',
-            'Regional response reviewed',
+            $needsModification ? 'Modification requested' : 'Regional response reviewed',
             sprintf(
                 '%s · %s · %s%s',
                 $regionLabel,
@@ -195,6 +207,105 @@ class NotificationService
                 'status' => $task->status,
                 'hr_request_id' => $task->hr_request_id,
                 'title' => $requestTitle,
+            ],
+        );
+    }
+
+    /**
+     * Department response submitted / resubmitted → regional (or federal for ICT tasks).
+     */
+    public function notifyDepartmentTaskSubmitted(DepartmentTask $task, User $actor, bool $isResubmit = false): void
+    {
+        $task->loadMissing(['hrRequest:id,title', 'department.regions', 'region:id,name']);
+        $requestTitle = $task->hrRequest?->title ?: 'Request';
+        $requestId = (string) $task->hr_request_id;
+
+        $this->notifyUsersWithRoutes(
+            $this->usersForDepartmentTaskSubmission($task),
+            $actor,
+            $isResubmit ? 'department_task.resubmitted' : 'department_task.submitted',
+            $isResubmit ? 'Department response resubmitted' : 'Department response received',
+            sprintf('%s · %s', $requestTitle, $requestId),
+            'department_task',
+            $task->id,
+            fn (User $user) => $this->routeForDepartmentTask($user, $task),
+            [
+                'status' => $task->status,
+                'hr_request_id' => $task->hr_request_id,
+                'title' => $requestTitle,
+                'is_resubmit' => $isResubmit,
+            ],
+        );
+    }
+
+    /**
+     * Regional/federal review returns a department task for modification → department users.
+     */
+    public function notifyDepartmentTaskNeedsModification(DepartmentTask $task, User $actor): void
+    {
+        $task->loadMissing(['hrRequest:id,title', 'department.regions']);
+        $requestTitle = $task->hrRequest?->title ?: 'Request';
+        $requestId = (string) $task->hr_request_id;
+
+        $this->notifyUsersWithRoutes(
+            $this->usersForDepartmentTaskAssigneesOnly($task),
+            $actor,
+            'department_task.needs_modification',
+            'Revision requested',
+            sprintf('%s · %s', $requestTitle, $requestId),
+            'department_task',
+            $task->id,
+            fn (User $user) => $this->routeForDepartmentTask($user, $task),
+            [
+                'status' => $task->status,
+                'regional_review_status' => $task->regional_review_status,
+                'hr_request_id' => $task->hr_request_id,
+                'title' => $requestTitle,
+            ],
+        );
+    }
+
+    public function notifyClarificationRequested(HrRequestClarification $clarification, User $actor): void
+    {
+        $clarification->loadMissing(['region:id,name', 'hrRequest:id,title']);
+        $regionLabel = $clarification->region?->name ?: 'Region';
+        $reqId = (string) $clarification->hr_request_id;
+
+        $this->notifyUsersWithRoutes(
+            $this->federalAdmins(),
+            $actor,
+            'hr_request_clarification.requested',
+            'Clarification requested',
+            sprintf('%s · %s', $regionLabel, $reqId),
+            'hr_request_clarification',
+            (string) $clarification->id,
+            fn () => '/requests/clarifications?id='.rawurlencode((string) $clarification->id),
+            [
+                'hr_request_id' => $clarification->hr_request_id,
+                'region_name' => $clarification->region?->name,
+                'status' => $clarification->status,
+            ],
+        );
+    }
+
+    public function notifyClarificationAnswered(HrRequestClarification $clarification, User $actor): void
+    {
+        $clarification->loadMissing(['region:id', 'hrRequest:id,title']);
+        $reqId = (string) $clarification->hr_request_id;
+        $requestTitle = $clarification->hrRequest?->title ?: 'Request';
+
+        $this->notifyUsersWithRoutes(
+            $this->usersForClarificationRegion($clarification),
+            $actor,
+            'hr_request_clarification.answered',
+            'Clarification answered',
+            sprintf('%s · %s', $requestTitle, $reqId),
+            'hr_request_clarification',
+            (string) $clarification->id,
+            fn (User $user) => $this->routeForHrRequest($user, $reqId),
+            [
+                'hr_request_id' => $clarification->hr_request_id,
+                'status' => $clarification->status,
             ],
         );
     }
@@ -394,7 +505,7 @@ class NotificationService
 
     /**
      * Department task notifications: assigned department users (+ owning regional for provincial tasks).
-     * Federal portal is not notified (regional responses only).
+     * Federal portal is not notified on assignment (regional responses / ICT submissions only).
      *
      * @return Collection<int, User>
      */
@@ -420,6 +531,64 @@ class NotificationService
                     });
                 }
             })
+            ->get();
+    }
+
+    /**
+     * Who should be notified when a department submits/resubmits a response.
+     * Provincial → regional admins; ICT/federal departments → federal admins.
+     *
+     * @return Collection<int, User>
+     */
+    private function usersForDepartmentTaskSubmission(DepartmentTask $task): Collection
+    {
+        $task->loadMissing(['department.regions']);
+        $isIct = $task->department?->coversRegionSlug('ict')
+            || $task->department?->coversRegionSlug('federal')
+            || false;
+
+        if ($isIct) {
+            return $this->federalAdmins();
+        }
+
+        if ($task->region_id === null) {
+            return collect();
+        }
+
+        return User::query()
+            ->with('roles')
+            ->whereHas('roles', fn ($r) => $r->where('slug', 'regional_admin'))
+            ->where('region_id', $task->region_id)
+            ->get();
+    }
+
+    /**
+     * Department assignees only (no regional/federal managers).
+     *
+     * @return Collection<int, User>
+     */
+    private function usersForDepartmentTaskAssigneesOnly(DepartmentTask $task): Collection
+    {
+        return User::query()
+            ->with(['roles', 'department.regions'])
+            ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
+            ->where('department_id', $task->department_id)
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function usersForClarificationRegion(HrRequestClarification $clarification): Collection
+    {
+        if ($clarification->region_id === null) {
+            return collect();
+        }
+
+        return User::query()
+            ->with('roles')
+            ->whereHas('roles', fn ($r) => $r->where('slug', 'regional_admin'))
+            ->where('region_id', $clarification->region_id)
             ->get();
     }
 

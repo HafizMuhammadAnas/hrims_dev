@@ -126,6 +126,38 @@ export function findDeptIndicatorYearTotalOverruns(
     const label = ind.indicator_text?.trim() || `Indicator #${ind.id}`
 
     for (const y of years) {
+      // PWDs use their own per-year "PWD total", not the card Year totals bar.
+      if (ind.collects_by_disability && isMatrixRowEnabled(draft.matrixRowEnabled, 'disability')) {
+        const pwdTotal = readDraftCell(
+          draft.yearDisabilityValues,
+          y.year_id,
+          DIMENSION_TOTAL_COLUMN_ID,
+        )
+        const distributed = sumDraftColumns(
+          draft.yearDisabilityValues,
+          y.year_id,
+          DISABILITY_KEYS,
+          (columnId) =>
+            indicatorFixedKeyCellAllowed(
+              ind,
+              y.year_id,
+              (i) => Boolean(i.collects_by_disability),
+              DISABILITY_KEYS,
+              String(columnId),
+            ),
+        )
+        if (distributed > pwdTotal) {
+          overruns.push({
+            indicatorId: ind.id,
+            indicatorLabel: label,
+            dimension: 'PWDs',
+            yearLabel: y.label,
+            yearTotal: pwdTotal,
+            distributed,
+          })
+        }
+      }
+
       const yt = yearTotalForDraft(ind, draft, y.year_id)
       if (yt == null) continue
 
@@ -163,26 +195,6 @@ export function findDeptIndicatorYearTotalOverruns(
                 y.year_id,
                 (i) => Boolean(i.collects_by_age),
                 AGE_KEYS,
-                String(columnId),
-              ),
-          ),
-        })
-      }
-
-      if (ind.collects_by_disability) {
-        checks.push({
-          dimension: 'PWDs',
-          enabled: isMatrixRowEnabled(draft.matrixRowEnabled, 'disability'),
-          distributed: sumDraftColumns(
-            draft.yearDisabilityValues,
-            y.year_id,
-            DISABILITY_KEYS,
-            (columnId) =>
-              indicatorFixedKeyCellAllowed(
-                ind,
-                y.year_id,
-                (i) => Boolean(i.collects_by_disability),
-                DISABILITY_KEYS,
                 String(columnId),
               ),
           ),
@@ -255,5 +267,6 @@ export function formatDeptYearTotalOverrunMessage(overruns: DeptYearTotalOverrun
   const first = overruns[0]
   if (!first) return ''
   const more = overruns.length > 1 ? ` (+${overruns.length - 1} more)` : ''
-  return `${first.indicatorLabel}: ${first.dimension} for ${first.yearLabel} distributed (${first.distributed}) exceeds year total (${first.yearTotal}).${more}`
+  const budgetLabel = first.dimension === 'PWDs' ? 'PWD total' : 'year total'
+  return `${first.indicatorLabel}: ${first.dimension} for ${first.yearLabel} distributed (${first.distributed}) exceeds ${budgetLabel} (${first.yearTotal}).${more}`
 }

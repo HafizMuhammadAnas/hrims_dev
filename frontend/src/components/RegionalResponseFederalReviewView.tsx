@@ -12,6 +12,8 @@ import { regionalResponseReviewPresentation } from '../lib/regionalResponseRevie
 import type { HrRequestRow } from '../types/hrRequest'
 import { DepartmentSubmissionsForRequest } from './DepartmentSubmissionsForRequest'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
+import { RegionalFederalReviewFeedback } from './RegionalFederalReviewFeedback'
+import { RegionalCompilationChangesTab } from './RegionalCompilationChangesTab'
 import { Alert } from './ui/Alert'
 import { Button } from './ui/Button'
 import { StatusBadge } from './ui/StatusBadge'
@@ -19,7 +21,7 @@ import { WorkflowActionFootback, type WorkflowActionFeedback } from './WorkflowA
 import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
 import { WorkflowModalHero } from './ui/WorkflowModalHero'
 
-type Tab = 'responses' | 'request'
+type Tab = 'responses' | 'request' | 'changes'
 
 type ReviewStatus = 'pending' | 'accepted' | 'needs-modification' | 'rejected'
 
@@ -215,6 +217,13 @@ export function RegionalResponseFederalReviewView({
         >
           Request
         </button>
+        <button
+          type="button"
+          className={'compiled-record-modal-tab' + (tab === 'changes' ? ' compiled-record-modal-tab--active' : '')}
+          onClick={() => setTab('changes')}
+        >
+          Changes
+        </button>
       </nav>
 
       <div className="modal-form regional-response-detail-modal__form dept-task-response-modal__body regional-response-detail-modal__form--flat">
@@ -269,7 +278,7 @@ export function RegionalResponseFederalReviewView({
               </div>
             </div>
 
-            {canReviewFederal && viewingRow.review_status !== 'accepted' ? (
+            {canReviewFederal && isUnderReview ? (
               <div className="form-row regional-response-detail-modal__feedback-field">
                 <label htmlFor="regional-fed-review-comments">Feedback to the region</label>
                 <textarea
@@ -284,6 +293,10 @@ export function RegionalResponseFederalReviewView({
                   aria-invalid={actionFeedback?.kind === 'validation' ? true : undefined}
                 />
               </div>
+            ) : null}
+
+            {canReviewFederal && !isUnderReview ? (
+              <RegionalFederalReviewFeedback row={viewingRow} />
             ) : null}
 
             {canReviewFederal &&
@@ -309,7 +322,7 @@ export function RegionalResponseFederalReviewView({
               </div>
             ) : null}
 
-            {canReviewFederal && viewingRow.review_status !== 'accepted' ? (
+            {canReviewFederal && isUnderReview ? (
               <WorkflowActionFootback
                 feedback={actionFeedback}
                 onDismiss={() => setActionFeedback(null)}
@@ -348,7 +361,9 @@ export function RegionalResponseFederalReviewView({
               </WorkflowActionFootback>
             ) : null}
           </>
-        ) : (
+        ) : null}
+
+        {tab === 'request' ? (
           <>
             {hrLoading ? <p className="muted">Loading request…</p> : null}
             {hrError ? (
@@ -365,7 +380,18 @@ export function RegionalResponseFederalReviewView({
               </p>
             ) : null}
           </>
-        )}
+        ) : null}
+
+        {tab === 'changes' ? (
+          <RegionalCompilationChangesTab
+            regionalResponseId={viewingRow.id}
+            currentTitle={viewingRow.title}
+            currentContent={viewingRow.content}
+            tasks={tasksForViewing}
+            issueIndicators={hrDetail?.issue?.indicators}
+            audience="federal"
+          />
+        ) : null}
       </div>
     </div>
   )

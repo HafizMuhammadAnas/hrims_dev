@@ -170,6 +170,8 @@ export async function updateDepartmentTaskReview(
   body: {
     regional_review_status: 'accepted' | 'needs-modification'
     regional_review_comments?: string | null
+    /** federal_follow_up = pushed after federal asked region for revision; regional = region-only. */
+    revision_origin?: 'federal_follow_up' | 'regional'
   },
 ): Promise<DepartmentTaskRow> {
   await ensureCsrfCookie()
@@ -242,6 +244,83 @@ export async function updateRegionalCompiledResponse(
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: RegionalResponseRow }
   return json.data
+}
+
+export type RegionalResponseRevisionRow = {
+  id: number | string
+  revision_no: number
+  title: string
+  content: string
+  review_status?: string | null
+  comments?: string | null
+  submitted_by_name?: string | null
+  created_at: string | null
+}
+
+export type RegionalResponseRevisionsPayload = {
+  current: {
+    title: string
+    content: string
+    review_status?: string | null
+    comments?: string | null
+    updated_at?: string | null
+  }
+  revisions: RegionalResponseRevisionRow[]
+}
+
+export type DepartmentTaskRevisionRow = {
+  id: number | string
+  revision_no: number
+  response_data: string | null
+  attachment_url: string | null
+  regional_review_status?: string | null
+  regional_review_comments?: string | null
+  revision_origin?: 'federal_follow_up' | 'regional' | string | null
+  submitted_by_name?: string | null
+  created_at: string | null
+}
+
+export type DepartmentTaskRevisionsPayload = {
+  current: {
+    response_data: string | null
+    attachment_url: string | null
+    regional_review_status?: string | null
+    regional_review_comments?: string | null
+    updated_at?: string | null
+  }
+  revisions: DepartmentTaskRevisionRow[]
+}
+
+export async function fetchRegionalResponseRevisions(
+  regionalResponseId: string,
+): Promise<RegionalResponseRevisionsPayload> {
+  const res = await fetch(
+    `/api/v1/regional-responses/${encodeURIComponent(regionalResponseId)}/revisions`,
+    { credentials: 'include', headers: { Accept: 'application/json' } },
+  )
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: RegionalResponseRevisionsPayload }
+  return {
+    current: json.data?.current ?? { title: '', content: '' },
+    revisions: Array.isArray(json.data?.revisions) ? json.data.revisions : [],
+  }
+}
+
+export async function fetchDepartmentTaskRevisions(
+  departmentTaskId: string,
+  options?: { audience?: 'federal' | 'regional' },
+): Promise<DepartmentTaskRevisionsPayload> {
+  const qs = options?.audience === 'federal' ? '?audience=federal' : ''
+  const res = await fetch(
+    `/api/v1/department-tasks/${encodeURIComponent(departmentTaskId)}/revisions${qs}`,
+    { credentials: 'include', headers: { Accept: 'application/json' } },
+  )
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: DepartmentTaskRevisionsPayload }
+  return {
+    current: json.data?.current ?? { response_data: null, attachment_url: null },
+    revisions: Array.isArray(json.data?.revisions) ? json.data.revisions : [],
+  }
 }
 
 export type CompilationPreview = {

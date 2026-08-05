@@ -9,6 +9,7 @@ use App\Models\HrRequestClarification;
 use App\Models\HrRequestClarificationAttachment;
 use App\Models\User;
 use App\Support\HrimsAccess;
+use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -184,6 +185,8 @@ class HrRequestClarificationController extends Controller
 
         $row->load(['region', 'attachments', 'requestedBy']);
 
+        app(NotificationService::class)->notifyClarificationRequested($row, $user);
+
         return response()->json(['data' => new HrRequestClarificationResource($row)], 201);
     }
 
@@ -216,6 +219,8 @@ class HrRequestClarificationController extends Controller
         });
 
         $hrRequestClarification->load(['region', 'attachments', 'requestedBy', 'respondedBy', 'hrRequest']);
+
+        app(NotificationService::class)->notifyClarificationAnswered($hrRequestClarification, $user);
 
         return response()->json(['data' => new HrRequestClarificationResource($hrRequestClarification->fresh(['region', 'attachments', 'requestedBy', 'respondedBy']))]);
     }

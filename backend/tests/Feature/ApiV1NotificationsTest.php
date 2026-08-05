@@ -128,7 +128,7 @@ class ApiV1NotificationsTest extends TestCase
         ]);
     }
 
-    public function test_federal_inbox_only_lists_regional_response_notifications(): void
+    public function test_federal_inbox_lists_regional_response_and_clarification_notifications(): void
     {
         $federal = Region::query()->where('slug', 'ict')->firstOrFail();
         $federalAdmin = $this->makeUserWithRole('federal_admin', ['region_id' => $federal->id]);
@@ -147,13 +147,154 @@ class ApiV1NotificationsTest extends TestCase
             'message' => 'Punjab · REQ-1',
             'route' => '/responses',
         ]);
+        $clarification = Notification::query()->create([
+            'user_id' => $federalAdmin->id,
+            'event_key' => 'hr_request_clarification.requested',
+            'title' => 'Clarification requested',
+            'message' => 'Punjab · REQ-1',
+            'route' => '/requests/clarifications',
+        ]);
 
         $list = $this->actingAs($federalAdmin)->getJson('/api/v1/notifications');
         $list->assertOk();
-        $this->assertSame(1, count($list->json('data')));
-        $this->assertSame($visible->id, $list->json('data.0.id'));
-        $this->assertSame('Regional response received', $list->json('data.0.title'));
-        $this->assertSame(1, $list->json('meta.unread_count'));
+        $this->assertSame(2, count($list->json('data')));
+        $ids = collect($list->json('data'))->pluck('id')->all();
+        $this->assertContains($visible->id, $ids);
+        $this->assertContains($clarification->id, $ids);
+        $this->assertSame(2, $list->json('meta.unread_count'));
+        $titles = collect($list->json('data'))->pluck('title')->all();
+        $this->assertContains('Regional response received', $titles);
+        $this->assertContains('Clarification requested', $titles);
+    }
+
+    public function test_regional_response_resubmit_notifies_federal(): void
+    {
+        $punjab = Region::query()->where('slug', 'punjab')->firstOrFail();
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
+        $regionalAdmin = $this->makeUserWithRole('regional_admin', ['region_id' => $punjab->id]);
+        $federalAdmin = $this->makeUserWithRole('federal_admin', ['region_id' => $federal->id]);
+
+        HrRequest::query()->create([
+            'id' => 'REQ-RESUB-001',
+            'title' => 'Resubmit notify request',
+            'conv' => 'CEDAW',
+            'region_id' => $punjab->id,
+            'due_date' => now()->addDays(10),
+            'status' => 'active',
+        ]);
+
+        $create = $this->actingAs($regionalAdmin)->postJson('/api/v1/regional-responses', [
+            'hr_request_id' => 'REQ-RESUB-001',
+            'title' => 'Initial compilation',
+            'content' => 'First version',
+        ]);
+        $create->assertCreated();
+        $responseId = (string) $create->json('data.id');
+
+        $this->actingAs($federalAdmin)->postJson("/api/v1/regional-responses/{$responseId}/review", [
+            'review_status' => 'needs-modification',
+            'comments' => 'Please revise',
+        ])->assertOk();
+
+        Notification::query()->where('user_id', $federalAdmin->id)->delete();
+
+        $resubmit = $this->actingAs($regionalAdmin)->putJson("/api/v1/regional-responses/{$responseId}", [
+            'title' => 'Revised compilation',
+            'content' => 'Second version',
+        ]);
+        $resubmit->assertOk();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $federalAdmin->id,
+            'event_key' => 'regional_response.resubmitted',
+            'entity_id' => $responseId,
+            'title' => 'Regional response resubmitted',
+        ]);
+    }
+
+    public function test_department_submit_and_needs_modification_notifications(): void
+    {
+        $punjab = Region::query()->where('slug', 'punjab')->firstOrFail();
+        $regionalAdmin = $this->makeUserWithRole('regional_admin', ['region_id' => $punjab->id]);
+
+        $department = Department::query()->create([
+            'code' => 'TEST-SUBMIT-NOTIFY',
+            'name' => 'Submit Notify Department',
+            'type' => 'test',
+        ]);
+        $department->regions()->attach($punjab->id);
+
+        $departmentAdmin = $this->makeUserWithRole('department_admin', [
+            'region_id' => $punjab->id,
+            'department_id' => $department->id,
+        ]);
+
+        HrRequest::query()->create([
+            'id' => 'REQ-DEPT-SUB-001',
+            'title' => 'Dept submit notify',
+            'conv' => 'CEDAW',
+            'region_id' => $punjab->id,
+            'due_date' => now()->addDays(10),
+            'status' => 'active',
+        ]);
+
+        $assign = $this->actingAs($regionalAdmin)->postJson('/api/v1/department-tasks', [
+            'hr_request_id' => 'REQ-DEPT-SUB-001',
+            'department_id' => $department->id,
+        ]);
+        $assign->assertCreated();
+        $taskId = (string) $assign->json('data.id');
+
+        Notification::query()->delete();
+
+        $submit = $this->actingAs($departmentAdmin)->postJson("/api/v1/department-tasks/{$taskId}/submit-response", [
+            'response_data' => 'Department answer',
+        ]);
+        $submit->assertOk();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $regionalAdmin->id,
+            'event_key' => 'department_task.submitted',
+            'entity_id' => $taskId,
+            'title' => 'Department response received',
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => $departmentAdmin->id,
+            'event_key' => 'department_task.submitted',
+        ]);
+
+        Notification::query()->delete();
+
+        $review = $this->actingAs($regionalAdmin)->patchJson("/api/v1/department-tasks/{$taskId}", [
+            'regional_review_status' => 'needs-modification',
+            'regional_review_comments' => 'Please fix figures',
+        ]);
+        $review->assertOk();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $departmentAdmin->id,
+            'event_key' => 'department_task.needs_modification',
+            'entity_id' => $taskId,
+            'title' => 'Revision requested',
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => $regionalAdmin->id,
+            'event_key' => 'department_task.needs_modification',
+        ]);
+
+        Notification::query()->delete();
+
+        $resubmit = $this->actingAs($departmentAdmin)->postJson("/api/v1/department-tasks/{$taskId}/submit-response", [
+            'response_data' => 'Revised department answer',
+        ]);
+        $resubmit->assertOk();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $regionalAdmin->id,
+            'event_key' => 'department_task.resubmitted',
+            'entity_id' => $taskId,
+            'title' => 'Department response resubmitted',
+        ]);
     }
 
     public function test_department_task_legacy_message_is_rewritten_on_read(): void

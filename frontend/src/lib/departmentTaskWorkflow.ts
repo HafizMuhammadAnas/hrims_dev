@@ -47,6 +47,26 @@ export function workflowPresentation(t: DepartmentTaskRow): {
   return { label: 'Under Review', tone: 'in-progress' }
 }
 
+/** Regional/federal can accept only while the task is still Under Review. */
+export function canAcceptDepartmentTaskReview(t: DepartmentTaskRow): boolean {
+  return hasDepartmentResponse(t) && departmentTaskWorkflowBucket(t) === 'responded'
+}
+
+/**
+ * Regional/federal can request modification while Under Review, or reopen an Accepted
+ * response so the department can correct inputs (e.g. after federal revision).
+ */
+export function canRequestDepartmentTaskModification(t: DepartmentTaskRow): boolean {
+  if (!hasDepartmentResponse(t)) return false
+  const b = departmentTaskWorkflowBucket(t)
+  return b === 'responded' || b === 'accepted'
+}
+
+/** Show Accept / Request modification action strip. */
+export function canShowDepartmentTaskReviewActions(t: DepartmentTaskRow): boolean {
+  return canAcceptDepartmentTaskReview(t) || canRequestDepartmentTaskModification(t)
+}
+
 export function workflowStatsLabels(scope: 'regional' | 'federal-ict'): {
   responded: string
   accepted: string

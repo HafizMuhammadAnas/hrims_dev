@@ -10,6 +10,7 @@ use App\Models\RegionalResponse;
 use App\Models\User;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
+use App\Support\ResponseRevisionRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -135,13 +136,18 @@ class RegionalResponseController extends Controller
                 'content' => ['required', 'string'],
             ]);
 
+            app(ResponseRevisionRecorder::class)->snapshotRegionalResponse($model, $user);
+
             $model->title = $data['title'];
             $model->content = $data['content'];
             $model->review_status = 'pending';
             $model->save();
 
+            $fresh = $model->fresh(['region', 'hrRequest']);
+            app(NotificationService::class)->notifyRegionalResponseCreated($fresh, $request->user(), true);
+
             return response()
-                ->json(['data' => $this->serialize($model->fresh(['region', 'hrRequest']))])
+                ->json(['data' => $this->serialize($fresh)])
                 ->header('Cache-Control', 'no-store, private');
         }
 
@@ -295,6 +301,49 @@ class RegionalResponseController extends Controller
         }
 
         return null;
+    }
+
+    public function revisions(Request $request, string $regionalResponse): JsonResponse
+    {
+        $model = RegionalResponse::query()->with(['region'])->find($regionalResponse);
+        if (! $model) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+        if (! $this->userMayView($request->user(), $model)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $revisions = $model->revisions()
+            ->with('submittedBy:id,name,username')
+            ->orderByDesc('revision_no')
+            ->get()
+            ->map(fn ($rev) => [
+                'id' => $rev->id,
+                'revision_no' => $rev->revision_no,
+                'title' => $rev->title,
+                'content' => $rev->content,
+                'review_status' => $rev->review_status,
+                'comments' => $rev->comments,
+                'submitted_by_name' => $rev->submittedBy?->name ?: $rev->submittedBy?->username,
+                'created_at' => optional($rev->created_at)?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+
+        return response()
+            ->json([
+                'data' => [
+                    'current' => [
+                        'title' => $model->title,
+                        'content' => $model->content,
+                        'review_status' => $model->review_status,
+                        'comments' => $model->comments,
+                        'updated_at' => optional($model->updated_at)?->toIso8601String(),
+                    ],
+                    'revisions' => $revisions,
+                ],
+            ])
+            ->header('Cache-Control', 'no-store, private');
     }
 
     private function serialize(RegionalResponse $r): array

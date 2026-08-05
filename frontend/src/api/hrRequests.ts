@@ -1,6 +1,7 @@
 import { apiJsonHeaders, apiMultipartHeaders, ensureCsrfCookie } from './client'
 import { ApiError, parseApiErrorResponse } from './apiError'
 import type { HrRequestIssueDetail, HrRequestRow, HrRequestType } from '../types/hrRequest'
+import type { HrReportingFramework } from '../lib/hrRequestReportingFramework'
 import { coerceHrRequestStatus } from '../types/hrRequest'
 
 async function throwIfNotOk(res: Response): Promise<void> {
@@ -113,10 +114,13 @@ export type HrRequestFormIssuesResult = {
 
 export type HrRequestCreateFromIssueFormInput = {
   title: string
+  reporting_framework: HrReportingFramework
   convention_id: number
   request_type: HrRequestType
   issue_id?: number | null
   other_issue_text?: string | null
+  upr?: string | null
+  upr_indicator?: string | null
   date: string
   status: HrRequestRow['status']
   details?: string | null
@@ -132,10 +136,13 @@ export async function createHrRequestFromIssueForm(
   await ensureCsrfCookie()
   const fd = new FormData()
   fd.append('title', input.title)
+  fd.append('reporting_framework', input.reporting_framework)
   fd.append('convention_id', String(input.convention_id))
   fd.append('request_type', input.request_type)
   if (input.issue_id != null) fd.append('issue_id', String(input.issue_id))
   if (input.other_issue_text?.trim()) fd.append('other_issue_text', input.other_issue_text.trim())
+  if (input.upr?.trim()) fd.append('upr', input.upr.trim())
+  if (input.upr_indicator?.trim()) fd.append('upr_indicator', input.upr_indicator.trim())
   fd.append('date', input.date)
   fd.append('status', input.status)
   if (input.details != null && input.details !== '') {
@@ -209,6 +216,7 @@ export type HrRequestPatchBody = {
   title?: string
   conv?: string
   convention_id?: number
+  reporting_framework?: HrReportingFramework
   request_type?: HrRequestType
   issue_id?: number | null
   other_issue_text?: string | null
@@ -252,10 +260,15 @@ export async function updateHrRequestFromIssueForm(
   await ensureCsrfCookie()
   const fd = new FormData()
   fd.append('title', input.title)
+  fd.append('reporting_framework', input.reporting_framework)
   fd.append('convention_id', String(input.convention_id))
   fd.append('request_type', input.request_type)
   if (input.issue_id != null) fd.append('issue_id', String(input.issue_id))
   if (input.other_issue_text?.trim()) fd.append('other_issue_text', input.other_issue_text.trim())
+  if (input.upr?.trim()) fd.append('upr', input.upr.trim())
+  else fd.append('upr', '')
+  if (input.upr_indicator?.trim()) fd.append('upr_indicator', input.upr_indicator.trim())
+  else fd.append('upr_indicator', '')
   fd.append('date', input.date)
   fd.append('status', input.status)
   if (input.details != null && input.details !== '') {

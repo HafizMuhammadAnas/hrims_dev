@@ -28,6 +28,7 @@ class HrRequestResource extends JsonResource
             'issue_id' => $this->issue_id,
             'request_type' => $this->request_type,
             'other_issue_text' => $this->other_issue_text,
+            'reporting_framework' => $this->reporting_framework,
             'date' => $this->due_date?->format('Y-m-d') ?? '',
             'status' => $this->status,
             'details' => $this->details,

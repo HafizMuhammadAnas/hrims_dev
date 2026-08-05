@@ -247,9 +247,17 @@ class HrRequestController extends Controller
             'title' => ['sometimes', 'string', 'max:500'],
             'conv' => ['sometimes', 'string', 'max:64'],
             'convention_id' => ['sometimes', 'integer', 'exists:conventions,id'],
+            'reporting_framework' => ['sometimes', 'string', Rule::in([
+                'upr',
+                'treaty_body_obligatory',
+                'treaty_body_optional_protocol',
+                'other_issue',
+            ])],
             'request_type' => ['sometimes', Rule::in(['loi', 'concluding_observation', 'other_issue'])],
             'issue_id' => ['sometimes', 'nullable', 'integer', 'exists:issues,id'],
             'other_issue_text' => ['sometimes', 'nullable', 'string', 'max:200000'],
+            'upr' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'upr_indicator' => ['sometimes', 'nullable', 'string', 'max:64'],
             'region_id' => ['sometimes', 'nullable', 'exists:regions,id'],
             'region_ids' => ['sometimes', 'array'],
             'region_ids.*' => ['integer', 'exists:regions,id'],
@@ -269,6 +277,17 @@ class HrRequestController extends Controller
             'status.in' => 'Status must be draft or active.',
         ]);
 
+        if (($data['reporting_framework'] ?? $model->reporting_framework) === 'upr') {
+            throw ValidationException::withMessages([
+                'reporting_framework' => [
+                    'Universal Periodic Review Reporting cannot be used to complete a request yet. Select Treaty Body Reporting or Other Issues.',
+                ],
+            ]);
+        }
+
+        if (($data['reporting_framework'] ?? '') === 'other_issue') {
+            $data['request_type'] = 'other_issue';
+        }
         $requestType = (string) (
             $data['request_type']
             ?? $model->request_type
@@ -288,7 +307,7 @@ class HrRequestController extends Controller
             }
             if (! empty($data['issue_id'])) {
                 throw ValidationException::withMessages([
-                    'issue_id' => ['Other Issues requests cannot use a catalog LOI or concluding observation.'],
+                    'issue_id' => ['Other Issues requests cannot use a catalog List of Issues or concluding observation.'],
                 ]);
             }
             if (array_key_exists('indicator_responses', $data) && $data['indicator_responses'] !== null) {
@@ -358,6 +377,9 @@ class HrRequestController extends Controller
                 'issue_id',
                 'request_type',
                 'other_issue_text',
+                'reporting_framework',
+                'upr',
+                'upr_indicator',
                 'status',
                 'details',
                 'region_id',
@@ -569,10 +591,18 @@ class HrRequestController extends Controller
     {
         $rules = [
             'title' => ['required', 'string', 'max:500'],
+            'reporting_framework' => ['required', 'string', Rule::in([
+                'upr',
+                'treaty_body_obligatory',
+                'treaty_body_optional_protocol',
+                'other_issue',
+            ])],
             'convention_id' => ['required', 'integer', 'exists:conventions,id'],
             'request_type' => ['nullable', Rule::in(['loi', 'concluding_observation', 'other_issue'])],
             'issue_id' => ['nullable', 'integer', 'exists:issues,id'],
             'other_issue_text' => ['nullable', 'string', 'max:200000'],
+            'upr' => ['nullable', 'string', 'max:64'],
+            'upr_indicator' => ['nullable', 'string', 'max:64'],
             'date' => ['required', 'date'],
             'status' => ['required', Rule::in(['draft', 'active'])],
             'details' => ['nullable', 'string'],
@@ -587,10 +617,23 @@ class HrRequestController extends Controller
 
         $data = $request->validate($rules, [
             'title.required' => 'Title is required.',
+            'reporting_framework.required' => 'Select a reporting type.',
             'convention_id.required' => 'Convention is required.',
             'date.required' => 'Due date is required.',
             'status.required' => 'Status is required.',
         ]);
+
+        if (($data['reporting_framework'] ?? '') === 'upr') {
+            throw ValidationException::withMessages([
+                'reporting_framework' => [
+                    'Universal Periodic Review Reporting cannot be used to complete a request yet. Select Treaty Body Reporting or Other Issues.',
+                ],
+            ]);
+        }
+
+        if (($data['reporting_framework'] ?? '') === 'other_issue') {
+            $data['request_type'] = 'other_issue';
+        }
 
         $requestType = (string) ($data['request_type'] ?? '');
         if ($requestType === '' && ! empty($data['issue_id'])) {
@@ -601,7 +644,7 @@ class HrRequestController extends Controller
         }
         if ($requestType === '') {
             throw ValidationException::withMessages([
-                'request_type' => ['Select LOI, Concluding Observation, or Other Issues.'],
+                'request_type' => ['Select List of Issues, Concluding Observation, or Other Issues.'],
             ]);
         }
         $issue = null;
@@ -620,7 +663,7 @@ class HrRequestController extends Controller
             }
             if (! empty($data['issue_id'])) {
                 throw ValidationException::withMessages([
-                    'issue_id' => ['Other Issues requests cannot use a catalog LOI or concluding observation.'],
+                    'issue_id' => ['Other Issues requests cannot use a catalog List of Issues or concluding observation.'],
                 ]);
             }
             if ($request->filled('indicator_responses')) {
@@ -630,10 +673,11 @@ class HrRequestController extends Controller
             }
             $data['issue_id'] = null;
             $data['other_issue_text'] = $otherIssueText;
+            $data['reporting_framework'] = 'other_issue';
         } else {
             if (empty($data['issue_id'])) {
                 throw ValidationException::withMessages([
-                    'issue_id' => ['Select an LOI or concluding observation.'],
+                    'issue_id' => ['Select a List of Issues or concluding observation.'],
                 ]);
             }
             $expectedEntryKind = $requestType === 'concluding_observation' ? 'recommendation' : 'issue';
@@ -649,6 +693,9 @@ class HrRequestController extends Controller
             }
             $data['other_issue_text'] = null;
             $indicatorPayload = $this->decodeIndicatorResponses($request->input('indicator_responses'));
+            if (! in_array($data['reporting_framework'], ['treaty_body_obligatory', 'treaty_body_optional_protocol'], true)) {
+                $data['reporting_framework'] = 'treaty_body_obligatory';
+            }
         }
 
         $regionIds = $data['region_ids'] ?? [];
@@ -683,6 +730,9 @@ class HrRequestController extends Controller
                 'issue_id' => $data['issue_id'] ?? null,
                 'request_type' => $data['request_type'],
                 'other_issue_text' => $data['other_issue_text'] ?? null,
+                'reporting_framework' => $data['reporting_framework'],
+                'upr' => null,
+                'upr_indicator' => null,
                 'region_id' => $data['region_ids'][0] ?? null,
                 'due_date' => $data['date'],
                 'status' => $data['status'],

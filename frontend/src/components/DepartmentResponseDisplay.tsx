@@ -39,6 +39,7 @@ function bundleHasSupplementaryContent(
   if (qualitativeTextsForDisplay(bundle.qualitative, qualYearLabels, filterYearId).length > 0) return true
   if (bundle.qualitative?.attachment_url?.trim()) return true
   if (bundle.quantitative?.comment?.trim() || bundle.quantitative?.attachment_url?.trim()) return true
+  if (bundle.quantitative?.challenges?.trim()) return true
   if (
     bundle.quantitative?.value != null &&
     !Number.isNaN(bundle.quantitative.value) &&
@@ -265,6 +266,11 @@ export function DepartmentResponseDisplay({
                 {bundle.quantitative.comment ? (
                   <p className="muted small" style={{ margin: hasMatrix ? '0 0 6px' : '6px 0 0' }}>
                     Comment: {bundle.quantitative.comment}
+                  </p>
+                ) : null}
+                {bundle.quantitative.challenges ? (
+                  <p className="muted small" style={{ margin: '6px 0 0' }}>
+                    Challenges: {bundle.quantitative.challenges}
                   </p>
                 ) : null}
                 {bundle.quantitative.attachment_url ? (

@@ -216,6 +216,13 @@ type DimDef = {
   saved?: MatrixValues
   onChange?: Props['onGenderChange']
   cellAllowed: (yearId: number, columnId: number | string) => boolean
+  /**
+   * When true, this dimension uses its own editable total (e.g. PWD total)
+   * instead of the card-level Year totals bar for Unaccounted / Total.
+   */
+  usesOwnTotal?: boolean
+  /** Header label for the own-total column (shown before breakdown columns). */
+  ownTotalLabel?: string
 }
 
 function DepartmentIndicatorDataCard({
@@ -381,22 +388,16 @@ function DepartmentIndicatorDataCard({
           ),
       })
     }
-    if (indicator.collects_by_disability) {
+    if (indicator.collects_by_religion && religions.length > 0) {
       dims.push({
-        key: 'disability',
-        title: 'PWDs Disaggregated',
-        columns: disabilityColumns(savedDisabilityByIndicator),
-        values: disabilityValues,
-        saved: savedDisabilityByIndicator,
-        onChange: onDisabilityChange,
+        key: 'religion',
+        title: 'Religion Disaggregate',
+        columns: religionColumns(religions),
+        values: religionValues,
+        saved: savedReligionByIndicator,
+        onChange: onReligionChange,
         cellAllowed: (yearId, columnId) =>
-          indicatorFixedKeyCellAllowed(
-            indicator,
-            yearId,
-            (i) => Boolean(i.collects_by_disability),
-            DISABILITY_KEYS,
-            String(columnId),
-          ),
+          indicatorReligionCellAllowed(indicator, yearId, Number(columnId)),
       })
     }
     if (indicator.collects_by_location && districts.length > 0) {
@@ -416,16 +417,24 @@ function DepartmentIndicatorDataCard({
           ),
       })
     }
-    if (indicator.collects_by_religion && religions.length > 0) {
+    if (indicator.collects_by_disability) {
       dims.push({
-        key: 'religion',
-        title: 'Religion Disaggregate',
-        columns: religionColumns(religions),
-        values: religionValues,
-        saved: savedReligionByIndicator,
-        onChange: onReligionChange,
+        key: 'disability',
+        title: 'PWDs Disaggregated',
+        columns: disabilityColumns(savedDisabilityByIndicator),
+        values: disabilityValues,
+        saved: savedDisabilityByIndicator,
+        onChange: onDisabilityChange,
         cellAllowed: (yearId, columnId) =>
-          indicatorReligionCellAllowed(indicator, yearId, Number(columnId)),
+          indicatorFixedKeyCellAllowed(
+            indicator,
+            yearId,
+            (i) => Boolean(i.collects_by_disability),
+            DISABILITY_KEYS,
+            String(columnId),
+          ),
+        usesOwnTotal: true,
+        ownTotalLabel: 'PWD total',
       })
     }
     return dims
@@ -531,7 +540,11 @@ function DepartmentIndicatorDataCard({
               years={years}
               indicatorId={indicator.id}
               yearTotalFor={(yearId) =>
-                yearTotalsIncluded ? num(yearTotalValue(yearId)) : null
+                dim.usesOwnTotal
+                  ? null
+                  : yearTotalsIncluded
+                    ? num(yearTotalValue(yearId))
+                    : null
               }
               included={included}
               readOnly={readOnly}
@@ -568,12 +581,20 @@ function DimensionYearPanels({
 }) {
   if (years.length === 0 || def.columns.length === 0) return null
 
+  const usesOwnTotal = Boolean(def.usesOwnTotal)
+  const ownTotalLabel = def.ownTotalLabel ?? 'Total'
+
   function cellValue(yearId: number, columnId: number | string): string {
     return readCell(def.values, def.saved, indicatorId, yearId, columnId, readOnly)
   }
 
   function handleChange(yearId: number, columnId: number | string, value: string) {
     if (!def.onChange) return
+    if (usesOwnTotal) {
+      // Own-total dimensions keep an editable budget; do not overwrite it with the breakdown sum.
+      def.onChange(indicatorId, yearId, columnId, value)
+      return
+    }
     const total = sumBreakdown(
       (colId) => cellValue(yearId, colId),
       def.columns,
@@ -606,17 +627,27 @@ function DimensionYearPanels({
       ) : (
         <div className="iwd-dim__years">
           {years.map((y) => {
-            const yt = yearTotalFor(y.year_id)
             const distributedRaw = sumBreakdown(
               (colId) => cellValue(y.year_id, colId),
               def.columns,
               (colId) => def.cellAllowed(y.year_id, colId),
             )
             const distributed = distributedRaw === '' ? 0 : num(distributedRaw)
+            const ownTotalRaw = usesOwnTotal
+              ? cellValue(y.year_id, DIMENSION_TOTAL_COLUMN_ID)
+              : ''
+            const ownTotal = usesOwnTotal ? num(ownTotalRaw) : null
+            const yt = usesOwnTotal ? ownTotal : yearTotalFor(y.year_id)
             const ua = yt == null ? null : yt - distributed
             const over = ua != null && ua < 0
             const dimTotal = cellValue(y.year_id, DIMENSION_TOTAL_COLUMN_ID)
-            const totalDisplay = yt != null ? yt : dimTotal === '' ? distributed : num(dimTotal)
+            const totalDisplay = usesOwnTotal
+              ? ownTotal
+              : yt != null
+                ? yt
+                : dimTotal === ''
+                  ? distributed
+                  : num(dimTotal)
 
             return (
               <div key={y.year_id} className="iwd-year-panel">
@@ -625,6 +656,9 @@ function DimensionYearPanels({
                   <table className="iwd-year-panel__table">
                     <thead>
                       <tr>
+                        {usesOwnTotal ? (
+                          <th className="iwd-year-panel__pwd-total-h">{ownTotalLabel}</th>
+                        ) : null}
                         {def.columns.map((c) => (
                           <th key={String(c.id)}>{c.label}</th>
                         ))}
@@ -634,6 +668,27 @@ function DimensionYearPanels({
                     </thead>
                     <tbody>
                       <tr>
+                        {usesOwnTotal ? (
+                          <td className="iwd-year-panel__pwd-total">
+                            {readOnly ? (
+                              <span className="iwd-sheet__num">
+                                {ownTotalRaw === '' ? '' : ownTotal}
+                              </span>
+                            ) : (
+                              <input
+                                className="iwd-sheet__input iwd-sheet__input--pwd-total"
+                                type="number"
+                                min={0}
+                                step={1}
+                                value={ownTotalRaw}
+                                onChange={(e) =>
+                                  handleChange(y.year_id, DIMENSION_TOTAL_COLUMN_ID, e.target.value)
+                                }
+                                aria-label={`${def.title} ${ownTotalLabel} ${y.label}`}
+                              />
+                            )}
+                          </td>
+                        ) : null}
                         {def.columns.map((c) => {
                           const allowed = def.cellAllowed(y.year_id, c.id)
                           return (
@@ -662,10 +717,20 @@ function DimensionYearPanels({
                         })}
                         <td
                           className={`iwd-year-panel__ua${over ? ' is-over' : ''}`}
+                          title={over && ua != null ? `Exceeded by ${Math.abs(ua)}` : undefined}
                         >
-                          {ua == null ? '—' : ua}
+                          {ua == null ? '—' : over ? `${Math.abs(ua)} exceeded` : ua}
                         </td>
-                        <td className="iwd-year-panel__total">{totalDisplay}</td>
+                        <td
+                          className={`iwd-year-panel__total${over ? ' is-over' : ''}`}
+                          title={
+                            over
+                              ? `Entered total ${distributed} exceeds budget ${yt ?? 0}`
+                              : undefined
+                          }
+                        >
+                          {over ? distributed : totalDisplay}
+                        </td>
                       </tr>
                     </tbody>
                   </table>

@@ -5,6 +5,10 @@ import {
   hrViewIssueDescriptionLabel,
   hrViewIssueTitleLabel,
 } from '../lib/issueEntryKind'
+import {
+  reportingFrameworkLabel,
+  type HrReportingFramework,
+} from '../lib/hrRequestReportingFramework'
 import type {
   HrRequestAttachmentRow,
   HrRequestIssueArticle,
@@ -48,6 +52,8 @@ type Props = {
   /** Issue vs recommendation (from issue catalog). */
   issueEntryKind?: IssueEntryKind | null
   requestType?: HrRequestType | null
+  /** Top-level reporting framework label source. */
+  reportingFramework?: HrReportingFramework | '' | null
   otherIssueText?: string | null
   categoryName: string
   issueDescription?: string | null
@@ -97,6 +103,7 @@ export function HrRequestViewTemplate({
   issueTitle,
   issueEntryKind = null,
   requestType = null,
+  reportingFramework = null,
   otherIssueText = null,
   categoryName,
   issueDescription = null,
@@ -115,6 +122,7 @@ export function HrRequestViewTemplate({
   const ictDepts = (ictDepartmentNames ?? []).filter((n) => n.trim().length > 0)
   const assignedDepts = (assignedDepartmentNames ?? []).filter((n) => n.trim().length > 0)
   const showIctDeptRow = ictDepts.length > 0 && assignedDepts.length === 0
+  const reportingTypeLabel = reportingFrameworkLabel(reportingFramework)
 
   return (
     <div
@@ -128,11 +136,25 @@ export function HrRequestViewTemplate({
             <div className="hr-request-view-template__kicker">Request ID</div>
             <div className="hr-request-view-template__req-id">{requestId}</div>
           </div>
-          <StatusBadge tone={statusTone(status)}>{statusDisplayLabel(status)}</StatusBadge>
+          <div className="hr-request-view-template__hero-badges">
+            {reportingTypeLabel ? (
+              <StatusBadge tone="pending">{reportingTypeLabel}</StatusBadge>
+            ) : null}
+            <StatusBadge tone={statusTone(status)}>{statusDisplayLabel(status)}</StatusBadge>
+          </div>
         </div>
         <h1 className="hr-request-view-template__title">{title.trim() || '—'}</h1>
 
         <div className="hr-request-view-template__hero-meta">
+          {reportingTypeLabel ? (
+            <div className="hr-request-view-template__meta-chip">
+              <CheckCircle2 size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
+              <span>
+                <span className="hr-request-view-template__meta-chip-label">Reporting type:</span>{' '}
+                {reportingTypeLabel}
+              </span>
+            </div>
+          ) : null}
           <div className="hr-request-view-template__meta-chip">
             <Calendar size={metaIconSize} aria-hidden className="hr-request-view-template__meta-icon" />
             <span>

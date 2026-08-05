@@ -37,6 +37,7 @@ class HrRequest extends Model
         'issue_id',
         'request_type',
         'other_issue_text',
+        'reporting_framework',
     ];
 
     protected function casts(): array

@@ -4,6 +4,13 @@ import { fetchHrRequest } from '../api/hrRequests'
 import { formatAppDate } from '../lib/dateFormat'
 import { buildDepartmentForwardedViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import {
+  inferReportingFramework,
+  reportingFrameworkLabel,
+} from '../lib/hrRequestReportingFramework'
+import {
+  canAcceptDepartmentTaskReview,
+  canRequestDepartmentTaskModification,
+  canShowDepartmentTaskReviewActions,
   departmentTaskWorkflowBucket,
   hasDepartmentResponse,
   workflowPresentation,
@@ -12,6 +19,7 @@ import { isIctLineTask, reviewFeedbackLabelForTask } from '../lib/ictRegion'
 import type { HrRequestRow } from '../types/hrRequest'
 import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
+import { ResponseRevisionChangesPanel } from './ResponseRevisionChangesPanel'
 import { Alert } from './ui/Alert'
 import { Button } from './ui/Button'
 import { WorkflowActionAlert } from './WorkflowActionFootback'
@@ -51,7 +59,7 @@ export function DepartmentTaskResponseModal({
   review,
   showReviewWhenResponded = true,
 }: Props) {
-  const [tab, setTab] = useState<'request' | 'response'>('response')
+  const [tab, setTab] = useState<'request' | 'response' | 'changes'>('response')
   const [reqRow, setReqRow] = useState<HrRequestRow | null>(null)
   const [reqLoading, setReqLoading] = useState(false)
   const [reqErr, setReqErr] = useState<string | null>(null)
@@ -95,12 +103,14 @@ export function DepartmentTaskResponseModal({
   const reviewFeedbackLabel = reviewFeedbackLabelForTask(task)
   const responded = hasDepartmentResponse(task)
   const bucket = departmentTaskWorkflowBucket(task)
-  /** Only tasks awaiting regional/federal review — not already accepted or in revision. */
   const showReviewActions = Boolean(
-    review && (!showReviewWhenResponded || responded) && bucket === 'responded',
+    review && (!showReviewWhenResponded || responded) && canShowDepartmentTaskReviewActions(task),
   )
-  const showReviewOutcomeBanner =
-    Boolean(review && responded && !showReviewActions && (bucket === 'accepted' || bucket === 'revision'))
+  const showAcceptAction = showReviewActions && canAcceptDepartmentTaskReview(task)
+  const showModificationAction = showReviewActions && canRequestDepartmentTaskModification(task)
+  const showReviewOutcomeBanner = Boolean(
+    review && responded && !showReviewActions && bucket === 'revision',
+  )
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
@@ -113,6 +123,11 @@ export function DepartmentTaskResponseModal({
           title={String(task.department_name ?? task.department_id)}
           onClose={onClose}
         >
+          {reportingFrameworkLabel(inferReportingFramework(reqRow)) ? (
+            <StatusBadge tone="pending">
+              {reportingFrameworkLabel(inferReportingFramework(reqRow))}
+            </StatusBadge>
+          ) : null}
           <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
           <span className="workflow-modal-hero__chip">Task {task.id}</span>
           <span className="workflow-modal-hero__chip">{task.req_id}</span>
@@ -139,6 +154,15 @@ export function DepartmentTaskResponseModal({
             onClick={() => setTab('request')}
           >
             Request
+          </button>
+          <button
+            type="button"
+            className={
+              'compiled-record-modal-tab' + (tab === 'changes' ? ' compiled-record-modal-tab--active' : '')
+            }
+            onClick={() => setTab('changes')}
+          >
+            Changes
           </button>
         </nav>
 
@@ -168,7 +192,9 @@ export function DepartmentTaskResponseModal({
                 </Button>
               </ModalActions>
             </>
-          ) : (
+          ) : null}
+
+          {tab === 'response' ? (
             <div className="dept-task-response-modal__panel">
               {responded ? (
                 <>
@@ -216,47 +242,40 @@ export function DepartmentTaskResponseModal({
                     <Button variant="secondary" compact disabled={review.saving} onClick={onClose}>
                       Close
                     </Button>
-                    <Button
-                      variant="primary"
-                      compact
-                      disabled={review.saving}
-                      onClick={() => void review.onAccept()}
-                    >
-                      {review.saving ? 'Saving…' : 'Accept'}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      compact
-                      disabled={review.saving}
-                      onClick={() => void review.onRequestModification()}
-                    >
-                      Request modification
-                    </Button>
+                    {showAcceptAction ? (
+                      <Button
+                        variant="primary"
+                        compact
+                        disabled={review.saving}
+                        onClick={() => void review.onAccept()}
+                      >
+                        {review.saving ? 'Saving…' : 'Accept'}
+                      </Button>
+                    ) : null}
+                    {showModificationAction ? (
+                      <Button
+                        variant="secondary"
+                        compact
+                        disabled={review.saving}
+                        onClick={() => void review.onRequestModification()}
+                      >
+                        Request modification
+                      </Button>
+                    ) : null}
                   </ModalActions>
                 </>
               ) : showReviewOutcomeBanner ? (
                 <>
-                  {bucket === 'accepted' ? (
-                    <Alert variant="success" title="Submission accepted">
-                      <p style={{ margin: 0 }}>This response has already been accepted. No further review actions apply.</p>
-                      {task.regional_review_comments?.trim() ? (
-                        <p style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
-                          <strong>Reviewer notes:</strong> {task.regional_review_comments}
-                        </p>
-                      ) : null}
-                    </Alert>
-                  ) : (
-                    <Alert variant="warning" title="Resubmission requested">
-                      <p style={{ margin: 0 }}>
-                        The department must submit an updated response before you can accept or request changes again.
+                  <Alert variant="warning" title="Resubmission requested">
+                    <p style={{ margin: 0 }}>
+                      The department must submit an updated response before you can accept or request changes again.
+                    </p>
+                    {task.regional_review_comments?.trim() ? (
+                      <p style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
+                        <strong>Feedback sent to the department:</strong> {task.regional_review_comments}
                       </p>
-                      {task.regional_review_comments?.trim() ? (
-                        <p style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
-                          <strong>Feedback sent to the department:</strong> {task.regional_review_comments}
-                        </p>
-                      ) : null}
-                    </Alert>
-                  )}
+                    ) : null}
+                  </Alert>
                   <ModalActions>
                     <Button variant="secondary" compact onClick={onClose}>
                       Close
@@ -271,7 +290,25 @@ export function DepartmentTaskResponseModal({
                 </ModalActions>
               )}
             </div>
-          )}
+          ) : null}
+
+          {tab === 'changes' ? (
+            <div className="dept-task-response-modal__panel">
+              <ResponseRevisionChangesPanel
+                kind="department"
+                departmentTaskId={task.id}
+                currentResponseData={task.response_data}
+                currentAttachmentUrl={task.attachment_url}
+                issueIndicators={reqRow?.issue?.indicators}
+                locationRegionIds={[task.region_id]}
+              />
+              <ModalActions>
+                <Button variant="secondary" compact onClick={onClose}>
+                  Close
+                </Button>
+              </ModalActions>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

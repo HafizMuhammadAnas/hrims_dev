@@ -1,6 +1,6 @@
 export type IssueEntryKind = 'issue' | 'recommendation'
 
-export const LOI_LABEL = 'LOI'
+export const LOI_LABEL = 'List of Issues'
 export const CONCLUDING_OBSERVATIONS_LABEL = 'Concluding Observations'
 /** Singular label for mapping blocks and short UI headings. */
 export const CONCLUDING_OBSERVATION_LABEL = 'Concluding Observation'

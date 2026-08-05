@@ -38,4 +38,10 @@ class RegionalResponse extends Model
     {
         return $this->belongsTo(Region::class);
     }
+
+    public function revisions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RegionalResponseRevision::class, 'regional_response_id', 'id')
+            ->orderByDesc('revision_no');
+    }
 }

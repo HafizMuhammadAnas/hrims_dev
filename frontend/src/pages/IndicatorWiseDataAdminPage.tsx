@@ -61,18 +61,6 @@ const DIMENSIONS: DimDef[] = [
     ],
   },
   {
-    id: 'pwd',
-    title: 'PWDs Disaggregated',
-    columns: [
-      { key: 'vision', label: 'Vision' },
-      { key: 'hearing', label: 'Hearing' },
-      { key: 'cognition', label: 'Cognition' },
-      { key: 'mobility', label: 'Mobility' },
-      { key: 'self_care', label: 'Self-care' },
-      { key: 'communication', label: 'Communication' },
-    ],
-  },
-  {
     id: 'religion',
     title: 'Religion Disaggregate',
     columns: [
@@ -82,6 +70,18 @@ const DIMENSIONS: DimDef[] = [
       { key: 'sikh', label: 'Sikh' },
       { key: 'ahmadis', label: 'Ahmadis' },
       { key: 'others', label: 'Others' },
+    ],
+  },
+  {
+    id: 'pwd',
+    title: 'PWDs Disaggregated',
+    columns: [
+      { key: 'vision', label: 'Vision' },
+      { key: 'hearing', label: 'Hearing' },
+      { key: 'cognition', label: 'Cognition' },
+      { key: 'mobility', label: 'Mobility' },
+      { key: 'self_care', label: 'Self-care' },
+      { key: 'communication', label: 'Communication' },
     ],
   },
 ]

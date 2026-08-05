@@ -12,9 +12,9 @@ export type MatrixDimensionKey =
 export const MATRIX_DIMENSION_KEYS: MatrixDimensionKey[] = [
   'gender',
   'age',
-  'disability',
-  'district',
   'religion',
+  'district',
+  'disability',
   'consolidated',
 ]
 

@@ -147,7 +147,7 @@ export function DepartmentTasksPage() {
                           setOpenActionId(null)
                         }}
                       >
-                        View & response
+                        View and Respond
                       </Button>
                     </RowActionsMenu>
                   </td>

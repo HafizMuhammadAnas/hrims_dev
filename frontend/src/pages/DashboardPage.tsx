@@ -444,45 +444,6 @@ export function DashboardPage() {
             )}
           </div>
 
-          {variant === 'federal' ? (
-            <StatsCards
-              className="dashboard-status-stats"
-              items={[
-                { label: 'Pending', value: count(review, 'pending'), accent: '#ffb300' },
-                { label: 'Accepted', value: count(review, 'accepted'), accent: '#4caf50' },
-                {
-                  label: 'Needs Modification',
-                  value: count(review, 'needs-modification'),
-                  accent: '#00bcd4',
-                },
-                { label: 'Rejected', value: count(review, 'rejected'), accent: '#f44336' },
-              ]}
-            />
-          ) : variant === 'regional' || variant === 'department' || variant === 'viewer' ? (
-            <StatsCards
-              className="dashboard-status-stats"
-              items={[
-                { label: 'Pending', value: workflowPending, accent: '#ffb300' },
-                { label: 'Under Review', value: workflowReview, accent: '#00bcd4' },
-                { label: 'Revision', value: workflowRevision, accent: '#f44336' },
-                { label: 'Accepted', value: workflowAccepted, accent: '#4caf50' },
-              ]}
-            />
-          ) : (
-            <StatsCards
-              className="dashboard-status-stats"
-              items={[
-                {
-                  label: variant === 'minimal' ? 'Requests in scope' : 'HR requests',
-                  value: summary.hr_requests_total,
-                },
-                { label: 'Draft', value: draft, accent: '#ffb300' },
-                { label: 'Active', value: active, accent: '#00bcd4' },
-                { label: 'Urgent queue', value: urgentRequestCount, accent: '#4caf50' },
-              ]}
-            />
-          )}
-
           <div
             style={{
               display: 'grid',
@@ -736,6 +697,45 @@ export function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {variant === 'federal' ? (
+            <StatsCards
+              className="dashboard-status-stats"
+              items={[
+                { label: 'Pending', value: count(review, 'pending'), accent: '#ffb300' },
+                { label: 'Accepted', value: count(review, 'accepted'), accent: '#4caf50' },
+                {
+                  label: 'Needs Modification',
+                  value: count(review, 'needs-modification'),
+                  accent: '#00bcd4',
+                },
+                { label: 'Rejected', value: count(review, 'rejected'), accent: '#f44336' },
+              ]}
+            />
+          ) : variant === 'regional' || variant === 'department' || variant === 'viewer' ? (
+            <StatsCards
+              className="dashboard-status-stats"
+              items={[
+                { label: 'Pending', value: workflowPending, accent: '#ffb300' },
+                { label: 'Under Review', value: workflowReview, accent: '#00bcd4' },
+                { label: 'Revision', value: workflowRevision, accent: '#f44336' },
+                { label: 'Accepted', value: workflowAccepted, accent: '#4caf50' },
+              ]}
+            />
+          ) : (
+            <StatsCards
+              className="dashboard-status-stats"
+              items={[
+                {
+                  label: variant === 'minimal' ? 'Requests in scope' : 'HR requests',
+                  value: summary.hr_requests_total,
+                },
+                { label: 'Draft', value: draft, accent: '#ffb300' },
+                { label: 'Active', value: active, accent: '#00bcd4' },
+                { label: 'Urgent queue', value: urgentRequestCount, accent: '#4caf50' },
+              ]}
+            />
+          )}
 
           <section>
             <div className="dashboard-panel-head" style={{ marginBottom: 12 }}>

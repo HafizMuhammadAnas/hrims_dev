@@ -158,7 +158,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
                           setOpenActionId(null)
                         }}
                       >
-                        View & response
+                        View and Respond
                       </Button>
                     </RowActionsMenu>
                   </td>

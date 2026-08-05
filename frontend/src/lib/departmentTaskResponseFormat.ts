@@ -15,6 +15,8 @@ export type DepartmentIndicatorQuantitative = {
   /** Legacy single value when indicator does not use year collection matrix. */
   value?: number | null
   comment: string | null
+  /** Additional relevant information / implementation challenges. */
+  challenges?: string | null
   attachment_url: string | null
   /** Per-dimension row inclusion toggles (false = department excluded this metric row). */
   matrix_row_enabled?: Partial<
@@ -132,6 +134,7 @@ export function formatDepartmentResponseAsPlaintext(
       const q = bundle.quantitative
       appendQuantitativeYearTotalLines(lines, q)
       if (q.comment) lines.push(`  Comment: ${q.comment}`)
+      if (q.challenges) lines.push(`  Challenges: ${q.challenges}`)
       if (q.attachment_url) lines.push(`  Quant attachment: ${q.attachment_url}`)
     }
     if (bundle.qualitative) {

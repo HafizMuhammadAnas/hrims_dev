@@ -14,6 +14,7 @@ use App\Models\IssueIndicator;
 use App\Models\IssueIndicatorYear;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
+use App\Support\ResponseRevisionRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -670,6 +671,9 @@ class DepartmentTaskController extends Controller
 
     private function submitLegacyDepartmentTaskResponse(Request $request, DepartmentTask $departmentTask): JsonResponse
     {
+        $wasResubmit = $departmentTask->status === 'submitted'
+            && $departmentTask->regional_review_status === 'needs-modification';
+
         $data = $request->validate([
             'response_data' => ['nullable', 'string', 'max:200000'],
             'attachment' => ['nullable', 'file', 'max:15360'],
@@ -705,6 +709,10 @@ class DepartmentTaskController extends Controller
             $attachmentUrl = null;
         }
 
+        if ($wasResubmit) {
+            app(ResponseRevisionRecorder::class)->snapshotDepartmentTask($departmentTask, $request->user());
+        }
+
         $departmentTask->update([
             'response_data' => $text !== '' ? $text : $departmentTask->response_data,
             'attachment_url' => $attachmentUrl,
@@ -712,17 +720,24 @@ class DepartmentTaskController extends Controller
             'status' => 'submitted',
             'regional_review_status' => null,
             'regional_review_comments' => null,
+            'pending_revision_origin' => null,
         ]);
+
+        $fresh = $departmentTask->fresh(['region', 'department', 'hrRequest']);
+        app(NotificationService::class)->notifyDepartmentTaskSubmitted($fresh, $request->user(), $wasResubmit);
 
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
 
         return response()->json([
-            'data' => $this->serializeTask($departmentTask->fresh(['region', 'department']), $redact),
+            'data' => $this->serializeTask($fresh, $redact),
         ]);
     }
 
     private function submitIndicatorBundleDepartmentTaskResponse(Request $request, DepartmentTask $departmentTask): JsonResponse
     {
+        $wasResubmit = $departmentTask->status === 'submitted'
+            && $departmentTask->regional_review_status === 'needs-modification';
+
         $hrRequest = $departmentTask->hrRequest;
         $issue = $hrRequest?->issue;
         if (! $issue) {
@@ -812,6 +827,12 @@ class DepartmentTaskController extends Controller
                     return response()->json(['message' => $msg], 422);
                 }
                 $comment = trim((string) ($qIn['comment'] ?? ''));
+                if ($comment === '') {
+                    return response()->json([
+                        'message' => 'Indicator '.$indicator->id.': a comment is required.',
+                    ], 422);
+                }
+                $challenges = trim((string) ($qIn['challenges'] ?? ''));
                 $qFile = $this->pickKeyedUploadedFile($quantFiles, (int) $indicator->id);
                 $qUrl = null;
                 if ($qFile && $qFile->isValid()) {
@@ -837,6 +858,7 @@ class DepartmentTaskController extends Controller
                 if ($collectsYearGender) {
                     $quantitative = [
                         'comment' => $comment !== '' ? $comment : null,
+                        'challenges' => $challenges !== '' ? $challenges : null,
                         'attachment_url' => $qUrl,
                     ];
                     $matrixRowEnabled = $this->extractMatrixRowEnabled($qIn);
@@ -917,6 +939,7 @@ class DepartmentTaskController extends Controller
                     $row['quantitative'] = [
                         'value' => (float) $valRaw,
                         'comment' => $comment !== '' ? $comment : null,
+                        'challenges' => $challenges !== '' ? $challenges : null,
                         'attachment_url' => $qUrl,
                     ];
                 }
@@ -1012,6 +1035,10 @@ class DepartmentTaskController extends Controller
             'by_indicator' => $outBy,
         ];
 
+        if ($wasResubmit) {
+            app(ResponseRevisionRecorder::class)->snapshotDepartmentTask($departmentTask, $request->user());
+        }
+
         $departmentTask->update([
             'response_data' => json_encode($payload, JSON_UNESCAPED_SLASHES),
             'attachment_url' => null,
@@ -1019,12 +1046,16 @@ class DepartmentTaskController extends Controller
             'status' => 'submitted',
             'regional_review_status' => null,
             'regional_review_comments' => null,
+            'pending_revision_origin' => null,
         ]);
+
+        $fresh = $departmentTask->fresh(['region', 'department', 'hrRequest']);
+        app(NotificationService::class)->notifyDepartmentTaskSubmitted($fresh, $request->user(), $wasResubmit);
 
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
 
         return response()->json([
-            'data' => $this->serializeTask($departmentTask->fresh(['region', 'department']), $redact),
+            'data' => $this->serializeTask($fresh, $redact),
         ]);
     }
 
@@ -1083,18 +1114,110 @@ class DepartmentTaskController extends Controller
         $data = $request->validate([
             'regional_review_status' => ['required', 'in:accepted,needs-modification'],
             'regional_review_comments' => ['nullable', 'string', 'max:20000'],
+            'revision_origin' => ['nullable', 'in:federal_follow_up,regional'],
         ]);
+
+        $pendingOrigin = null;
+        if ($data['regional_review_status'] === 'needs-modification') {
+            $pendingOrigin = $data['revision_origin']
+                ?? app(ResponseRevisionRecorder::class)->inferOriginFromRegionalResponse($departmentTask);
+        }
 
         $departmentTask->update([
             'regional_review_status' => $data['regional_review_status'],
             'regional_review_comments' => $data['regional_review_comments'] ?? null,
+            'pending_revision_origin' => $pendingOrigin,
         ]);
+
+        $fresh = $departmentTask->fresh(['region', 'department', 'hrRequest']);
+        if ($data['regional_review_status'] === 'needs-modification') {
+            app(NotificationService::class)->notifyDepartmentTaskNeedsModification($fresh, $request->user());
+        }
 
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
 
         return response()->json([
-            'data' => $this->serializeTask($departmentTask->fresh(['region', 'department']), $redact),
+            'data' => $this->serializeTask($fresh, $redact),
         ]);
+    }
+
+    public function revisions(Request $request, DepartmentTask $departmentTask): JsonResponse
+    {
+        $user = $request->user();
+        if (! $this->userMayViewDepartmentTask($user, $departmentTask)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $redact = HrimsAccess::redactDepartmentTaskPayloadFor($user);
+        $federalAudience = $request->query('audience') === 'federal'
+            || $request->boolean('federal_only');
+
+        // Federal portal must not see region-only department revision rounds.
+        if ($federalAudience && ! (HrimsAccess::isSuperAdmin($user) || $user->hasRole('federal_admin'))) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $query = $departmentTask->revisions()->with('submittedBy:id,name,username');
+        if ($federalAudience) {
+            $query->where('revision_origin', ResponseRevisionRecorder::ORIGIN_FEDERAL_FOLLOW_UP);
+        }
+
+        $revisions = $query
+            ->orderByDesc('revision_no')
+            ->get()
+            ->map(function ($rev) use ($redact) {
+                return [
+                    'id' => $rev->id,
+                    'revision_no' => $rev->revision_no,
+                    'response_data' => $redact ? null : $rev->response_data,
+                    'attachment_url' => $redact ? null : $rev->attachment_url,
+                    'regional_review_status' => $rev->regional_review_status,
+                    'regional_review_comments' => $rev->regional_review_comments,
+                    'revision_origin' => $rev->revision_origin,
+                    'submitted_by_name' => $rev->submittedBy?->name ?: $rev->submittedBy?->username,
+                    'created_at' => optional($rev->created_at)?->toIso8601String(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return response()->json([
+            'data' => [
+                'current' => [
+                    'response_data' => $redact ? null : $departmentTask->response_data,
+                    'attachment_url' => $redact ? null : $departmentTask->attachment_url,
+                    'regional_review_status' => $departmentTask->regional_review_status,
+                    'regional_review_comments' => $departmentTask->regional_review_comments,
+                    'updated_at' => optional($departmentTask->updated_at)?->toIso8601String(),
+                ],
+                'revisions' => $revisions,
+            ],
+        ]);
+    }
+
+    private function userMayViewDepartmentTask($user, DepartmentTask $departmentTask): bool
+    {
+        if (! $user) {
+            return false;
+        }
+        if (HrimsAccess::isSuperAdmin($user) || $user->hasRole('federal_admin')) {
+            return true;
+        }
+        if ($user->hasRole('regional_admin') && $user->region_id !== null) {
+            return (int) $user->region_id === (int) $departmentTask->region_id;
+        }
+        if (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
+            if ((int) $user->department_id !== (int) $departmentTask->department_id) {
+                return false;
+            }
+            if ($user->region_id !== null && (int) $user->region_id !== (int) $departmentTask->region_id) {
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     public function index(Request $request): JsonResponse

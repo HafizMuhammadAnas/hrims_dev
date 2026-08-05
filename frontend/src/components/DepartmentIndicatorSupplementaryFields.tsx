@@ -11,6 +11,8 @@ import type { MatrixRowEnabledMap } from '../lib/deptMatrixRowEnabled'
 export type DeptIndicatorDraft = {
   value: string
   comment: string
+  /** Additional relevant information / implementation challenges (stored as `challenges`). */
+  challenges: string
   /** Legacy single qualitative text when no qualitative years are configured. */
   qualText: string
   /** year_id → narrative text for each qualitative collection year. */
@@ -33,6 +35,7 @@ export function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
   return {
     value: '',
     comment: '',
+    challenges: '',
     qualText: '',
     qualByYear: {},
     yearGenderValues: {},
@@ -94,7 +97,7 @@ export function DepartmentIndicatorSupplementaryFields({
           </div>
           {usesMatrix ? (
             <p className="muted small" style={{ margin: '0 0 10px' }}>
-              Enter numbers in the table above. Add an optional comment and attachment for this metric below.
+              Enter numbers in the table above. Add a comment and optional attachment for this metric below.
             </p>
           ) : (
             <div className="form-row" style={{ marginBottom: 8 }}>
@@ -110,7 +113,7 @@ export function DepartmentIndicatorSupplementaryFields({
             </div>
           )}
           <div className="form-row" style={{ marginBottom: 8 }}>
-            <label htmlFor={`dept-ind-${ind.id}-comment`}>Comment (optional)</label>
+            <label htmlFor={`dept-ind-${ind.id}-comment`}>Comment</label>
             <textarea
               id={`dept-ind-${ind.id}-comment`}
               rows={2}
@@ -168,6 +171,21 @@ export function DepartmentIndicatorSupplementaryFields({
               }}
             />
           ) : null}
+          <div className="form-row" style={{ marginTop: 8 }}>
+            <label htmlFor={`dept-ind-${ind.id}-challenges`}>
+              Please provide any additional relevant information, including any challenges you face in
+              the implementation of your mandate related to this category of concluding observation/
+              list of issues.
+            </label>
+            <textarea
+              id={`dept-ind-${ind.id}-challenges`}
+              rows={2}
+              value={d.challenges}
+              onChange={(e) => onChange({ ...d, challenges: e.target.value })}
+              placeholder="Additional information or challenges…"
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
         </div>
       ) : null}
 
