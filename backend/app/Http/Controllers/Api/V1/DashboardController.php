@@ -92,6 +92,7 @@ class DashboardController extends Controller
         if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
             $compiledTotal = CompiledRecord::query()->count();
             $activeCount = (int) ($byStatus['active'] ?? 0);
+            $data['regional_responses_pending_submission'] = $this->pendingProvincialResponsesCount($user);
             $data['compiled_records_total'] = $compiledTotal;
             $data['hr_requests_pending_federal'] = max(0, $activeCount - $compiledTotal);
             $data['clarifications_pending_federal'] = HrRequestClarification::query()
@@ -197,6 +198,28 @@ class DashboardController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * Assigned provinces (ICT / national line excluded) that have not submitted
+     * a regional compilation yet — the federal "Pending Responses" figure.
+     */
+    private function pendingProvincialResponsesCount(User $user): int
+    {
+        $requestQuery = HrRequest::query();
+        HrimsAccess::applyHrRequestScope($requestQuery, $user);
+
+        return (int) DB::table('hr_request_region as hrr')
+            ->join('regions as r', 'r.id', '=', 'hrr.region_id')
+            ->whereIn('hrr.hr_request_id', $requestQuery->select('hr_requests.id'))
+            ->whereNotIn('r.slug', ['ict', 'federal'])
+            ->whereNotExists(function ($q): void {
+                $q->select(DB::raw(1))
+                    ->from('regional_responses as rr')
+                    ->whereColumn('rr.hr_request_id', 'hrr.hr_request_id')
+                    ->whereColumn('rr.region_id', 'hrr.region_id');
+            })
+            ->count();
     }
 
     /**

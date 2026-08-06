@@ -121,6 +121,14 @@ export function catTrackerProgressBadgeClass(progress: string): string {
   return 'cat-tracker-badge cat-tracker-badge--neutral'
 }
 
+/** Badge text only: strip arrow and percentage ("▼ Declined (-42%)" → "Declined"). */
+export function catTrackerProgressLabel(progress: string): string {
+  return progress
+    .replace(/^[▲▼]\s*/u, '')
+    .replace(/\s*\([^)]*%\)\s*$/u, '')
+    .trim()
+}
+
 export const CAT_TRACKER_PROGRESS_FILTERS = [
   { value: 'ALL', label: 'All Progress Types (84 Metrics)' },
   { value: 'Single data point', label: 'Single Data Point' },

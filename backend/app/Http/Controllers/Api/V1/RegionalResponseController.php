@@ -89,7 +89,7 @@ class RegionalResponseController extends Controller
         }
 
         $data = $request->validate([
-            'review_status' => ['required', Rule::in(['pending', 'accepted', 'needs-modification', 'rejected'])],
+            'review_status' => ['required', Rule::in(['pending', 'accepted', 'needs-modification'])],
             'comments' => ['nullable', 'string'],
         ]);
 

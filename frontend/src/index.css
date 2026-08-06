@@ -4619,6 +4619,88 @@ textarea.hr-request-readonly-prose {
   font-weight: 650;
 }
 
+/* Highlight values that differ in After (current) vs Before.
+   Soft indigo — distinct from PWD-total mango/yellow (#fef9c3) and grand-total mint. */
+.response-revision-changed,
+.muted.response-revision-changed,
+.muted.small.response-revision-changed,
+.text-sm.response-revision-changed {
+  background-color: #e0e7ff;
+  color: #312e81;
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0.05em 0.2em;
+  font-weight: 650;
+}
+
+.response-revision-changed--block {
+  display: block;
+  padding: 8px 10px;
+  border: 1px solid #a5b4fc;
+  border-left: 3px solid #6366f1;
+  white-space: pre-wrap;
+}
+
+.response-revision-changed--line {
+  display: block;
+  padding: 2px 8px;
+  margin: 1px 0;
+  white-space: pre-wrap;
+  border-radius: 3px;
+}
+
+.response-revision-text-diff {
+  padding: 6px 0;
+  border-left: 3px solid #6366f1;
+  padding-left: 8px;
+}
+
+.response-revision-text-diff__prefix {
+  margin-bottom: 4px;
+}
+
+.response-revision-text-diff__line {
+  white-space: pre-wrap;
+  padding: 2px 8px;
+}
+
+.iwd-sheet__num.response-revision-changed,
+.iwd-totals__value.response-revision-changed {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 2.25em;
+  align-self: flex-start;
+  text-align: center;
+  line-height: 1.4;
+  padding: 0.15em 0.45em;
+}
+
+td.response-revision-changed,
+.iwd-year-panel__ua.response-revision-changed,
+.iwd-year-panel__total.response-revision-changed,
+.iwd-year-panel__pwd-total.response-revision-changed {
+  background-color: #e0e7ff !important;
+  color: #312e81 !important;
+  font-weight: 650;
+}
+
+/* PWD total cells are normally mango/yellow — keep change mark visible on the inner value */
+.iwd-year-panel__pwd-total .iwd-sheet__num.response-revision-changed {
+  background-color: #e0e7ff;
+  color: #312e81;
+  box-shadow: inset 0 0 0 1px #a5b4fc;
+}
+
+textarea.response-revision-changed,
+.hr-request-readonly-prose.response-revision-changed {
+  background-color: #eef2ff;
+  border-color: #a5b4fc;
+  border-left: 3px solid #6366f1;
+  color: #312e81;
+}
+
 .response-revision-snapshot__title {
   margin: 0 0 8px;
   font-size: 1rem;
@@ -4970,6 +5052,11 @@ textarea.hr-request-readonly-prose {
   object-fit: contain;
 }
 
+.knowledge-hub .card-icon svg {
+  display: block;
+  flex-shrink: 0;
+}
+
 .knowledge-hub .card-title {
   font-size: 18px;
   color: var(--txt);
@@ -5073,6 +5160,11 @@ textarea.hr-request-readonly-prose {
   width: 64px;
   height: 64px;
   object-fit: contain;
+}
+
+.knowledge-hub .conv-icon-lg svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .knowledge-hub .conv-title-section {
@@ -8782,6 +8874,53 @@ textarea.hr-request-readonly-prose {
   font-size: 0.92rem;
   line-height: 1.35;
 }
+
+/* Collapsible sections on the department response form */
+.dept-response-form-section {
+  margin: 0 0 16px;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.dept-response-form-section__summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #1e3a5f;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  border: none;
+  user-select: none;
+}
+.dept-response-form-section__summary::-webkit-details-marker {
+  display: none;
+}
+.dept-response-form-section__summary::after {
+  content: '▾';
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  opacity: 0.9;
+  transition: transform 0.15s ease;
+}
+.dept-response-form-section:not([open]) > .dept-response-form-section__summary::after {
+  transform: rotate(-90deg);
+}
+.dept-response-form-section__body {
+  padding: 14px 16px 16px;
+  border-top: 1px solid #1e3a5f;
+  background: #fff;
+}
+.dept-response-form-section__body > :first-child {
+  margin-top: 0;
+}
+
 .iwd-totals {
   margin: 12px 16px;
   padding: 12px;

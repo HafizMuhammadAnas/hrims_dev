@@ -57,12 +57,12 @@ class KnowledgeHubController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        $rows = Article::query()
-            ->where('convention_id', $convention->id)
-            ->where('is_active', true)
-            ->orderBy('article_name')
-            ->orderBy('id')
-            ->get(['id', 'convention_id', 'article_name', 'description']);
+        $rows = Article::sortByNaturalName(
+            Article::query()
+                ->where('convention_id', $convention->id)
+                ->where('is_active', true)
+                ->get(['id', 'convention_id', 'article_name', 'description'])
+        );
 
         return response()->json([
             'data' => $rows->map(fn (Article $a) => [
@@ -90,11 +90,43 @@ class KnowledgeHubController extends Controller
                 'category:id,name',
                 'articles:id,article_name,description',
             ])
-            ->orderByDesc('id')
             ->get();
 
+        $sorted = $rows
+            ->sort(function (Issue $a, Issue $b): int {
+                $firstA = Article::sortByNaturalName($a->articles)->first();
+                $firstB = Article::sortByNaturalName($b->articles)->first();
+
+                $numA = $firstA ? Article::naturalNumberFromName($firstA->article_name) : null;
+                $numB = $firstB ? Article::naturalNumberFromName($firstB->article_name) : null;
+
+                if ($numA !== null && $numB !== null && $numA !== $numB) {
+                    return $numA <=> $numB;
+                }
+                if ($numA !== null && $numB === null) {
+                    return -1;
+                }
+                if ($numA === null && $numB !== null) {
+                    return 1;
+                }
+
+                if ($firstA && $firstB) {
+                    $byName = strnatcasecmp((string) $firstA->article_name, (string) $firstB->article_name);
+                    if ($byName !== 0) {
+                        return $byName;
+                    }
+                } elseif ($firstA && ! $firstB) {
+                    return -1;
+                } elseif (! $firstA && $firstB) {
+                    return 1;
+                }
+
+                return ((int) $a->id) <=> ((int) $b->id);
+            })
+            ->values();
+
         return response()->json([
-            'data' => $rows->map(fn (Issue $i) => $this->serializeIssueListRow($i))->all(),
+            'data' => $sorted->map(fn (Issue $i) => $this->serializeIssueListRow($i))->all(),
         ]);
     }
 
@@ -218,7 +250,7 @@ class KnowledgeHubController extends Controller
     {
         $articlesOut = [];
         if ($i->relationLoaded('articles')) {
-            foreach ($i->articles->sortBy('id')->values() as $a) {
+            foreach (Article::sortByNaturalName($i->articles) as $a) {
                 $articlesOut[] = [
                     'id' => $a->id,
                     'article_name' => $a->article_name,

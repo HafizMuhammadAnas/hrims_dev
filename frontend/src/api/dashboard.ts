@@ -31,6 +31,8 @@ export interface DashboardSummary {
   requests_created_by_month: MonthCountPoint[]
   regional_responses_total?: number
   regional_responses_by_review?: Record<string, number>
+  /** Assigned provinces (ICT excluded) that have not submitted a compilation yet. */
+  regional_responses_pending_submission?: number
   compiled_records_total?: number
   hr_requests_pending_federal?: number
   clarifications_pending_federal?: number

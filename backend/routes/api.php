@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\DepartmentTaskController;
 use App\Http\Controllers\Api\V1\CollectionReligionController;
+use App\Http\Controllers\Api\V1\CollectionYearController;
 use App\Http\Controllers\Api\V1\DistrictController;
 use App\Http\Controllers\Api\V1\HrRequestController;
 use App\Http\Controllers\Api\V1\KnowledgeHubController;
@@ -49,6 +50,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/regions', [RegionController::class, 'index'])->name('api.v1.regions.index');
         Route::get('/districts', [DistrictController::class, 'index'])->name('api.v1.districts.index');
         Route::get('/collection-religions', [CollectionReligionController::class, 'index'])->name('api.v1.collection-religions.index');
+        Route::get('/collection-years', [CollectionYearController::class, 'index'])->name('api.v1.collection-years.index');
         Route::get('/departments', [DepartmentController::class, 'index'])->name('api.v1.departments.index');
         Route::post('/departments', [DepartmentController::class, 'store'])->name('api.v1.departments.store');
         Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('api.v1.departments.update');

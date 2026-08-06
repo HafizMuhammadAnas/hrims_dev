@@ -175,11 +175,10 @@ export function FederalCompilationPage() {
   )
 
   const responseCounts = useMemo(() => {
-    const counts = { pending: 0, accepted: 0, needs_modification: 0, rejected: 0 }
+    const counts = { pending: 0, accepted: 0, needs_modification: 0 }
     for (const r of selectedResponses) {
       if (r.review_status === 'accepted') counts.accepted++
       else if (r.review_status === 'needs-modification') counts.needs_modification++
-      else if (r.review_status === 'rejected') counts.rejected++
       else counts.pending++
     }
     return counts
@@ -403,7 +402,6 @@ export function FederalCompilationPage() {
                   ? [
                       { label: 'Pending Review', value: responseCounts.pending },
                       { label: 'Needs Modification', value: responseCounts.needs_modification },
-                      { label: 'Rejected', value: responseCounts.rejected },
                     ]
                   : []),
               ]}
@@ -600,6 +598,7 @@ export function FederalCompilationPage() {
           requests={requests}
           responses={responses}
           deptTasks={deptTasks}
+          compiledRecords={compiledRecords}
         />
       </div>
 

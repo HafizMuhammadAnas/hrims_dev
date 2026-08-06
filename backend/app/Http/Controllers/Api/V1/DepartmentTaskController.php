@@ -829,10 +829,9 @@ class DepartmentTaskController extends Controller
                 $comment = trim((string) ($qIn['comment'] ?? ''));
                 if ($comment === '') {
                     return response()->json([
-                        'message' => 'Indicator '.$indicator->id.': a comment is required.',
+                        'message' => 'Indicator '.$indicator->id.': a narrative related to the indicator is required.',
                     ], 422);
                 }
-                $challenges = trim((string) ($qIn['challenges'] ?? ''));
                 $qFile = $this->pickKeyedUploadedFile($quantFiles, (int) $indicator->id);
                 $qUrl = null;
                 if ($qFile && $qFile->isValid()) {
@@ -858,7 +857,6 @@ class DepartmentTaskController extends Controller
                 if ($collectsYearGender) {
                     $quantitative = [
                         'comment' => $comment !== '' ? $comment : null,
-                        'challenges' => $challenges !== '' ? $challenges : null,
                         'attachment_url' => $qUrl,
                     ];
                     $matrixRowEnabled = $this->extractMatrixRowEnabled($qIn);
@@ -939,7 +937,6 @@ class DepartmentTaskController extends Controller
                     $row['quantitative'] = [
                         'value' => (float) $valRaw,
                         'comment' => $comment !== '' ? $comment : null,
-                        'challenges' => $challenges !== '' ? $challenges : null,
                         'attachment_url' => $qUrl,
                     ];
                 }
@@ -1034,6 +1031,14 @@ class DepartmentTaskController extends Controller
             'format' => self::DEPARTMENT_INDICATOR_FORMAT,
             'by_indicator' => $outBy,
         ];
+
+        $challengesRaw = $decoded['challenges'] ?? null;
+        if (is_string($challengesRaw)) {
+            $challenges = trim($challengesRaw);
+            if ($challenges !== '') {
+                $payload['challenges'] = $challenges;
+            }
+        }
 
         if ($wasResubmit) {
             app(ResponseRevisionRecorder::class)->snapshotDepartmentTask($departmentTask, $request->user());

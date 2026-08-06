@@ -42,6 +42,7 @@ import {
 import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import { DepartmentIndicatorDisaggregationMatrices } from '../components/DepartmentIndicatorDisaggregationMatrices'
+import { DeptResponseFormSection } from '../components/DeptResponseFormSection'
 import {
   DepartmentIndicatorSupplementaryFields,
   emptyDeptIndicatorDraft,
@@ -102,7 +103,10 @@ import {
   serializeMatrixRowEnabled,
   type MatrixDimensionKey,
 } from '../lib/deptMatrixRowEnabled'
-import { parseDepartmentTaskResponseData } from '../lib/departmentTaskResponseFormat'
+import {
+  departmentResponseChallenges,
+  parseDepartmentTaskResponseData,
+} from '../lib/departmentTaskResponseFormat'
 import {
   canAcceptDepartmentTaskReview,
   canDepartmentSubmitResponse,
@@ -223,6 +227,7 @@ export function HrRequestViewPage() {
   /** Bumps remount file inputs after clearing a chosen file (same file can be picked again). */
   const [deptFileInputRev, setDeptFileInputRev] = useState<Record<string, number>>({})
   const [indicatorDrafts, setIndicatorDrafts] = useState<Record<number, DeptIndicatorDraft>>({})
+  const [deptChallenges, setDeptChallenges] = useState('')
   const [submittingResponse, setSubmittingResponse] = useState(false)
   const [submitResponseError, setSubmitResponseError] = useState<string | null>(null)
   const [deptPortalTab, setDeptPortalTab] = useState<'response' | 'request' | 'changes'>('response')
@@ -405,6 +410,7 @@ export function HrRequestViewPage() {
       setLegacyAttachmentClear(false)
       setDeptFileInputRev({})
       setIndicatorDrafts({})
+      setDeptChallenges('')
       setSubmitResponseError(null)
       return
     }
@@ -419,11 +425,13 @@ export function HrRequestViewPage() {
         activeTask.response_data,
         activeTask.attachment_url,
       )
+      setDeptChallenges(
+        parsed.kind === 'structured' ? departmentResponseChallenges(parsed.payload) : '',
+      )
       const next: Record<number, DeptIndicatorDraft> = {}
       for (const ind of collecting) {
         let value = ''
         let comment = ''
-        let challenges = ''
         let qualText = ''
         const qualByYear: Record<string, string> = {}
         let yearGenderValues: Record<string, string> = {}
@@ -462,7 +470,6 @@ export function HrRequestViewPage() {
             yearConsolidatedValues = loadYearKeyedValuesFromBundle(consolidatedBundle, false)
           }
           if (b?.quantitative?.comment) comment = b.quantitative.comment
-          if (b?.quantitative?.challenges) challenges = b.quantitative.challenges
           if (b?.qualitative?.by_year) {
             for (const [yearKey, cell] of Object.entries(b.qualitative.by_year)) {
               qualByYear[yearKey] = cell?.text ?? ''
@@ -481,7 +488,6 @@ export function HrRequestViewPage() {
           ...emptyDeptIndicatorDraft(),
           value,
           comment,
-          challenges,
           qualText,
           qualByYear,
           yearGenderValues,
@@ -498,6 +504,7 @@ export function HrRequestViewPage() {
       return
     }
     setIndicatorDrafts({})
+    setDeptChallenges('')
     setResponseText(activeTask.response_data?.trim() ? activeTask.response_data : '')
   }, [activeTask?.id, activeTask?.response_data, activeTask?.attachment_url, activeTask?.assigned_indicator_ids, detail])
 
@@ -750,7 +757,7 @@ export function HrRequestViewPage() {
           const overrunMsg = formatDeptYearTotalOverrunMessage(deptYearTotalOverruns)
           setSubmitResponseError(
             overrunMsg ||
-              'Complete each indicator: numbers where required, a comment for quantitative metrics, and qualitative text and/or an attachment where required.',
+              'Complete each indicator: numbers where required, a narrative for quantitative metrics, and qualitative text and/or an attachment where required.',
           )
           return
         }
@@ -773,7 +780,6 @@ export function HrRequestViewPage() {
           if (indicatorRequiresQuantitativeMatrixPayload(ind)) {
             const quantitative: {
               comment: string
-              challenges: string
               matrix_row_enabled?: Partial<
                 Record<
                   'gender' | 'age' | 'disability' | 'district' | 'religion' | 'consolidated',
@@ -787,7 +793,7 @@ export function HrRequestViewPage() {
               by_year_district?: Record<string, Record<string, { value: string }>>
               by_year_religion?: Record<string, Record<string, { value: string }>>
               by_year_consolidated?: Record<string, Record<string, { value: string }>>
-            } = { comment: d.comment.trim(), challenges: d.challenges.trim() }
+            } = { comment: d.comment.trim() }
             const matrixRowEnabled = serializeMatrixRowEnabled(d.matrixRowEnabled)
             if (matrixRowEnabled) {
               quantitative.matrix_row_enabled = matrixRowEnabled
@@ -943,7 +949,6 @@ export function HrRequestViewPage() {
             entry.quantitative = {
               value: d.value.trim(),
               comment: d.comment.trim(),
-              challenges: d.challenges.trim(),
             }
             if (d.quantFile) quantFiles[ind.id] = d.quantFile
             if (d.clearSavedQuantAttachment) stripQuantIndicatorIds.push(ind.id)
@@ -967,7 +972,10 @@ export function HrRequestViewPage() {
         }
         await submitDepartmentTaskResponse(activeTask.id, {
           mode: 'indicators',
-          indicator_bundles: JSON.stringify({ by_indicator }),
+          indicator_bundles: JSON.stringify({
+            by_indicator,
+            challenges: deptChallenges.trim(),
+          }),
           quantFiles,
           qualFiles,
           stripQuantIndicatorIds,
@@ -1609,6 +1617,7 @@ export function HrRequestViewPage() {
             ) : null}
             {deptIndicatorsForForm.length > 0 ? (
               <>
+                <DeptResponseFormSection title="Quantitative data">
                 {deptFormUsesIndicatorMatrix(deptIndicatorsForForm) ? (
                   <DepartmentIndicatorDisaggregationMatrices
                     indicators={deptIndicatorsForForm}
@@ -1795,23 +1804,21 @@ export function HrRequestViewPage() {
                     }}
                   />
                 ) : null}
-                <h4 className="font-semibold text-compact" style={{ margin: '16px 0 10px' }}>
-                  {deptFormUsesIndicatorMatrix(deptIndicatorsForForm)
-                    ? 'Comments, narrative responses, and attachments'
-                    : 'Indicator responses'}
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 16,
+                    marginTop: deptFormUsesIndicatorMatrix(deptIndicatorsForForm) ? 16 : 0,
+                  }}
+                >
                   {deptIndicatorsForForm.map((ind) => {
+                    if (!ind.has_quantitative) return null
                     const d = indicatorDrafts[ind.id] ?? emptyDeptIndicatorDraft()
                     const usesMatrix = indicatorUsesDataMatrix(ind)
-                    if (!ind.has_quantitative && !ind.has_qualitative) return null
-                    const typeBits = [
-                      ind.has_quantitative ? 'Quantitative' : null,
-                      ind.has_qualitative ? 'Qualitative' : null,
-                    ].filter(Boolean) as string[]
                     return (
                       <div
-                        key={ind.id}
+                        key={`quant-${ind.id}`}
                         className="dept-indicator-response-card"
                         style={{
                           padding: 14,
@@ -1820,21 +1827,15 @@ export function HrRequestViewPage() {
                           background: 'var(--field-bg, #fafbfd)',
                         }}
                       >
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-                          <strong className="text-sm font-semibold">
-                            #{deptIndicatorOrdinals[ind.id] ?? '—'} {ind.indicator_text}
-                          </strong>
-                          {typeBits.map((t) => (
-                            <span key={t} className="dept-data-matrix-block__type-pill">
-                              {t}
-                            </span>
-                          ))}
-                        </div>
+                        <strong className="text-sm font-semibold" style={{ display: 'block', marginBottom: 10 }}>
+                          #{deptIndicatorOrdinals[ind.id] ?? '—'} {ind.indicator_text}
+                        </strong>
                         <DepartmentIndicatorSupplementaryFields
                           indicator={ind}
                           draft={d}
                           parsed={deptParsedTaskResponse}
                           matrixMode={usesMatrix}
+                          section="quantitative"
                           fileInputRev={deptFileInputRev}
                           onBumpFileInput={bumpDeptFileInput}
                           onChange={(next) =>
@@ -1845,6 +1846,65 @@ export function HrRequestViewPage() {
                     )
                   })}
                 </div>
+                </DeptResponseFormSection>
+
+                {deptIndicatorsForForm.some((ind) => ind.has_qualitative) ? (
+                  <DeptResponseFormSection title="Qualitative data">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {deptIndicatorsForForm.map((ind) => {
+                        if (!ind.has_qualitative) return null
+                        const d = indicatorDrafts[ind.id] ?? emptyDeptIndicatorDraft()
+                        const usesMatrix = indicatorUsesDataMatrix(ind)
+                        return (
+                          <div
+                            key={`qual-${ind.id}`}
+                            className="dept-indicator-response-card"
+                            style={{
+                              padding: 14,
+                              border: '1px solid var(--field-border, #e1e7f5)',
+                              borderRadius: 10,
+                              background: 'var(--field-bg, #fafbfd)',
+                            }}
+                          >
+                            <strong className="text-sm font-semibold" style={{ display: 'block', marginBottom: 10 }}>
+                              #{deptIndicatorOrdinals[ind.id] ?? '—'} {ind.indicator_text}
+                            </strong>
+                            <DepartmentIndicatorSupplementaryFields
+                              indicator={ind}
+                              draft={d}
+                              parsed={deptParsedTaskResponse}
+                              matrixMode={usesMatrix}
+                              section="qualitative"
+                              fileInputRev={deptFileInputRev}
+                              onBumpFileInput={bumpDeptFileInput}
+                              onChange={(next) =>
+                                setIndicatorDrafts((prev) => ({ ...prev, [ind.id]: next }))
+                              }
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </DeptResponseFormSection>
+                ) : null}
+
+                <DeptResponseFormSection title="Other information (challenges)">
+                  <div className="form-row" style={{ margin: 0 }}>
+                    <label htmlFor="dept-response-challenges">
+                      Please provide any additional relevant information, including any challenges
+                      you face in the implementation of your mandate related to this category of
+                      concluding observation/ list of issues.
+                    </label>
+                    <textarea
+                      id="dept-response-challenges"
+                      rows={4}
+                      value={deptChallenges}
+                      onChange={(e) => setDeptChallenges(e.target.value)}
+                      placeholder="Additional information or challenges for this department response…"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </DeptResponseFormSection>
               </>
             ) : (
               <>

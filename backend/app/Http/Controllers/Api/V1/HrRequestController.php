@@ -112,6 +112,7 @@ class HrRequestController extends Controller
             'region',
             'regions',
             'convention:id,code,name',
+            'conventions:id,code,name',
             'issue:id,issue_title,entry_kind,description,category_id',
             'issue.category:id,name',
             'departments:id,code,name',
@@ -130,6 +131,7 @@ class HrRequestController extends Controller
                 'region',
                 'regions',
                 'convention',
+                'conventions',
                 'issue.category',
                 'issue.articles',
                 'issue.indicators',
@@ -246,7 +248,9 @@ class HrRequestController extends Controller
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:500'],
             'conv' => ['sometimes', 'string', 'max:64'],
-            'convention_id' => ['sometimes', 'integer', 'exists:conventions,id'],
+            'convention_id' => ['sometimes', 'nullable', 'integer', 'exists:conventions,id'],
+            'convention_ids' => ['sometimes', 'nullable', 'array'],
+            'convention_ids.*' => ['integer', 'exists:conventions,id'],
             'reporting_framework' => ['sometimes', 'string', Rule::in([
                 'upr',
                 'treaty_body_obligatory',
@@ -322,6 +326,12 @@ class HrRequestController extends Controller
             $data['issue_id'] = null;
             $data['other_issue_text'] = $otherIssueText;
             $data['indicator_responses'] = [];
+            if ($request->exists('convention_ids') || array_key_exists('convention_id', $data)) {
+                $conventionIds = $this->normalizeConventionIdsFromRequest($request, $data);
+                $data['convention_ids'] = $conventionIds;
+                $data['convention_id'] = $conventionIds[0] ?? null;
+                $data['conv'] = $this->conventionCodeForId($data['convention_id']);
+            }
         } elseif ($requestType !== '') {
             $data['request_type'] = $requestType;
             $data['other_issue_text'] = null;
@@ -388,7 +398,18 @@ class HrRequestController extends Controller
                 $model->fill($scalar);
             }
 
-            if (array_key_exists('conv', $data) && $model->convention_id) {
+            if (array_key_exists('convention_ids', $data)) {
+                $this->syncHrRequestConventions($model, $data['convention_ids']);
+                $model->convention_id = $data['convention_ids'][0] ?? null;
+                $model->conv = $this->conventionCodeForId($model->convention_id);
+            } elseif (array_key_exists('convention_id', $data) && ($data['request_type'] ?? $model->request_type) !== 'other_issue') {
+                $this->syncHrRequestConventions(
+                    $model,
+                    $data['convention_id'] != null ? [(int) $data['convention_id']] : []
+                );
+            }
+
+            if (array_key_exists('conv', $data) && $model->convention_id && ! array_key_exists('convention_ids', $data)) {
                 $code = Convention::query()->whereKey($model->convention_id)->value('code');
                 if ($code) {
                     $model->conv = $code;
@@ -462,6 +483,7 @@ class HrRequestController extends Controller
             'region',
             'regions',
             'convention',
+            'conventions',
             'issue.category',
             'issue.articles',
             'issue.indicators',
@@ -589,6 +611,9 @@ class HrRequestController extends Controller
 
     private function storeFromIssueForm(Request $request): HrRequestResource|JsonResponse
     {
+        $isOtherIssueFramework = ($request->input('reporting_framework') === 'other_issue')
+            || ($request->input('request_type') === 'other_issue');
+
         $rules = [
             'title' => ['required', 'string', 'max:500'],
             'reporting_framework' => ['required', 'string', Rule::in([
@@ -597,7 +622,14 @@ class HrRequestController extends Controller
                 'treaty_body_optional_protocol',
                 'other_issue',
             ])],
-            'convention_id' => ['required', 'integer', 'exists:conventions,id'],
+            'convention_id' => [
+                Rule::requiredIf(! $isOtherIssueFramework),
+                'nullable',
+                'integer',
+                'exists:conventions,id',
+            ],
+            'convention_ids' => ['nullable', 'array'],
+            'convention_ids.*' => ['integer', 'exists:conventions,id'],
             'request_type' => ['nullable', Rule::in(['loi', 'concluding_observation', 'other_issue'])],
             'issue_id' => ['nullable', 'integer', 'exists:issues,id'],
             'other_issue_text' => ['nullable', 'string', 'max:200000'],
@@ -674,10 +706,18 @@ class HrRequestController extends Controller
             $data['issue_id'] = null;
             $data['other_issue_text'] = $otherIssueText;
             $data['reporting_framework'] = 'other_issue';
+            $conventionIds = $this->normalizeConventionIdsFromRequest($request, $data);
+            $data['convention_ids'] = $conventionIds;
+            $data['convention_id'] = $conventionIds[0] ?? null;
         } else {
             if (empty($data['issue_id'])) {
                 throw ValidationException::withMessages([
                     'issue_id' => ['Select a List of Issues or concluding observation.'],
+                ]);
+            }
+            if (empty($data['convention_id'])) {
+                throw ValidationException::withMessages([
+                    'convention_id' => ['Convention is required.'],
                 ]);
             }
             $expectedEntryKind = $requestType === 'concluding_observation' ? 'recommendation' : 'issue';
@@ -696,6 +736,7 @@ class HrRequestController extends Controller
             if (! in_array($data['reporting_framework'], ['treaty_body_obligatory', 'treaty_body_optional_protocol'], true)) {
                 $data['reporting_framework'] = 'treaty_body_obligatory';
             }
+            $data['convention_ids'] = [(int) $data['convention_id']];
         }
 
         $regionIds = $data['region_ids'] ?? [];
@@ -720,13 +761,16 @@ class HrRequestController extends Controller
 
         $row = DB::transaction(function () use ($request, $data, $issue, $indicatorPayload, $departmentIds) {
             $id = $this->nextRequestId();
-            $code = Convention::query()->whereKey($data['convention_id'])->value('code') ?? '';
+            $conventionId = $data['convention_id'] ?? null;
+            $code = $conventionId
+                ? (Convention::query()->whereKey($conventionId)->value('code') ?? '')
+                : '';
 
             $row = HrRequest::query()->create([
                 'id' => $id,
                 'title' => $data['title'],
                 'conv' => $code,
-                'convention_id' => $data['convention_id'],
+                'convention_id' => $conventionId,
                 'issue_id' => $data['issue_id'] ?? null,
                 'request_type' => $data['request_type'],
                 'other_issue_text' => $data['other_issue_text'] ?? null,
@@ -740,6 +784,7 @@ class HrRequestController extends Controller
             ]);
 
             $row->regions()->sync($data['region_ids']);
+            $this->syncHrRequestConventions($row, $data['convention_ids'] ?? []);
 
             if ($departmentIds !== []) {
                 $row->departments()->sync($departmentIds);
@@ -770,6 +815,7 @@ class HrRequestController extends Controller
                 'region',
                 'regions',
                 'convention',
+                'conventions',
                 'issue.category',
                 'issue.articles',
                 'issue.indicators',
@@ -1232,6 +1278,50 @@ class HrRequestController extends Controller
         }
 
         return $matches[0];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<int>
+     */
+    private function normalizeConventionIdsFromRequest(Request $request, array $data): array
+    {
+        if ($request->exists('convention_ids')) {
+            $raw = $request->input('convention_ids', []);
+            if ($raw === '' || $raw === null) {
+                $raw = [];
+            }
+        } elseif (array_key_exists('convention_ids', $data)) {
+            $raw = $data['convention_ids'] ?? [];
+        } elseif (array_key_exists('convention_id', $data) && ($data['convention_id'] === null || $data['convention_id'] === '')) {
+            $raw = [];
+        } elseif (! empty($data['convention_id'])) {
+            $raw = [$data['convention_id']];
+        } else {
+            $raw = [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map('intval', (array) $raw),
+            static fn (int $id): bool => $id > 0
+        )));
+    }
+
+    /**
+     * @param  list<int>  $conventionIds
+     */
+    private function syncHrRequestConventions(HrRequest $row, array $conventionIds): void
+    {
+        $row->conventions()->sync(array_values(array_unique(array_map('intval', $conventionIds))));
+    }
+
+    private function conventionCodeForId(int|string|null $conventionId): string
+    {
+        if ($conventionId === null || $conventionId === '') {
+            return '';
+        }
+
+        return (string) (Convention::query()->whereKey($conventionId)->value('code') ?? '');
     }
 
     /**

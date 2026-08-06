@@ -116,6 +116,7 @@ function FederalDepartmentChangesCard({
               <DepartmentResponseDisplay
                 responseData={afterData}
                 attachmentUrl={afterAttachment}
+                compareAgainstResponseData={latest.response_data}
                 {...displayOpts}
               />
             </section>

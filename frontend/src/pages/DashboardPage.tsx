@@ -51,7 +51,6 @@ import {
   LABEL_ACTIVE_SHARE,
   LABEL_COMPILED_REPORTS,
   LABEL_HUMAN_RIGHTS_INDICATORS,
-  LABEL_LINKED_REQUEST_ATTENTION,
   LABEL_NEEDS_ATTENTION,
   LABEL_NEW_REQUESTS_SCOPE_6MO,
   LABEL_OPEN_TASKS,
@@ -181,7 +180,6 @@ export function DashboardPage() {
           pending: 0,
           'needs-modification': 1,
           accepted: 2,
-          rejected: 3,
         }
         const sorted = [...rows].sort((a, b) => {
           const rankDiff = (statusRank[a.review_status] ?? 9) - (statusRank[b.review_status] ?? 9)
@@ -208,6 +206,8 @@ export function DashboardPage() {
   const active = count(by, 'active')
 
   const review = summary?.regional_responses_by_review
+  /** Assigned provinces that still owe a regional compilation (not the same as under review). */
+  const pendingResponses = summary?.regional_responses_pending_submission ?? 0
   const taskWorkflow = summary?.department_tasks_by_workflow
   const taskBy = summary?.department_tasks_by_status
   const taskTotal = summary?.department_tasks_total ?? 0
@@ -217,6 +217,8 @@ export function DashboardPage() {
   const workflowReview = taskWorkflow?.responded ?? 0
   const workflowRevision = taskWorkflow?.revision ?? 0
   const workflowAccepted = taskWorkflow?.accepted ?? 0
+  /** Regional compilations sent back for revision (federal → region). */
+  const regionalCompilationRevision = count(review, 'needs-modification')
 
   const resolvedRatePct =
     summary && summary.hr_requests_total > 0
@@ -343,10 +345,13 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">{LABEL_LINKED_REQUEST_ATTENTION}</div>
-                  <div className="dashboard-card-value">{draft}</div>
+                  <div className="dashboard-card-title">{LABEL_NEEDS_ATTENTION}</div>
+                  <div className="dashboard-card-value">{workflowRevision}</div>
                   <div className="dashboard-card-subtitle">
-                    {draft} draft · {urgentRequestCount} in urgent queue (HR requests in your scope)
+                    {workflowRevision} response{workflowRevision === 1 ? '' : 's'} need revision
+                    {taskAssigned > 0
+                      ? ` · ${taskAssigned} open task${taskAssigned === 1 ? '' : 's'} awaiting submission`
+                      : ''}
                   </div>
                 </div>
               </>
@@ -375,9 +380,16 @@ export function DashboardPage() {
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
                   <div className="dashboard-card-title">{LABEL_NEEDS_ATTENTION}</div>
-                  <div className="dashboard-card-value">{draft + workflowRevision}</div>
+                  <div className="dashboard-card-value">
+                    {workflowRevision + regionalCompilationRevision}
+                  </div>
                   <div className="dashboard-card-subtitle">
-                    {draft} draft requests · {workflowRevision} department responses need revision
+                    {workflowRevision} department response{workflowRevision === 1 ? '' : 's'} need
+                    revision
+                    {regionalCompilationRevision > 0
+                      ? ` · ${regionalCompilationRevision} compilation${regionalCompilationRevision === 1 ? '' : 's'} need revision`
+                      : ''}
+                    {draft > 0 ? ` · ${draft} draft request${draft === 1 ? '' : 's'}` : ''}
                   </div>
                 </div>
               </>
@@ -509,9 +521,7 @@ export function DashboardPage() {
                                   ? '#00bcd4'
                                   : r.review_status === 'accepted'
                                     ? '#4caf50'
-                                    : r.review_status === 'rejected'
-                                      ? '#f44336'
-                                      : '#c5d0e6'
+                                    : '#c5d0e6'
                             }`,
                             display: 'flex',
                             justifyContent: 'space-between',
@@ -702,14 +712,14 @@ export function DashboardPage() {
             <StatsCards
               className="dashboard-status-stats"
               items={[
-                { label: 'Pending', value: count(review, 'pending'), accent: '#ffb300' },
+                { label: 'Pending Responses', value: pendingResponses, accent: '#ffb300' },
+                { label: 'Under Review', value: count(review, 'pending'), accent: '#5b8def' },
                 { label: 'Accepted', value: count(review, 'accepted'), accent: '#4caf50' },
                 {
                   label: 'Needs Modification',
                   value: count(review, 'needs-modification'),
                   accent: '#00bcd4',
                 },
-                { label: 'Rejected', value: count(review, 'rejected'), accent: '#f44336' },
               ]}
             />
           ) : variant === 'regional' || variant === 'department' || variant === 'viewer' ? (

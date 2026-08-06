@@ -26,6 +26,8 @@ type Props = {
   requests: HrRequestRow[]
   responses: RegionalResponseRow[]
   deptTasks: DepartmentTaskRow[]
+  /** National compiled records — submitted ones are excluded from the temporary picker. */
+  compiledRecords: CompiledRecordRow[]
 }
 
 function isPreviewIncludableReviewStatus(status: string): boolean {
@@ -54,11 +56,13 @@ function responseIdsSignature(ids: string[]): string {
 /**
  * Temporary national compile: Under Review + Accepted provinces only.
  * Downloads PDF/Excel at runtime; never persists to Compiled records.
+ * Dropdown lists only requests that are not yet nationally submitted.
  */
 export function TemporaryFederalCompilationPreviewCard({
   requests,
   responses,
   deptTasks,
+  compiledRecords,
 }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -73,22 +77,48 @@ export function TemporaryFederalCompilationPreviewCard({
   const [excelLoading, setExcelLoading] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
+  const reqIdsNationallySubmitted = useMemo(() => {
+    const s = new Set<string>()
+    for (const c of compiledRecords) {
+      if (c.status === 'submitted' && c.req_id) s.add(c.req_id)
+    }
+    return s
+  }, [compiledRecords])
+
   const reqIdsForPicker = useMemo(() => {
     const s = new Set<string>()
-    for (const r of responses) s.add(r.req_id)
+    for (const r of responses) {
+      if (!reqIdsNationallySubmitted.has(r.req_id)) s.add(r.req_id)
+    }
     for (const t of deptTasks) {
-      if (isIctLineTask(t) && hasDepartmentResponse(t)) s.add(t.req_id)
+      if (
+        isIctLineTask(t) &&
+        hasDepartmentResponse(t) &&
+        !reqIdsNationallySubmitted.has(t.req_id)
+      ) {
+        s.add(t.req_id)
+      }
     }
     return [...s].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
-  }, [responses, deptTasks])
+  }, [responses, deptTasks, reqIdsNationallySubmitted])
 
   const requestsForSelect = useMemo(() => {
     const allowed = new Set(reqIdsForPicker)
     return sortRowsLatestFirst(
-      requests.filter((r) => allowed.has(r.id)),
+      requests.filter((r) => allowed.has(r.id) && !reqIdsNationallySubmitted.has(r.id)),
       (r) => pickActivityTimestamp(r.updated_at, r.created_at, r.date, r.id),
     )
-  }, [requests, reqIdsForPicker])
+  }, [requests, reqIdsForPicker, reqIdsNationallySubmitted])
+
+  useEffect(() => {
+    if (selectedReqId && reqIdsNationallySubmitted.has(selectedReqId)) {
+      setSelectedReqId('')
+      setSummary('')
+      setIncludedResponseIds([])
+      setIctIncluded(false)
+      setExportError(null)
+    }
+  }, [selectedReqId, reqIdsNationallySubmitted])
 
   const selectedReq = useMemo(
     () => requests.find((r) => r.id === selectedReqId) ?? null,
@@ -268,16 +298,17 @@ export function TemporaryFederalCompilationPreviewCard({
       </h3>
       <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
         Compile every received provincial response that is still <strong>Under Review</strong> or already{' '}
-        <strong>Accepted</strong>. This is for runtime PDF / Excel download only — nothing is saved to Compiled
-        records.
+        <strong>Accepted</strong> for requests that are <strong>not yet nationally compiled</strong>. This is for
+        runtime PDF / Excel download only — nothing is saved to Compiled records.
       </p>
 
       <label className="muted">HR request</label>
       {requestsForSelect.length === 0 ? (
         <p className="muted" style={{ margin: '8px 0 12px' }}>
-          No regional or ICT submissions available yet. Provinces submit from{' '}
+          No uncompiled requests with regional or ICT submissions are available. Provinces submit from{' '}
           <Link to="/region-compilation">Response compilation</Link>; national-line departments submit from{' '}
-          <Link to="/federal-department-requests">{LABEL_DEPARTMENTAL_RESPONSES}</Link>.
+          <Link to="/federal-department-requests">{LABEL_DEPARTMENTAL_RESPONSES}</Link>. Already submitted national
+          compilations are listed under <Link to="/compiled-records">Compiled records</Link>.
         </p>
       ) : null}
       <select

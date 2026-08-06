@@ -207,7 +207,7 @@ export async function createRegionalResponse(body: {
 
 export async function updateRegionalReview(
   id: string,
-  review_status: 'pending' | 'accepted' | 'needs-modification' | 'rejected',
+  review_status: 'pending' | 'accepted' | 'needs-modification',
   comments: string,
 ): Promise<RegionalResponseRow> {
   await ensureCsrfCookie()

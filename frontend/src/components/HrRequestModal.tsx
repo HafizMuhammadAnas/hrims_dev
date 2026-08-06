@@ -70,6 +70,7 @@ import { Button } from './ui/Button'
 import { FormControl } from './ui/FormControl'
 import { FormField } from './ui/FormField'
 import { SearchableSelect } from './ui/SearchableSelect'
+import { SearchableMultiSelect } from './ui/SearchableMultiSelect'
 import { FormGrid } from './ui/FormGrid'
 import { FormRow } from './ui/FormRow'
 import { ModalActions, ModalHeader } from './ui/ModalChrome'
@@ -131,6 +132,8 @@ type IssueFormState = {
   title: string
   reporting_framework: HrReportingFramework | ''
   convention_id: number | ''
+  /** Other Issues optional multi-select; kept in sync with convention_id for treaty body. */
+  convention_ids: number[]
   issue_id: number | ''
   request_type: HrRequestType
   other_issue_text: string
@@ -157,6 +160,7 @@ function emptyIssueForm(lockedRegionId: number | null): IssueFormState {
     title: '',
     reporting_framework: '',
     convention_id: '',
+    convention_ids: [],
     issue_id: '',
     request_type: 'loi',
     other_issue_text: '',
@@ -212,10 +216,19 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
     ...new Set((row.indicator_responses ?? []).map((r) => r.issue_indicator_id)),
   ]
   const reportingFramework = inferReportingFramework(row)
+  const conventionIds =
+    row.convention_ids && row.convention_ids.length > 0
+      ? row.convention_ids
+      : row.conventions && row.conventions.length > 0
+        ? row.conventions.map((c) => c.id)
+        : row.convention_id != null
+          ? [row.convention_id]
+          : []
   return {
     title: row.title,
     reporting_framework: reportingFramework,
-    convention_id: row.convention_id ?? '',
+    convention_id: row.convention_id ?? (conventionIds[0] ?? ''),
+    convention_ids: conventionIds,
     issue_id: row.issue_id ?? '',
     request_type:
       row.request_type ??
@@ -716,13 +729,27 @@ export function HrRequestModal({
   }, [selectedIssue, readOnly, issueForm?.selectedIndicatorIds])
 
   const conventionDisplayLabel = useMemo(() => {
-    if (detail?.convention) return conventionOptionLabel(detail.convention)
-    if (issueForm?.convention_id !== '' && issueForm?.convention_id !== undefined) {
-      const c = conventions.find((x) => x.id === issueForm.convention_id)
-      if (c) return conventionOptionLabel(c)
-    }
-    return '—'
-  }, [detail?.convention, issueForm?.convention_id, conventions])
+    const fromDetail = detail?.conventions?.length
+      ? detail.conventions.map((c) => conventionOptionLabel(c)).join(', ')
+      : detail?.convention
+        ? conventionOptionLabel(detail.convention)
+        : null
+    if (fromDetail) return fromDetail
+    const ids =
+      issueForm?.convention_ids?.length
+        ? issueForm.convention_ids
+        : issueForm?.convention_id !== '' && issueForm?.convention_id !== undefined
+          ? [issueForm.convention_id]
+          : []
+    if (ids.length === 0) return '—'
+    const labels = ids
+      .map((id) => {
+        const c = conventions.find((x) => x.id === id)
+        return c ? conventionOptionLabel(c) : null
+      })
+      .filter((x): x is string => Boolean(x))
+    return labels.length > 0 ? labels.join(', ') : '—'
+  }, [detail?.conventions, detail?.convention, issueForm?.convention_ids, issueForm?.convention_id, conventions])
 
   const viewTemplateAssignedDepartmentNames = useMemo(() => {
     if (!portalDeptViewer || !readOnly) return null
@@ -781,7 +808,9 @@ export function HrRequestModal({
         fe.upr_recommendation = 'UPR recommendation is required.'
       }
     } else if (treatyBody || otherIssue) {
-      if (issueForm.convention_id === '') fe.convention_id = 'Convention is required.'
+      if (treatyBody && issueForm.convention_id === '') {
+        fe.convention_id = 'Convention is required.'
+      }
       if (otherIssue) {
         if (!issueForm.other_issue_text.trim()) {
           fe.other_issue_text = 'Other issue details are required.'
@@ -868,12 +897,18 @@ export function HrRequestModal({
     setSaving(true)
     try {
       if (mode === 'create') {
-        if (issueForm.convention_id === '') return
+        if (!otherIssue && issueForm.convention_id === '') return
         if (!otherIssue && issueForm.issue_id === '') return
+        const conventionIds = otherIssue
+          ? issueForm.convention_ids
+          : issueForm.convention_id === ''
+            ? []
+            : [issueForm.convention_id as number]
         await createHrRequestFromIssueForm({
           title: issueForm.title.trim(),
           reporting_framework: framework,
-          convention_id: issueForm.convention_id,
+          convention_id: conventionIds[0] ?? null,
+          convention_ids: conventionIds,
           request_type: otherIssue ? 'other_issue' : issueForm.request_type,
           issue_id: otherIssue ? null : (issueForm.issue_id as number),
           other_issue_text: otherIssue ? issueForm.other_issue_text.trim() : null,
@@ -896,10 +931,16 @@ export function HrRequestModal({
           attachments: issueForm.attachmentFiles,
         })
       } else if (mode === 'edit' && detail) {
+        const conventionIds = otherIssue
+          ? issueForm.convention_ids
+          : issueForm.convention_id === ''
+            ? []
+            : [issueForm.convention_id as number]
         await updateHrRequestFromIssueForm(detail.id, {
           title: issueForm.title.trim(),
           reporting_framework: framework,
-          convention_id: issueForm.convention_id as number,
+          convention_id: conventionIds[0] ?? null,
+          convention_ids: conventionIds,
           request_type: otherIssue ? 'other_issue' : issueForm.request_type,
           issue_id: otherIssue ? null : (issueForm.issue_id as number),
           other_issue_text: otherIssue ? issueForm.other_issue_text.trim() : null,
@@ -1200,6 +1241,19 @@ export function HrRequestModal({
                       if (!f) return f
                       const isOther = next === 'other_issue'
                       const isUpr = next === 'upr'
+                      const nextIds = isUpr
+                        ? []
+                        : isOther
+                          ? f.convention_ids.length > 0
+                            ? f.convention_ids
+                            : f.convention_id === ''
+                              ? []
+                              : [f.convention_id]
+                          : f.convention_ids.length > 0
+                            ? [f.convention_ids[0]!]
+                            : f.convention_id === ''
+                              ? []
+                              : [f.convention_id]
                       return {
                         ...f,
                         reporting_framework: next,
@@ -1208,7 +1262,8 @@ export function HrRequestModal({
                           : f.request_type === 'other_issue'
                             ? 'loi'
                             : f.request_type,
-                        convention_id: isUpr ? '' : f.convention_id,
+                        convention_id: nextIds[0] ?? '',
+                        convention_ids: nextIds,
                         issue_id: '',
                         other_issue_text: isOther ? f.other_issue_text : '',
                         upr_reporting_cycle: isUpr ? f.upr_reporting_cycle : '',
@@ -1303,6 +1358,50 @@ export function HrRequestModal({
               {isTreatyBodyReportingFramework(issueForm.reporting_framework) ||
               issueForm.reporting_framework === 'other_issue' ? (
                 <>
+              {issueForm.reporting_framework === 'other_issue' ? (
+                <FormField
+                  label="Convention (optional)"
+                  htmlFor="hr-conv"
+                  hint="Select one or more conventions when relevant. Leave empty if none apply."
+                >
+                  <SearchableMultiSelect
+                    id="hr-conv"
+                    values={issueForm.convention_ids.map(String)}
+                    onChange={(values) => {
+                      const ids = values
+                        .map((v) => Number(v))
+                        .filter((n) => Number.isFinite(n) && n > 0)
+                      setIssueForm((f) =>
+                        f
+                          ? {
+                              ...f,
+                              convention_ids: ids,
+                              convention_id: ids[0] ?? '',
+                            }
+                          : f,
+                      )
+                    }}
+                    options={conventionChoices.map((c) => ({
+                      value: String(c.id),
+                      label: conventionOptionLabel(c),
+                    }))}
+                    disabled={
+                      readOnly ||
+                      (issueForm.reporting_framework !== 'other_issue' && mode !== 'create')
+                    }
+                    placeholder="Select convention(s)"
+                    emptyFilterMessage="No conventions match"
+                    selectedSummary={(count, first) =>
+                      count === 0
+                        ? 'Select convention(s)'
+                        : count === 1
+                          ? (first ?? '1 convention')
+                          : `${count} conventions selected`
+                    }
+                  />
+                  <FieldError id="hr-conv-err" message={fieldErrors.convention_id} />
+                </FormField>
+              ) : (
               <FormField label="Convention" htmlFor="hr-conv">
                 <select
                   id="hr-conv"
@@ -1317,6 +1416,7 @@ export function HrRequestModal({
                         ? {
                             ...f,
                             convention_id: v === '' ? '' : v,
+                            convention_ids: v === '' ? [] : [v],
                             issue_id: '',
                             selectedIndicatorIds: [],
                             indicatorValues: {},
@@ -1338,6 +1438,7 @@ export function HrRequestModal({
                 </select>
                 <FieldError id="hr-conv-err" message={fieldErrors.convention_id} />
               </FormField>
+              )}
 
               {!readOnly && isTreatyBodyReportingFramework(issueForm.reporting_framework) ? (
                 <FormField label={issueEntryKindToggleAriaLabel()}>

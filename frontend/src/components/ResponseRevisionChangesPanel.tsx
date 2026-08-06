@@ -35,11 +35,33 @@ type DepartmentProps = {
 
 type Props = RegionalProps | DepartmentProps
 
-function RegionalBody({ title, content }: { title: string; content: string }) {
+function RegionalBody({
+  title,
+  content,
+  changedTitle,
+  changedContent,
+}: {
+  title: string
+  content: string
+  changedTitle?: boolean
+  changedContent?: boolean
+}) {
   return (
     <div className="response-revision-snapshot">
-      {title.trim() ? <h4 className="response-revision-snapshot__title">{title.trim()}</h4> : null}
-      <div className="compiled-record-body regional-response-body">
+      {title.trim() ? (
+        <h4
+          className={`response-revision-snapshot__title${
+            changedTitle ? ' response-revision-changed response-revision-changed--block' : ''
+          }`}
+        >
+          {title.trim()}
+        </h4>
+      ) : null}
+      <div
+        className={`compiled-record-body regional-response-body${
+          changedContent ? ' response-revision-changed response-revision-changed--block' : ''
+        }`}
+      >
         {content.trim() ? content : '—'}
       </div>
     </div>
@@ -161,7 +183,12 @@ export function ResponseRevisionChangesPanel(props: Props) {
             <section className="response-revision-pair__col response-revision-pair__col--new">
               <h3 className="response-revision-pair__heading">After (current)</h3>
               <RevisionMeta label="Current" at={regionalCurrent?.updated_at} />
-              <RegionalBody title={afterTitle} content={afterContent} />
+              <RegionalBody
+                title={afterTitle}
+                content={afterContent}
+                changedTitle={afterTitle.trim() !== (latest.title ?? '').trim()}
+                changedContent={(afterContent ?? '').trim() !== (latest.content ?? '').trim()}
+              />
             </section>
           </div>
         </article>
@@ -231,6 +258,7 @@ export function ResponseRevisionChangesPanel(props: Props) {
             <DepartmentResponseDisplay
               responseData={afterData}
               attachmentUrl={afterAttachment}
+              compareAgainstResponseData={latest.response_data}
               {...displayOpts}
             />
           </section>

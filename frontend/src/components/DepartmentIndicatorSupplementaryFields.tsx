@@ -11,8 +11,6 @@ import type { MatrixRowEnabledMap } from '../lib/deptMatrixRowEnabled'
 export type DeptIndicatorDraft = {
   value: string
   comment: string
-  /** Additional relevant information / implementation challenges (stored as `challenges`). */
-  challenges: string
   /** Legacy single qualitative text when no qualitative years are configured. */
   qualText: string
   /** year_id → narrative text for each qualitative collection year. */
@@ -35,7 +33,6 @@ export function emptyDeptIndicatorDraft(): DeptIndicatorDraft {
   return {
     value: '',
     comment: '',
-    challenges: '',
     qualText: '',
     qualByYear: {},
     yearGenderValues: {},
@@ -58,6 +55,8 @@ type Props = {
   draft: DeptIndicatorDraft
   parsed: ParsedDepartmentResponse | null
   matrixMode?: boolean
+  /** Which fields to render — used when the form is split into Quantitative / Qualitative sections. */
+  section?: 'quantitative' | 'qualitative' | 'all'
   onChange: (next: DeptIndicatorDraft) => void
   onBumpFileInput: (key: string) => void
   fileInputRev: Record<string, number>
@@ -68,6 +67,7 @@ export function DepartmentIndicatorSupplementaryFields({
   draft,
   parsed,
   matrixMode = false,
+  section = 'all',
   onChange,
   onBumpFileInput,
   fileInputRev,
@@ -76,6 +76,8 @@ export function DepartmentIndicatorSupplementaryFields({
   const d = draft
   const usesMatrix = matrixMode || indicatorUsesDataMatrix(ind)
   const qualYears = indicatorQualitativeYears(ind)
+  const showQuantitative = section === 'all' || section === 'quantitative'
+  const showQualitative = section === 'all' || section === 'qualitative'
 
   const prevQuantUrl =
     parsed?.kind === 'structured'
@@ -88,16 +90,21 @@ export function DepartmentIndicatorSupplementaryFields({
 
   return (
     <>
-      {!usesMatrix ? <IndicatorYearGenderHint indicator={ind} style={{ margin: '0 0 12px' }} /> : null}
+      {showQuantitative && !usesMatrix ? (
+        <IndicatorYearGenderHint indicator={ind} style={{ margin: '0 0 12px' }} />
+      ) : null}
 
-      {ind.has_quantitative ? (
-        <div style={{ marginBottom: ind.has_qualitative ? 14 : 0 }}>
-          <div className="muted small" style={{ marginBottom: 8 }}>
-            Quantitative
-          </div>
+      {showQuantitative && ind.has_quantitative ? (
+        <div style={{ marginBottom: showQualitative && ind.has_qualitative && section === 'all' ? 14 : 0 }}>
+          {section === 'all' ? (
+            <div className="muted small" style={{ marginBottom: 8 }}>
+              Quantitative
+            </div>
+          ) : null}
           {usesMatrix ? (
             <p className="muted small" style={{ margin: '0 0 10px' }}>
-              Enter numbers in the table above. Add a comment and optional attachment for this metric below.
+              Enter numbers in the table above. Add a narrative and optional attachment for this metric
+              below.
             </p>
           ) : (
             <div className="form-row" style={{ marginBottom: 8 }}>
@@ -113,13 +120,15 @@ export function DepartmentIndicatorSupplementaryFields({
             </div>
           )}
           <div className="form-row" style={{ marginBottom: 8 }}>
-            <label htmlFor={`dept-ind-${ind.id}-comment`}>Comment</label>
+            <label htmlFor={`dept-ind-${ind.id}-comment`}>
+              Please provide narrative related to the indicator
+            </label>
             <textarea
               id={`dept-ind-${ind.id}-comment`}
               rows={2}
               value={d.comment}
               onChange={(e) => onChange({ ...d, comment: e.target.value })}
-              placeholder="Notes or context for this metric…"
+              placeholder="Narrative related to this indicator…"
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
           </div>
@@ -171,29 +180,16 @@ export function DepartmentIndicatorSupplementaryFields({
               }}
             />
           ) : null}
-          <div className="form-row" style={{ marginTop: 8 }}>
-            <label htmlFor={`dept-ind-${ind.id}-challenges`}>
-              Please provide any additional relevant information, including any challenges you face in
-              the implementation of your mandate related to this category of concluding observation/
-              list of issues.
-            </label>
-            <textarea
-              id={`dept-ind-${ind.id}-challenges`}
-              rows={2}
-              value={d.challenges}
-              onChange={(e) => onChange({ ...d, challenges: e.target.value })}
-              placeholder="Additional information or challenges…"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
         </div>
       ) : null}
 
-      {ind.has_qualitative ? (
+      {showQualitative && ind.has_qualitative ? (
         <div>
-          <div className="muted small" style={{ marginBottom: 8 }}>
-            Qualitative
-          </div>
+          {section === 'all' ? (
+            <div className="muted small" style={{ marginBottom: 8 }}>
+              Qualitative
+            </div>
+          ) : null}
           {qualYears.length > 0 ? (
             <p className="muted small" style={{ margin: '0 0 8px' }}>
               Enter a narrative response for each selected qualitative year.

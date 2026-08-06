@@ -15,7 +15,9 @@ export type DepartmentIndicatorQuantitative = {
   /** Legacy single value when indicator does not use year collection matrix. */
   value?: number | null
   comment: string | null
-  /** Additional relevant information / implementation challenges. */
+  /**
+   * @deprecated Prefer payload-level `challenges`. Kept for older saved responses.
+   */
   challenges?: string | null
   attachment_url: string | null
   /** Per-dimension row inclusion toggles (false = department excluded this metric row). */
@@ -50,6 +52,11 @@ export type DepartmentIndicatorBundle = {
 export type DepartmentIndicatorPayload = {
   format: typeof DEPARTMENT_INDICATOR_FORMAT
   by_indicator: Record<string, DepartmentIndicatorBundle>
+  /**
+   * One challenges / additional-info narrative for the whole department response
+   * (not per indicator).
+   */
+  challenges?: string | null
 }
 
 export type ParsedDepartmentResponse =
@@ -81,6 +88,20 @@ export function parseDepartmentTaskResponseData(
     text: raw,
     attachmentUrl: attachmentUrl?.trim() ? attachmentUrl : null,
   }
+}
+
+/** Department-level challenges text, with fallback to older per-indicator storage. */
+export function departmentResponseChallenges(
+  payload: DepartmentIndicatorPayload | null | undefined,
+): string {
+  if (!payload) return ''
+  const root = payload.challenges?.trim() ?? ''
+  if (root) return root
+  for (const bundle of Object.values(payload.by_indicator ?? {})) {
+    const legacy = bundle.quantitative?.challenges?.trim()
+    if (legacy) return legacy
+  }
+  return ''
 }
 
 function appendQuantitativeYearTotalLines(
@@ -133,8 +154,7 @@ export function formatDepartmentResponseAsPlaintext(
     if (bundle.quantitative) {
       const q = bundle.quantitative
       appendQuantitativeYearTotalLines(lines, q)
-      if (q.comment) lines.push(`  Comment: ${q.comment}`)
-      if (q.challenges) lines.push(`  Challenges: ${q.challenges}`)
+      if (q.comment) lines.push(`  Please provide narrative related to the indicator: ${q.comment}`)
       if (q.attachment_url) lines.push(`  Quant attachment: ${q.attachment_url}`)
     }
     if (bundle.qualitative) {
@@ -151,6 +171,13 @@ export function formatDepartmentResponseAsPlaintext(
       if (l.attachment_url) lines.push(`  Qual attachment: ${l.attachment_url}`)
     }
     lines.push('')
+  }
+  const challenges = departmentResponseChallenges(p.payload)
+  if (challenges) {
+    lines.push(
+      'Please provide any additional relevant information, including any challenges you face in the implementation of your mandate related to this category of concluding observation/ list of issues:',
+    )
+    lines.push(`  ${challenges}`)
   }
   return lines.join('\n').trim() || 'No response data yet.'
 }
@@ -172,7 +199,7 @@ export function formatDepartmentResponseTextOnly(
     if (bundle.quantitative) {
       const q = bundle.quantitative
       appendQuantitativeYearTotalLines(lines, q)
-      if (q.comment) lines.push(`  Comment: ${q.comment}`)
+      if (q.comment) lines.push(`  Please provide narrative related to the indicator: ${q.comment}`)
     }
     if (bundle.qualitative) {
       const l = bundle.qualitative
@@ -187,6 +214,13 @@ export function formatDepartmentResponseTextOnly(
       }
     }
     lines.push('')
+  }
+  const challenges = departmentResponseChallenges(p.payload)
+  if (challenges) {
+    lines.push(
+      'Please provide any additional relevant information, including any challenges you face in the implementation of your mandate related to this category of concluding observation/ list of issues:',
+    )
+    lines.push(`  ${challenges}`)
   }
   return lines.join('\n').trim() || '—'
 }

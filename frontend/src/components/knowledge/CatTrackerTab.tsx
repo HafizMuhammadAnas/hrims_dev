@@ -24,6 +24,7 @@ import {
   CAT_TRACKER_TORTURE_PROSECUTIONS,
   CAT_TRACKER_YEAR_KEYS,
   catTrackerProgressBadgeClass,
+  catTrackerProgressLabel,
   type CatTrackerLogRow,
   type CatTrackerSubtab,
 } from '../../data/catTrackerData'
@@ -72,7 +73,9 @@ function LogTableRow({ row }: { row: CatTrackerLogRow }) {
         <LogYearCell key={key} value={row[key]} />
       ))}
       <td>
-        <span className={catTrackerProgressBadgeClass(row.progress)}>{row.progress}</span>
+        <span className={catTrackerProgressBadgeClass(row.progress)}>
+          {catTrackerProgressLabel(row.progress)}
+        </span>
       </td>
       <td>{row.source}</td>
     </tr>

@@ -16,15 +16,14 @@ import {
   issueEntryDescriptionFieldLabel,
   issueEntryFormShowsTitleField,
   issueEntryKindBadgeLabel,
-  issueEntryLoiTableCellText,
-  issueEntryLoiTableTitleLabel,
-  issueEntryListShowsTitleColumn,
   issueEntryTitleFieldLabel,
 } from '../../lib/issueEntryKind'
 import {
   LABEL_CONVENTION_ARTICLES,
   LABEL_OPTIONAL_PROTOCOL,
 } from '../../lib/uiLabels'
+import { knowledgeConventionIcon } from '../../lib/knowledgeConventionIcons'
+import { sortArticlesByNaturalName, sortIssuesByArticles } from '../../lib/articleNaturalSort'
 import { CatTrackerTab } from './CatTrackerTab'
 import { Button } from '../ui/Button'
 import { TableCard } from '../ui/TableCard'
@@ -128,7 +127,7 @@ function KnowledgeIssueReadOnlyPanel({ issue }: { issue: KnowledgeConventionIssu
               '—'
             ) : (
               <ul className="issues-mapping-indicator-list issues-article-detail-list">
-                {issue.articles.map((a) => (
+                {sortArticlesByNaturalName(issue.articles).map((a) => (
                   <li key={a.id}>
                     <strong>{a.article_name}</strong>
                     {a.description?.trim() ? (
@@ -183,7 +182,7 @@ function ConventionArticlesTab({ conventionId }: { conventionId: number }) {
     setError(null)
     void fetchKnowledgeConventionArticles(conventionId)
       .then((rows) => {
-        if (!cancelled) setArticles(rows)
+        if (!cancelled) setArticles(sortArticlesByNaturalName(rows))
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(isApiError(e) ? e.message : 'Could not load articles')
@@ -243,7 +242,7 @@ function ConventionIssuesTab({
     setLoading(true)
     setError(null)
     try {
-      setIssues(await fetchKnowledgeConventionIssues(conventionId, entryKind))
+      setIssues(sortIssuesByArticles(await fetchKnowledgeConventionIssues(conventionId, entryKind)))
     } catch (e: unknown) {
       setIssues([])
       setError(isApiError(e) ? e.message : 'Could not load entries')
@@ -280,23 +279,24 @@ function ConventionIssuesTab({
     }
   }, [viewIssueId])
 
-  const showTitleColumn = issueEntryListShowsTitleColumn(entryKind)
-  const tableColSpan = showTitleColumn ? 4 : 3
+  const tableColSpan = 4
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return issues
-    return issues.filter((i) => {
-      const arts = i.articles.map((a) => a.article_name).join(' ').toLowerCase()
-      const cat = (i.category?.name ?? String(i.category_id)).toLowerCase()
-      return (
-        String(i.id).includes(q) ||
-        (i.issue_title ?? '').toLowerCase().includes(q) ||
-        (i.description ?? '').toLowerCase().includes(q) ||
-        arts.includes(q) ||
-        cat.includes(q)
-      )
-    })
+    const source = q
+      ? issues.filter((i) => {
+          const arts = i.articles.map((a) => a.article_name).join(' ').toLowerCase()
+          const cat = (i.category?.name ?? String(i.category_id)).toLowerCase()
+          return (
+            String(i.id).includes(q) ||
+            (i.issue_title ?? '').toLowerCase().includes(q) ||
+            (i.description ?? '').toLowerCase().includes(q) ||
+            arts.includes(q) ||
+            cat.includes(q)
+          )
+        })
+      : issues
+    return sortIssuesByArticles(source)
   }, [issues, search])
 
   const emptyMessage =
@@ -327,13 +327,6 @@ function ConventionIssuesTab({
               <tr>
                 <th>Articles</th>
                 <th>Category</th>
-                {showTitleColumn ? (
-                  <th className="issues-mapping-table__issue-col">
-                    <span className="issues-mapping-table__issue-col-title">
-                      {issueEntryLoiTableTitleLabel()}
-                    </span>
-                  </th>
-                ) : null}
                 <th className="issues-mapping-table__status-col">Status</th>
                 <th className="issues-mapping-table__actions-col">View</th>
               </tr>
@@ -341,7 +334,7 @@ function ConventionIssuesTab({
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={tableColSpan + 1} className="muted">
+                  <td colSpan={tableColSpan} className="muted">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -355,9 +348,6 @@ function ConventionIssuesTab({
                       {i.articles.map((a) => a.article_name).join(', ') || 'None'}
                     </td>
                     <td className="issues-mapping-table__category">{i.category?.name ?? i.category_id}</td>
-                    {showTitleColumn ? (
-                      <td className="issues-mapping-table__issue">{issueEntryLoiTableCellText(i)}</td>
-                    ) : null}
                     <td className="issues-mapping-table__status">{issueStatusLabel(i)}</td>
                     <td className="issues-mapping-table__actions">
                       <Button variant="link" compact onClick={() => setViewIssueId(i.id)}>
@@ -452,6 +442,7 @@ export function KnowledgeConventionCatDetail({
         subtitle={data.name}
         icon={data.knowledge_icon}
         fallback="📜"
+        fallbackIcon={knowledgeConventionIcon(data.code)}
         metaLines={[`Adopted: ${adopted}`, `Ratified: ${ratified}`]}
         onBack={onBack}
       />

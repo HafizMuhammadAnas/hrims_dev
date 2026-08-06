@@ -116,6 +116,9 @@ export interface HrRequestRow {
   regions?: { id: number; name: string; slug: string }[]
   departments?: { id: number; code: string; name: string }[]
   convention?: { id: number; code: string; name: string } | null
+  /** Other Issues may link multiple conventions; treaty body uses one. */
+  convention_ids?: number[]
+  conventions?: { id: number; code: string; name: string }[]
   issue?: HrRequestIssueDetail | null
   attachments?: HrRequestAttachmentRow[]
   indicator_responses?: HrRequestIndicatorResponseRow[]

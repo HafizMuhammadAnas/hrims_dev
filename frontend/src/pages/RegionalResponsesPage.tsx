@@ -36,7 +36,7 @@ import {
 } from '../lib/tableExportColumns'
 import type { HrRequestRow } from '../types/hrRequest'
 
-const REVIEW_STATUSES = ['pending', 'accepted', 'needs-modification', 'rejected'] as const
+const REVIEW_STATUSES = ['pending', 'accepted', 'needs-modification'] as const
 
 type RegionalResponseDisplayRow =
   | { kind: 'submission'; row: RegionalResponseRow }

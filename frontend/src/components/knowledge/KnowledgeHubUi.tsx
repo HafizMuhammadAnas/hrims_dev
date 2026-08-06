@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { KnowledgeHubIcon } from '../KnowledgeHubIcon'
 import { formatKnowledgeHubTitle } from '../../lib/displayTitleCase'
@@ -35,6 +35,7 @@ export function KnowledgeHubCardsGrid({ children }: { children: ReactNode }) {
 export function KnowledgeHubCard({
   icon,
   fallback,
+  fallbackIcon,
   title,
   description,
   stat1Value,
@@ -45,6 +46,7 @@ export function KnowledgeHubCard({
 }: {
   icon?: string | null
   fallback: string
+  fallbackIcon?: LucideIcon
   title: string
   description?: string | null
   stat1Value?: string | null
@@ -66,7 +68,12 @@ export function KnowledgeHubCard({
       className={`card${onClick ? '' : ' card-static'}`}
       onClick={onClick}
     >
-      <KnowledgeHubIcon value={icon} fallback={fallback} variant="card" />
+      <KnowledgeHubIcon
+        value={icon}
+        fallback={fallback}
+        fallbackIcon={fallbackIcon}
+        variant="card"
+      />
       <h3 className="card-title">{displayTitle}</h3>
       <p className="card-desc">{description?.trim() || '—'}</p>
       {hasStats ? (
@@ -90,6 +97,7 @@ export function KnowledgeHubDetailHeader({
   subtitle,
   icon,
   fallback,
+  fallbackIcon,
   metaLines,
   onBack,
 }: {
@@ -97,6 +105,7 @@ export function KnowledgeHubDetailHeader({
   subtitle?: string | null
   icon?: string | null
   fallback: string
+  fallbackIcon?: LucideIcon
   metaLines?: string[]
   onBack: () => void
 }) {
@@ -107,7 +116,12 @@ export function KnowledgeHubDetailHeader({
         Back to List
       </button>
       <div className="conv-header">
-        <KnowledgeHubIcon value={icon} fallback={fallback} variant="hero" />
+        <KnowledgeHubIcon
+          value={icon}
+          fallback={fallback}
+          fallbackIcon={fallbackIcon}
+          variant="hero"
+        />
         <div className="conv-title-section">
           <h1 className="conv-title">{formatKnowledgeHubTitle(title)}</h1>
           {subtitle?.trim() ? <p className="conv-subtitle">{subtitle.trim()}</p> : null}

@@ -25,6 +25,11 @@ class HrRequestResource extends JsonResource
             'title' => $this->title,
             'conv' => $this->conv,
             'convention_id' => $this->convention_id,
+            'convention_ids' => $this->whenLoaded('conventions', fn () => $this->conventions
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all()),
             'issue_id' => $this->issue_id,
             'request_type' => $this->request_type,
             'other_issue_text' => $this->other_issue_text,
@@ -66,6 +71,11 @@ class HrRequestResource extends JsonResource
                 'code' => $this->convention->code,
                 'name' => $this->convention->name,
             ] : null),
+            'conventions' => $this->whenLoaded('conventions', fn () => $this->conventions->map(fn ($c) => [
+                'id' => $c->id,
+                'code' => $c->code,
+                'name' => $c->name,
+            ])->values()->all()),
             'issue' => $this->whenLoaded('issue', function () {
                 if (! $this->issue instanceof Issue) {
                     return null;

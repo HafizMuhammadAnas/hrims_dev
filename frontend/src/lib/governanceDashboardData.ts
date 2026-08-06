@@ -85,10 +85,11 @@ export function buildIndicatorDimensionTotalsSeries(
   tasks: DepartmentTaskRow[],
   indicators: ReportLookupIndicator[],
   selectedIndicatorIds: string[],
+  yearCatalog?: Array<{ id: number | string; label: string }>,
 ): IndicatorDimensionTotalsSeries[] {
   const selected = new Set(selectedIndicatorIds.map(String))
   const byId = new Map(indicators.map((i) => [String(i.id), i]))
-  const labels = yearLabelMap(indicators)
+  const labels = yearLabelMap(indicators, yearCatalog)
 
   // indicatorId -> yearId -> dimensionKey -> sum
   const totals = new Map<string, Map<string, Map<GovernanceDimensionKey, number>>>()
@@ -169,12 +170,23 @@ export function buildIndicatorDimensionTotalsSeries(
   return series
 }
 
-function yearLabelMap(indicators: ReportLookupIndicator[]): Map<string, string> {
+function yearLabelMap(
+  indicators: ReportLookupIndicator[],
+  yearCatalog?: Array<{ id: number | string; label: string }>,
+): Map<string, string> {
   const map = new Map<string, string>()
+  for (const y of yearCatalog ?? []) {
+    const id = String(y.id)
+    const label = String(y.label ?? '').trim()
+    if (id && label) map.set(id, label)
+  }
   for (const ind of indicators) {
     for (const y of ind.collection_years ?? []) {
       const id = String(y.id)
-      if (!map.has(id)) map.set(id, y.label)
+      const label = String(y.label ?? '').trim()
+      if (!id || !label) continue
+      // Catalog labels win; fill gaps from indicator metadata.
+      if (!map.has(id)) map.set(id, label)
     }
   }
   return map
@@ -202,10 +214,11 @@ export function buildIndicatorGenderTrendSeries(
   tasks: DepartmentTaskRow[],
   indicators: ReportLookupIndicator[],
   selectedIndicatorIds: string[],
+  yearCatalog?: Array<{ id: number | string; label: string }>,
 ): IndicatorTrendSeries[] {
   const selected = new Set(selectedIndicatorIds.map(String))
   const byId = new Map(indicators.map((i) => [String(i.id), i]))
-  const labels = yearLabelMap(indicators)
+  const labels = yearLabelMap(indicators, yearCatalog)
 
   const totals = new Map<string, Map<string, number>>()
 

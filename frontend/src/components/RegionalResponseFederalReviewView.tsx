@@ -23,7 +23,7 @@ import { WorkflowModalHero } from './ui/WorkflowModalHero'
 
 type Tab = 'responses' | 'request' | 'changes'
 
-type ReviewStatus = 'pending' | 'accepted' | 'needs-modification' | 'rejected'
+type ReviewStatus = 'pending' | 'accepted' | 'needs-modification'
 
 type Props = {
   viewing: RegionalResponseRow

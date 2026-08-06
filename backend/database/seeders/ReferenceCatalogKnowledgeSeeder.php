@@ -35,14 +35,16 @@ class ReferenceCatalogKnowledgeSeeder extends Seeder
 
     private function seedConventions(): void
     {
+        // No knowledge_icon is seeded: the Knowledge Hub renders a built-in vector icon per
+        // convention code, and emoji stored here do not survive non-utf8mb4 dumps/imports.
         $rows = [
-            ['code' => 'ICERD', 'name' => 'International Convention on the Elimination of All Forms of Racial Discrimination', 'icon' => '📜', 'adopted' => '1965', 'ratified' => '1966', 'articles' => '25', 'impl' => '72'],
-            ['code' => 'ICCPR', 'name' => 'International Covenant on Civil and Political Rights', 'icon' => '⚖️', 'adopted' => '1966', 'ratified' => '2010', 'articles' => '53', 'impl' => '68'],
-            ['code' => 'ICESCR', 'name' => 'International Covenant on Economic, Social and Cultural Rights', 'icon' => '🏛️', 'adopted' => '1966', 'ratified' => '2008', 'articles' => '31', 'impl' => '55'],
-            ['code' => 'CEDAW', 'name' => 'Convention on the Elimination of All Forms of Discrimination against Women', 'icon' => '👩', 'adopted' => '1979', 'ratified' => '1996', 'articles' => '30', 'impl' => '65'],
-            ['code' => 'CAT', 'name' => 'Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment', 'icon' => '🛡️', 'adopted' => '1984', 'ratified' => '2010', 'articles' => '33', 'impl' => '58'],
-            ['code' => 'CRC', 'name' => 'Convention on the Rights of the Child', 'icon' => '👶', 'adopted' => '1989', 'ratified' => '1990', 'articles' => '54', 'impl' => '61'],
-            ['code' => 'CRPD', 'name' => 'Convention on the Rights of Persons with Disabilities', 'icon' => '♿', 'adopted' => '2006', 'ratified' => '2011', 'articles' => '50', 'impl' => '52'],
+            ['code' => 'ICERD', 'name' => 'International Convention on the Elimination of All Forms of Racial Discrimination', 'adopted' => '1965', 'ratified' => '1966', 'articles' => '25', 'impl' => '72'],
+            ['code' => 'ICCPR', 'name' => 'International Covenant on Civil and Political Rights', 'adopted' => '1966', 'ratified' => '2010', 'articles' => '53', 'impl' => '68'],
+            ['code' => 'ICESCR', 'name' => 'International Covenant on Economic, Social and Cultural Rights', 'adopted' => '1966', 'ratified' => '2008', 'articles' => '31', 'impl' => '55'],
+            ['code' => 'CEDAW', 'name' => 'Convention on the Elimination of All Forms of Discrimination against Women', 'adopted' => '1979', 'ratified' => '1996', 'articles' => '30', 'impl' => '65'],
+            ['code' => 'CAT', 'name' => 'Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment', 'adopted' => '1984', 'ratified' => '2010', 'articles' => '33', 'impl' => '58'],
+            ['code' => 'CRC', 'name' => 'Convention on the Rights of the Child', 'adopted' => '1989', 'ratified' => '1990', 'articles' => '54', 'impl' => '61'],
+            ['code' => 'CRPD', 'name' => 'Convention on the Rights of Persons with Disabilities', 'adopted' => '2006', 'ratified' => '2011', 'articles' => '50', 'impl' => '52'],
         ];
 
         foreach ($rows as $i => $row) {
@@ -52,7 +54,6 @@ class ReferenceCatalogKnowledgeSeeder extends Seeder
                 ['code' => $row['code']],
                 [
                     'name' => $row['name'],
-                    'knowledge_icon' => $row['icon'],
                     'knowledge_adopted' => $row['adopted'],
                     'knowledge_ratified' => $row['ratified'],
                     'knowledge_articles' => $row['articles'],
@@ -86,27 +87,28 @@ class ReferenceCatalogKnowledgeSeeder extends Seeder
 
     private function seedSdgGoals(): void
     {
+        // Icons come from the frontend goal-number map for the same reason as conventions.
         $goals = [
-            [1, '🎯', 'No poverty', 'End poverty in all its forms everywhere'],
-            [2, '🌾', 'Zero hunger', 'End hunger, achieve food security and improved nutrition'],
-            [3, '❤️', 'Good health and well-being', 'Ensure healthy lives and promote well-being for all'],
-            [4, '📚', 'Quality education', 'Inclusive and equitable quality education'],
-            [5, '⚖️', 'Gender equality', 'Achieve gender equality and empower all women and girls'],
-            [6, '💧', 'Clean water and sanitation', 'Availability and sustainable management of water and sanitation'],
-            [7, '⚡', 'Affordable and clean energy', 'Access to affordable, reliable, sustainable energy'],
-            [8, '📈', 'Decent work and economic growth', 'Sustained, inclusive and sustainable economic growth'],
-            [9, '🏭', 'Industry, innovation and infrastructure', 'Resilient infrastructure and inclusive industrialization'],
-            [10, '🤝', 'Reduce inequality', 'Reduce inequality within and among countries'],
-            [11, '🏙️', 'Sustainable cities and communities', 'Inclusive, safe, resilient and sustainable cities'],
-            [12, '♻️', 'Responsible consumption and production', 'Sustainable consumption and production patterns'],
-            [13, '🌍', 'Climate action', 'Urgent action to combat climate change and impacts'],
-            [14, '🐟', 'Life below water', 'Conserve and sustainably use oceans and marine resources'],
-            [15, '🌳', 'Life on land', 'Protect and restore terrestrial ecosystems'],
-            [16, '🕊️', 'Peace, justice and strong institutions', 'Peaceful and inclusive societies and access to justice'],
-            [17, '🔗', 'Partnership for the goals', 'Strengthen means of implementation and global partnership'],
+            [1, 'No poverty', 'End poverty in all its forms everywhere'],
+            [2, 'Zero hunger', 'End hunger, achieve food security and improved nutrition'],
+            [3, 'Good health and well-being', 'Ensure healthy lives and promote well-being for all'],
+            [4, 'Quality education', 'Inclusive and equitable quality education'],
+            [5, 'Gender equality', 'Achieve gender equality and empower all women and girls'],
+            [6, 'Clean water and sanitation', 'Availability and sustainable management of water and sanitation'],
+            [7, 'Affordable and clean energy', 'Access to affordable, reliable, sustainable energy'],
+            [8, 'Decent work and economic growth', 'Sustained, inclusive and sustainable economic growth'],
+            [9, 'Industry, innovation and infrastructure', 'Resilient infrastructure and inclusive industrialization'],
+            [10, 'Reduce inequality', 'Reduce inequality within and among countries'],
+            [11, 'Sustainable cities and communities', 'Inclusive, safe, resilient and sustainable cities'],
+            [12, 'Responsible consumption and production', 'Sustainable consumption and production patterns'],
+            [13, 'Climate action', 'Urgent action to combat climate change and impacts'],
+            [14, 'Life below water', 'Conserve and sustainably use oceans and marine resources'],
+            [15, 'Life on land', 'Protect and restore terrestrial ecosystems'],
+            [16, 'Peace, justice and strong institutions', 'Peaceful and inclusive societies and access to justice'],
+            [17, 'Partnership for the goals', 'Strengthen means of implementation and global partnership'],
         ];
 
-        foreach ($goals as [$num, $icon, $title, $desc]) {
+        foreach ($goals as [$num, $title, $desc]) {
             SdgNode::query()->updateOrCreate(
                 ['code' => 'SDG-'.$num],
                 [
@@ -114,7 +116,6 @@ class ReferenceCatalogKnowledgeSeeder extends Seeder
                     'node_type' => 'goal',
                     'title' => $title,
                     'goal_number' => $num,
-                    'knowledge_icon' => $icon,
                     'summary' => $desc,
                     'body' => null,
                     'stat_1_value' => '—',
@@ -152,46 +153,47 @@ class ReferenceCatalogKnowledgeSeeder extends Seeder
     {
         KnowledgeCard::query()->whereIn('section', ['indicators', 'upr'])->delete();
 
+        // Icons stay blank so the Knowledge Hub renders its built-in vector icon per card title.
         $indicators = [
-            ['🏥', 'Right to Health', 'Access to healthcare services', '78%', 'Coverage', '15', 'Programs'],
-            ['📚', 'Right to Education', 'Universal access to quality education', '62%', 'Literacy', '28', 'Initiatives'],
-            ['💼', 'Right to Work', 'Fair employment opportunities', '5.8%', 'Unemployment', '12', 'Policies'],
-            ['🏠', 'Right to Housing', 'Adequate housing for all', '45%', 'Adequate', '8', 'Projects'],
-            ['🍎', 'Right to Food', 'Access to nutritious food', '36%', 'Food Security', '19', 'Programs'],
+            ['Right to Health', 'Access to healthcare services', '78%', 'Coverage', '15', 'Programs'],
+            ['Right to Education', 'Universal access to quality education', '62%', 'Literacy', '28', 'Initiatives'],
+            ['Right to Work', 'Fair employment opportunities', '5.8%', 'Unemployment', '12', 'Policies'],
+            ['Right to Housing', 'Adequate housing for all', '45%', 'Adequate', '8', 'Projects'],
+            ['Right to Food', 'Access to nutritious food', '36%', 'Food Security', '19', 'Programs'],
         ];
 
         foreach ($indicators as $i => $row) {
             KnowledgeCard::query()->create([
                 'section' => 'indicators',
-                'icon' => $row[0],
-                'title' => $row[1],
-                'summary' => $row[2],
-                'stat_1_value' => $row[3],
-                'stat_1_label' => $row[4],
-                'stat_2_value' => $row[5],
-                'stat_2_label' => $row[6],
+                'icon' => '',
+                'title' => $row[0],
+                'summary' => $row[1],
+                'stat_1_value' => $row[2],
+                'stat_1_label' => $row[3],
+                'stat_2_value' => $row[4],
+                'stat_2_label' => $row[5],
                 'body' => null,
                 'sort_order' => $i,
             ]);
         }
 
         $upr = [
-            ['📊', 'Total Recommendations', 'Received in latest cycle', '302', 'Total', '2023', 'Year'],
-            ['✅', 'Accepted', 'For implementation', '253', 'Accepted', '83.7%', 'Rate'],
-            ['📝', 'Noted', 'For consideration', '49', 'Noted', '16.3%', 'Rate'],
-            ['⚡', 'Implementation', 'Current progress', '45%', 'Progress', '114', 'Done'],
+            ['Total Recommendations', 'Received in latest cycle', '302', 'Total', '2023', 'Year'],
+            ['Accepted', 'For implementation', '253', 'Accepted', '83.7%', 'Rate'],
+            ['Noted', 'For consideration', '49', 'Noted', '16.3%', 'Rate'],
+            ['Implementation', 'Current progress', '45%', 'Progress', '114', 'Done'],
         ];
 
         foreach ($upr as $i => $row) {
             KnowledgeCard::query()->create([
                 'section' => 'upr',
-                'icon' => $row[0],
-                'title' => $row[1],
-                'summary' => $row[2],
-                'stat_1_value' => $row[3],
-                'stat_1_label' => $row[4],
-                'stat_2_value' => $row[5],
-                'stat_2_label' => $row[6],
+                'icon' => '',
+                'title' => $row[0],
+                'summary' => $row[1],
+                'stat_1_value' => $row[2],
+                'stat_1_label' => $row[3],
+                'stat_2_value' => $row[4],
+                'stat_2_label' => $row[5],
                 'body' => null,
                 'sort_order' => $i,
             ]);

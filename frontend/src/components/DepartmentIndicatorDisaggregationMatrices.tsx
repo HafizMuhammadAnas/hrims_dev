@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import type { DistrictRow } from '../api/districts'
 import type { CollectionReligionRow } from '../api/collectionReligions'
+import { religionDisplayLabel, sortReligionsForDisplay } from '../lib/collectionReligionOrder'
 import { isSelectableCollectionGender } from '../lib/collectionGenderOptions'
 import {
   AGE_KEYS,
@@ -29,6 +30,12 @@ import {
   matrixCellKey,
 } from '../lib/indicatorMatrixColumns'
 import { MatrixRowEnableToggle } from './ui/MatrixRowEnableToggle'
+import {
+  dimensionYearHighlighted,
+  matrixCellHighlighted,
+  yearTotalHighlighted,
+  type ResponseRevisionHighlight,
+} from '../lib/responseRevisionDiff'
 
 type MatrixValues = Record<number, Record<string, string>>
 
@@ -100,6 +107,8 @@ type Props = {
   savedDistrictByIndicator?: MatrixValues
   savedReligionByIndicator?: MatrixValues
   savedConsolidatedByIndicator?: MatrixValues
+  /** When set (Changes tab), highlight cells that differ from the before snapshot. */
+  revisionHighlight?: ResponseRevisionHighlight | null
 }
 
 function num(v: string | number | '' | undefined | null): number {
@@ -181,6 +190,12 @@ function disabilityColumns(saved?: MatrixValues): DimColumn[] {
   }))
   if (!saved) return cols
   const legacyKeys = [
+    'vision',
+    'hearing',
+    'cognition',
+    'mobility',
+    'self_care',
+    'communication',
     DISABILITY_PERSONS_WITH_DISABILITY,
     DISABILITY_YES,
     DISABILITY_NO,
@@ -205,7 +220,10 @@ function districtColumns(districts: DistrictRow[]): DimColumn[] {
 }
 
 function religionColumns(religions: CollectionReligionRow[]): DimColumn[] {
-  return religions.map((r) => ({ id: r.id, label: r.name }))
+  return sortReligionsForDisplay(religions).map((r) => ({
+    id: r.id,
+    label: religionDisplayLabel(r.name),
+  }))
 }
 
 type DimDef = {
@@ -251,6 +269,7 @@ function DepartmentIndicatorDataCard({
   savedDistrictByIndicator,
   savedReligionByIndicator,
   savedConsolidatedByIndicator,
+  revisionHighlight,
 }: {
   /** 1-based number from the request indicator list (matches regional assign #N). */
   ordinal: number
@@ -278,6 +297,7 @@ function DepartmentIndicatorDataCard({
   savedDistrictByIndicator?: MatrixValues
   savedReligionByIndicator?: MatrixValues
   savedConsolidatedByIndicator?: MatrixValues
+  revisionHighlight?: ResponseRevisionHighlight | null
 }) {
   const years = useMemo(() => indicatorConfiguredYears(indicator), [indicator])
   const showConsolidated = Boolean(indicator.collects_by_consolidated)
@@ -354,6 +374,9 @@ function DepartmentIndicatorDataCard({
     if (!yearTotalsIncluded) return sum
     return sum + num(yearTotalValue(y.year_id))
   }, 0)
+  const grandTotalChanged =
+    revisionHighlight != null &&
+    years.some((y) => yearTotalHighlighted(revisionHighlight, indicator.id, y.year_id))
 
   const dimensions = useMemo(() => {
     const dims: DimDef[] = []
@@ -472,10 +495,6 @@ function DepartmentIndicatorDataCard({
       </header>
 
       <div className="iwd-card__body">
-        <div className="iwd-card__indicator-banner" title={title}>
-          {title}
-        </div>
-
         {showYearTotalsBar ? (
           <section className="iwd-totals" aria-label="Year totals">
             <div className="iwd-totals__head">
@@ -508,7 +527,15 @@ function DepartmentIndicatorDataCard({
                   <label key={y.year_id} className="iwd-totals__year">
                     <span className="iwd-totals__year-label">{y.label}</span>
                     {readOnly ? (
-                      <span className="iwd-totals__value">{num(yearTotalValue(y.year_id))}</span>
+                      <span
+                        className={`iwd-totals__value${
+                          yearTotalHighlighted(revisionHighlight, indicator.id, y.year_id)
+                            ? ' response-revision-changed'
+                            : ''
+                        }`}
+                      >
+                        {num(yearTotalValue(y.year_id))}
+                      </span>
                     ) : (
                       <input
                         className="iwd-sheet__input iwd-totals__input"
@@ -524,7 +551,13 @@ function DepartmentIndicatorDataCard({
                 ))}
                 <div className="iwd-totals__year iwd-totals__year--grand">
                   <span className="iwd-totals__year-label">Grand Total</span>
-                  <span className="iwd-totals__value">{grandTotal}</span>
+                  <span
+                    className={`iwd-totals__value${
+                      grandTotalChanged ? ' response-revision-changed' : ''
+                    }`}
+                  >
+                    {grandTotal}
+                  </span>
                 </div>
               </div>
             )}
@@ -549,6 +582,7 @@ function DepartmentIndicatorDataCard({
               included={included}
               readOnly={readOnly}
               showToggle={showToggle}
+              revisionHighlight={revisionHighlight}
               onToggleIncluded={
                 onRowEnabledChange ? (enabled) => onRowEnabledChange(dim.key, enabled) : undefined
               }
@@ -569,6 +603,7 @@ function DimensionYearPanels({
   readOnly,
   showToggle,
   onToggleIncluded,
+  revisionHighlight,
 }: {
   def: DimDef
   years: Array<{ year_id: number; label: string }>
@@ -578,6 +613,7 @@ function DimensionYearPanels({
   readOnly: boolean
   showToggle: boolean
   onToggleIncluded?: (enabled: boolean) => void
+  revisionHighlight?: ResponseRevisionHighlight | null
 }) {
   if (years.length === 0 || def.columns.length === 0) return null
 
@@ -649,6 +685,13 @@ function DimensionYearPanels({
                   ? distributed
                   : num(dimTotal)
 
+            const dimYearChanged = dimensionYearHighlighted(
+              revisionHighlight,
+              indicatorId,
+              def.key,
+              y.year_id,
+            )
+
             return (
               <div key={y.year_id} className="iwd-year-panel">
                 <div className="iwd-year-panel__head">{y.label}</div>
@@ -669,9 +712,33 @@ function DimensionYearPanels({
                     <tbody>
                       <tr>
                         {usesOwnTotal ? (
-                          <td className="iwd-year-panel__pwd-total">
+                          <td
+                            className={`iwd-year-panel__pwd-total${
+                              matrixCellHighlighted(
+                                revisionHighlight,
+                                indicatorId,
+                                def.key,
+                                y.year_id,
+                                DIMENSION_TOTAL_COLUMN_ID,
+                              )
+                                ? ' response-revision-changed'
+                                : ''
+                            }`}
+                          >
                             {readOnly ? (
-                              <span className="iwd-sheet__num">
+                              <span
+                                className={`iwd-sheet__num${
+                                  matrixCellHighlighted(
+                                    revisionHighlight,
+                                    indicatorId,
+                                    def.key,
+                                    y.year_id,
+                                    DIMENSION_TOTAL_COLUMN_ID,
+                                  )
+                                    ? ' response-revision-changed'
+                                    : ''
+                                }`}
+                              >
                                 {ownTotalRaw === '' ? '' : ownTotal}
                               </span>
                             ) : (
@@ -691,12 +758,23 @@ function DimensionYearPanels({
                         ) : null}
                         {def.columns.map((c) => {
                           const allowed = def.cellAllowed(y.year_id, c.id)
+                          const cellChanged = matrixCellHighlighted(
+                            revisionHighlight,
+                            indicatorId,
+                            def.key,
+                            y.year_id,
+                            c.id,
+                          )
                           return (
                             <td key={String(c.id)}>
                               {!allowed ? (
                                 <span className="iwd-sheet__num muted">—</span>
                               ) : readOnly ? (
-                                <span className="iwd-sheet__num">
+                                <span
+                                  className={`iwd-sheet__num${
+                                    cellChanged ? ' response-revision-changed' : ''
+                                  }`}
+                                >
                                   {cellValue(y.year_id, c.id) === ''
                                     ? ''
                                     : num(cellValue(y.year_id, c.id))}
@@ -716,13 +794,26 @@ function DimensionYearPanels({
                           )
                         })}
                         <td
-                          className={`iwd-year-panel__ua${over ? ' is-over' : ''}`}
+                          className={`iwd-year-panel__ua${over ? ' is-over' : ''}${
+                            dimYearChanged ? ' response-revision-changed' : ''
+                          }`}
                           title={over && ua != null ? `Exceeded by ${Math.abs(ua)}` : undefined}
                         >
                           {ua == null ? '—' : over ? `${Math.abs(ua)} exceeded` : ua}
                         </td>
                         <td
-                          className={`iwd-year-panel__total${over ? ' is-over' : ''}`}
+                          className={`iwd-year-panel__total${over ? ' is-over' : ''}${
+                            dimYearChanged ||
+                            matrixCellHighlighted(
+                              revisionHighlight,
+                              indicatorId,
+                              def.key,
+                              y.year_id,
+                              DIMENSION_TOTAL_COLUMN_ID,
+                            )
+                              ? ' response-revision-changed'
+                              : ''
+                          }`}
                           title={
                             over
                               ? `Entered total ${distributed} exceeds budget ${yt ?? 0}`
@@ -770,6 +861,7 @@ export function DepartmentIndicatorDisaggregationMatrices({
   savedDistrictByIndicator,
   savedReligionByIndicator,
   savedConsolidatedByIndicator,
+  revisionHighlight,
 }: Props) {
   const matrixIndicators = useMemo(
     () =>
@@ -821,6 +913,7 @@ export function DepartmentIndicatorDisaggregationMatrices({
           savedDistrictByIndicator={savedDistrictByIndicator}
           savedReligionByIndicator={savedReligionByIndicator}
           savedConsolidatedByIndicator={savedConsolidatedByIndicator}
+          revisionHighlight={revisionHighlight}
         />
       ))}
     </div>
