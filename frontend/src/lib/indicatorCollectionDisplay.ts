@@ -182,7 +182,7 @@ export function indicatorDimensionHints(ind: HrRequestIssueIndicator): string[] 
     hints.push('Location: all regions and districts')
   }
   if (ind.collects_by_disability) {
-    hints.push(`Disability: ${DISABILITY_LABELS[DISABILITY_KEYS[0]]}`)
+    hints.push(`Disability: ${DISABILITY_KEYS.map((key) => DISABILITY_LABELS[key]).join(', ')}`)
   }
   if (ind.collects_by_religion) {
     hints.push('Religion: full catalog (all options)')

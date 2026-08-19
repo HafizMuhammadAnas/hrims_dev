@@ -67,7 +67,7 @@ export function GovernanceTrendChartPanel({ item }: { item: GovernanceTrendChart
             {item.shapeId === 'bar' ? (
               <BarChart data={item.points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Bar dataKey="total" name="Total" fill={color} radius={[6, 6, 0, 0]} />
@@ -99,7 +99,7 @@ export function GovernanceTrendChartPanel({ item }: { item: GovernanceTrendChart
             ) : item.shapeId === 'area' ? (
               <AreaChart data={item.points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Area
@@ -115,7 +115,7 @@ export function GovernanceTrendChartPanel({ item }: { item: GovernanceTrendChart
             ) : item.shapeId === 'step' ? (
               <LineChart data={item.points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Line
@@ -131,7 +131,7 @@ export function GovernanceTrendChartPanel({ item }: { item: GovernanceTrendChart
             ) : item.shapeId === 'composed' ? (
               <ComposedChart data={item.points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Bar dataKey="total" name="Total" fill={color} fillOpacity={0.35} radius={[4, 4, 0, 0]} />
@@ -147,7 +147,7 @@ export function GovernanceTrendChartPanel({ item }: { item: GovernanceTrendChart
             ) : (
               <LineChart data={item.points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Line

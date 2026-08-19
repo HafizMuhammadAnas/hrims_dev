@@ -13,6 +13,7 @@ import {
   KnowledgeHubStateMessage,
   KnowledgeHubTabs,
 } from '../../components/knowledge/KnowledgeHubUi'
+import { knowledgeStatCardIcon } from '../../lib/knowledgeCardIcons'
 
 const UPR_TABS = ['Breakdown', 'Response', 'Action Plan'] as const
 type UprTab = (typeof UPR_TABS)[number]
@@ -27,6 +28,7 @@ function UprDetail({ data, onBack }: { data: KnowledgeStatCard; onBack: () => vo
         subtitle="Universal Periodic Review — thematic area (4th cycle)"
         icon={data.icon}
         fallback="📋"
+        fallbackIcon={knowledgeStatCardIcon('upr', data.title)}
         onBack={onBack}
       />
 
@@ -122,6 +124,7 @@ export function UprInfoPage() {
                 key={item.id}
                 icon={item.icon}
                 fallback="📋"
+                fallbackIcon={knowledgeStatCardIcon('upr', item.title)}
                 title={item.title}
                 description={item.summary}
                 stat1Value={item.stat_1_value}

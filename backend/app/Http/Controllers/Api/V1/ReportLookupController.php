@@ -49,14 +49,14 @@ class ReportLookupController extends Controller
     public function articles(Request $request): JsonResponse
     {
         $conventionId = $request->query('convention_id');
-        $q = Article::query()->orderBy('article_name');
+        $q = Article::query();
         if (Schema::hasColumn('articles', 'is_active')) {
             $q->where('is_active', true);
         }
         if ($conventionId !== null && $conventionId !== '') {
             $q->where('convention_id', (int) $conventionId);
         }
-        $rows = $q->get(['id', 'convention_id', 'article_name']);
+        $rows = Article::sortByNaturalName($q->get(['id', 'convention_id', 'article_name']));
 
         return response()->json([
             'data' => $rows->map(fn (Article $a) => [

@@ -61,23 +61,29 @@ const DIMENSIONS: DimDef[] = [
     ],
   },
   {
-    id: 'pwd',
-    title: 'PWDs Disaggregated',
-    columns: [
-      { key: 'pwds', label: 'PWDs' },
-      { key: 'not_pwds', label: 'Not PWDs' },
-    ],
-  },
-  {
     id: 'religion',
     title: 'Religion Disaggregate',
     columns: [
       { key: 'muslim', label: 'Muslim' },
-      { key: 'christian', label: 'Christian' },
+      { key: 'christian', label: 'Christianity' },
       { key: 'hindu', label: 'Hindu' },
       { key: 'sikh', label: 'Sikh' },
-      { key: 'ahmadis', label: 'Ahmadis' },
+      { key: 'ahmadis', label: 'Ahmadiyya' },
       { key: 'others', label: 'Others' },
+    ],
+  },
+  {
+    id: 'pwd',
+    title: 'PWDs Disaggregated',
+    columns: [
+      { key: 'hearing_disability', label: 'Hearing Disability' },
+      { key: 'lower_limb_disability', label: 'Lower Limb Disability' },
+      { key: 'mental_disability', label: 'Mental Disability' },
+      { key: 'speech_disability', label: 'Speech Disability' },
+      { key: 'upper_limb_disability', label: 'Upper Limb Disability' },
+      { key: 'visual_disability_full', label: 'Visual Disability (Full)' },
+      { key: 'visual_disability_partial', label: 'Visual Disability (Partial)' },
+      { key: 'other', label: 'Other' },
     ],
   },
 ]

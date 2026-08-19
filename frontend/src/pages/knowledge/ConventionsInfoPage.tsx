@@ -22,6 +22,7 @@ import {
 } from '../../components/knowledge/KnowledgeHubUi'
 import { KnowledgeConventionCatDetail } from '../../components/knowledge/KnowledgeConventionCatDetail'
 import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_SEVEN_CORE_CONVENTIONS } from '../../lib/uiLabels'
+import { knowledgeConventionIcon } from '../../lib/knowledgeConventionIcons'
 
 const CONVENTION_TABS = ['Overview', 'Recommendations', 'Implementation', 'Challenges', 'Resources'] as const
 type ConventionTab = (typeof CONVENTION_TABS)[number]
@@ -50,6 +51,7 @@ function ConventionDetail({
         subtitle={data.name}
         icon={data.knowledge_icon}
         fallback="📜"
+        fallbackIcon={knowledgeConventionIcon(data.code)}
         metaLines={[`Adopted: ${adopted}`, `Ratified: ${ratified}`]}
         onBack={onBack}
       />
@@ -217,6 +219,7 @@ export function ConventionsInfoPage() {
                 key={c.id}
                 icon={c.knowledge_icon}
                 fallback="📜"
+                fallbackIcon={knowledgeConventionIcon(c.code)}
                 title={c.code}
                 description={c.name}
                 onClick={() => {

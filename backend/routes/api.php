@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\DepartmentTaskController;
 use App\Http\Controllers\Api\V1\CollectionReligionController;
+use App\Http\Controllers\Api\V1\CollectionYearController;
 use App\Http\Controllers\Api\V1\DistrictController;
 use App\Http\Controllers\Api\V1\HrRequestController;
 use App\Http\Controllers\Api\V1\KnowledgeHubController;
@@ -49,6 +50,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/regions', [RegionController::class, 'index'])->name('api.v1.regions.index');
         Route::get('/districts', [DistrictController::class, 'index'])->name('api.v1.districts.index');
         Route::get('/collection-religions', [CollectionReligionController::class, 'index'])->name('api.v1.collection-religions.index');
+        Route::get('/collection-years', [CollectionYearController::class, 'index'])->name('api.v1.collection-years.index');
         Route::get('/departments', [DepartmentController::class, 'index'])->name('api.v1.departments.index');
         Route::post('/departments', [DepartmentController::class, 'store'])->name('api.v1.departments.store');
         Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('api.v1.departments.update');
@@ -85,6 +87,7 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update']);
         Route::get('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'show'])->name('api.v1.regional-responses.show');
         Route::get('/regional-responses/{regionalResponse}/department-tasks', [RegionalResponseController::class, 'departmentTasks'])->name('api.v1.regional-responses.department-tasks');
+        Route::get('/regional-responses/{regionalResponse}/revisions', [RegionalResponseController::class, 'revisions'])->name('api.v1.regional-responses.revisions');
 
         Route::get('/compiled-records/preview', [CompiledRecordController::class, 'preview'])->name('api.v1.compiled-records.preview');
         Route::get('/compiled-records', [CompiledRecordController::class, 'index'])->name('api.v1.compiled-records.index');
@@ -93,6 +96,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/department-tasks', [DepartmentTaskController::class, 'index'])->name('api.v1.department-tasks.index');
         Route::post('/department-tasks', [DepartmentTaskController::class, 'store'])->name('api.v1.department-tasks.store');
         Route::post('/department-tasks/{departmentTask}/submit-response', [DepartmentTaskController::class, 'submitResponse'])->name('api.v1.department-tasks.submit-response');
+        Route::get('/department-tasks/{departmentTask}/revisions', [DepartmentTaskController::class, 'revisions'])->name('api.v1.department-tasks.revisions');
         Route::patch('/department-tasks/{departmentTask}', [DepartmentTaskController::class, 'updateReview'])->name('api.v1.department-tasks.update-review');
         Route::get('/violation-entries', [ViolationEntryController::class, 'index'])->name('api.v1.violation-entries.index');
 

@@ -7,6 +7,7 @@ import type { HrRequestRow } from '../types/hrRequest'
 import { DepartmentSubmissionsForRequest } from './DepartmentSubmissionsForRequest'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
 import { RegionalFederalReviewFeedback } from './RegionalFederalReviewFeedback'
+import { RegionalCompilationChangesTab } from './RegionalCompilationChangesTab'
 import { Alert } from './ui/Alert'
 import { Button } from './ui/Button'
 import { StatusBadge } from './ui/StatusBadge'
@@ -14,7 +15,7 @@ import { WorkflowModalHero } from './ui/WorkflowModalHero'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
 
-type PreviewTab = 'responses' | 'request'
+type PreviewTab = 'responses' | 'request' | 'changes'
 
 type Props = {
   row: RegionalResponseRow | null
@@ -29,6 +30,8 @@ type ViewProps = {
   embedded?: boolean
   onClose?: () => void
   footerExtra?: ReactNode
+  /** Extra content under Responses tab (e.g. push revision to departments). */
+  belowResponses?: ReactNode
 }
 
 export function RegionalResponsePreviewView({
@@ -37,6 +40,7 @@ export function RegionalResponsePreviewView({
   embedded = false,
   onClose,
   footerExtra,
+  belowResponses,
 }: ViewProps) {
   const [tab, setTab] = useState<PreviewTab>('responses')
   const [hrDetail, setHrDetail] = useState<HrRequestRow | null>(null)
@@ -107,6 +111,13 @@ export function RegionalResponsePreviewView({
         >
           Request
         </button>
+        <button
+          type="button"
+          className={'compiled-record-modal-tab' + (tab === 'changes' ? ' compiled-record-modal-tab--active' : '')}
+          onClick={() => setTab('changes')}
+        >
+          Changes
+        </button>
       </nav>
 
       <div className="modal-form regional-response-detail-modal__form dept-task-response-modal__body regional-response-detail-modal__form--flat">
@@ -131,8 +142,11 @@ export function RegionalResponsePreviewView({
                 <p className="muted regional-response-detail-modal__summary-empty">—</p>
               )}
             </div>
+            {belowResponses}
           </>
-        ) : (
+        ) : null}
+
+        {tab === 'request' ? (
           <>
             {hrLoading ? <p className="muted">Loading request…</p> : null}
             {hrError ? (
@@ -149,7 +163,18 @@ export function RegionalResponsePreviewView({
               </p>
             ) : null}
           </>
-        )}
+        ) : null}
+
+        {tab === 'changes' ? (
+          <RegionalCompilationChangesTab
+            regionalResponseId={row.id}
+            currentTitle={row.title}
+            currentContent={row.content}
+            tasks={tasksForDetail}
+            issueIndicators={hrDetail?.issue?.indicators}
+            audience="regional"
+          />
+        ) : null}
         {!embedded && onClose ? (
           <div className="hr-request-view-footback hr-request-view-footback--actions" style={{ marginTop: 16 }}>
             {footerExtra}

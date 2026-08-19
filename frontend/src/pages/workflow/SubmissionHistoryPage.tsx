@@ -31,7 +31,7 @@ import { regionalResponseReviewPresentation } from '../../lib/regionalResponseRe
 import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isViewer } from '../../lib/roles'
 import { regionalCompilationViewPath } from '../../lib/workflowNavigation'
 
-const REVIEW_STATUSES = ['pending', 'accepted', 'needs-modification', 'rejected'] as const
+const REVIEW_STATUSES = ['pending', 'accepted', 'needs-modification'] as const
 
 type Props = {
   title: string

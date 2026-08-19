@@ -1,3 +1,7 @@
+import type { HrReportingFramework } from '../lib/hrRequestReportingFramework'
+
+export type { HrReportingFramework }
+
 /** Publication lifecycle for an HR request (not department/regional workflow). */
 export type HrRequestStatus = 'draft' | 'active'
 export type HrRequestType = 'loi' | 'concluding_observation' | 'other_issue'
@@ -86,6 +90,8 @@ export interface HrRequestRow {
   issue_id?: number | null
   request_type?: HrRequestType | null
   other_issue_text?: string | null
+  /** Top-level reporting framework (UPR / treaty body / other issues). */
+  reporting_framework?: HrReportingFramework | null
   date: string
   status: HrRequestStatus
   details?: string | null
@@ -100,7 +106,9 @@ export interface HrRequestRow {
   recommendation_id?: string | null
   sdg?: string | null
   sdg_indicator?: string | null
+  /** UPR reporting cycle when reporting_framework is `upr` (e.g. cycle_1). */
   upr?: string | null
+  /** UPR recommendation when reporting_framework is `upr` (e.g. recommendation_1). */
   upr_indicator?: string | null
   issue_cards?: unknown
   region?: { id: number; name: string; slug: string } | null
@@ -108,6 +116,9 @@ export interface HrRequestRow {
   regions?: { id: number; name: string; slug: string }[]
   departments?: { id: number; code: string; name: string }[]
   convention?: { id: number; code: string; name: string } | null
+  /** Other Issues may link multiple conventions; treaty body uses one. */
+  convention_ids?: number[]
+  conventions?: { id: number; code: string; name: string }[]
   issue?: HrRequestIssueDetail | null
   attachments?: HrRequestAttachmentRow[]
   indicator_responses?: HrRequestIndicatorResponseRow[]

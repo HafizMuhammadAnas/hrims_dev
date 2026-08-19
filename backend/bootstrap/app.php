@@ -5,6 +5,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,6 +13,14 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        // Apache Alias /api (NTC VM) strips /api before index.php, so Laravel sees v1/...
+        apiPrefix: '',
+        then: function (): void {
+            // Keep /api/v1/... for Vite, php artisan serve, tests, nginx, and named route URLs.
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(base_path('routes/api.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
@@ -22,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         // Avoid exposing SQL / connection details to API clients (still logged).
         $exceptions->render(function (QueryException $e, Request $request) {
-            if ($request->is('api/*')) {
+            if ($request->is('api/*') || $request->is('v1/*')) {
                 report($e);
 
                 return response()->json([
@@ -36,7 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Temporary: turn APP_DEBUG=true on the server to see the real error for login failures.
         $exceptions->render(function (\Throwable $e, Request $request) {
-            if (! config('app.debug') || ! $request->is('api/v1/auth/login') || $request->method() !== 'POST') {
+            if (! config('app.debug') || ! $request->is('api/v1/auth/login', 'v1/auth/login') || $request->method() !== 'POST') {
                 return null;
             }
             report($e);

@@ -23,17 +23,5 @@ export function RegionalFederalReviewFeedback({ row, className }: Props) {
     )
   }
 
-  if (row.review_status === 'rejected') {
-    return (
-      <Alert
-        variant="error"
-        title="Federal feedback — compilation rejected"
-        className={className ?? 'regional-federal-review-feedback'}
-      >
-        <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{text}</p>
-      </Alert>
-    )
-  }
-
   return null
 }

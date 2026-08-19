@@ -19,6 +19,7 @@ import { isDepartmentAdmin, isFederalAdmin, isViewer } from '../lib/roles'
 import { sortCollectionYearsByLabelValue } from '../lib/collectionYearSort'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import {
+  LOI_LABEL,
   coerceIssueEntryKind,
   hrIssueSelectFieldLabel,
   hrIssueSelectPlaceholder,
@@ -35,6 +36,16 @@ import {
   selectIndicatorForLoiMessage,
   type IssueEntryKind,
 } from '../lib/issueEntryKind'
+import {
+  HR_REPORTING_FRAMEWORK_OPTIONS,
+  UPR_COMPLETION_BLOCKED_MESSAGE,
+  UPR_RECOMMENDATION_OPTIONS,
+  UPR_REPORTING_CYCLE_OPTIONS,
+  inferReportingFramework,
+  isTreatyBodyReportingFramework,
+  reportingFrameworkLabel,
+  type HrReportingFramework,
+} from '../lib/hrRequestReportingFramework'
 import {
   LABEL_EDIT_HR_REQUEST,
   LABEL_NEW_REQUEST,
@@ -59,6 +70,7 @@ import { Button } from './ui/Button'
 import { FormControl } from './ui/FormControl'
 import { FormField } from './ui/FormField'
 import { SearchableSelect } from './ui/SearchableSelect'
+import { SearchableMultiSelect } from './ui/SearchableMultiSelect'
 import { FormGrid } from './ui/FormGrid'
 import { FormRow } from './ui/FormRow'
 import { ModalActions, ModalHeader } from './ui/ModalChrome'
@@ -118,10 +130,17 @@ type IndicatorYearSelections = Record<number, { quantitative: number[]; qualitat
 
 type IssueFormState = {
   title: string
+  reporting_framework: HrReportingFramework | ''
   convention_id: number | ''
+  /** Other Issues optional multi-select; kept in sync with convention_id for treaty body. */
+  convention_ids: number[]
   issue_id: number | ''
   request_type: HrRequestType
   other_issue_text: string
+  /** UPR reporting cycle (`cycle_1` … `cycle_5`), stored as `upr`. */
+  upr_reporting_cycle: string
+  /** UPR recommendation (`recommendation_1` …), stored as `upr_indicator`. */
+  upr_recommendation: string
   region_ids: number[]
   department_ids: number[]
   date: string
@@ -139,10 +158,14 @@ function emptyIssueForm(lockedRegionId: number | null): IssueFormState {
   const region_ids = lockedRegionId != null ? [lockedRegionId] : []
   return {
     title: '',
+    reporting_framework: '',
     convention_id: '',
+    convention_ids: [],
     issue_id: '',
     request_type: 'loi',
     other_issue_text: '',
+    upr_reporting_cycle: '',
+    upr_recommendation: '',
     region_ids,
     department_ids: [],
     date: todayIso(),
@@ -192,14 +215,27 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
   const selectedIndicatorIds = [
     ...new Set((row.indicator_responses ?? []).map((r) => r.issue_indicator_id)),
   ]
+  const reportingFramework = inferReportingFramework(row)
+  const conventionIds =
+    row.convention_ids && row.convention_ids.length > 0
+      ? row.convention_ids
+      : row.conventions && row.conventions.length > 0
+        ? row.conventions.map((c) => c.id)
+        : row.convention_id != null
+          ? [row.convention_id]
+          : []
   return {
     title: row.title,
-    convention_id: row.convention_id ?? '',
+    reporting_framework: reportingFramework,
+    convention_id: row.convention_id ?? (conventionIds[0] ?? ''),
+    convention_ids: conventionIds,
     issue_id: row.issue_id ?? '',
     request_type:
       row.request_type ??
       (row.issue?.entry_kind === 'recommendation' ? 'concluding_observation' : 'loi'),
     other_issue_text: row.other_issue_text ?? '',
+    upr_reporting_cycle: row.upr ?? '',
+    upr_recommendation: row.upr_indicator ?? '',
     region_ids,
     department_ids: row.departments?.map((d) => d.id) ?? [],
     date: row.date,
@@ -693,13 +729,27 @@ export function HrRequestModal({
   }, [selectedIssue, readOnly, issueForm?.selectedIndicatorIds])
 
   const conventionDisplayLabel = useMemo(() => {
-    if (detail?.convention) return conventionOptionLabel(detail.convention)
-    if (issueForm?.convention_id !== '' && issueForm?.convention_id !== undefined) {
-      const c = conventions.find((x) => x.id === issueForm.convention_id)
-      if (c) return conventionOptionLabel(c)
-    }
-    return '—'
-  }, [detail?.convention, issueForm?.convention_id, conventions])
+    const fromDetail = detail?.conventions?.length
+      ? detail.conventions.map((c) => conventionOptionLabel(c)).join(', ')
+      : detail?.convention
+        ? conventionOptionLabel(detail.convention)
+        : null
+    if (fromDetail) return fromDetail
+    const ids =
+      issueForm?.convention_ids?.length
+        ? issueForm.convention_ids
+        : issueForm?.convention_id !== '' && issueForm?.convention_id !== undefined
+          ? [issueForm.convention_id]
+          : []
+    if (ids.length === 0) return '—'
+    const labels = ids
+      .map((id) => {
+        const c = conventions.find((x) => x.id === id)
+        return c ? conventionOptionLabel(c) : null
+      })
+      .filter((x): x is string => Boolean(x))
+    return labels.length > 0 ? labels.join(', ') : '—'
+  }, [detail?.conventions, detail?.convention, issueForm?.convention_ids, issueForm?.convention_id, conventions])
 
   const viewTemplateAssignedDepartmentNames = useMemo(() => {
     if (!portalDeptViewer || !readOnly) return null
@@ -743,26 +793,48 @@ export function HrRequestModal({
   function runIssueValidation(): boolean {
     if (!issueForm) return false
     const fe: Record<string, string> = {}
-    const otherIssue = issueForm.request_type === 'other_issue'
+    const framework = issueForm.reporting_framework
+    const otherIssue = framework === 'other_issue' || issueForm.request_type === 'other_issue'
+    const treatyBody = isTreatyBodyReportingFramework(framework)
     if (!issueForm.title.trim()) fe.title = 'Title is required.'
-    if (issueForm.convention_id === '') fe.convention_id = 'Convention is required.'
-    if (otherIssue) {
-      if (!issueForm.other_issue_text.trim()) {
-        fe.other_issue_text = 'Other issue details are required.'
+    if (!framework) {
+      fe.reporting_framework = 'Select a reporting type.'
+    } else if (framework === 'upr') {
+      fe.reporting_framework = UPR_COMPLETION_BLOCKED_MESSAGE
+      if (!issueForm.upr_reporting_cycle) {
+        fe.upr_reporting_cycle = 'Reporting cycle is required.'
       }
-    } else if (issueForm.issue_id === '') {
-      fe.issue_id = loiRequiredMessage()
+      if (!issueForm.upr_recommendation) {
+        fe.upr_recommendation = 'UPR recommendation is required.'
+      }
+    } else if (treatyBody || otherIssue) {
+      if (treatyBody && issueForm.convention_id === '') {
+        fe.convention_id = 'Convention is required.'
+      }
+      if (otherIssue) {
+        if (!issueForm.other_issue_text.trim()) {
+          fe.other_issue_text = 'Other issue details are required.'
+        }
+      } else if (issueForm.issue_id === '') {
+        fe.issue_id = loiRequiredMessage()
+      }
     }
     if (!issueForm.date) fe.date = 'Due date is required.'
     if (
       !otherIssue &&
+      framework !== 'upr' &&
       selectedIssue &&
       selectedIssue.indicators.length > 0 &&
       issueForm.selectedIndicatorIds.length === 0
     ) {
       fe.indicator_ids = selectIndicatorForLoiMessage()
     }
-    if (!otherIssue && selectedIssue && issueForm.selectedIndicatorIds.length > 0) {
+    if (
+      !otherIssue &&
+      framework !== 'upr' &&
+      selectedIssue &&
+      issueForm.selectedIndicatorIds.length > 0
+    ) {
       for (const ind of selectedIssue.indicators) {
         if (!issueForm.selectedIndicatorIds.includes(ind.id)) continue
         const years = issueForm.indicatorYearIds[ind.id] ?? { quantitative: [], qualitative: [] }
@@ -778,12 +850,12 @@ export function HrRequestModal({
         }
       }
     }
-    if (issueForm.region_ids.length === 0) {
+    if (framework !== 'upr' && issueForm.region_ids.length === 0) {
       fe.region_ids = 'Select at least one region.'
     }
     const ictOnly =
       issueForm.region_ids.length > 0 && issueForm.region_ids.every((id) => ictRegionIdSet.has(id))
-    if (ictOnly && issueForm.department_ids.length === 0) {
+    if (framework !== 'upr' && ictOnly && issueForm.department_ids.length === 0) {
       fe.department_ids =
         'Select at least one national-line department when the request is directed only to ICT.'
     }
@@ -817,20 +889,31 @@ export function HrRequestModal({
     setFormBanner(null)
     setFieldErrors({})
     if (!runIssueValidation()) return
-    const otherIssue = issueForm.request_type === 'other_issue'
+    const framework = issueForm.reporting_framework
+    if (!framework || framework === 'upr') return
+    const otherIssue = framework === 'other_issue' || issueForm.request_type === 'other_issue'
     if (!otherIssue && !selectedIssue) return
     const ictInPayload = issueForm.region_ids.some((id) => ictRegionIdSet.has(id))
     setSaving(true)
     try {
       if (mode === 'create') {
-        if (issueForm.convention_id === '') return
+        if (!otherIssue && issueForm.convention_id === '') return
         if (!otherIssue && issueForm.issue_id === '') return
+        const conventionIds = otherIssue
+          ? issueForm.convention_ids
+          : issueForm.convention_id === ''
+            ? []
+            : [issueForm.convention_id as number]
         await createHrRequestFromIssueForm({
           title: issueForm.title.trim(),
-          convention_id: issueForm.convention_id,
-          request_type: issueForm.request_type,
+          reporting_framework: framework,
+          convention_id: conventionIds[0] ?? null,
+          convention_ids: conventionIds,
+          request_type: otherIssue ? 'other_issue' : issueForm.request_type,
           issue_id: otherIssue ? null : (issueForm.issue_id as number),
           other_issue_text: otherIssue ? issueForm.other_issue_text.trim() : null,
+          upr: null,
+          upr_indicator: null,
           date: issueForm.date,
           status,
           details: issueForm.details.trim() || null,
@@ -848,12 +931,21 @@ export function HrRequestModal({
           attachments: issueForm.attachmentFiles,
         })
       } else if (mode === 'edit' && detail) {
+        const conventionIds = otherIssue
+          ? issueForm.convention_ids
+          : issueForm.convention_id === ''
+            ? []
+            : [issueForm.convention_id as number]
         await updateHrRequestFromIssueForm(detail.id, {
           title: issueForm.title.trim(),
-          convention_id: issueForm.convention_id as number,
-          request_type: issueForm.request_type,
+          reporting_framework: framework,
+          convention_id: conventionIds[0] ?? null,
+          convention_ids: conventionIds,
+          request_type: otherIssue ? 'other_issue' : issueForm.request_type,
           issue_id: otherIssue ? null : (issueForm.issue_id as number),
           other_issue_text: otherIssue ? issueForm.other_issue_text.trim() : null,
+          upr: null,
+          upr_indicator: null,
           region_ids: issueForm.region_ids,
           department_ids: ictInPayload ? issueForm.department_ids : [],
           date: issueForm.date,
@@ -984,6 +1076,13 @@ export function HrRequestModal({
           >
             {issueForm && detail ? (
               <>
+                {reportingFrameworkLabel(issueForm.reporting_framework || inferReportingFramework(detail)) ? (
+                  <StatusBadge tone="pending">
+                    {reportingFrameworkLabel(
+                      issueForm.reporting_framework || inferReportingFramework(detail),
+                    )}
+                  </StatusBadge>
+                ) : null}
                 <StatusBadge tone={statusTone(issueForm.status)}>
                   {statusDisplayLabel(issueForm.status)}
                 </StatusBadge>
@@ -1045,6 +1144,11 @@ export function HrRequestModal({
                   assignedDepartmentNames={viewTemplateAssignedDepartmentNames}
                   conventionLabel={conventionDisplayLabel}
                   requestType={issueForm.request_type}
+                  reportingFramework={
+                    issueForm.reporting_framework ||
+                    (detail ? inferReportingFramework(detail) : '') ||
+                    null
+                  }
                   otherIssueText={issueForm.other_issue_text}
                   issueTitle={selectedIssue ? issueEntryPrimaryText(selectedIssue) : 'Other Issues'}
                   issueEntryKind={
@@ -1126,6 +1230,178 @@ export function HrRequestModal({
                 <FieldError id="hr-title-err" message={fieldErrors.title} />
               </FormField>
 
+              <FormField label="Reporting type" htmlFor="hr-reporting-framework">
+                <select
+                  id="hr-reporting-framework"
+                  value={issueForm.reporting_framework}
+                  onChange={(e) => {
+                    const next = e.target.value as HrReportingFramework | ''
+                    setEntryKindFilters(defaultEntryKindFilters())
+                    setIssueForm((f) => {
+                      if (!f) return f
+                      const isOther = next === 'other_issue'
+                      const isUpr = next === 'upr'
+                      const nextIds = isUpr
+                        ? []
+                        : isOther
+                          ? f.convention_ids.length > 0
+                            ? f.convention_ids
+                            : f.convention_id === ''
+                              ? []
+                              : [f.convention_id]
+                          : f.convention_ids.length > 0
+                            ? [f.convention_ids[0]!]
+                            : f.convention_id === ''
+                              ? []
+                              : [f.convention_id]
+                      return {
+                        ...f,
+                        reporting_framework: next,
+                        request_type: isOther
+                          ? 'other_issue'
+                          : f.request_type === 'other_issue'
+                            ? 'loi'
+                            : f.request_type,
+                        convention_id: nextIds[0] ?? '',
+                        convention_ids: nextIds,
+                        issue_id: '',
+                        other_issue_text: isOther ? f.other_issue_text : '',
+                        upr_reporting_cycle: isUpr ? f.upr_reporting_cycle : '',
+                        upr_recommendation: isUpr ? f.upr_recommendation : '',
+                        selectedIndicatorIds: [],
+                        indicatorValues: {},
+                        indicatorYearIds: {},
+                      }
+                    })
+                  }}
+                  disabled={readOnly || mode !== 'create'}
+                  aria-invalid={Boolean(fieldErrors.reporting_framework)}
+                  aria-describedby={
+                    fieldErrors.reporting_framework ? 'hr-reporting-framework-err' : undefined
+                  }
+                >
+                  <option value="">Select reporting type</option>
+                  {HR_REPORTING_FRAMEWORK_OPTIONS.filter(
+                    (o) => o.value !== 'other_issue' || canUseOtherIssues,
+                  ).map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <FieldError
+                  id="hr-reporting-framework-err"
+                  message={fieldErrors.reporting_framework}
+                />
+              </FormField>
+
+              {issueForm.reporting_framework === 'upr' ? (
+                <>
+                  <FormField label="Reporting Cycle" htmlFor="hr-upr-cycle">
+                    <select
+                      id="hr-upr-cycle"
+                      value={issueForm.upr_reporting_cycle}
+                      onChange={(e) =>
+                        setIssueForm((f) =>
+                          f ? { ...f, upr_reporting_cycle: e.target.value } : f,
+                        )
+                      }
+                      disabled={readOnly}
+                      aria-invalid={Boolean(fieldErrors.upr_reporting_cycle)}
+                      aria-describedby={
+                        fieldErrors.upr_reporting_cycle ? 'hr-upr-cycle-err' : undefined
+                      }
+                    >
+                      <option value="">Select reporting cycle</option>
+                      {UPR_REPORTING_CYCLE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError
+                      id="hr-upr-cycle-err"
+                      message={fieldErrors.upr_reporting_cycle}
+                    />
+                  </FormField>
+
+                  <FormField label="List of UPR Recommendations" htmlFor="hr-upr-rec">
+                    <select
+                      id="hr-upr-rec"
+                      value={issueForm.upr_recommendation}
+                      onChange={(e) =>
+                        setIssueForm((f) =>
+                          f ? { ...f, upr_recommendation: e.target.value } : f,
+                        )
+                      }
+                      disabled={readOnly}
+                      aria-invalid={Boolean(fieldErrors.upr_recommendation)}
+                      aria-describedby={
+                        fieldErrors.upr_recommendation ? 'hr-upr-rec-err' : undefined
+                      }
+                    >
+                      <option value="">Select UPR recommendation</option>
+                      {UPR_RECOMMENDATION_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError
+                      id="hr-upr-rec-err"
+                      message={fieldErrors.upr_recommendation}
+                    />
+                  </FormField>
+                </>
+              ) : null}
+
+              {isTreatyBodyReportingFramework(issueForm.reporting_framework) ||
+              issueForm.reporting_framework === 'other_issue' ? (
+                <>
+              {issueForm.reporting_framework === 'other_issue' ? (
+                <FormField
+                  label="Convention (optional)"
+                  htmlFor="hr-conv"
+                  hint="Select one or more conventions when relevant. Leave empty if none apply."
+                >
+                  <SearchableMultiSelect
+                    id="hr-conv"
+                    values={issueForm.convention_ids.map(String)}
+                    onChange={(values) => {
+                      const ids = values
+                        .map((v) => Number(v))
+                        .filter((n) => Number.isFinite(n) && n > 0)
+                      setIssueForm((f) =>
+                        f
+                          ? {
+                              ...f,
+                              convention_ids: ids,
+                              convention_id: ids[0] ?? '',
+                            }
+                          : f,
+                      )
+                    }}
+                    options={conventionChoices.map((c) => ({
+                      value: String(c.id),
+                      label: conventionOptionLabel(c),
+                    }))}
+                    disabled={
+                      readOnly ||
+                      (issueForm.reporting_framework !== 'other_issue' && mode !== 'create')
+                    }
+                    placeholder="Select convention(s)"
+                    emptyFilterMessage="No conventions match"
+                    selectedSummary={(count, first) =>
+                      count === 0
+                        ? 'Select convention(s)'
+                        : count === 1
+                          ? (first ?? '1 convention')
+                          : `${count} conventions selected`
+                    }
+                  />
+                  <FieldError id="hr-conv-err" message={fieldErrors.convention_id} />
+                </FormField>
+              ) : (
               <FormField label="Convention" htmlFor="hr-conv">
                 <select
                   id="hr-conv"
@@ -1140,6 +1416,7 @@ export function HrRequestModal({
                         ? {
                             ...f,
                             convention_id: v === '' ? '' : v,
+                            convention_ids: v === '' ? [] : [v],
                             issue_id: '',
                             selectedIndicatorIds: [],
                             indicatorValues: {},
@@ -1161,28 +1438,21 @@ export function HrRequestModal({
                 </select>
                 <FieldError id="hr-conv-err" message={fieldErrors.convention_id} />
               </FormField>
+              )}
 
-              {!readOnly && (
+              {!readOnly && isTreatyBodyReportingFramework(issueForm.reporting_framework) ? (
                 <FormField label={issueEntryKindToggleAriaLabel()}>
                   <div
                     className="hr-request-entry-kind-filters checkbox-grid"
                     role="radiogroup"
                     aria-label={issueEntryKindToggleAriaLabel()}
                   >
-                    {(
-                      canUseOtherIssues
-                        ? (['issue', 'recommendation', 'other_issue'] as const)
-                        : (['issue', 'recommendation'] as const)
-                    ).map((kind) => (
+                    {(['issue', 'recommendation'] as const).map((kind) => (
                       <label key={kind} className="checkbox-label">
                         <input
                           type="radio"
                           name="hr-entry-kind"
-                          checked={
-                            kind === 'other_issue'
-                              ? issueForm.request_type === 'other_issue'
-                              : entryKindFilters[kind]
-                          }
+                          checked={entryKindFilters[kind]}
                           onChange={() => {
                             setEntryKindFilters({
                               issue: kind === 'issue',
@@ -1193,14 +1463,9 @@ export function HrRequestModal({
                                 ? {
                                     ...f,
                                     request_type:
-                                      kind === 'issue'
-                                        ? 'loi'
-                                        : kind === 'recommendation'
-                                          ? 'concluding_observation'
-                                          : 'other_issue',
+                                      kind === 'issue' ? 'loi' : 'concluding_observation',
                                     issue_id: '',
-                                    other_issue_text:
-                                      kind === 'other_issue' ? f.other_issue_text : '',
+                                    other_issue_text: '',
                                     selectedIndicatorIds: [],
                                     indicatorValues: {},
                                     indicatorYearIds: {},
@@ -1209,18 +1474,15 @@ export function HrRequestModal({
                             )
                           }}
                         />
-                        <span>
-                          {kind === 'other_issue'
-                            ? 'Other Issues'
-                            : issueEntryKindBadgeLabel(kind)}
-                        </span>
+                        <span>{issueEntryKindBadgeLabel(kind)}</span>
                       </label>
                     ))}
                   </div>
                 </FormField>
-              )}
+              ) : null}
 
-              {issueForm.request_type === 'other_issue' ? (
+              {issueForm.reporting_framework === 'other_issue' ||
+              issueForm.request_type === 'other_issue' ? (
                 <FormField label="Other issue details" htmlFor="hr-other-issue">
                   <textarea
                     id="hr-other-issue"
@@ -1273,7 +1535,7 @@ export function HrRequestModal({
                       issueForm.convention_id === ''
                         ? 'Select a convention first'
                         : !entryKindFilters.issue && !entryKindFilters.recommendation
-                          ? 'Select LOI or Concluding Observations'
+                          ? `Select ${issueEntryKindToggleAriaLabel()}`
                           : issuesLoading
                             ? loiLoadingPlaceholder()
                             : hrIssueSelectPlaceholder(entryKindFilters)
@@ -1285,6 +1547,8 @@ export function HrRequestModal({
                   <FieldError id="hr-issue-err" message={fieldErrors.issue_id} />
                 </FormField>
               )}
+                </>
+              ) : null}
 
               {readOnly && (
                 <FormField label="Request description" htmlFor="hr-details-summary">
@@ -1321,7 +1585,7 @@ export function HrRequestModal({
                           <strong>
                             {coerceIssueEntryKind(selectedIssue.entry_kind) === 'recommendation'
                               ? 'Concluding Observation'
-                              : 'LOI description'}
+                              : `${LOI_LABEL} description`}
                           </strong>
                         </summary>
                         <div className="mapping-article-collapse__body">
@@ -1929,14 +2193,24 @@ export function HrRequestModal({
                   variant="secondary"
                   compact
                   type="button"
-                  disabled={saving}
+                  disabled={saving || issueForm.reporting_framework === 'upr'}
                   onClick={() => void handleSaveDraft()}
                 >
                   {saving ? 'Saving…' : 'Save as Draft'}
                 </Button>
               ) : null}
               {showPrimarySubmit ? (
-                <Button variant="primary" compact type="submit" disabled={saving}>
+                <Button
+                  variant="primary"
+                  compact
+                  type="submit"
+                  disabled={saving || issueForm.reporting_framework === 'upr'}
+                  title={
+                    issueForm.reporting_framework === 'upr'
+                      ? UPR_COMPLETION_BLOCKED_MESSAGE
+                      : undefined
+                  }
+                >
                   {saving ? 'Submitting…' : 'Submit'}
                 </Button>
               ) : null}

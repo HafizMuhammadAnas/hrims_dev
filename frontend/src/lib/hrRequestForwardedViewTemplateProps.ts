@@ -1,5 +1,6 @@
 import type { DepartmentTaskRow } from '../api/lists'
 import { coerceIssueEntryKind, issueEntryPrimaryText } from './issueEntryKind'
+import { inferReportingFramework } from './hrRequestReportingFramework'
 import type { HrRequestIssueDetail } from '../types/hrRequest'
 import type { HrRequestRow } from '../types/hrRequest'
 import type { HrRequestViewIndicatorRow } from '../components/HrRequestViewTemplate'
@@ -74,6 +75,7 @@ export function buildDepartmentForwardedViewTemplateProps(
   issueTitle: string
   issueEntryKind: ReturnType<typeof coerceIssueEntryKind>
   requestType: HrRequestRow['request_type']
+  reportingFramework: ReturnType<typeof inferReportingFramework> | null
   otherIssueText: string | null
   categoryName: string
   issueDescription: string | null
@@ -122,6 +124,7 @@ export function buildDepartmentForwardedViewTemplateProps(
   const assignedDepartmentNames = ictTask ? assignedDepartmentNamesForTask(detail, task) : null
   const assignmentNotes = task.assignment_instructions?.trim() ?? ''
   const useRegionalInstructions = !ictTask || Boolean(assignmentNotes)
+  const reportingFramework = inferReportingFramework(detail) || null
 
   return {
     requestId: detail.id,
@@ -136,6 +139,7 @@ export function buildDepartmentForwardedViewTemplateProps(
     issueTitle: selectedIssue ? issueEntryPrimaryText(selectedIssue) : 'Other Issues',
     issueEntryKind: coerceIssueEntryKind(selectedIssue?.entry_kind),
     requestType: detail.request_type,
+    reportingFramework,
     otherIssueText: detail.other_issue_text?.trim() || null,
     categoryName: selectedIssue?.category?.name ?? '—',
     issueDescription: selectedIssue?.description?.trim() ? selectedIssue.description.trim() : null,
@@ -209,6 +213,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
   issueTitle: string
   issueEntryKind: ReturnType<typeof coerceIssueEntryKind>
   requestType: HrRequestRow['request_type']
+  reportingFramework: ReturnType<typeof inferReportingFramework> | null
   otherIssueText: string | null
   categoryName: string
   issueDescription: string | null
@@ -259,6 +264,7 @@ export function buildFederalOriginalRequestViewTemplateProps(detail: HrRequestRo
     issueTitle: selectedIssue ? issueEntryPrimaryText(selectedIssue) : 'Other Issues',
     issueEntryKind: coerceIssueEntryKind(selectedIssue?.entry_kind),
     requestType: detail.request_type,
+    reportingFramework: inferReportingFramework(detail) || null,
     otherIssueText: detail.other_issue_text?.trim() || null,
     categoryName: selectedIssue?.category?.name ?? '—',
     issueDescription: selectedIssue?.description?.trim() ? selectedIssue.description.trim() : null,

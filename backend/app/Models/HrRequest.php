@@ -37,6 +37,7 @@ class HrRequest extends Model
         'issue_id',
         'request_type',
         'other_issue_text',
+        'reporting_framework',
     ];
 
     protected function casts(): array
@@ -65,6 +66,12 @@ class HrRequest extends Model
     public function convention(): BelongsTo
     {
         return $this->belongsTo(Convention::class);
+    }
+
+    /** One or more conventions (Other Issues may link several; treaty body uses one). */
+    public function conventions(): BelongsToMany
+    {
+        return $this->belongsToMany(Convention::class, 'hr_request_convention', 'hr_request_id', 'convention_id');
     }
 
     public function issue(): BelongsTo

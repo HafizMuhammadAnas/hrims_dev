@@ -26,9 +26,13 @@ export interface DashboardSummary {
   hr_requests_total: number
   by_status: Record<string, number>
   urgent_requests: UrgentRequestRow[]
+  /** Recent in-scope HR requests (not limited to overdue / draft). */
+  recent_requests?: UrgentRequestRow[]
   requests_created_by_month: MonthCountPoint[]
   regional_responses_total?: number
   regional_responses_by_review?: Record<string, number>
+  /** Assigned provinces (ICT excluded) that have not submitted a compilation yet. */
+  regional_responses_pending_submission?: number
   compiled_records_total?: number
   hr_requests_pending_federal?: number
   clarifications_pending_federal?: number

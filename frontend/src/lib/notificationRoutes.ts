@@ -68,6 +68,15 @@ export function resolveNotificationRoute(
     }
   }
 
+  if (item.entity_type === 'hr_request_clarification' && entityId) {
+    if (federal) {
+      return `/requests/clarifications?id=${encodeURIComponent(entityId)}`
+    }
+    if (regional && hrRequestId) {
+      return `/requests/${encodeURIComponent(hrRequestId)}?from=${encodeURIComponent('/region-received')}`
+    }
+  }
+
   if (item.entity_type === 'user' && entityId) {
     if (regional) return `/regional-users-mgmt/${encodeURIComponent(entityId)}/edit`
     if (federal) return `/federal-users-mgmt/${encodeURIComponent(entityId)}/edit`

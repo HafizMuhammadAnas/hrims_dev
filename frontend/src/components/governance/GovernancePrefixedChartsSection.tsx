@@ -62,7 +62,7 @@ function TrendShapeChart({
         {shape === 'bar' ? (
           <BarChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="year" />
+            <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
             <YAxis allowDecimals={false} width={40} />
             <Tooltip />
             <Bar dataKey="total" name="Total" fill={color} radius={[6, 6, 0, 0]} />
@@ -87,7 +87,7 @@ function TrendShapeChart({
         ) : shape === 'area' ? (
           <AreaChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="year" />
+            <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
             <YAxis allowDecimals={false} width={40} />
             <Tooltip />
             <Area
@@ -103,7 +103,7 @@ function TrendShapeChart({
         ) : shape === 'step' ? (
           <LineChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="year" />
+            <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
             <YAxis allowDecimals={false} width={40} />
             <Tooltip />
             <Line
@@ -119,7 +119,7 @@ function TrendShapeChart({
         ) : shape === 'composed' ? (
           <ComposedChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="year" />
+            <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
             <YAxis allowDecimals={false} width={40} />
             <Tooltip />
             <Bar dataKey="total" name="Total" fill={color} fillOpacity={0.35} radius={[4, 4, 0, 0]} />
@@ -128,7 +128,7 @@ function TrendShapeChart({
         ) : (
           <LineChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="year" />
+            <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
             <YAxis allowDecimals={false} width={40} />
             <Tooltip />
             <Line
@@ -188,7 +188,7 @@ function ComparisonChart({
             {chart.shape === 'bar' ? (
               <BarChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />
@@ -198,7 +198,7 @@ function ComparisonChart({
             ) : chart.shape === 'composed' ? (
               <ComposedChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />
@@ -215,7 +215,7 @@ function ComparisonChart({
             ) : (
               <LineChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />
@@ -314,7 +314,7 @@ function DimensionTotalsChart({
             {chart.shape === 'bar' ? (
               <BarChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />
@@ -331,7 +331,7 @@ function DimensionTotalsChart({
             ) : chart.shape === 'composed' ? (
               <ComposedChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />
@@ -361,7 +361,7 @@ function DimensionTotalsChart({
             ) : (
               <LineChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" />
+                <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />

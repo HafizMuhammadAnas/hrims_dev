@@ -14,19 +14,19 @@ return new class extends Migration
     public static function officialReligionNames(): array
     {
         return [
-            'None',
+            'Muslim',
+            'Christianity',
+            'Hindu',
+            'Sikh',
             'Ahmadiyya',
+            'Others',
+            'None',
             'Bahais',
             'Buddhist',
-            'Christians',
-            'Hindus',
             'Jews',
-            'Muslims',
             'Non-believers',
             'Parsi',
-            'Sikhs',
             'Zikri',
-            'Others',
         ];
     }
 

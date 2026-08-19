@@ -20,6 +20,7 @@ import {
 } from '../lib/hrRequestForwardedViewTemplateProps'
 import { indicatorsScopedToRequest } from '../lib/hrRequestIndicatorScope'
 import { issueEntryPrimaryText } from '../lib/issueEntryKind'
+import { inferReportingFramework } from '../lib/hrRequestReportingFramework'
 import type { HrRequestRow } from '../types/hrRequest'
 
 type Props = {
@@ -96,6 +97,9 @@ export function ClarificationFederalViewPanel({ clarificationId, onClose, onResp
       issueTitle: issueEntryPrimaryText(issue),
       issueEntryKind:
         issue.entry_kind === 'recommendation' ? ('recommendation' as const) : ('issue' as const),
+      requestType: hrRequest.request_type,
+      reportingFramework: inferReportingFramework(hrRequest) || null,
+      otherIssueText: hrRequest.other_issue_text?.trim() || null,
       categoryName: issue.category?.name ?? '—',
       issueDescription: issue.description ?? null,
       description: hrRequest.details ?? '',

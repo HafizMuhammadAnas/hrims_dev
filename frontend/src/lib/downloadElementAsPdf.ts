@@ -17,6 +17,8 @@ const BREAK_SELECTORS = [
   '.iwd-dimension',
   '.iwd-card__toolbar',
   '.iwd-card__indicator-banner',
+  '.dept-response-form-section',
+  '.dept-response-form-section__summary',
   '.ministry-compiled-region-card',
   '.ministry-compiled-dept-response-item',
   '.ministry-compiled-print-document',

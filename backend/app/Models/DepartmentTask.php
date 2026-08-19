@@ -19,6 +19,7 @@ class DepartmentTask extends Model
         'status',
         'regional_review_status',
         'regional_review_comments',
+        'pending_revision_origin',
         'assigned_date',
         'assignment_instructions',
         'assigned_indicator_ids',
@@ -52,5 +53,11 @@ class DepartmentTask extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function revisions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(DepartmentTaskRevision::class, 'department_task_id', 'id')
+            ->orderByDesc('revision_no');
     }
 }

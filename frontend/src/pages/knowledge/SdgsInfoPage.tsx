@@ -14,6 +14,7 @@ import {
   KnowledgeHubTabs,
   KnowledgeHubTargetList,
 } from '../../components/knowledge/KnowledgeHubUi'
+import { knowledgeSdgIcon } from '../../lib/knowledgeSdgIcons'
 
 const SDG_TABS = ['Targets', 'Progress', 'Initiatives'] as const
 type SdgTab = (typeof SDG_TABS)[number]
@@ -37,6 +38,7 @@ function SdgDetail({ data, onBack }: { data: KnowledgeSdgGoal; onBack: () => voi
         subtitle="Sustainable Development Goal"
         icon={data.knowledge_icon}
         fallback="🎯"
+        fallbackIcon={knowledgeSdgIcon(data.goal_number, data.code)}
         onBack={onBack}
       />
 
@@ -143,6 +145,7 @@ export function SdgsInfoPage() {
                 key={goal.id}
                 icon={goal.knowledge_icon}
                 fallback="🎯"
+                fallbackIcon={knowledgeSdgIcon(goal.goal_number, goal.code)}
                 title={goal.title}
                 description={goal.summary}
                 stat1Value={goal.stat_1_value}

@@ -53,7 +53,7 @@ import {
   type ReportingDashboardResult,
   type ReportingDashboardSummaryCards,
 } from '../lib/reportGeneratorData'
-import { reportColorForLabel, reportDashboardChartColor } from '../lib/reportChartTheme'
+import { reportDashboardChartColor, reportTop10BarColor } from '../lib/reportChartTheme'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { LABEL_REPORTING_DASHBOARD } from '../lib/uiLabels'
 import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
@@ -167,9 +167,12 @@ function DonutChartPanel({
 function ReportingRankPanel({
   title,
   rows,
+  reverseColors = false,
 }: {
   title: string
   rows: ReportRankRow[]
+  /** Indicators use the reverse of the Categories top-10 palette. */
+  reverseColors?: boolean
 }) {
   return (
     <div className="reporting-rank-panel">
@@ -188,7 +191,7 @@ function ReportingRankPanel({
                   className="reporting-rank-row__bar-fill"
                   style={{
                     width: `${row.barPercent}%`,
-                    background: reportColorForLabel(row.label, index),
+                    background: reportTop10BarColor(index, reverseColors),
                   }}
                 />
               </div>
@@ -701,7 +704,11 @@ export function ReportGeneratorPage() {
                       />
                     </div>
                     <div className="report-generator__chart-panel reporting-dashboard__panel reporting-dashboard__panel--rank">
-                      <ReportingRankPanel title="Indicators — top 10" rows={dashboardResult.topIndicators} />
+                      <ReportingRankPanel
+                        title="Indicators — top 10"
+                        rows={dashboardResult.topIndicators}
+                        reverseColors
+                      />
                     </div>
                   </div>
                 </>

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use App\Support\NotificationService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,20 +15,19 @@ class NotificationController extends Controller
     {
         $limit = max(1, min((int) $request->query('limit', 10), 200));
         $user = $request->user();
+        $service = app(NotificationService::class);
 
-        $rows = Notification::query()
-            ->where('user_id', $user->id)
+        $rows = $this->scopedQuery($user, $service)
             ->latest()
             ->limit($limit)
             ->get();
 
-        $unreadCount = Notification::query()
-            ->where('user_id', $user->id)
+        $unreadCount = $this->scopedQuery($user, $service)
             ->whereNull('read_at')
             ->count();
 
         return response()->json([
-            'data' => $rows->map(fn (Notification $notification) => $this->serialize($notification)),
+            'data' => $rows->map(fn (Notification $notification) => $this->serialize($notification, $service)),
             'meta' => [
                 'unread_count' => $unreadCount,
             ],
@@ -35,9 +36,8 @@ class NotificationController extends Controller
 
     public function markRead(Request $request, int $notification): JsonResponse
     {
-        $model = Notification::query()
-            ->where('user_id', $request->user()->id)
-            ->find($notification);
+        $service = app(NotificationService::class);
+        $model = $this->scopedQuery($request->user(), $service)->find($notification);
 
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
@@ -47,13 +47,13 @@ class NotificationController extends Controller
             $model->forceFill(['read_at' => now()])->save();
         }
 
-        return response()->json(['data' => $this->serialize($model)]);
+        return response()->json(['data' => $this->serialize($model, $service)]);
     }
 
     public function markAllRead(Request $request): JsonResponse
     {
-        Notification::query()
-            ->where('user_id', $request->user()->id)
+        $service = app(NotificationService::class);
+        $this->scopedQuery($request->user(), $service)
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 
@@ -61,15 +61,29 @@ class NotificationController extends Controller
     }
 
     /**
+     * @return Builder<Notification>
+     */
+    private function scopedQuery($user, NotificationService $service): Builder
+    {
+        $query = Notification::query()->where('user_id', $user->id);
+        $allowed = $service->allowedEventKeysFor($user);
+        if ($allowed !== null) {
+            $query->whereIn('event_key', $allowed);
+        }
+
+        return $query;
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function serialize(Notification $notification): array
+    private function serialize(Notification $notification, NotificationService $service): array
     {
         return [
             'id' => $notification->id,
             'event_key' => $notification->event_key,
-            'title' => $notification->title,
-            'message' => $notification->message,
+            'title' => $service->displayTitle($notification),
+            'message' => $service->displayMessage($notification),
             'entity_type' => $notification->entity_type,
             'entity_id' => $notification->entity_id,
             'route' => $notification->route,

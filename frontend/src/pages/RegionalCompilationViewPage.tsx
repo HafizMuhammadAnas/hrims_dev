@@ -6,6 +6,7 @@ import type { HrRequestRow } from '../types/hrRequest'
 import { updateRegionalCompiledResponse } from '../api/workflows'
 import { useAuth } from '../auth/AuthContext'
 import { DepartmentSubmissionsForRequest } from '../components/DepartmentSubmissionsForRequest'
+import { RegionalDepartmentRevisionFollowUp } from '../components/RegionalDepartmentRevisionFollowUp'
 import { RegionalFederalReviewFeedback } from '../components/RegionalFederalReviewFeedback'
 import { RegionalResponsePreviewView } from '../components/RegionalResponsePreviewModal'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
@@ -100,8 +101,25 @@ export function RegionalCompilationViewPage() {
 
   const tasksForDetail = useMemo(() => {
     if (!row) return []
-    return tasks.filter((t) => t.req_id === row.req_id).sort(sortTasksByDept)
+    return tasks
+      .filter((t) => {
+        if (t.req_id !== row.req_id) return false
+        if (row.region_id != null) return t.region_id === row.region_id
+        if (row.region_name) return (t.region_name ?? '').trim() === row.region_name.trim()
+        return true
+      })
+      .sort(sortTasksByDept)
   }, [tasks, row])
+
+  function upsertTask(updated: DepartmentTaskRow) {
+    setTasks((prev) => {
+      const i = prev.findIndex((t) => t.id === updated.id)
+      if (i < 0) return [...prev, updated]
+      const next = [...prev]
+      next[i] = updated
+      return next
+    })
+  }
 
   async function saveEditedCompilation() {
     if (!row) return
@@ -146,12 +164,26 @@ export function RegionalCompilationViewPage() {
           <p className="login-error">Regional compilation not found.</p>
         ) : null}
         {!loading && !error && row && !editing ? (
-          <RegionalResponsePreviewView
-            row={row}
-            tasksForDetail={tasksForDetail}
-            embedded
-            footerExtra={footerExtra}
-          />
+          <>
+            <RegionalResponsePreviewView
+              row={row}
+              tasksForDetail={tasksForDetail}
+              embedded
+              footerExtra={footerExtra}
+              belowResponses={
+                regional && row.review_status === 'needs-modification' ? (
+                  <RegionalDepartmentRevisionFollowUp
+                    tasks={tasks}
+                    reqId={row.req_id}
+                    regionId={row.region_id}
+                    regionName={row.region_name}
+                    defaultComments={row.comments?.trim() ?? ''}
+                    onUpdated={upsertTask}
+                  />
+                ) : null
+              }
+            />
+          </>
         ) : null}
         {!loading && !error && row && editing && regional ? (
           <div className="modal-card modal-card-wide regional-response-detail-modal workflow-tabbed-card">
@@ -165,6 +197,16 @@ export function RegionalCompilationViewPage() {
             <div className="modal-form regional-response-detail-modal__form dept-task-response-modal__body">
               <RegionalFederalReviewFeedback row={row} />
               {saveError ? <p className="login-error">{saveError}</p> : null}
+              {row.review_status === 'needs-modification' ? (
+                <RegionalDepartmentRevisionFollowUp
+                  tasks={tasks}
+                  reqId={row.req_id}
+                  regionId={row.region_id}
+                  regionName={row.region_name}
+                  defaultComments={row.comments?.trim() ?? ''}
+                  onUpdated={upsertTask}
+                />
+              ) : null}
               <section className="hr-request-view-template__card regional-response-detail-modal__section">
                 <h2 className="card-section-heading">Reference - department submissions</h2>
                 <DepartmentSubmissionsForRequest

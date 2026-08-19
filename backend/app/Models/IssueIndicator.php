@@ -50,6 +50,56 @@ class IssueIndicator extends Model
 
     public const AGE_ABOVE_60 = 'above_60';
 
+    /** Disability type disaggregates (PWD categories). */
+    public const DISABILITY_HEARING = 'hearing_disability';
+
+    public const DISABILITY_LOWER_LIMB = 'lower_limb_disability';
+
+    public const DISABILITY_MENTAL = 'mental_disability';
+
+    public const DISABILITY_SPEECH = 'speech_disability';
+
+    public const DISABILITY_UPPER_LIMB = 'upper_limb_disability';
+
+    public const DISABILITY_VISUAL_FULL = 'visual_disability_full';
+
+    public const DISABILITY_VISUAL_PARTIAL = 'visual_disability_partial';
+
+    public const DISABILITY_OTHER = 'other';
+
+    /**
+     * @var list<string>
+     */
+    public const DISABILITY_KEYS = [
+        self::DISABILITY_HEARING,
+        self::DISABILITY_LOWER_LIMB,
+        self::DISABILITY_MENTAL,
+        self::DISABILITY_SPEECH,
+        self::DISABILITY_UPPER_LIMB,
+        self::DISABILITY_VISUAL_FULL,
+        self::DISABILITY_VISUAL_PARTIAL,
+        self::DISABILITY_OTHER,
+    ];
+
+    /** @deprecated Legacy Washington Group keys — older submissions only. */
+    public const DISABILITY_VISION = 'vision';
+
+    /** @deprecated Legacy key. */
+    public const DISABILITY_HEARING_LEGACY = 'hearing';
+
+    /** @deprecated Legacy key. */
+    public const DISABILITY_COGNITION = 'cognition';
+
+    /** @deprecated Legacy key. */
+    public const DISABILITY_MOBILITY = 'mobility';
+
+    /** @deprecated Legacy key. */
+    public const DISABILITY_SELF_CARE = 'self_care';
+
+    /** @deprecated Legacy key. */
+    public const DISABILITY_COMMUNICATION = 'communication';
+
+    /** @deprecated Legacy key — older submissions only. */
     public const DISABILITY_PERSONS_WITH_DISABILITY = 'persons_with_disability';
 
     protected $fillable = [

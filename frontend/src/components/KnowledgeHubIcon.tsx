@@ -1,3 +1,5 @@
+import type { ComponentType } from 'react'
+
 function shouldRenderAsImage(raw: string): boolean {
   const s = raw.trim()
   if (!s) return false
@@ -17,13 +19,31 @@ function resolveIconSrc(trimmed: string): string {
   return trimmed
 }
 
+/**
+ * Emoji stored through a non-utf8mb4 connection collapses to "?" (or U+FFFD).
+ * Those values carry no meaning, so they must not win over the built-in icon.
+ */
+function isMeaninglessGlyph(raw: string): boolean {
+  const stripped = raw
+    // Variation selectors / zero-width joiners left behind by a mangled emoji.
+    .replace(/[\uFE0E\uFE0F\u200B-\u200D\u2060]/g, '')
+    .trim()
+  if (!stripped) return true
+  return /^[?\uFFFD]+$/.test(stripped)
+}
+
+type IconComponent = ComponentType<{ size?: number; strokeWidth?: number; 'aria-hidden'?: boolean }>
+
 type Props = {
   value: string | null | undefined
+  /** Text/emoji shown when no icon component is supplied. */
   fallback: string
+  /** Preferred vector icon when there is no usable stored icon. */
+  fallbackIcon?: IconComponent
   variant?: 'card' | 'hero'
 }
 
-export function KnowledgeHubIcon({ value, fallback, variant = 'card' }: Props) {
+export function KnowledgeHubIcon({ value, fallback, fallbackIcon, variant = 'card' }: Props) {
   const trimmed = value?.trim() ?? ''
   const className =
     variant === 'hero' ? 'conv-icon-lg' : variant === 'card' ? 'card-icon' : 'knowledge-card-icon'
@@ -36,10 +56,20 @@ export function KnowledgeHubIcon({ value, fallback, variant = 'card' }: Props) {
     )
   }
 
-  const display = trimmed || fallback
+  const usableGlyph = trimmed && !isMeaninglessGlyph(trimmed) ? trimmed : ''
+
+  if (!usableGlyph && fallbackIcon) {
+    const FallbackIcon = fallbackIcon
+    return (
+      <div className={className} aria-hidden>
+        <FallbackIcon size={variant === 'hero' ? 56 : 26} strokeWidth={1.9} aria-hidden />
+      </div>
+    )
+  }
+
   return (
     <div className={className} aria-hidden>
-      {display}
+      {usableGlyph || fallback}
     </div>
   )
 }

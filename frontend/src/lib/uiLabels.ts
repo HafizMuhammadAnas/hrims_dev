@@ -58,12 +58,13 @@ export const LABEL_REQUEST_DISTRIBUTION = 'Request Distribution'
 export const LABEL_RECEIVED_REQUEST = 'Received Request'
 export const LABEL_DEPARTMENTAL_RESPONSE = 'Departmental Response'
 export const LABEL_ASSIGNED_TASK = 'Assigned Task'
-export const LABEL_LOI_OBSERVATION_TITLE = 'LOI / Observation Title'
+export const LABEL_LOI_OBSERVATION_TITLE = 'List of Issues / Observation Title'
 
 /** Dashboard KPI and panel headings */
 export const LABEL_OPEN_TASKS = 'Open Tasks'
 export const LABEL_SUBMITTED_RATE = 'Submitted Rate'
-export const LABEL_LINKED_REQUEST_ATTENTION = 'Linked Request Attention'
+/** @deprecated Prefer LABEL_NEEDS_ATTENTION — department KPI now uses revision status. */
+export const LABEL_LINKED_REQUEST_ATTENTION = 'Needs Attention'
 export const LABEL_ACTIVE_REQUESTS = 'Active Requests'
 export const LABEL_ACCEPTED_RATE = 'Accepted Rate'
 export const LABEL_NEEDS_ATTENTION = 'Needs Attention'

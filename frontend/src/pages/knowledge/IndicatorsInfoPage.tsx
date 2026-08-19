@@ -13,6 +13,7 @@ import {
   KnowledgeHubStateMessage,
   KnowledgeHubTabs,
 } from '../../components/knowledge/KnowledgeHubUi'
+import { knowledgeStatCardIcon } from '../../lib/knowledgeCardIcons'
 
 const INDICATOR_TABS = ['Overview', 'Provincial context', 'Policies'] as const
 type IndicatorTab = (typeof INDICATOR_TABS)[number]
@@ -27,6 +28,7 @@ function IndicatorDetail({ data, onBack }: { data: KnowledgeStatCard; onBack: ()
         subtitle={data.summary}
         icon={data.icon}
         fallback="📊"
+        fallbackIcon={knowledgeStatCardIcon('indicators', data.title)}
         onBack={onBack}
       />
 
@@ -119,6 +121,7 @@ export function IndicatorsInfoPage() {
                 key={item.id}
                 icon={item.icon}
                 fallback="📊"
+                fallbackIcon={knowledgeStatCardIcon('indicators', item.title)}
                 title={item.title}
                 description={item.summary}
                 stat1Value={item.stat_1_value}

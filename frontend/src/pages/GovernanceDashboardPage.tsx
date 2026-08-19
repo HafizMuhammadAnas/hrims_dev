@@ -7,6 +7,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { fetchDepartmentTasks, fetchGovernanceDefaultCharts } from '../api/lists'
+import { fetchCollectionYears, type CollectionYearRow } from '../api/collectionYears'
 import {
   fetchReportConventions,
   fetchReportIndicators,
@@ -79,6 +80,7 @@ export function GovernanceDashboardPage() {
   >([])
   const [indicators, setIndicators] = useState<ReportLookupIndicator[]>([])
   const [allIndicators, setAllIndicators] = useState<ReportLookupIndicator[]>([])
+  const [collectionYears, setCollectionYears] = useState<CollectionYearRow[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [chartLoading, setChartLoading] = useState(false)
   const [defaultLoading, setDefaultLoading] = useState(true)
@@ -92,12 +94,14 @@ export function GovernanceDashboardPage() {
       fetchReportConventions(),
       fetchReportIssueCategories(),
       fetchReportIndicators({}),
+      fetchCollectionYears().catch(() => [] as CollectionYearRow[]),
       fetchGovernanceDefaultCharts().catch(() => [] as Awaited<ReturnType<typeof fetchGovernanceDefaultCharts>>),
     ])
-      .then(([conv, cats, inds, defaultCharts]) => {
+      .then(([conv, cats, inds, years, defaultCharts]) => {
         setConventions(conv)
         setCategories(cats)
         setAllIndicators(inds)
+        setCollectionYears(years)
         setSavedDefaultCharts(defaultCharts)
       })
       .catch((e: unknown) => {
@@ -205,10 +209,16 @@ export function GovernanceDashboardPage() {
         const dimMeta = allIndicators.filter((i) => dimIds.includes(String(i.id)))
         const genderSeries = buildIndicatorGenderTrendSeries(
           scopedTasks,
-          genderMeta,
+          genderMeta.length > 0 ? genderMeta : allIndicators,
           genderOnlyIds,
+          collectionYears,
         )
-        const dimSeries = buildIndicatorDimensionTotalsSeries(scopedTasks, dimMeta, dimIds)
+        const dimSeries = buildIndicatorDimensionTotalsSeries(
+          scopedTasks,
+          dimMeta.length > 0 ? dimMeta : allIndicators,
+          dimIds,
+          collectionYears,
+        )
         if (!cancelled) {
           setPrefixedSeries(genderSeries)
           setDimensionSeries(dimSeries)
@@ -227,7 +237,7 @@ export function GovernanceDashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [allIndicators, savedDefaultCharts, federalPortal, lockedRegionalId])
+  }, [allIndicators, collectionYears, savedDefaultCharts, federalPortal, lockedRegionalId])
 
   const dirty = filtersAreDirty(filters, defaults)
   const canApply = filters.indicatorIds.length > 0
@@ -263,6 +273,7 @@ export function GovernanceDashboardPage() {
         scopedTasks,
         selectedMeta.length > 0 ? selectedMeta : indicators,
         filters.indicatorIds,
+        collectionYears,
       )
       setTrendSeries(series)
     } catch (e: unknown) {
