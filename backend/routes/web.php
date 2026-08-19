@@ -44,7 +44,7 @@ Route::fallback(function () use ($spaIndexPath) {
     if (! in_array(request()->method(), ['GET', 'HEAD'], true)) {
         abort(404);
     }
-    if (request()->is('api/*')) {
+    if (request()->is('api/*') || request()->is('v1/*')) {
         abort(404);
     }
 
