@@ -35,6 +35,12 @@ class AppServiceProvider extends ServiceProvider
                 $stateful[] = $host;
             }
         }
+        if (! $this->app->runningInConsole()) {
+            $requestHost = request()->getHost();
+            if (is_string($requestHost) && $requestHost !== '' && ! in_array($requestHost, $stateful, true)) {
+                $stateful[] = $requestHost;
+            }
+        }
         config(['sanctum.stateful' => $stateful]);
     }
 }
