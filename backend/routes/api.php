@@ -35,6 +35,10 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', fn () => ['status' => 'ok', 'app' => config('app.name')])->name('api.v1.health');
 
+    // Under /api so Apache Alias /api reaches Laravel (plain /sanctum/csrf-cookie often hits the SPA).
+    Route::get('/auth/csrf-cookie', [\Laravel\Sanctum\Http\Controllers\CsrfCookieController::class, 'show'])
+        ->name('api.v1.auth.csrf-cookie');
+
     // Throttle uses the default cache store; database cache without a `cache` table causes 500 here.
     // Re-add e.g. ->middleware('throttle:5,1') after CACHE_STORE=file (or migrate cache table).
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.v1.auth.login');

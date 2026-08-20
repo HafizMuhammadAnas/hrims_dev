@@ -21,4 +21,10 @@ class ApiV1HealthTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('status', 'ok');
     }
+
+    public function test_csrf_cookie_endpoint_is_available_under_api_prefix(): void
+    {
+        $this->getJson('/api/v1/auth/csrf-cookie')->assertNoContent();
+        $this->getJson('/v1/auth/csrf-cookie')->assertNoContent();
+    }
 }

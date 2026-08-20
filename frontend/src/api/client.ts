@@ -8,8 +8,9 @@ function getCookie(name: string): string | undefined {
 }
 
 export async function ensureCsrfCookie(): Promise<void> {
-  await fetch('/sanctum/csrf-cookie', {
+  await fetch('/api/v1/auth/csrf-cookie', {
     credentials: 'include',
+    headers: { Accept: 'application/json' },
   })
 }
 
