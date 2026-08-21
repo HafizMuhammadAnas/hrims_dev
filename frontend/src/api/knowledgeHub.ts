@@ -30,11 +30,20 @@ export type KnowledgeConventionDetail = KnowledgeConventionListItem & {
   components: KnowledgeConventionComponent[]
 }
 
+export type KnowledgeRelatedIssue = {
+  id: number
+  entry_kind: 'issue' | 'recommendation'
+  issue_title: string | null
+  description: string | null
+}
+
 export type KnowledgeConventionArticle = {
   id: number
   convention_id: number
   article_name: string
   description: string | null
+  related_loi?: KnowledgeRelatedIssue[]
+  related_concluding_observations?: KnowledgeRelatedIssue[]
 }
 
 export type KnowledgeConventionIssueRow = {

@@ -61,16 +61,38 @@ class KnowledgeHubController extends Controller
             Article::query()
                 ->where('convention_id', $convention->id)
                 ->where('is_active', true)
+                ->with([
+                    'issues' => function ($q) use ($convention): void {
+                        $q->where('issues.convention_id', $convention->id)
+                            ->where('issues.is_active', true)
+                            ->orderBy('issues.id');
+                    },
+                ])
                 ->get(['id', 'convention_id', 'article_name', 'description'])
         );
 
         return response()->json([
-            'data' => $rows->map(fn (Article $a) => [
-                'id' => $a->id,
-                'convention_id' => (int) $a->convention_id,
-                'article_name' => $a->article_name,
-                'description' => $a->description,
-            ])->all(),
+            'data' => $rows->map(function (Article $a) {
+                $relatedLoi = [];
+                $relatedObservations = [];
+                foreach ($a->issues as $issue) {
+                    $payload = $this->serializeRelatedIssue($issue);
+                    if ($issue->entry_kind === 'recommendation') {
+                        $relatedObservations[] = $payload;
+                    } else {
+                        $relatedLoi[] = $payload;
+                    }
+                }
+
+                return [
+                    'id' => $a->id,
+                    'convention_id' => (int) $a->convention_id,
+                    'article_name' => $a->article_name,
+                    'description' => $a->description,
+                    'related_loi' => $relatedLoi,
+                    'related_concluding_observations' => $relatedObservations,
+                ];
+            })->all(),
         ]);
     }
 
@@ -88,7 +110,7 @@ class KnowledgeHubController extends Controller
             ->where('is_active', true)
             ->with([
                 'category:id,name',
-                'articles:id,article_name,description',
+                'articles',
             ])
             ->get();
 
@@ -139,7 +161,7 @@ class KnowledgeHubController extends Controller
         $issue->load([
             'convention:id,code,name',
             'category:id,name',
-            'articles:id,article_name,description',
+            'articles',
             'indicators.yearGenderCells.collectionYear:id,label,sort_order',
             'indicators.yearGenderCells.collectionGender:id,name,sort_order',
             'indicators.yearReligionCells.collectionYear:id,label,sort_order',
@@ -240,6 +262,19 @@ class KnowledgeHubController extends Controller
             'stat_2_label' => $k->stat_2_label,
             'body' => $k->body,
             'sort_order' => $k->sort_order,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeRelatedIssue(Issue $i): array
+    {
+        return [
+            'id' => $i->id,
+            'entry_kind' => $i->entry_kind === 'recommendation' ? 'recommendation' : 'issue',
+            'issue_title' => $i->issue_title,
+            'description' => $i->description,
         ];
     }
 

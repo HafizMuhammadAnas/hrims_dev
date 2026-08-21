@@ -7,19 +7,27 @@ import {
   type KnowledgeConventionDetail,
   type KnowledgeConventionIssueDetail,
   type KnowledgeConventionIssueRow,
+  type KnowledgeRelatedIssue,
 } from '../../api/knowledgeHub'
 import { isApiError } from '../../api/apiError'
 import { CAT_CONVENTION_OVERVIEW } from '../../data/catConventionOverview'
 import { CAT_REPOSITORY_CYCLES } from '../../data/catRepositoryContent'
 import {
   coerceIssueEntryKind,
+  CONCLUDING_OBSERVATION_LABEL,
+  CONCLUDING_OBSERVATIONS_LABEL,
   issueEntryDescriptionFieldLabel,
   issueEntryFormShowsTitleField,
   issueEntryKindBadgeLabel,
+  issueEntryListPreview,
+  issueEntryListShowsTitleColumn,
+  issueEntryLoiTableCellText,
   issueEntryTitleFieldLabel,
+  LOI_LABEL,
 } from '../../lib/issueEntryKind'
 import {
   LABEL_CONVENTION_ARTICLES,
+  LABEL_CONVENTIONS_AND_COMPONENTS,
   LABEL_OPTIONAL_PROTOCOL,
 } from '../../lib/uiLabels'
 import { knowledgeConventionIcon } from '../../lib/knowledgeConventionIcons'
@@ -36,17 +44,71 @@ import {
   KnowledgeHubTabs,
 } from './KnowledgeHubUi'
 
-const CAT_TABS = [
-  'Overview',
-  'Articles',
-  'LOI',
-  'Concluding Observations',
-  'Repositories',
-  'CAT Tracker',
-  'Optional Protocol',
-] as const
+const SHARED_CONVENTION_TABS = ['Overview', 'Articles', 'LOI', 'Concluding Observations'] as const
+const CAT_EXTRA_TABS = ['Repositories', 'CAT Tracker', LABEL_OPTIONAL_PROTOCOL] as const
 
-type CatTab = (typeof CAT_TABS)[number]
+type ConventionHubTab = (typeof SHARED_CONVENTION_TABS)[number] | (typeof CAT_EXTRA_TABS)[number]
+
+function isCatConvention(code: string): boolean {
+  return code.trim().toUpperCase() === 'CAT'
+}
+
+function relatedIssueLabel(row: KnowledgeRelatedIssue | KnowledgeConventionIssueRow): string {
+  return issueEntryListPreview(row) || `#${row.id}`
+}
+
+function RelatedArticlesCell({ articles }: { articles: KnowledgeConventionIssueRow['articles'] }) {
+  if (articles.length === 0) return <>None</>
+  return (
+    <ul className="knowledge-hub-related-articles">
+      {articles.map((a) => (
+        <li key={a.id}>{a.article_name}</li>
+      ))}
+    </ul>
+  )
+}
+
+function KnowledgeIssueViewModal({
+  issueId,
+  entryKind,
+  issue,
+  loading,
+  onClose,
+}: {
+  issueId: number
+  entryKind: 'issue' | 'recommendation'
+  issue: KnowledgeConventionIssueDetail | null
+  loading: boolean
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="knowledge-hub-issue-view-title"
+      onClick={onClose}
+    >
+      <div
+        className="modal-card modal-card-wide knowledge-hub-issue-view-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="knowledge-hub-issue-view-modal__head">
+          <h2 id="knowledge-hub-issue-view-title" className="knowledge-hub-issue-view-modal__title">
+            {issueEntryKindBadgeLabel(entryKind)} #{issueId}
+          </h2>
+          <Button variant="secondary" compact onClick={onClose}>
+            Close
+          </Button>
+        </div>
+        <div className="knowledge-hub-issue-view-modal__body">
+          {loading ? <p className="muted">Loading entry…</p> : null}
+          {!loading && issue ? <KnowledgeIssueReadOnlyPanel issue={issue} /> : null}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function issueStatusLabel(issue: KnowledgeConventionIssueRow): string {
   return issue.is_active ? 'Active' : 'Inactive'
@@ -175,14 +237,34 @@ function ConventionArticlesTab({ conventionId }: { conventionId: number }) {
   const [articles, setArticles] = useState<KnowledgeConventionArticle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewIssueId, setViewIssueId] = useState<number | null>(null)
+  const [viewEntryKind, setViewEntryKind] = useState<'issue' | 'recommendation'>('issue')
+  const [viewIssue, setViewIssue] = useState<KnowledgeConventionIssueDetail | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    void fetchKnowledgeConventionArticles(conventionId)
-      .then((rows) => {
-        if (!cancelled) setArticles(sortArticlesByNaturalName(rows))
+    void Promise.all([
+      fetchKnowledgeConventionArticles(conventionId),
+      fetchKnowledgeConventionIssues(conventionId, 'issue'),
+      fetchKnowledgeConventionIssues(conventionId, 'recommendation'),
+    ])
+      .then(([articleRows, loiRows, observationRows]) => {
+        if (cancelled) return
+        const withRelated = articleRows.map((article) => {
+          const relatedLoi = article.related_loi ?? loiRows.filter((i) => i.articles.some((a) => a.id === article.id))
+          const relatedObservations =
+            article.related_concluding_observations ??
+            observationRows.filter((i) => i.articles.some((a) => a.id === article.id))
+          return {
+            ...article,
+            related_loi: relatedLoi,
+            related_concluding_observations: relatedObservations,
+          }
+        })
+        setArticles(sortArticlesByNaturalName(withRelated))
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(isApiError(e) ? e.message : 'Could not load articles')
@@ -195,30 +277,112 @@ function ConventionArticlesTab({ conventionId }: { conventionId: number }) {
     }
   }, [conventionId])
 
+  useEffect(() => {
+    if (viewIssueId == null) {
+      setViewIssue(null)
+      return
+    }
+    let cancelled = false
+    setViewLoading(true)
+    void fetchKnowledgeIssue(viewIssueId)
+      .then((row) => {
+        if (!cancelled) setViewIssue(row)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(isApiError(e) ? e.message : 'Could not load entry')
+      })
+      .finally(() => {
+        if (!cancelled) setViewLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [viewIssueId])
+
   if (loading) return <p className="muted">Loading articles…</p>
-  if (error) return <p className="login-error">{error}</p>
+  if (error && articles.length === 0) return <p className="login-error">{error}</p>
   if (articles.length === 0) return <p className="muted">No articles are published for this convention.</p>
 
   return (
     <KnowledgeHubPanel title={LABEL_CONVENTION_ARTICLES}>
+      {error ? <p className="login-error">{error}</p> : null}
       <div className="knowledge-hub-articles-list">
-        {articles.map((article, idx) => (
-          <details
-            key={article.id}
-            className="mapping-article-collapse knowledge-hub-articles-list__item"
-            open={idx === 0}
-          >
-            <summary className="mapping-article-collapse__summary">
-              <strong>{article.article_name}</strong>
-            </summary>
-            <div className="mapping-article-collapse__body">
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-                {article.description?.trim() || 'No description provided.'}
-              </p>
-            </div>
-          </details>
-        ))}
+        {articles.map((article, idx) => {
+          const relatedLoi = article.related_loi ?? []
+          const relatedObservations = article.related_concluding_observations ?? []
+          return (
+            <details
+              key={article.id}
+              className="mapping-article-collapse knowledge-hub-articles-list__item"
+              open={idx === 0}
+            >
+              <summary className="mapping-article-collapse__summary">
+                <strong>{article.article_name}</strong>
+              </summary>
+              <div className="mapping-article-collapse__body">
+                <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+                  {article.description?.trim() || 'No description provided.'}
+                </p>
+                <div className="knowledge-hub-article-related">
+                  <h4>{LOI_LABEL}</h4>
+                  {relatedLoi.length === 0 ? (
+                    <p className="muted">No related {LOI_LABEL} mapped to this article.</p>
+                  ) : (
+                    <ul>
+                      {relatedLoi.map((row) => (
+                        <li key={row.id}>
+                          <Button
+                            variant="link"
+                            compact
+                            onClick={() => {
+                              setViewEntryKind('issue')
+                              setViewIssueId(row.id)
+                            }}
+                          >
+                            {relatedIssueLabel(row)}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="knowledge-hub-article-related">
+                  <h4>{CONCLUDING_OBSERVATIONS_LABEL}</h4>
+                  {relatedObservations.length === 0 ? (
+                    <p className="muted">No related {CONCLUDING_OBSERVATIONS_LABEL} mapped to this article.</p>
+                  ) : (
+                    <ul>
+                      {relatedObservations.map((row) => (
+                        <li key={row.id}>
+                          <Button
+                            variant="link"
+                            compact
+                            onClick={() => {
+                              setViewEntryKind('recommendation')
+                              setViewIssueId(row.id)
+                            }}
+                          >
+                            {relatedIssueLabel(row)}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </details>
+          )
+        })}
       </div>
+      {viewIssueId != null ? (
+        <KnowledgeIssueViewModal
+          issueId={viewIssueId}
+          entryKind={viewEntryKind}
+          issue={viewIssue}
+          loading={viewLoading}
+          onClose={() => setViewIssueId(null)}
+        />
+      ) : null}
     </KnowledgeHubPanel>
   )
 }
@@ -279,7 +443,8 @@ function ConventionIssuesTab({
     }
   }, [viewIssueId])
 
-  const tableColSpan = 4
+  const showTitleColumn = issueEntryListShowsTitleColumn(entryKind)
+  const tableColSpan = 5
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -325,8 +490,9 @@ function ConventionIssuesTab({
           <table className="data-table issues-mapping-table">
             <thead>
               <tr>
-                <th>Articles</th>
+                <th>Related articles</th>
                 <th>Category</th>
+                {showTitleColumn ? <th>{LOI_LABEL}</th> : <th>{CONCLUDING_OBSERVATION_LABEL}</th>}
                 <th className="issues-mapping-table__status-col">Status</th>
                 <th className="issues-mapping-table__actions-col">View</th>
               </tr>
@@ -345,9 +511,12 @@ function ConventionIssuesTab({
                     className={`issues-mapping-table__row issues-mapping-table__row--${entryKind}`}
                   >
                     <td className="text-compact issues-mapping-table__articles">
-                      {i.articles.map((a) => a.article_name).join(', ') || 'None'}
+                      <RelatedArticlesCell articles={i.articles} />
                     </td>
                     <td className="issues-mapping-table__category">{i.category?.name ?? i.category_id}</td>
+                    <td className="issues-mapping-table__issue">
+                      {showTitleColumn ? issueEntryLoiTableCellText(i) : issueEntryListPreview(i) || '—'}
+                    </td>
                     <td className="issues-mapping-table__status">{issueStatusLabel(i)}</td>
                     <td className="issues-mapping-table__actions">
                       <Button variant="link" compact onClick={() => setViewIssueId(i.id)}>
@@ -363,31 +532,13 @@ function ConventionIssuesTab({
       ) : null}
 
       {viewIssueId != null ? (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="knowledge-hub-issue-view-title"
-          onClick={() => setViewIssueId(null)}
-        >
-          <div
-            className="modal-card modal-card-wide knowledge-hub-issue-view-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="knowledge-hub-issue-view-modal__head">
-              <h2 id="knowledge-hub-issue-view-title" className="knowledge-hub-issue-view-modal__title">
-                {issueEntryKindBadgeLabel(entryKind)} #{viewIssueId}
-              </h2>
-              <Button variant="secondary" compact onClick={() => setViewIssueId(null)}>
-                Close
-              </Button>
-            </div>
-            <div className="knowledge-hub-issue-view-modal__body">
-              {viewLoading ? <p className="muted">Loading entry…</p> : null}
-              {!viewLoading && viewIssue ? <KnowledgeIssueReadOnlyPanel issue={viewIssue} /> : null}
-            </div>
-          </div>
-        </div>
+        <KnowledgeIssueViewModal
+          issueId={viewIssueId}
+          entryKind={entryKind}
+          issue={viewIssue}
+          loading={viewLoading}
+          onClose={() => setViewIssueId(null)}
+        />
       ) : null}
     </>
   )
@@ -431,9 +582,14 @@ export function KnowledgeConventionCatDetail({
   data: KnowledgeConventionDetail
   onBack: () => void
 }) {
-  const [activeTab, setActiveTab] = useState<CatTab>('Overview')
+  const [activeTab, setActiveTab] = useState<ConventionHubTab>('Overview')
+  const isCat = isCatConvention(data.code)
+  const tabs: ConventionHubTab[] = isCat
+    ? [...SHARED_CONVENTION_TABS, ...CAT_EXTRA_TABS]
+    : [...SHARED_CONVENTION_TABS]
   const adopted = data.knowledge_adopted?.trim() || '—'
   const ratified = data.knowledge_ratified?.trim() || '—'
+  const overview = data.description?.trim() || ''
 
   return (
     <KnowledgeHubPage>
@@ -448,14 +604,23 @@ export function KnowledgeConventionCatDetail({
       />
 
       <KnowledgeHubTabs
-        tabs={[...CAT_TABS]}
+        tabs={[...tabs]}
         activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab as CatTab)}
+        onTabChange={(tab) => setActiveTab(tab as ConventionHubTab)}
       />
 
       {activeTab === 'Overview' && (
         <KnowledgeHubPanel title="Convention Overview">
-          <KnowledgeHubProse>{CAT_CONVENTION_OVERVIEW}</KnowledgeHubProse>
+          {isCat ? (
+            <KnowledgeHubProse>{CAT_CONVENTION_OVERVIEW}</KnowledgeHubProse>
+          ) : overview ? (
+            <KnowledgeHubProse>{overview}</KnowledgeHubProse>
+          ) : (
+            <KnowledgeHubMutedProse>
+              No narrative has been added yet. A super administrator can publish overview text from Super Admin →
+              {LABEL_CONVENTIONS_AND_COMPONENTS}.
+            </KnowledgeHubMutedProse>
+          )}
         </KnowledgeHubPanel>
       )}
 
@@ -467,15 +632,15 @@ export function KnowledgeConventionCatDetail({
         <ConventionIssuesTab conventionId={data.id} entryKind="recommendation" />
       )}
 
-      {activeTab === 'Repositories' && <ConventionRepositoriesTab />}
+      {isCat && activeTab === 'Repositories' ? <ConventionRepositoriesTab /> : null}
 
-      {activeTab === 'CAT Tracker' && <CatTrackerTab />}
+      {isCat && activeTab === 'CAT Tracker' ? <CatTrackerTab /> : null}
 
-      {activeTab === LABEL_OPTIONAL_PROTOCOL && (
+      {isCat && activeTab === LABEL_OPTIONAL_PROTOCOL ? (
         <KnowledgeHubPanel title={LABEL_OPTIONAL_PROTOCOL}>
           <KnowledgeHubMutedProse>No optional protocol content is available yet.</KnowledgeHubMutedProse>
         </KnowledgeHubPanel>
-      )}
+      ) : null}
     </KnowledgeHubPage>
   )
 }

@@ -15,7 +15,16 @@ return new class extends Migration
 
         $catConventionId = DB::table('conventions')->where('code', 'CAT')->value('id');
         if ($catConventionId === null) {
-            throw new \RuntimeException('CAT convention not found. Ensure conventions are seeded before migrating articles.');
+            $now = now();
+            $catConventionId = DB::table('conventions')->insertGetId([
+                'code' => 'CAT',
+                'name' => 'Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment',
+                'description' => null,
+                'sort_order' => 4,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
         }
 
         DB::table('articles')->update(['convention_id' => $catConventionId]);

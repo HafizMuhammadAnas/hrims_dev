@@ -15,6 +15,7 @@ use App\Models\IssueIndicatorYear;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
 use App\Support\ResponseRevisionRecorder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -44,7 +45,7 @@ class DepartmentTaskController extends Controller
             'status' => $t->status,
             'regional_review_status' => $t->regional_review_status,
             'regional_review_comments' => $t->regional_review_comments,
-            'assigned_date' => $t->assigned_date->format('Y-m-d'),
+            'assigned_date' => $t->assigned_date?->format('Y-m-d'),
             'assignment_instructions' => $redact ? null : $t->assignment_instructions,
             'assigned_indicator_ids' => self::normalizeAssignedIndicatorIds($t->assigned_indicator_ids),
             'submission_date' => $t->submission_date?->format('Y-m-d'),
@@ -1128,13 +1129,19 @@ class DepartmentTaskController extends Controller
                 ?? app(ResponseRevisionRecorder::class)->inferOriginFromRegionalResponse($departmentTask);
         }
 
-        $this->persistDepartmentTask($departmentTask, [
+        $reviewAttributes = [
             'regional_review_status' => $data['regional_review_status'],
             'regional_review_comments' => $data['regional_review_comments'] ?? null,
-            'pending_revision_origin' => $pendingOrigin,
-        ]);
+        ];
+        // Accept must not SET pending_revision_origin: production DBs that never ran
+        // 2026_08_05_070000 still lack that column, and writing null 500s the review.
+        if ($data['regional_review_status'] === 'needs-modification') {
+            $reviewAttributes['pending_revision_origin'] = $pendingOrigin;
+        }
 
-        $fresh = $departmentTask->fresh(['region', 'department', 'hrRequest']);
+        $this->persistDepartmentTask($departmentTask, $reviewAttributes);
+
+        $fresh = $departmentTask->fresh(['region', 'department']) ?? $departmentTask;
         if ($data['regional_review_status'] === 'needs-modification') {
             app(NotificationService::class)->notifyDepartmentTaskNeedsModification($fresh, $request->user());
         }
@@ -1277,14 +1284,47 @@ class DepartmentTaskController extends Controller
      */
     private function persistDepartmentTask(DepartmentTask $departmentTask, array $attributes): void
     {
-        if (
-            array_key_exists('pending_revision_origin', $attributes)
-            && ! Schema::hasColumn('department_tasks', 'pending_revision_origin')
-        ) {
+        $attributes = $this->withoutUnknownDepartmentTaskColumns($attributes);
+
+        try {
+            $departmentTask->update($attributes);
+        } catch (QueryException $e) {
+            if (! $this->queryExceptionMentionsUnknownColumn($e, 'pending_revision_origin')) {
+                throw $e;
+            }
+            unset($attributes['pending_revision_origin']);
+            $departmentTask->update($attributes);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function withoutUnknownDepartmentTaskColumns(array $attributes): array
+    {
+        if (! array_key_exists('pending_revision_origin', $attributes)) {
+            return $attributes;
+        }
+
+        try {
+            if (! Schema::hasColumn('department_tasks', 'pending_revision_origin')) {
+                unset($attributes['pending_revision_origin']);
+            }
+        } catch (\Throwable) {
+            // Restricted DB users cannot always inspect information_schema.
             unset($attributes['pending_revision_origin']);
         }
 
-        $departmentTask->update($attributes);
+        return $attributes;
+    }
+
+    private function queryExceptionMentionsUnknownColumn(QueryException $e, string $column): bool
+    {
+        $message = $e->getMessage();
+
+        return str_contains($message, "Unknown column '{$column}'")
+            || str_contains($message, 'Unknown column `'.$column.'`');
     }
 
     /**

@@ -5650,6 +5650,35 @@ textarea.response-revision-changed,
   margin: 0;
 }
 
+.knowledge-hub-article-related {
+  margin-top: 16px;
+}
+
+.knowledge-hub-article-related h4 {
+  margin: 0 0 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--pk-green);
+}
+
+.knowledge-hub-article-related ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.knowledge-hub-article-related li {
+  margin: 0 0 6px;
+}
+
+.knowledge-hub-related-articles {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.knowledge-hub-related-articles li {
+  margin: 0 0 4px;
+}
+
 .knowledge-hub-issues-toolbar {
   display: flex;
   flex-wrap: wrap;
