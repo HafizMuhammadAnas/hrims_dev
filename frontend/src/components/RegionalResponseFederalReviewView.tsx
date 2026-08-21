@@ -264,6 +264,7 @@ export function RegionalResponseFederalReviewView({
                 filterByRegionId={viewingRow.region_id ?? undefined}
                 omitHeading
                 showCardMeta
+                hideStatusBadge
               />
 
               <h2 className="card-section-heading">Summary</h2>

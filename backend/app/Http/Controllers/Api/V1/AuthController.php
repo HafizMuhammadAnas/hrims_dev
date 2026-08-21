@@ -39,6 +39,7 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+        $this->storeSessionPasswordHash($request, $user);
 
         return response()->json([
             'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
@@ -101,6 +102,19 @@ class AuthController extends Controller
         return response()->json([
             'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
         ]);
+    }
+
+    private function storeSessionPasswordHash(Request $request, User $user): void
+    {
+        $guard = Auth::guard('web');
+        $hash = $user->getAuthPassword();
+        if ($hash === null || $hash === '') {
+            return;
+        }
+        if (method_exists($guard, 'hashPasswordForCookie')) {
+            $hash = $guard->hashPasswordForCookie($hash);
+        }
+        $request->session()->put('password_hash_web', $hash);
     }
 
     /**

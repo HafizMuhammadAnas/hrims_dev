@@ -26,14 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Fortinet / reverse proxy often terminates HTTPS; trust X-Forwarded-* so Secure cookies work.
         $middleware->trustProxies(at: '*');
         $middleware->prepend(\App\Http\Middleware\RestoreSanctumOrigin::class);
-        // Always start the session on /api. Sanctum's stateful check needs Origin/Referer,
-        // which Fortinet often strips on GET — login then succeeds but /me returns 401.
-        $middleware->api(prepend: [
-            \Illuminate\Cookie\Middleware\EncryptCookies::class,
-            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-            \Illuminate\Session\Middleware\StartSession::class,
-            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
-        ]);
+        // Sanctum starts the session once for first-party SPA requests. Do not also prepend
+        // StartSession here — running it twice logs the user out on the next GET (Referer present).
         $middleware->statefulApi();
         $middleware->alias([
             'super.admin' => \App\Http\Middleware\EnsureSuperAdmin::class,

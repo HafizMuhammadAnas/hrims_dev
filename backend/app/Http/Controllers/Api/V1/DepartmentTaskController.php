@@ -713,7 +713,7 @@ class DepartmentTaskController extends Controller
             app(ResponseRevisionRecorder::class)->snapshotDepartmentTask($departmentTask, $request->user());
         }
 
-        $departmentTask->update([
+        $this->persistDepartmentTask($departmentTask, [
             'response_data' => $text !== '' ? $text : $departmentTask->response_data,
             'attachment_url' => $attachmentUrl,
             'submission_date' => now()->toDateString(),
@@ -1044,7 +1044,7 @@ class DepartmentTaskController extends Controller
             app(ResponseRevisionRecorder::class)->snapshotDepartmentTask($departmentTask, $request->user());
         }
 
-        $departmentTask->update([
+        $this->persistDepartmentTask($departmentTask, [
             'response_data' => json_encode($payload, JSON_UNESCAPED_SLASHES),
             'attachment_url' => null,
             'submission_date' => now()->toDateString(),
@@ -1128,7 +1128,7 @@ class DepartmentTaskController extends Controller
                 ?? app(ResponseRevisionRecorder::class)->inferOriginFromRegionalResponse($departmentTask);
         }
 
-        $departmentTask->update([
+        $this->persistDepartmentTask($departmentTask, [
             'regional_review_status' => $data['regional_review_status'],
             'regional_review_comments' => $data['regional_review_comments'] ?? null,
             'pending_revision_origin' => $pendingOrigin,
@@ -1268,6 +1268,23 @@ class DepartmentTaskController extends Controller
         return response()->json([
             'data' => $rows->map(fn (DepartmentTask $t) => $this->serializeTask($t, $redact)),
         ]);
+    }
+
+    /**
+     * Skip columns that exist in code but have not been migrated on this database.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function persistDepartmentTask(DepartmentTask $departmentTask, array $attributes): void
+    {
+        if (
+            array_key_exists('pending_revision_origin', $attributes)
+            && ! Schema::hasColumn('department_tasks', 'pending_revision_origin')
+        ) {
+            unset($attributes['pending_revision_origin']);
+        }
+
+        $departmentTask->update($attributes);
     }
 
     /**

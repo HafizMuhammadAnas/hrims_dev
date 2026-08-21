@@ -17,7 +17,7 @@ import { regionalResponseFederalReviewPath } from '../lib/workflowNavigation'
 import type { HrRequestRow } from '../types/hrRequest'
 import { CompiledRecordPrintDocument } from './CompiledRecordPrintDocument'
 import { RegionalSubmissionCoverageBar } from './RegionalSubmissionCoverageBar'
-import { Alert } from './ui/Alert'
+import { ActionNoticeAlert, Alert, type ActionNotice } from './ui/Alert'
 import { Button } from './ui/Button'
 import { StatusBadge } from './ui/StatusBadge'
 import { TableCard } from './ui/TableCard'
@@ -75,7 +75,7 @@ export function TemporaryFederalCompilationPreviewCard({
   const [docReady, setDocReady] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [excelLoading, setExcelLoading] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportNotice, setExportNotice] = useState<ActionNotice | null>(null)
 
   const reqIdsNationallySubmitted = useMemo(() => {
     const s = new Set<string>()
@@ -116,7 +116,7 @@ export function TemporaryFederalCompilationPreviewCard({
       setSummary('')
       setIncludedResponseIds([])
       setIctIncluded(false)
-      setExportError(null)
+      setExportNotice(null)
     }
   }, [selectedReqId, reqIdsNationallySubmitted])
 
@@ -232,7 +232,7 @@ export function TemporaryFederalCompilationPreviewCard({
 
   useEffect(() => {
     setDocReady(false)
-    setExportError(null)
+    setExportNotice(null)
   }, [previewRecord?.id, previewRecord?.region_names.join('\u0001'), previewRecord?.summary])
 
   function toggleResponseInclusion(responseId: string) {
@@ -255,7 +255,7 @@ export function TemporaryFederalCompilationPreviewCard({
     const el = printRef.current
     if (!el || !previewRecord || !docReady) return
     setPdfLoading(true)
-    setExportError(null)
+    setExportNotice(null)
     try {
       const base = [previewRecord.req_id, previewRecord.title].filter(Boolean).join(' — ')
       await downloadElementAsPdf(el, base, {
@@ -263,8 +263,17 @@ export function TemporaryFederalCompilationPreviewCard({
         marginMm: 10,
         headerTitle: base,
       })
+      setExportNotice({
+        variant: 'info',
+        title: 'PDF downloaded',
+        message: 'Temporary compilation PDF was generated and downloaded on this page.',
+      })
     } catch (e: unknown) {
-      setExportError(e instanceof Error ? e.message : 'Could not generate PDF.')
+      setExportNotice({
+        variant: 'error',
+        title: 'Could not generate PDF',
+        message: e instanceof Error ? e.message : 'Could not generate PDF.',
+      })
     } finally {
       setPdfLoading(false)
     }
@@ -274,15 +283,24 @@ export function TemporaryFederalCompilationPreviewCard({
     const el = printRef.current
     if (!el || !previewRecord || !docReady) return
     setExcelLoading(true)
-    setExportError(null)
+    setExportNotice(null)
     try {
       const base = [previewRecord.req_id, previewRecord.title].filter(Boolean).join(' — ')
       downloadElementTablesAsExcel(el, base, {
         sheetName: 'Temporary compilation',
         documentTitle: previewRecord.title,
       })
+      setExportNotice({
+        variant: 'info',
+        title: 'Excel downloaded',
+        message: 'Temporary compilation Excel file was generated and downloaded on this page.',
+      })
     } catch (e: unknown) {
-      setExportError(e instanceof Error ? e.message : 'Could not generate Excel file.')
+      setExportNotice({
+        variant: 'error',
+        title: 'Could not generate Excel',
+        message: e instanceof Error ? e.message : 'Could not generate Excel file.',
+      })
     } finally {
       setExcelLoading(false)
     }
@@ -301,6 +319,7 @@ export function TemporaryFederalCompilationPreviewCard({
         <strong>Accepted</strong> for requests that are <strong>not yet nationally compiled</strong>. This is for
         runtime PDF / Excel download only — nothing is saved to Compiled records.
       </p>
+      <ActionNoticeAlert notice={exportNotice} onDismiss={() => setExportNotice(null)} />
 
       <label className="muted">HR request</label>
       {requestsForSelect.length === 0 ? (
@@ -315,7 +334,7 @@ export function TemporaryFederalCompilationPreviewCard({
         style={{ width: '100%', marginTop: 6, marginBottom: 12 }}
         value={selectedReqId}
         onChange={(e) => {
-          setExportError(null)
+          setExportNotice(null)
           setSummary('')
           setSelectedReqId(e.target.value)
         }}
@@ -579,7 +598,6 @@ export function TemporaryFederalCompilationPreviewCard({
             Select at least one Under Review or Accepted province, or include the ICT national line.
           </span>
         ) : null}
-        {exportError ? <span className="login-error small">{exportError}</span> : null}
       </div>
 
       {previewRecord ? (

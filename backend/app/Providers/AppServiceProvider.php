@@ -31,12 +31,22 @@ class AppServiceProvider extends ServiceProvider
                 continue;
             }
             $host = parse_url($url, PHP_URL_HOST);
-            if (is_string($host) && $host !== '' && ! in_array($host, $stateful, true)) {
-                $stateful[] = $host;
+            if (! is_string($host) || $host === '') {
+                continue;
+            }
+            $port = parse_url($url, PHP_URL_PORT);
+            $entries = [$host];
+            if (is_int($port)) {
+                $entries[] = $host.':'.$port;
+            }
+            foreach ($entries as $entry) {
+                if (! in_array($entry, $stateful, true)) {
+                    $stateful[] = $entry;
+                }
             }
         }
         if (! $this->app->runningInConsole()) {
-            $requestHost = request()->getHost();
+            $requestHost = request()->getHttpHost();
             if (is_string($requestHost) && $requestHost !== '' && ! in_array($requestHost, $stateful, true)) {
                 $stateful[] = $requestHost;
             }

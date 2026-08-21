@@ -719,6 +719,10 @@ body:has(.modal-overlay) {
   margin-bottom: 16px;
 }
 
+.table-card-padded > .app-alert {
+  margin-bottom: 12px;
+}
+
 .page-toolbar {
   display: flex;
   flex-wrap: wrap;

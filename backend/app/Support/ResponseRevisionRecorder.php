@@ -7,6 +7,7 @@ use App\Models\DepartmentTaskRevision;
 use App\Models\RegionalResponse;
 use App\Models\RegionalResponseRevision;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
 
 class ResponseRevisionRecorder
 {
@@ -39,16 +40,20 @@ class ResponseRevisionRecorder
 
         $origin = $this->resolveDepartmentRevisionOrigin($task);
 
-        return DepartmentTaskRevision::query()->create([
+        $payload = [
             'department_task_id' => $task->id,
             'revision_no' => max(1, $next),
             'response_data' => $task->response_data,
             'attachment_url' => $task->attachment_url,
             'regional_review_status' => $task->regional_review_status,
             'regional_review_comments' => $task->regional_review_comments,
-            'revision_origin' => $origin,
             'submitted_by_user_id' => $actor?->id,
-        ]);
+        ];
+        if (Schema::hasColumn('department_task_revisions', 'revision_origin')) {
+            $payload['revision_origin'] = $origin;
+        }
+
+        return DepartmentTaskRevision::query()->create($payload);
     }
 
     public function resolveDepartmentRevisionOrigin(DepartmentTask $task): string

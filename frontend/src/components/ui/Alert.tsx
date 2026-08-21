@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
 export type AlertVariant = 'error' | 'warning' | 'success' | 'info'
 
@@ -41,6 +41,46 @@ export function Alert({ variant, title, children, onDismiss, className = '' }: A
 type FieldErrorProps = {
   message?: string | null
   id?: string
+}
+
+export type ActionNotice = {
+  variant: AlertVariant
+  title: string
+  message: string
+}
+
+const AUTO_DISMISS_MS: Partial<Record<AlertVariant, number>> = {
+  success: 4500,
+  info: 5000,
+}
+
+/** Dismissible page/section feedback after a user action. Success/info close on their own. */
+export function ActionNoticeAlert({
+  notice,
+  onDismiss,
+  className,
+}: {
+  notice: ActionNotice | null
+  onDismiss?: () => void
+  className?: string
+}) {
+  const onDismissRef = useRef(onDismiss)
+  onDismissRef.current = onDismiss
+
+  useEffect(() => {
+    if (!notice) return
+    const ms = AUTO_DISMISS_MS[notice.variant]
+    if (!ms) return
+    const id = window.setTimeout(() => onDismissRef.current?.(), ms)
+    return () => window.clearTimeout(id)
+  }, [notice])
+
+  if (!notice) return null
+  return (
+    <Alert variant={notice.variant} title={notice.title} onDismiss={onDismiss} className={className}>
+      <p style={{ margin: 0 }}>{notice.message}</p>
+    </Alert>
+  )
 }
 
 /** Single validation line under an input (connect with `aria-describedby`). */

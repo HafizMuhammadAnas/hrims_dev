@@ -5,7 +5,7 @@ import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { downloadElementAsWord } from '../lib/downloadElementAsWord'
 import { formatAppDate } from '../lib/dateFormat'
 import { CompiledRecordPrintDocument } from './CompiledRecordPrintDocument'
-import { Alert } from './ui/Alert'
+import { ActionNoticeAlert, Alert, type ActionNotice } from './ui/Alert'
 import { Button } from './ui/Button'
 import { SearchableMultiSelect } from './ui/SearchableMultiSelect'
 import { TableCard } from './ui/TableCard'
@@ -23,7 +23,7 @@ export function MergeCompiledRecordsSection({ records }: Props) {
   const [readyById, setReadyById] = useState<Record<string, boolean>>({})
   const [pdfLoading, setPdfLoading] = useState(false)
   const [wordLoading, setWordLoading] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportNotice, setExportNotice] = useState<ActionNotice | null>(null)
   const mergeRef = useRef<HTMLDivElement>(null)
 
   const options = useMemo(
@@ -67,7 +67,7 @@ export function MergeCompiledRecordsSection({ records }: Props) {
 
   function handleSelectionChange(values: string[]) {
     setSelectedIds(values)
-    setExportError(null)
+    setExportNotice(null)
     setReadyById((prev) => {
       const next: Record<string, boolean> = {}
       for (const id of values) {
@@ -89,15 +89,24 @@ export function MergeCompiledRecordsSection({ records }: Props) {
     const el = mergeRef.current
     if (!el || !allReady) return
     setPdfLoading(true)
-    setExportError(null)
+    setExportNotice(null)
     try {
       await downloadElementAsPdf(el, exportBaseName(), {
         captureClass: 'ministry-compiled-pdf-capture',
         marginMm: 10,
         headerTitle: exportBaseName(),
       })
+      setExportNotice({
+        variant: 'info',
+        title: 'PDF downloaded',
+        message: `Merged PDF for ${selectedRecords.length} compiled records was generated and downloaded.`,
+      })
     } catch (e: unknown) {
-      setExportError(e instanceof Error ? e.message : 'Could not generate PDF.')
+      setExportNotice({
+        variant: 'error',
+        title: 'Could not generate PDF',
+        message: e instanceof Error ? e.message : 'Could not generate PDF.',
+      })
     } finally {
       setPdfLoading(false)
     }
@@ -107,14 +116,23 @@ export function MergeCompiledRecordsSection({ records }: Props) {
     const el = mergeRef.current
     if (!el || !allReady) return
     setWordLoading(true)
-    setExportError(null)
+    setExportNotice(null)
     try {
       await downloadElementAsWord(el, exportBaseName(), {
         captureClass: 'ministry-compiled-pdf-capture',
         documentTitle: exportBaseName(),
       })
+      setExportNotice({
+        variant: 'info',
+        title: 'Word downloaded',
+        message: `Merged Word file for ${selectedRecords.length} compiled records was generated and downloaded.`,
+      })
     } catch (e: unknown) {
-      setExportError(e instanceof Error ? e.message : 'Could not generate Word document.')
+      setExportNotice({
+        variant: 'error',
+        title: 'Could not generate Word',
+        message: e instanceof Error ? e.message : 'Could not generate Word document.',
+      })
     } finally {
       setWordLoading(false)
     }
@@ -130,6 +148,7 @@ export function MergeCompiledRecordsSection({ records }: Props) {
         Select two or more compiled records, then download a single PDF or Word file. Each record’s
         full content (request, responses, and summary) appears one after another.
       </p>
+      <ActionNoticeAlert notice={exportNotice} onDismiss={() => setExportNotice(null)} />
 
       {records.length === 0 ? (
         <Alert variant="info" title="No compiled records yet">
@@ -190,7 +209,6 @@ export function MergeCompiledRecordsSection({ records }: Props) {
               {selectedRecords.length >= 2 && !allReady ? (
                 <span className="muted small">Loading selected records…</span>
               ) : null}
-              {exportError ? <span className="login-error small">{exportError}</span> : null}
             </div>
           ) : null}
 

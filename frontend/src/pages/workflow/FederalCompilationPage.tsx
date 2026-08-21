@@ -22,7 +22,7 @@ import {
   countProvincialSubmissionCoverage,
 } from '../../lib/regionalSubmissionCoverage'
 import { regionalResponseReviewPresentation } from '../../lib/regionalResponseReviewStatus'
-import { Alert } from '../../components/ui/Alert'
+import { ActionNoticeAlert, Alert, type ActionNotice } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
 import { LABEL_COMPILATION_CENTER, LABEL_DEPARTMENTAL_RESPONSES, LABEL_REGIONAL_RESPONSES } from '../../lib/uiLabels'
@@ -62,6 +62,7 @@ export function FederalCompilationPage() {
   const [ictIncluded, setIctIncluded] = useState(false)
   const [summary, setSummary] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null)
   const [saving, setSaving] = useState<'draft' | 'submitted' | null>(null)
   const [compiledRecords, setCompiledRecords] = useState<CompiledRecordRow[]>([])
 
@@ -257,13 +258,17 @@ export function FederalCompilationPage() {
 
   async function save(status: 'draft' | 'submitted') {
     if (!selectedReq || selectedRegionNames.length === 0) {
-      setError(
-        'Select at least one accepted provincial compilation (checkbox) or include the ICT national line, then save.',
-      )
+      setActionNotice({
+        variant: 'warning',
+        title: 'Action required',
+        message:
+          'Select at least one accepted provincial compilation (checkbox) or include the ICT national line, then save.',
+      })
       return
     }
     setSaving(status)
     setError(null)
+    setActionNotice(null)
     try {
       await createCompiledRecord({
         hr_request_id: selectedReq.id,
@@ -273,13 +278,31 @@ export function FederalCompilationPage() {
         status,
         submitted_to: status === 'submitted' ? 'Compilation Center' : null,
       })
+      const reqLabel = selectedReq.id
       setSummary('')
       setSelectedReqId('')
       setIncludedResponseIds([])
       setIctIncluded(false)
       void fetchCompiledRecords().then(setCompiledRecords).catch(() => {})
+      setActionNotice(
+        status === 'submitted'
+          ? {
+              variant: 'success',
+              title: 'Compilation submitted',
+              message: `National compilation for ${reqLabel} was submitted. It is listed under Compiled records.`,
+            }
+          : {
+              variant: 'info',
+              title: 'Draft saved',
+              message: `Draft national compilation for ${reqLabel} was saved on this page.`,
+            },
+      )
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save')
+      setActionNotice({
+        variant: 'error',
+        title: status === 'submitted' ? 'Could not submit' : 'Could not save draft',
+        message: e instanceof Error ? e.message : 'Failed to save',
+      })
     } finally {
       setSaving(null)
     }
@@ -292,7 +315,11 @@ export function FederalCompilationPage() {
       {fromCompiledRecords && selectedReqId ? (
         <CompiledRecordsWorkflowNav reqId={selectedReqId} activeTab="compilation" />
       ) : null}
-      {error && <p className="login-error">{error}</p>}
+      {error ? (
+        <Alert variant="error" title="Could not load compilation data" onDismiss={() => setError(null)}>
+          <p style={{ margin: 0 }}>{error}</p>
+        </Alert>
+      ) : null}
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
@@ -302,6 +329,7 @@ export function FederalCompilationPage() {
         />
       </div>
       <TableCard padded>
+        <ActionNoticeAlert notice={actionNotice} onDismiss={() => setActionNotice(null)} />
         <label className="muted">HR request</label>
         {requestsForSelect.length === 0 && reqIdsForPicker.length === 0 ? (
           <p className="muted" style={{ margin: '8px 0 12px' }}>
@@ -322,6 +350,7 @@ export function FederalCompilationPage() {
           value={selectedReqId}
           onChange={(e) => {
             setError(null)
+            setActionNotice(null)
             setSelectedReqId(e.target.value)
           }}
           disabled={requestsForSelect.length === 0}

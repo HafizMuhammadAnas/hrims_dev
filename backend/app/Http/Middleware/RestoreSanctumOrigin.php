@@ -18,23 +18,42 @@ class RestoreSanctumOrigin
             return $next($request);
         }
 
+        $origin = $this->fallbackOrigin($request);
+        if ($origin !== null) {
+            $request->headers->set('Origin', $origin);
+        }
+
+        return $next($request);
+    }
+
+    private function fallbackOrigin(Request $request): ?string
+    {
+        foreach ([config('app.frontend_url'), config('app.url')] as $url) {
+            if (! is_string($url) || $url === '') {
+                continue;
+            }
+            $parts = parse_url($url);
+            $scheme = $parts['scheme'] ?? ($request->isSecure() ? 'https' : 'http');
+            $host = $parts['host'] ?? null;
+            if (! is_string($host) || $host === '') {
+                continue;
+            }
+            $port = $parts['port'] ?? null;
+
+            return $port ? "{$scheme}://{$host}:{$port}" : "{$scheme}://{$host}";
+        }
+
         $forwarded = $request->header('X-Forwarded-Host');
         $host = is_string($forwarded) && $forwarded !== ''
             ? trim(explode(',', $forwarded)[0])
-            : $request->getHost();
+            : $request->getHttpHost();
 
-        $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
-        if (is_string($appHost) && $appHost !== '') {
-            $host = $appHost;
+        if ($host === '') {
+            return null;
         }
 
-        $scheme = parse_url((string) config('app.url'), PHP_URL_SCHEME);
-        if (! is_string($scheme) || $scheme === '') {
-            $scheme = $request->isSecure() ? 'https' : 'http';
-        }
+        $scheme = $request->isSecure() ? 'https' : 'http';
 
-        $request->headers->set('Origin', $scheme.'://'.$host);
-
-        return $next($request);
+        return $scheme.'://'.$host;
     }
 }
