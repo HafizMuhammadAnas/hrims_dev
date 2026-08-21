@@ -175,11 +175,23 @@ export async function updateDepartmentTaskReview(
   },
 ): Promise<DepartmentTaskRow> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/department-tasks/${encodeURIComponent(taskId)}`, {
-    method: 'PATCH',
+  const payload: {
+    regional_review_status: 'accepted' | 'needs-modification'
+    regional_review_comments?: string
+    revision_origin?: 'federal_follow_up' | 'regional'
+  } = {
+    regional_review_status: body.regional_review_status,
+  }
+  const comments = body.regional_review_comments?.trim()
+  if (comments) payload.regional_review_comments = comments
+  if (body.revision_origin) payload.revision_origin = body.revision_origin
+
+  // POST: FortiGate in front of hrims.mohr.gov.pk blocks HTTP PATCH (Attack ID 20000001).
+  const res = await fetch(`/api/v1/department-tasks/${encodeURIComponent(taskId)}/review`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: DepartmentTaskRow }

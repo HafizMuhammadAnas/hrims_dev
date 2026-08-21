@@ -101,7 +101,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/department-tasks', [DepartmentTaskController::class, 'store'])->name('api.v1.department-tasks.store');
         Route::post('/department-tasks/{departmentTask}/submit-response', [DepartmentTaskController::class, 'submitResponse'])->name('api.v1.department-tasks.submit-response');
         Route::get('/department-tasks/{departmentTask}/revisions', [DepartmentTaskController::class, 'revisions'])->name('api.v1.department-tasks.revisions');
-        Route::patch('/department-tasks/{departmentTask}', [DepartmentTaskController::class, 'updateReview'])->name('api.v1.department-tasks.update-review');
+        Route::post('/department-tasks/{departmentTask}/review', [DepartmentTaskController::class, 'updateReview'])->name('api.v1.department-tasks.update-review');
+        Route::patch('/department-tasks/{departmentTask}', [DepartmentTaskController::class, 'updateReview'])->name('api.v1.department-tasks.update-review.patch');
         Route::get('/violation-entries', [ViolationEntryController::class, 'index'])->name('api.v1.violation-entries.index');
 
         Route::get('/hr-request-form/conventions', [HrRequestController::class, 'formConventions'])->name('api.v1.hr-request-form.conventions');

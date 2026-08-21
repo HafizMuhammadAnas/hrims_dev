@@ -1139,18 +1139,27 @@ class DepartmentTaskController extends Controller
             $reviewAttributes['pending_revision_origin'] = $pendingOrigin;
         }
 
-        $this->persistDepartmentTask($departmentTask, $reviewAttributes);
+        try {
+            $this->persistDepartmentTask($departmentTask, $reviewAttributes);
 
-        $fresh = $departmentTask->fresh(['region', 'department']) ?? $departmentTask;
-        if ($data['regional_review_status'] === 'needs-modification') {
-            app(NotificationService::class)->notifyDepartmentTaskNeedsModification($fresh, $request->user());
+            $fresh = $departmentTask->fresh(['region', 'department']) ?? $departmentTask;
+            if ($data['regional_review_status'] === 'needs-modification') {
+                app(NotificationService::class)->notifyDepartmentTaskNeedsModification($fresh, $request->user());
+            }
+
+            $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
+
+            return response()->json([
+                'data' => $this->serializeTask($fresh, $redact),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'exception' => class_basename($e),
+            ], 500);
         }
-
-        $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
-
-        return response()->json([
-            'data' => $this->serializeTask($fresh, $redact),
-        ]);
     }
 
     public function revisions(Request $request, DepartmentTask $departmentTask): JsonResponse

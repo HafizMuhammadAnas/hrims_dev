@@ -35,7 +35,7 @@ class ApiV1DepartmentTaskReviewTest extends TestCase
     {
         [$regionalAdmin, $taskId] = $this->assignAndSubmitDepartmentTask();
 
-        $review = $this->actingAs($regionalAdmin)->patchJson("/api/v1/department-tasks/{$taskId}", [
+        $review = $this->actingAs($regionalAdmin)->postJson("/api/v1/department-tasks/{$taskId}/review", [
             'regional_review_status' => 'accepted',
         ]);
 
@@ -56,7 +56,7 @@ class ApiV1DepartmentTaskReviewTest extends TestCase
 
         [$regionalAdmin, $taskId] = $this->assignAndSubmitDepartmentTask();
 
-        $review = $this->actingAs($regionalAdmin)->patchJson("/api/v1/department-tasks/{$taskId}", [
+        $review = $this->actingAs($regionalAdmin)->postJson("/api/v1/department-tasks/{$taskId}/review", [
             'regional_review_status' => 'accepted',
         ]);
 
