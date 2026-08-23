@@ -347,13 +347,6 @@ export function RegionalResponseFederalReviewView({
                   type="button"
                   disabled={saving}
                   onClick={() => {
-                    if (!reviewComments.trim()) {
-                      setActionFeedback({
-                        kind: 'validation',
-                        message: 'Add feedback for the region when requesting modification.',
-                      })
-                      return
-                    }
                     void persistReview('needs-modification', reviewComments)
                   }}
                 >

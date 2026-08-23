@@ -72,7 +72,7 @@ import {
   indicatorRequiresQuantitativeMatrixPayload,
 } from '../lib/indicatorDisaggregation'
 import { scopeLocationCatalogToRegions } from '../lib/departmentLocationCatalog'
-import { loadYearKeyedValuesFromBundle, matrixCellInputReady, matrixCellNumericValue } from '../lib/departmentMatrixLoaders'
+import { loadYearKeyedValuesFromBundle, matrixCellNumericValue } from '../lib/departmentMatrixLoaders'
 import {
   deptIndicatorYearTotalsWithinBudget,
   findDeptIndicatorYearTotalOverruns,
@@ -152,10 +152,6 @@ function loadYearGenderValuesFromBundle(
     byYearGender as import('../lib/departmentTaskResponseFormat').DepartmentQuantitativeByYearKeyed | null | undefined,
     true,
   )
-}
-
-function matrixValueReady(values: Record<string, string>, key: string): boolean {
-  return matrixCellInputReady(values[key])
 }
 
 function clearDraftDimensionValues(
@@ -515,113 +511,13 @@ export function HrRequestViewPage() {
 
   const indicatorFormReady = useMemo(() => {
     if (deptIndicatorsForForm.length === 0 || !activeTask) return true
-    const parsed = deptParsedTaskResponse
-    if (!parsed) return true
-    for (const ind of deptIndicatorsForForm) {
-      const d = indicatorDrafts[ind.id]
-      if (!d) return false
-      if (indicatorRequiresQuantitativeMatrixPayload(ind)) {
-        if (
-          (indicatorIsYearOnly(ind) || ind.collects_by_gender) &&
-          isMatrixRowEnabled(d.matrixRowEnabled, 'gender')
-        ) {
-          let matrixReady = true
-          forEachIndicatorMatrixCell(ind, (yearId, genderId) => {
-            if (!matrixValueReady(d.yearGenderValues, matrixCellKey(yearId, genderId))) matrixReady = false
-          })
-          if (!matrixReady) return false
-        }
-        if (ind.collects_by_age && isMatrixRowEnabled(d.matrixRowEnabled, 'age')) {
-          let matrixReady = true
-          forEachFixedKeyMatrixCell(ind, (i) => Boolean(i.collects_by_age), AGE_KEYS, (yearId, key) => {
-            if (!matrixValueReady(d.yearAgeValues, fixedKeyMatrixCellKey(yearId, key))) matrixReady = false
-          })
-          if (!matrixReady) return false
-        }
-        if (ind.collects_by_disability && isMatrixRowEnabled(d.matrixRowEnabled, 'disability')) {
-          let matrixReady = true
-          for (const y of indicatorConfiguredYears(ind)) {
-            if (!matrixValueReady(d.yearDisabilityValues, genderTotalCellKey(y.year_id))) {
-              matrixReady = false
-            }
-          }
-          forEachFixedKeyMatrixCell(
-            ind,
-            (i) => Boolean(i.collects_by_disability),
-            DISABILITY_KEYS,
-            (yearId, key) => {
-              if (!matrixValueReady(d.yearDisabilityValues, fixedKeyMatrixCellKey(yearId, key))) matrixReady = false
-            },
-          )
-          if (!matrixReady) return false
-        }
-        if (ind.collects_by_location && isMatrixRowEnabled(d.matrixRowEnabled, 'district')) {
-          let matrixReady = true
-          const districtCatalog = deptLocationCatalog.districts.map((x) => ({ id: x.id, name: x.name }))
-          forEachCatalogMatrixCell(
-            ind,
-            (i) => Boolean(i.collects_by_location),
-            districtCatalog,
-            (yearId, districtId) => {
-              if (!matrixValueReady(d.yearDistrictValues, matrixCellKey(yearId, districtId))) matrixReady = false
-            },
-          )
-          if (!matrixReady) return false
-        }
-        if (ind.collects_by_religion && isMatrixRowEnabled(d.matrixRowEnabled, 'religion')) {
-          let matrixReady = true
-          const religionCatalog = religions.map((r) => ({ id: r.id, name: r.name }))
-          forEachReligionMatrixCell(ind, religionCatalog, (yearId, religionId) => {
-            if (!matrixValueReady(d.yearReligionValues, matrixCellKey(yearId, religionId))) matrixReady = false
-          })
-          if (!matrixReady) return false
-        }
-        if (
-          ind.collects_by_consolidated &&
-          isMatrixRowEnabled(d.matrixRowEnabled, 'consolidated')
-        ) {
-          let matrixReady = true
-          for (const y of indicatorConfiguredYears(ind)) {
-            if (!matrixValueReady(d.yearConsolidatedValues, genderTotalCellKey(y.year_id))) {
-              matrixReady = false
-            }
-          }
-          if (!matrixReady) return false
-        }
-        if (!d.comment.trim()) return false
-      } else if (ind.has_quantitative) {
-        const v = d.value.trim()
-        if (!v || !Number.isFinite(Number(v))) return false
-        if (!d.comment.trim()) return false
-      }
-      if (ind.has_qualitative) {
-        const qualYears = indicatorQualitativeYears(ind)
-        if (qualYears.length > 0) {
-          for (const y of qualYears) {
-            if (!(d.qualByYear[String(y.year_id)] ?? '').trim()) return false
-          }
-        } else {
-          const prevQualUrl =
-            parsed.kind === 'structured'
-              ? parsed.payload.by_indicator[String(ind.id)]?.qualitative?.attachment_url?.trim()
-              : ''
-          const effectiveQualUrl = d.clearSavedQualAttachment ? '' : prevQualUrl
-          if (!d.qualText.trim() && !d.qualFile && !effectiveQualUrl) return false
-        }
-      }
-    }
-    if (
-      !deptIndicatorYearTotalsWithinBudget(
-        deptIndicatorsForForm,
-        indicatorDrafts,
-        deptLocationCatalog.districts,
-        religions,
-      )
-    ) {
-      return false
-    }
-    return true
-  }, [deptIndicatorsForForm, indicatorDrafts, activeTask, deptParsedTaskResponse, deptLocationCatalog, religions])
+    return deptIndicatorYearTotalsWithinBudget(
+      deptIndicatorsForForm,
+      indicatorDrafts,
+      deptLocationCatalog.districts,
+      religions,
+    )
+  }, [deptIndicatorsForForm, indicatorDrafts, activeTask, deptLocationCatalog, religions])
 
   const deptYearTotalOverruns = useMemo(
     () =>
@@ -634,12 +530,7 @@ export function HrRequestViewPage() {
     [deptIndicatorsForForm, indicatorDrafts, deptLocationCatalog.districts, religions],
   )
 
-  const deptLegacySubmitReady = useMemo(() => {
-    if (!activeTask) return false
-    const trimmed = responseText.trim()
-    const hadStored = Boolean(activeTask.attachment_url?.trim())
-    return Boolean(trimmed || responseFile || (hadStored && !legacyAttachmentClear))
-  }, [activeTask, responseText, responseFile, legacyAttachmentClear])
+  const deptLegacySubmitReady = Boolean(activeTask)
 
   const canRegionalProceed =
     Boolean(regionalUser && detail && tasksForRequest.length === 0 && regionDepartments.length > 0)
@@ -667,10 +558,6 @@ export function HrRequestViewPage() {
   async function submitClarification() {
     if (!detail) return
     const msg = clarMessage.trim()
-    if (!msg) {
-      setClarError('Describe what you need clarified.')
-      return
-    }
     setClarSubmitting(true)
     setClarError(null)
     try {
@@ -757,7 +644,7 @@ export function HrRequestViewPage() {
           const overrunMsg = formatDeptYearTotalOverrunMessage(deptYearTotalOverruns)
           setSubmitResponseError(
             overrunMsg ||
-              'Complete each indicator: numbers where required, a narrative for quantitative metrics, and qualitative text and/or an attachment where required.',
+              'Year totals cannot be less than the sum of breakdown values. Reduce breakdown values so Unaccounted is not negative, then submit.',
           )
           return
         }
@@ -983,10 +870,6 @@ export function HrRequestViewPage() {
         })
       } else {
         const trimmed = responseText.trim()
-        if (!deptLegacySubmitReady) {
-          setSubmitResponseError('Enter a response and/or attach a file.')
-          return
-        }
         await submitDepartmentTaskResponse(activeTask.id, {
           mode: 'legacy',
           response_data: trimmed,
@@ -1101,13 +984,6 @@ export function HrRequestViewPage() {
 
   async function submitMonitorReview(status: 'accepted' | 'needs-modification') {
     if (!activeTask) return
-    if (status === 'needs-modification' && !reviewComments.trim()) {
-      setReviewFeedback({
-        kind: 'validation',
-        message: 'Add a short note for the department when requesting changes.',
-      })
-      return
-    }
     setSavingReview(true)
     setReviewFeedback(null)
     try {
@@ -1214,7 +1090,7 @@ export function HrRequestViewPage() {
               Request clarification from federal
             </h4>
             <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-              Describe what you need clarified before assigning departments.
+              You can describe what you need clarified before assigning departments. This is optional.
             </p>
             <Button variant="link" compact type="button" onClick={() => setRegionalPathChoice(null)}>
               ← Choose a different path
@@ -1246,7 +1122,7 @@ export function HrRequestViewPage() {
               <Button
                 variant="primary"
                 compact
-                disabled={clarSubmitting || !clarMessage.trim()}
+                disabled={clarSubmitting}
                 onClick={() => void submitClarification()}
               >
                 {clarSubmitting ? 'Submitting…' : 'Submit clarification request'}
@@ -1380,7 +1256,7 @@ export function HrRequestViewPage() {
                         <div style={{ marginTop: 20 }}>
                           <div className="form-row">
                             <label htmlFor="monitor-review-comments">
-                              Notes to department (required for modification)
+                              Notes to department (optional)
                             </label>
                             <textarea
                               id="monitor-review-comments"

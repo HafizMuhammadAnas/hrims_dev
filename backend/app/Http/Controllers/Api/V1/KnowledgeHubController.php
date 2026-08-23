@@ -220,6 +220,8 @@ class KnowledgeHubController extends Controller
             'knowledge_articles' => $c->knowledge_articles,
             'knowledge_implementation' => $c->knowledge_implementation,
             'description' => $c->description,
+            'repositories' => $c->normalizedRepositories(),
+            'optional_protocol_body' => $c->optional_protocol_body,
             'sort_order' => $c->sort_order,
         ];
     }

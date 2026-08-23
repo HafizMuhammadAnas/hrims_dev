@@ -41,6 +41,8 @@ export type AdminConvention = {
   knowledge_articles: string | null
   knowledge_implementation: string | null
   description: string | null
+  repositories?: import('../lib/conventionKnowledgeContent').ConventionRepositoryCycle[] | null
+  optional_protocol_body?: string | null
   sort_order: number
   is_active: boolean
 }
@@ -311,8 +313,16 @@ export async function adminFetchConventions(): Promise<AdminConvention[]> {
 export async function adminCreateConvention(body: {
   code: string
   name: string
+  knowledge_icon?: string | null
+  knowledge_adopted?: string | null
+  knowledge_ratified?: string | null
+  knowledge_articles?: string | null
+  knowledge_implementation?: string | null
   description?: string | null
+  repositories?: import('../lib/conventionKnowledgeContent').ConventionRepositoryCycle[]
+  optional_protocol_body?: string | null
   sort_order?: number
+  is_active?: boolean
 }): Promise<AdminConvention> {
   const res = await adminSend('POST', '/conventions', body)
   await throwIfNotOk(res)
@@ -335,6 +345,8 @@ export async function adminUpdateConvention(
     knowledge_articles: string | null
     knowledge_implementation: string | null
     description: string | null
+    repositories: import('../lib/conventionKnowledgeContent').ConventionRepositoryCycle[]
+    optional_protocol_body: string | null
     sort_order: number
     is_active: boolean
   }>,

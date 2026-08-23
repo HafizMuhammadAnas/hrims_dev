@@ -143,8 +143,8 @@ export function DepartmentIndicatorDataMatrix({
       </table>
       {!readOnly ? (
         <p className="muted small dept-data-matrix__hint">
-          Enter a number for each year and gender combination required for that metric. Use the sections below
-          for qualitative responses and attachments.
+          Numbers are optional. Leave a cell blank to store 0. Use the sections below for qualitative
+          responses and attachments.
         </p>
       ) : null}
     </div>

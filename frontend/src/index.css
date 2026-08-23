@@ -5189,15 +5189,33 @@ textarea.response-revision-changed,
   margin: 0 0 5px;
 }
 
+.knowledge-hub .conv-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.knowledge-hub .conv-meta__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--kh-lt-cyan, #eef8fb);
+  color: var(--txt);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .knowledge-hub .tabs-nav {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 30px;
   background: #fff;
   padding: 10px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  overflow-x: auto;
 }
 
 .knowledge-hub .tab-btn {
@@ -9202,4 +9220,46 @@ textarea.response-revision-changed,
   width: 100%;
   min-width: 5.75rem;
   min-height: 2.25rem;
+}
+
+.convention-editor {
+  display: grid;
+  gap: 20px;
+  max-width: 920px;
+}
+
+.convention-editor__section {
+  background: #fff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 20px 22px 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.convention-editor__heading {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+}
+
+.convention-editor__hint {
+  margin: 0 0 16px;
+}
+
+.convention-editor__cycle,
+.convention-editor__document {
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--border, #eef0f3);
+}
+
+.convention-editor__cycle-actions,
+.convention-editor__document-actions {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 8px;
+}
+
+.convention-editor__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

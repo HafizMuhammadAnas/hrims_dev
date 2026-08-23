@@ -23,7 +23,7 @@ class CompiledRecordController extends Controller
 
         $data = $request->validate([
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
-            'title' => ['required', 'string', 'max:500'],
+            'title' => ['nullable', 'string', 'max:500'],
             'region_names' => ['required', 'array', 'min:1'],
             'region_names.*' => ['string', 'max:128'],
             'summary' => ['nullable', 'string'],
@@ -34,7 +34,7 @@ class CompiledRecordController extends Controller
         $row = CompiledRecord::query()->create([
             'id' => 'COMP-'.strtoupper(Str::random(10)),
             'hr_request_id' => $data['hr_request_id'],
-            'title' => $data['title'],
+            'title' => filled($data['title'] ?? null) ? $data['title'] : 'Compiled Report',
             'region_names' => $data['region_names'],
             'compilation_date' => now()->toDateString(),
             'submitted_to' => $data['submitted_to'] ?? ($data['status'] === 'submitted' ? 'Ministry of Human Rights' : null),
@@ -67,11 +67,11 @@ class CompiledRecordController extends Controller
         $data = $request->validate([
             'status' => ['sometimes', Rule::in(['draft', 'submitted'])],
             'summary' => ['sometimes', 'nullable', 'string'],
-            'title' => ['sometimes', 'string', 'max:500'],
+            'title' => ['sometimes', 'nullable', 'string', 'max:500'],
             'submitted_to' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
-        if (array_key_exists('title', $data)) {
+        if (array_key_exists('title', $data) && filled($data['title'])) {
             $model->title = $data['title'];
         }
         if (array_key_exists('summary', $data)) {

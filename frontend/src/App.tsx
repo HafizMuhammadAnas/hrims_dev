@@ -29,6 +29,7 @@ import { IndicatorWiseDataAdminPage } from './pages/IndicatorWiseDataAdminPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { IssuesMappingsAdminPage } from './pages/IssuesMappingsAdminPage'
 import { RegionsDistrictsAdminPage } from './pages/RegionsDistrictsAdminPage'
+import { ConventionEditorPage } from './pages/ConventionEditorPage'
 import { SuperAdminConsolePage } from './pages/SuperAdminConsolePage'
 import { UserManagementPage } from './pages/UserManagementPage'
 import { ViolationEntriesPage } from './pages/ViolationEntriesPage'
@@ -180,6 +181,8 @@ function App() {
               <Route path="admin/indicator-wise-data" element={<IndicatorWiseDataAdminPage />} />
               <Route path="admin/indicator-wise-data/create" element={<IndicatorWiseDataAdminPage />} />
               <Route path="admin/indicator-wise-data/view/:recordId" element={<IndicatorWiseDataAdminPage />} />
+              <Route path="admin/conventions/new" element={<ConventionEditorPage />} />
+              <Route path="admin/conventions/:conventionId/edit" element={<ConventionEditorPage />} />
               <Route path="admin/:section" element={<SuperAdminConsolePage />} />
             </Route>
           </Route>

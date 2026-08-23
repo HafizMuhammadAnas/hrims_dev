@@ -13,6 +13,10 @@ import { isApiError } from '../../api/apiError'
 import { CAT_CONVENTION_OVERVIEW } from '../../data/catConventionOverview'
 import { CAT_REPOSITORY_CYCLES } from '../../data/catRepositoryContent'
 import {
+  normalizeRepositoryCycles,
+  type ConventionRepositoryCycle,
+} from '../../lib/conventionKnowledgeContent'
+import {
   coerceIssueEntryKind,
   CONCLUDING_OBSERVATION_LABEL,
   CONCLUDING_OBSERVATIONS_LABEL,
@@ -44,13 +48,45 @@ import {
   KnowledgeHubTabs,
 } from './KnowledgeHubUi'
 
-const SHARED_CONVENTION_TABS = ['Overview', 'Articles', 'LOI', 'Concluding Observations'] as const
-const CAT_EXTRA_TABS = ['Repositories', 'CAT Tracker', LABEL_OPTIONAL_PROTOCOL] as const
+const SHARED_CONVENTION_TABS = [
+  'Overview',
+  'Articles',
+  'LOI',
+  'Concluding Observations',
+  'Repositories',
+  LABEL_OPTIONAL_PROTOCOL,
+] as const
+const CAT_ONLY_TABS = ['CAT Tracker'] as const
 
-type ConventionHubTab = (typeof SHARED_CONVENTION_TABS)[number] | (typeof CAT_EXTRA_TABS)[number]
+type ConventionHubTab = (typeof SHARED_CONVENTION_TABS)[number] | (typeof CAT_ONLY_TABS)[number]
 
 function isCatConvention(code: string): boolean {
   return code.trim().toUpperCase() === 'CAT'
+}
+
+function conventionOverviewText(data: KnowledgeConventionDetail): string {
+  const fromAdmin = data.description?.trim() || ''
+  if (fromAdmin) return fromAdmin
+  if (isCatConvention(data.code)) return CAT_CONVENTION_OVERVIEW
+  return ''
+}
+
+function conventionRepositoryCycles(data: KnowledgeConventionDetail): ConventionRepositoryCycle[] {
+  const fromAdmin = normalizeRepositoryCycles(data.repositories)
+  if (fromAdmin.length > 0) return fromAdmin
+  if (!isCatConvention(data.code)) return []
+  return CAT_REPOSITORY_CYCLES.map((cycle) => ({
+    id: cycle.id,
+    title: cycle.title,
+    documents: cycle.documents.map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      href: doc.href,
+      type_label: doc.typeLabel,
+      icon: doc.icon,
+      file_name: doc.fileName,
+    })),
+  }))
 }
 
 function relatedIssueLabel(row: KnowledgeRelatedIssue | KnowledgeConventionIssueRow): string {
@@ -544,31 +580,45 @@ function ConventionIssuesTab({
   )
 }
 
-function ConventionRepositoriesTab() {
+function ConventionRepositoriesTab({ cycles }: { cycles: ConventionRepositoryCycle[] }) {
+  if (cycles.length === 0) {
+    return (
+      <KnowledgeHubPanel title="Repositories">
+        <KnowledgeHubMutedProse>
+          No repository documents have been published yet. A super administrator can add reporting cycles from Super
+          Admin → {LABEL_CONVENTIONS_AND_COMPONENTS}.
+        </KnowledgeHubMutedProse>
+      </KnowledgeHubPanel>
+    )
+  }
   return (
     <>
-      {CAT_REPOSITORY_CYCLES.map((cycle) => (
+      {cycles.map((cycle) => (
         <KnowledgeHubPanel key={cycle.id} title={cycle.title}>
-          <div className="resources-grid">
-            {cycle.documents.map((doc) => (
-              <a
-                key={doc.id}
-                href={doc.href}
-                className="resource-link"
-                target="_blank"
-                rel="noopener noreferrer"
-                download={doc.fileName}
-              >
-                <span className="resource-icon" aria-hidden>
-                  {doc.icon}
-                </span>
-                <div className="resource-text">
-                  <div className="resource-title">{doc.title}</div>
-                  <div className="resource-type">{doc.typeLabel}</div>
-                </div>
-              </a>
-            ))}
-          </div>
+          {cycle.documents.length === 0 ? (
+            <KnowledgeHubMutedProse>No documents in this cycle yet.</KnowledgeHubMutedProse>
+          ) : (
+            <div className="resources-grid">
+              {cycle.documents.map((doc) => (
+                <a
+                  key={doc.id}
+                  href={doc.href || undefined}
+                  className="resource-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={doc.file_name || undefined}
+                >
+                  <span className="resource-icon" aria-hidden>
+                    {doc.icon}
+                  </span>
+                  <div className="resource-text">
+                    <div className="resource-title">{doc.title}</div>
+                    <div className="resource-type">{doc.type_label || 'Document'}</div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
         </KnowledgeHubPanel>
       ))}
     </>
@@ -584,12 +634,25 @@ export function KnowledgeConventionCatDetail({
 }) {
   const [activeTab, setActiveTab] = useState<ConventionHubTab>('Overview')
   const isCat = isCatConvention(data.code)
-  const tabs: ConventionHubTab[] = isCat
-    ? [...SHARED_CONVENTION_TABS, ...CAT_EXTRA_TABS]
-    : [...SHARED_CONVENTION_TABS]
+  const tabs = useMemo<ConventionHubTab[]>(
+    () => (isCat ? [...SHARED_CONVENTION_TABS, ...CAT_ONLY_TABS] : [...SHARED_CONVENTION_TABS]),
+    [isCat],
+  )
   const adopted = data.knowledge_adopted?.trim() || '—'
   const ratified = data.knowledge_ratified?.trim() || '—'
-  const overview = data.description?.trim() || ''
+  const articlesLabel = data.knowledge_articles?.trim() || '—'
+  const implementation = data.knowledge_implementation?.trim() || '—'
+  const overview = conventionOverviewText(data)
+  const repositoryCycles = conventionRepositoryCycles(data)
+  const optionalProtocol = data.optional_protocol_body?.trim() || ''
+
+  useEffect(() => {
+    setActiveTab('Overview')
+  }, [data.id])
+
+  useEffect(() => {
+    if (!tabs.includes(activeTab)) setActiveTab('Overview')
+  }, [activeTab, tabs])
 
   return (
     <KnowledgeHubPage>
@@ -599,7 +662,12 @@ export function KnowledgeConventionCatDetail({
         icon={data.knowledge_icon}
         fallback="📜"
         fallbackIcon={knowledgeConventionIcon(data.code)}
-        metaLines={[`Adopted: ${adopted}`, `Ratified: ${ratified}`]}
+        metaLines={[
+          `Adopted ${adopted}`,
+          `Ratified ${ratified}`,
+          `Articles ${articlesLabel}`,
+          `Implementation ${implementation}`,
+        ]}
         onBack={onBack}
       />
 
@@ -611,13 +679,11 @@ export function KnowledgeConventionCatDetail({
 
       {activeTab === 'Overview' && (
         <KnowledgeHubPanel title="Convention Overview">
-          {isCat ? (
-            <KnowledgeHubProse>{CAT_CONVENTION_OVERVIEW}</KnowledgeHubProse>
-          ) : overview ? (
+          {overview ? (
             <KnowledgeHubProse>{overview}</KnowledgeHubProse>
           ) : (
             <KnowledgeHubMutedProse>
-              No narrative has been added yet. A super administrator can publish overview text from Super Admin →
+              No narrative has been added yet. A super administrator can publish overview text from Super Admin →{' '}
               {LABEL_CONVENTIONS_AND_COMPONENTS}.
             </KnowledgeHubMutedProse>
           )}
@@ -632,13 +698,20 @@ export function KnowledgeConventionCatDetail({
         <ConventionIssuesTab conventionId={data.id} entryKind="recommendation" />
       )}
 
-      {isCat && activeTab === 'Repositories' ? <ConventionRepositoriesTab /> : null}
+      {activeTab === 'Repositories' ? <ConventionRepositoriesTab cycles={repositoryCycles} /> : null}
 
       {isCat && activeTab === 'CAT Tracker' ? <CatTrackerTab /> : null}
 
-      {isCat && activeTab === LABEL_OPTIONAL_PROTOCOL ? (
+      {activeTab === LABEL_OPTIONAL_PROTOCOL ? (
         <KnowledgeHubPanel title={LABEL_OPTIONAL_PROTOCOL}>
-          <KnowledgeHubMutedProse>No optional protocol content is available yet.</KnowledgeHubMutedProse>
+          {optionalProtocol ? (
+            <KnowledgeHubProse>{optionalProtocol}</KnowledgeHubProse>
+          ) : (
+            <KnowledgeHubMutedProse>
+              No optional protocol content is available yet. A super administrator can add it from Super Admin →{' '}
+              {LABEL_CONVENTIONS_AND_COMPONENTS}.
+            </KnowledgeHubMutedProse>
+          )}
         </KnowledgeHubPanel>
       ) : null}
     </KnowledgeHubPage>

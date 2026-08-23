@@ -121,7 +121,7 @@ export function DepartmentIndicatorSupplementaryFields({
           )}
           <div className="form-row" style={{ marginBottom: 8 }}>
             <label htmlFor={`dept-ind-${ind.id}-comment`}>
-              Please provide narrative related to the indicator
+              Please provide narrative related to the indicator (optional)
             </label>
             <textarea
               id={`dept-ind-${ind.id}-comment`}
@@ -192,11 +192,11 @@ export function DepartmentIndicatorSupplementaryFields({
           ) : null}
           {qualYears.length > 0 ? (
             <p className="muted small" style={{ margin: '0 0 8px' }}>
-              Enter a narrative response for each selected qualitative year.
+              Enter an optional narrative for each selected qualitative year.
             </p>
           ) : usesMatrix && ind.has_quantitative ? (
             <p className="muted small" style={{ margin: '0 0 8px' }}>
-              Narrative response for this metric (required unless you attach a file).
+              Optional narrative for this metric. You may also attach a file.
             </p>
           ) : null}
           {qualYears.length > 0 ? (

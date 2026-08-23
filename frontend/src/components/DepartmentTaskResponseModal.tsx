@@ -222,7 +222,7 @@ export function DepartmentTaskResponseModal({
               {showReviewActions && review ? (
                 <>
                   <div className="form-row">
-                    <label htmlFor="dept-review-comments">Notes to department (required for modification)</label>
+                    <label htmlFor="dept-review-comments">Notes to department (optional)</label>
                     <textarea
                       id="dept-review-comments"
                       rows={4}

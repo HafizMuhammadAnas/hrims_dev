@@ -127,8 +127,8 @@ export function RegionalCompilationViewPage() {
     setSaveError(null)
     try {
       const updated = await updateRegionalCompiledResponse(row.id, {
-        title: editTitle.trim(),
-        content: editContent.trim(),
+        title: editTitle.trim() || row.title,
+        content: editContent,
       })
       setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
       setEditing(false)
@@ -258,7 +258,7 @@ export function RegionalCompilationViewPage() {
                 <Button
                   variant="primary"
                   compact
-                  disabled={saving || !editTitle.trim() || !editContent.trim()}
+                  disabled={saving}
                   type="button"
                   onClick={() => void saveEditedCompilation()}
                 >

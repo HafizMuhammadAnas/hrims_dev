@@ -132,7 +132,7 @@ class HrRequestClarificationController extends Controller
 
         $data = $request->validate([
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
-            'region_message' => ['required', 'string', 'max:20000'],
+            'region_message' => ['nullable', 'string', 'max:20000'],
             'attachment' => ['nullable', 'file', 'max:15360'],
         ]);
 
@@ -159,7 +159,7 @@ class HrRequestClarificationController extends Controller
             if ($existing && $existing->status === 'pending_region') {
                 $existing->update([
                     'status' => 'pending_federal',
-                    'region_message' => $data['region_message'],
+                    'region_message' => (string) ($data['region_message'] ?? ''),
                     'region_submitted_at' => now(),
                     'requested_by_user_id' => $user->id,
                 ]);
@@ -170,7 +170,7 @@ class HrRequestClarificationController extends Controller
                     'hr_request_id' => $data['hr_request_id'],
                     'region_id' => $regionId,
                     'status' => 'pending_federal',
-                    'region_message' => $data['region_message'],
+                    'region_message' => (string) ($data['region_message'] ?? ''),
                     'requested_by_user_id' => $user->id,
                     'region_submitted_at' => now(),
                 ]);
@@ -201,13 +201,13 @@ class HrRequestClarificationController extends Controller
         }
 
         $data = $request->validate([
-            'federal_response' => ['required', 'string', 'max:20000'],
+            'federal_response' => ['nullable', 'string', 'max:20000'],
             'attachment' => ['nullable', 'file', 'max:15360'],
         ]);
 
         DB::transaction(function () use ($request, $user, $data, $hrRequestClarification) {
             $hrRequestClarification->update([
-                'federal_response' => $data['federal_response'],
+                'federal_response' => $data['federal_response'] ?? '',
                 'status' => 'pending_region',
                 'responded_by_user_id' => $user->id,
                 'federal_responded_at' => now(),

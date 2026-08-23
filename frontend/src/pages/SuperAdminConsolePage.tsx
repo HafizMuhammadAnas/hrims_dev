@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
-  adminCreateConvention,
   adminCreateConventionComponent,
   adminCreateDepartment,
   adminCreateKnowledgeCard,
@@ -20,7 +19,6 @@ import {
   adminFetchRegionsPublic,
   adminFetchSdgNodes,
   adminFetchUpr,
-  adminUpdateConvention,
   adminUpdateConventionComponent,
   adminUpdateDepartment,
   adminUpdateKnowledgeCard,
@@ -85,6 +83,7 @@ const TAB_PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
 export function SuperAdminConsolePage() {
   const { user } = useAuth()
   const { section } = useParams<{ section: string }>()
+  const navigate = useNavigate()
   const tab = section ? ADMIN_SECTION_TO_TAB[section] : undefined
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -102,17 +101,6 @@ export function SuperAdminConsolePage() {
   const [editDeptCode, setEditDeptCode] = useState('')
   const [editDeptName, setEditDeptName] = useState('')
   const [editDeptType, setEditDeptType] = useState('')
-
-  const [editingConvId, setEditingConvId] = useState<number | null>(null)
-  const [editConvCode, setEditConvCode] = useState('')
-  const [editConvName, setEditConvName] = useState('')
-  const [editConvIcon, setEditConvIcon] = useState('')
-  const [editConvAdopted, setEditConvAdopted] = useState('')
-  const [editConvRatified, setEditConvRatified] = useState('')
-  const [editConvArticles, setEditConvArticles] = useState('')
-  const [editConvImpl, setEditConvImpl] = useState('')
-  const [editConvDesc, setEditConvDesc] = useState('')
-  const [editConvSort, setEditConvSort] = useState('')
 
   const [editingCompId, setEditingCompId] = useState<number | null>(null)
   const [editCompType, setEditCompType] = useState('')
@@ -341,15 +329,15 @@ export function SuperAdminConsolePage() {
         <TableCard padded>
           <h3 style={{ marginTop: 0 }}>Conventions</h3>
           <p className="text-muted">
-            Create the catalog entry, then use <strong>Edit</strong> to fill the knowledge-page fields (icon, treaty
-            dates, narrative, and optional sort order). Those fields power the Conventions page in the knowledge hub.
+            Create a convention, then use <strong>Edit</strong> to fill Overview, Repositories, and Optional Protocol.
+            Those sections appear as tabs on Convention Info. Articles, LOI, and Concluding Observations are managed
+            under Issues & mappings for the same convention.
           </p>
-          <ConvForm
-            busy={busy}
-            setBusy={setBusy}
-            setError={setError}
-            onDone={async () => setConventions(await adminFetchConventions())}
-          />
+          <div style={{ marginBottom: 16 }}>
+            <Button variant="primary" compact onClick={() => navigate('/admin/conventions/new')}>
+              Create convention
+            </Button>
+          </div>
           <table className="data-table" style={{ marginTop: 16 }}>
             <thead>
               <tr>
@@ -359,86 +347,7 @@ export function SuperAdminConsolePage() {
               </tr>
             </thead>
             <tbody>
-              {conventions.map((c) =>
-                editingConvId === c.id ? (
-                  <tr key={c.id}>
-                    <td colSpan={2}>
-                      <FormGrid>
-                        <FormRow twoCol>
-                          <FormControl label="Code">
-                            <input value={editConvCode} onChange={(e) => setEditConvCode(e.target.value)} />
-                          </FormControl>
-                          <FormControl label="Full name">
-                            <input value={editConvName} onChange={(e) => setEditConvName(e.target.value)} />
-                          </FormControl>
-                        </FormRow>
-                        <FormRow twoCol>
-                          <FormControl label="Icon (emoji)">
-                            <input value={editConvIcon} onChange={(e) => setEditConvIcon(e.target.value)} placeholder="📜" />
-                          </FormControl>
-                          <div />
-                        </FormRow>
-                        <FormRow twoCol>
-                          <FormControl label="Adopted">
-                            <input value={editConvAdopted} onChange={(e) => setEditConvAdopted(e.target.value)} />
-                          </FormControl>
-                          <FormControl label="Ratified">
-                            <input value={editConvRatified} onChange={(e) => setEditConvRatified(e.target.value)} />
-                          </FormControl>
-                        </FormRow>
-                        <FormRow twoCol>
-                          <FormControl label="Articles">
-                            <input value={editConvArticles} onChange={(e) => setEditConvArticles(e.target.value)} />
-                          </FormControl>
-                          <FormControl label="Implementation %">
-                            <input value={editConvImpl} onChange={(e) => setEditConvImpl(e.target.value)} />
-                          </FormControl>
-                        </FormRow>
-                        <FormRow twoCol>
-                          <FormControl label="Sort">
-                            <input value={editConvSort} onChange={(e) => setEditConvSort(e.target.value)} />
-                          </FormControl>
-                          <div />
-                        </FormRow>
-                        <FormField label="Page narrative (knowledge hub)">
-                          <textarea rows={4} value={editConvDesc} onChange={(e) => setEditConvDesc(e.target.value)} />
-                        </FormField>
-                      </FormGrid>
-                    </td>
-                    <td>
-                      <Button
-                        variant="primary"
-                        compact
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await adminUpdateConvention(c.id, {
-                                code: editConvCode.trim(),
-                                name: editConvName.trim(),
-                                knowledge_icon: editConvIcon.trim() || null,
-                                knowledge_adopted: editConvAdopted.trim() || null,
-                                knowledge_ratified: editConvRatified.trim() || null,
-                                knowledge_articles: editConvArticles.trim() || null,
-                                knowledge_implementation: editConvImpl.trim() || null,
-                                description: editConvDesc.trim() || null,
-                                sort_order: editConvSort === '' ? undefined : Number(editConvSort),
-                              })
-                              setEditingConvId(null)
-                              setConventions(await adminFetchConventions())
-                            } catch (e: unknown) {
-                              setError(isApiError(e) ? e.message : 'Update failed')
-                            }
-                          })()
-                        }}
-                      >
-                        Save
-                      </Button>{' '}
-                      <Button variant="link" compact onClick={() => setEditingConvId(null)}>
-                        Cancel
-                      </Button>
-                    </td>
-                  </tr>
-                ) : (
+              {conventions.map((c) => (
                   <tr key={c.id}>
                     <td>{c.code}</td>
                     <td>{c.name}</td>
@@ -447,18 +356,7 @@ export function SuperAdminConsolePage() {
                         <Button
                           variant="link"
                           compact
-                          onClick={() => {
-                            setEditingConvId(c.id)
-                            setEditConvCode(c.code)
-                            setEditConvName(c.name)
-                            setEditConvIcon(c.knowledge_icon ?? '')
-                            setEditConvAdopted(c.knowledge_adopted ?? '')
-                            setEditConvRatified(c.knowledge_ratified ?? '')
-                            setEditConvArticles(c.knowledge_articles ?? '')
-                            setEditConvImpl(c.knowledge_implementation ?? '')
-                            setEditConvDesc(c.description ?? '')
-                            setEditConvSort(String(c.sort_order ?? 0))
-                          }}
+                          onClick={() => navigate(`/admin/conventions/${c.id}/edit`)}
                         >
                           Edit
                         </Button>
@@ -485,16 +383,15 @@ export function SuperAdminConsolePage() {
                       </ActionMenu>
                     </td>
                   </tr>
-                ),
-              )}
+              ))}
             </tbody>
           </table>
           {selConv !== '' && (
             <>
               <h3 style={{ marginTop: 24 }}>Components (convention #{selConv})</h3>
               <p className="text-muted">
-                Articles and other treaty parts: optional <strong>Body</strong> text appears on the public convention
-                detail page under each component.
+                Optional catalog parts for this convention. Overview, Repositories, and Optional Protocol are edited
+                on the convention form. Articles, LOI, and Concluding Observations come from Issues & mappings.
               </p>
               <ConvCompForm
                 conventionId={Number(selConv)}
@@ -1112,58 +1009,6 @@ function DeptForm({
         <RegionCheckboxMulti regions={regions} selectedIds={regionIds} onChange={setRegionIds} disabled={busy} />
       </div>
     </div>
-  )
-}
-
-function ConvForm({
-  busy,
-  setBusy,
-  setError,
-  onDone,
-}: {
-  busy: boolean
-  setBusy: (v: boolean) => void
-  setError: (s: string | null) => void
-  onDone: () => Promise<void>
-}) {
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
-  return (
-    <FormGrid>
-      <FormRow twoCol>
-        <FormControl label="Code">
-          <input placeholder="Code (e.g. CEDAW)" value={code} onChange={(e) => setCode(e.target.value)} />
-        </FormControl>
-        <FormControl label="Name">
-          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-        </FormControl>
-      </FormRow>
-      <div>
-        <Button
-          variant="primary"
-          compact
-          disabled={busy || !code || !name}
-          onClick={() => {
-            void (async () => {
-              setBusy(true)
-              setError(null)
-              try {
-                await adminCreateConvention({ code, name })
-                setCode('')
-                setName('')
-                await onDone()
-              } catch (e: unknown) {
-                setError(isApiError(e) ? e.message : 'Save failed')
-              } finally {
-                setBusy(false)
-              }
-            })()
-          }}
-        >
-          Add convention
-        </Button>
-      </div>
-    </FormGrid>
   )
 }
 

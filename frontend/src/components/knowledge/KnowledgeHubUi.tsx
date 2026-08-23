@@ -126,9 +126,13 @@ export function KnowledgeHubDetailHeader({
           <h1 className="conv-title">{formatKnowledgeHubTitle(title)}</h1>
           {subtitle?.trim() ? <p className="conv-subtitle">{subtitle.trim()}</p> : null}
           {metaLines && metaLines.length > 0 ? (
-            <p className="text-lt" style={{ marginTop: '12px', fontSize: '14px', lineHeight: 1.6 }}>
-              {metaLines.join(' · ')}
-            </p>
+            <div className="conv-meta">
+              {metaLines.map((line) => (
+                <span key={line} className="conv-meta__chip">
+                  {line}
+                </span>
+              ))}
+            </div>
           ) : null}
         </div>
       </div>
@@ -177,7 +181,11 @@ export function KnowledgeHubPanel({
 }
 
 export function KnowledgeHubProse({ children }: { children: ReactNode }) {
-  return <p className="overview-text">{children}</p>
+  return (
+    <p className="overview-text" style={{ whiteSpace: 'pre-wrap' }}>
+      {children}
+    </p>
+  )
 }
 
 export function KnowledgeHubMutedProse({ children }: { children: ReactNode }) {

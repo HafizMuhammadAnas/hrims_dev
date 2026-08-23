@@ -16,6 +16,8 @@ class Convention extends Model
         'knowledge_articles',
         'knowledge_implementation',
         'description',
+        'repositories',
+        'optional_protocol_body',
         'sort_order',
         'is_active',
     ];
@@ -24,7 +26,67 @@ class Convention extends Model
     {
         return [
             'is_active' => 'boolean',
+            'repositories' => 'array',
         ];
+    }
+
+    /**
+     * @return list<array{id: string, title: string, documents: list<array{id: string, title: string, href: string, type_label: string, icon: string, file_name: string}>}>
+     */
+    public function normalizedRepositories(): array
+    {
+        return self::normalizeRepositories($this->repositories);
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<array{id: string, title: string, documents: list<array{id: string, title: string, href: string, type_label: string, icon: string, file_name: string}>}>
+     */
+    public static function normalizeRepositories(mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $cycles = [];
+        foreach ($raw as $cycle) {
+            if (! is_array($cycle)) {
+                continue;
+            }
+            $documents = [];
+            $docsIn = $cycle['documents'] ?? [];
+            if (is_array($docsIn)) {
+                foreach ($docsIn as $doc) {
+                    if (! is_array($doc)) {
+                        continue;
+                    }
+                    $title = trim((string) ($doc['title'] ?? ''));
+                    $href = trim((string) ($doc['href'] ?? $doc['url'] ?? ''));
+                    if ($title === '' && $href === '') {
+                        continue;
+                    }
+                    $documents[] = [
+                        'id' => trim((string) ($doc['id'] ?? '')) ?: (string) count($documents),
+                        'title' => $title,
+                        'href' => $href,
+                        'type_label' => trim((string) ($doc['type_label'] ?? $doc['typeLabel'] ?? '')),
+                        'icon' => trim((string) ($doc['icon'] ?? '')) ?: '📄',
+                        'file_name' => trim((string) ($doc['file_name'] ?? $doc['fileName'] ?? '')),
+                    ];
+                }
+            }
+            $cycleTitle = trim((string) ($cycle['title'] ?? ''));
+            if ($cycleTitle === '' && $documents === []) {
+                continue;
+            }
+            $cycles[] = [
+                'id' => trim((string) ($cycle['id'] ?? '')) ?: (string) count($cycles),
+                'title' => $cycleTitle !== '' ? $cycleTitle : 'Repository',
+                'documents' => $documents,
+            ];
+        }
+
+        return $cycles;
     }
 
     public function components(): HasMany

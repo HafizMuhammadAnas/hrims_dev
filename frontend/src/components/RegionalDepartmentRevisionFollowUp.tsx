@@ -66,10 +66,6 @@ export function RegionalDepartmentRevisionFollowUp({
 
   async function requestModification(task: DepartmentTaskRow) {
     const notes = commentFor(task.id).trim()
-    if (!notes) {
-      setError('Add feedback for the department when requesting modification.')
-      return
-    }
     setSavingId(task.id)
     setError(null)
     try {
@@ -89,10 +85,6 @@ export function RegionalDepartmentRevisionFollowUp({
   async function requestModificationAll() {
     if (reopenable.length === 0) return
     const notes = (defaultComments || Object.values(commentsByTask)[0] || '').trim()
-    if (!notes) {
-      setError('Add shared feedback before requesting modification from all departments.')
-      return
-    }
     setBulkSaving(true)
     setError(null)
     try {

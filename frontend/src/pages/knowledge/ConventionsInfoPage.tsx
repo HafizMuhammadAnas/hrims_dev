@@ -50,7 +50,7 @@ export function ConventionsInfoPage() {
   }
 
   if (selected) {
-    return <KnowledgeConventionCatDetail data={selected} onBack={() => setSelected(null)} />
+    return <KnowledgeConventionCatDetail key={selected.id} data={selected} onBack={() => setSelected(null)} />
   }
 
   return (
@@ -67,6 +67,10 @@ export function ConventionsInfoPage() {
                 fallbackIcon={knowledgeConventionIcon(c.code)}
                 title={c.code}
                 description={c.name}
+                stat1Value={c.knowledge_adopted}
+                stat1Label="Adopted"
+                stat2Value={c.knowledge_ratified}
+                stat2Label="Ratified"
                 onClick={() => {
                   void openDetail(c.id)
                 }}

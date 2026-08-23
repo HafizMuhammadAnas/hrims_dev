@@ -329,9 +329,7 @@ class DepartmentTaskController extends Controller
     private function normalizeQuantitativeByYearGender(IssueIndicator $indicator, mixed $raw): array|JsonResponse
     {
         if (! is_array($raw)) {
-            return response()->json([
-                'message' => 'Indicator '.$indicator->id.': year/gender values are required.',
-            ], 422);
+            $raw = [];
         }
 
         $indicator->loadMissing([
@@ -367,9 +365,7 @@ class DepartmentTaskController extends Controller
             $yearKey = (string) $yearId;
             $yearIn = $raw[$yearKey] ?? $raw[$yearId] ?? null;
             if (! is_array($yearIn)) {
-                return response()->json([
-                    'message' => 'Indicator '.$indicator->id.': missing values for year '.$yearId.'.',
-                ], 422);
+                $yearIn = [];
             }
             $out[$yearKey] = [];
             foreach (array_keys($genders) as $genderId) {
@@ -427,9 +423,7 @@ class DepartmentTaskController extends Controller
         }
 
         if (! is_array($raw)) {
-            return response()->json([
-                'message' => 'Indicator '.$indicator->id.': '.$dimensionLabel.' values are required.',
-            ], 422);
+            $raw = [];
         }
 
         $out = [];
@@ -437,9 +431,7 @@ class DepartmentTaskController extends Controller
             $yearKey = (string) $yearId;
             $yearIn = $raw[$yearKey] ?? $raw[$yearId] ?? null;
             if (! is_array($yearIn)) {
-                return response()->json([
-                    'message' => 'Indicator '.$indicator->id.': missing '.$dimensionLabel.' values for year '.$yearId.'.',
-                ], 422);
+                $yearIn = [];
             }
             $out[$yearKey] = [];
             foreach ($expectedKeys as $cellKey) {
@@ -574,9 +566,7 @@ class DepartmentTaskController extends Controller
         }
 
         if (! is_array($raw)) {
-            return response()->json([
-                'message' => 'Indicator '.$indicator->id.': consolidated data values are required.',
-            ], 422);
+            $raw = [];
         }
 
         $out = [];
@@ -584,9 +574,7 @@ class DepartmentTaskController extends Controller
             $yearKey = (string) $yearId;
             $yearIn = $raw[$yearKey] ?? $raw[$yearId] ?? null;
             if (! is_array($yearIn)) {
-                return response()->json([
-                    'message' => 'Indicator '.$indicator->id.': missing consolidated data values for year '.$yearId.'.',
-                ], 422);
+                $yearIn = [];
             }
             $totalIn = $yearIn['total'] ?? null;
             $totalRaw = is_array($totalIn) ? ($totalIn['value'] ?? null) : $totalIn;
@@ -686,13 +674,6 @@ class DepartmentTaskController extends Controller
         $prevAttach = trim((string) ($departmentTask->attachment_url ?? ''));
         $removeAttachment = $request->boolean('remove_attachment');
 
-        if ($text === '' && ! $request->hasFile('attachment')) {
-            $willKeepAttachment = $prevAttach !== '' && ! $removeAttachment;
-            if ($prevText === '' && ! $willKeepAttachment) {
-                return response()->json(['message' => 'Provide a written response and/or an attachment.'], 422);
-            }
-        }
-
         $attachmentUrl = $departmentTask->attachment_url;
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
@@ -753,7 +734,7 @@ class DepartmentTaskController extends Controller
         $selectedIds = $hrRequest->indicatorResponses->pluck('issue_indicator_id')->map(fn ($id) => (int) $id)->all();
 
         $validated = $request->validate([
-            'indicator_bundles' => ['required', 'string', 'max:500000'],
+            'indicator_bundles' => ['nullable', 'string', 'max:500000'],
             'quant_file' => ['nullable', 'array'],
             'quant_file.*' => ['nullable', 'file', 'max:15360'],
             'qual_file' => ['nullable', 'array'],
@@ -764,11 +745,15 @@ class DepartmentTaskController extends Controller
             'strip_qual.*' => ['integer'],
         ]);
 
-        $decoded = json_decode($validated['indicator_bundles'], true);
-        if (! is_array($decoded) || ! isset($decoded['by_indicator']) || ! is_array($decoded['by_indicator'])) {
-            return response()->json(['message' => 'indicator_bundles must be JSON with a by_indicator object.'], 422);
+        $rawJson = $validated['indicator_bundles'] ?? $request->input('indicator_bundles') ?? '{}';
+        if (! is_string($rawJson) || trim($rawJson) === '') {
+            $rawJson = '{}';
         }
-        $submitted = $decoded['by_indicator'];
+        $decoded = json_decode($rawJson, true);
+        if (! is_array($decoded)) {
+            $decoded = [];
+        }
+        $submitted = is_array($decoded['by_indicator'] ?? null) ? $decoded['by_indicator'] : [];
 
         $prevPayload = $this->parseStoredIndicatorPayload($departmentTask->response_data);
         $prevBy = $prevPayload['by_indicator'] ?? [];
@@ -809,7 +794,7 @@ class DepartmentTaskController extends Controller
             $idKey = (string) $indicator->id;
             $entry = $submitted[$idKey] ?? $submitted[$indicator->id] ?? null;
             if (! is_array($entry)) {
-                return response()->json(['message' => 'Missing response bundle for indicator '.$indicator->id.'.'], 422);
+                $entry = [];
             }
 
             $labelRaw = isset($entry['indicator_label']) ? trim((string) $entry['indicator_label']) : '';
@@ -821,18 +806,9 @@ class DepartmentTaskController extends Controller
             if ($flags['has_quantitative']) {
                 $qIn = $entry['quantitative'] ?? null;
                 if (! is_array($qIn)) {
-                    $msg = $collectsYearGender
-                        ? 'Indicator '.$indicator->id.': quantitative breakdown by year (matrix tables) is required.'
-                        : 'Indicator '.$indicator->id.': quantitative fields are required.';
-
-                    return response()->json(['message' => $msg], 422);
+                    $qIn = [];
                 }
                 $comment = trim((string) ($qIn['comment'] ?? ''));
-                if ($comment === '') {
-                    return response()->json([
-                        'message' => 'Indicator '.$indicator->id.': a narrative related to the indicator is required.',
-                    ], 422);
-                }
                 $qFile = $this->pickKeyedUploadedFile($quantFiles, (int) $indicator->id);
                 $qUrl = null;
                 if ($qFile && $qFile->isValid()) {
@@ -930,7 +906,7 @@ class DepartmentTaskController extends Controller
                 } else {
                     $valRaw = $qIn['value'] ?? null;
                     if ($valRaw === null || trim((string) $valRaw) === '') {
-                        return response()->json(['message' => 'Indicator '.$indicator->id.': a number is required.'], 422);
+                        $valRaw = '0';
                     }
                     if (! is_numeric($valRaw)) {
                         return response()->json(['message' => 'Indicator '.$indicator->id.': the number must be numeric.'], 422);
@@ -948,7 +924,7 @@ class DepartmentTaskController extends Controller
             if ($flags['has_qualitative']) {
                 $lIn = $entry['qualitative'] ?? null;
                 if (! is_array($lIn)) {
-                    return response()->json(['message' => 'Indicator '.$indicator->id.': qualitative fields are required.'], 422);
+                    $lIn = [];
                 }
 
                 $qualYearIds = $indicator->qualitativeCollectionYearIds();
@@ -956,13 +932,8 @@ class DepartmentTaskController extends Controller
                 $byYearOut = [];
                 if ($qualYearIds !== []) {
                     if (! is_array($byYearIn)) {
-                        // Legacy single-text submit → apply to every qualitative year.
+                        // Legacy single-text submit → apply to every qualitative year (may be empty).
                         $legacyText = trim((string) ($lIn['text'] ?? ''));
-                        if ($legacyText === '') {
-                            return response()->json([
-                                'message' => 'Indicator '.$indicator->id.': qualitative text is required for each selected year.',
-                            ], 422);
-                        }
                         foreach ($qualYearIds as $yearId) {
                             $byYearOut[(string) $yearId] = ['text' => $legacyText];
                         }
@@ -973,11 +944,6 @@ class DepartmentTaskController extends Controller
                             $yearText = is_array($yearEntry)
                                 ? trim((string) ($yearEntry['text'] ?? ''))
                                 : trim((string) ($yearEntry ?? ''));
-                            if ($yearText === '') {
-                                return response()->json([
-                                    'message' => 'Indicator '.$indicator->id.': qualitative text is required for year '.$yearId.'.',
-                                ], 422);
-                            }
                             $byYearOut[$yearKey] = ['text' => $yearText];
                         }
                     }
@@ -1008,9 +974,6 @@ class DepartmentTaskController extends Controller
                 } else {
                     $prevL = is_array($prevBy[$idKey] ?? null) ? ($prevBy[$idKey]['qualitative'] ?? null) : null;
                     $lUrl = is_array($prevL) ? ($prevL['attachment_url'] ?? null) : null;
-                }
-                if ($byYearOut === [] && $lText === '' && ($lUrl === null || $lUrl === '')) {
-                    return response()->json(['message' => 'Indicator '.$indicator->id.': add a written response and/or attach a file.'], 422);
                 }
                 $row['qualitative'] = [
                     'text' => $lText !== '' ? $lText : null,

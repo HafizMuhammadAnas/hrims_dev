@@ -28,7 +28,7 @@ class RegionalResponseController extends Controller
 
         $data = $request->validate([
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
-            'title' => ['required', 'string', 'max:500'],
+            'title' => ['nullable', 'string', 'max:500'],
             'content' => ['nullable', 'string'],
             'region_id' => ['sometimes', 'integer', 'exists:regions,id'],
         ]);
@@ -60,7 +60,7 @@ class RegionalResponseController extends Controller
             'id' => 'RES-'.strtoupper(Str::random(10)),
             'hr_request_id' => $hrRequest->id,
             'region_id' => $targetRegionId,
-            'title' => $data['title'],
+            'title' => filled($data['title'] ?? null) ? $data['title'] : (string) ($hrRequest->title ?: 'Regional compilation'),
             'submission_date' => now()->toDateString(),
             'review_status' => 'pending',
             'comments' => null,
@@ -132,14 +132,15 @@ class RegionalResponseController extends Controller
             }
 
             $data = $request->validate([
-                'title' => ['required', 'string', 'max:500'],
-                'content' => ['required', 'string'],
+                'title' => ['nullable', 'string', 'max:500'],
+                'content' => ['nullable', 'string'],
             ]);
 
             app(ResponseRevisionRecorder::class)->snapshotRegionalResponse($model, $user);
 
-            $model->title = $data['title'];
-            $model->content = $data['content'];
+            $title = trim((string) ($data['title'] ?? ''));
+            $model->title = $title !== '' ? $title : $model->title;
+            $model->content = $data['content'] ?? '';
             $model->review_status = 'pending';
             $model->save();
 

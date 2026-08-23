@@ -28,9 +28,15 @@ class ConventionController extends Controller
             'knowledge_articles' => ['nullable', 'string', 'max:64'],
             'knowledge_implementation' => ['nullable', 'string', 'max:64'],
             'description' => ['nullable', 'string'],
+            'repositories' => ['nullable', 'array'],
+            'optional_protocol_body' => ['nullable', 'string'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
+
+        if (array_key_exists('repositories', $data)) {
+            $data['repositories'] = Convention::normalizeRepositories($data['repositories']);
+        }
 
         $row = Convention::query()->create($data);
 
@@ -48,9 +54,14 @@ class ConventionController extends Controller
             'knowledge_articles' => ['sometimes', 'nullable', 'string', 'max:64'],
             'knowledge_implementation' => ['sometimes', 'nullable', 'string', 'max:64'],
             'description' => ['sometimes', 'nullable', 'string'],
+            'repositories' => ['sometimes', 'nullable', 'array'],
+            'optional_protocol_body' => ['sometimes', 'nullable', 'string'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
+        if (array_key_exists('repositories', $data)) {
+            $data['repositories'] = Convention::normalizeRepositories($data['repositories']);
+        }
         $convention->fill($data);
         $convention->save();
 
@@ -79,6 +90,8 @@ class ConventionController extends Controller
             'knowledge_articles' => $c->knowledge_articles,
             'knowledge_implementation' => $c->knowledge_implementation,
             'description' => $c->description,
+            'repositories' => $c->normalizedRepositories(),
+            'optional_protocol_body' => $c->optional_protocol_body,
             'sort_order' => $c->sort_order,
             'is_active' => $c->is_active,
         ];

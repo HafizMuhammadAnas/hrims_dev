@@ -215,7 +215,7 @@ export function ClarificationFederalViewPanel({ clarificationId, onClose, onResp
                     <Button
                       variant="primary"
                       compact
-                      disabled={submitting || !federalResponse.trim()}
+                      disabled={submitting}
                       onClick={() => {
                         void (async () => {
                           setSubmitting(true)
