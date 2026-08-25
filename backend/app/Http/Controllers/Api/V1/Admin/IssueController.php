@@ -9,6 +9,7 @@ use App\Models\IssueIndicator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -281,17 +282,29 @@ class IssueController extends Controller
         ]);
 
         $conventionId = (int) ($data['convention_id'] ?? $issue?->convention_id ?? $request->input('convention_id', 0));
-        if ($conventionId > 0 && array_key_exists('category_id', $data)) {
+        if (
+            $conventionId > 0
+            && array_key_exists('category_id', $data)
+            && Schema::hasColumn('issue_categories', 'convention_id')
+        ) {
             $categoryId = (int) $data['category_id'];
-            $categoryOk = IssueCategory::query()
-                ->where('id', $categoryId)
-                ->where('convention_id', $conventionId)
-                ->where('is_active', true)
-                ->exists();
-            if (! $categoryOk) {
+            $category = IssueCategory::query()->where('id', $categoryId)->first();
+            if ($category === null || $category->is_active === false) {
                 throw ValidationException::withMessages([
-                    'category_id' => ['The selected category does not belong to this convention.'],
+                    'category_id' => ['The selected category is invalid or inactive.'],
                 ]);
+            }
+
+            if ((int) $category->convention_id !== $conventionId) {
+                // Legacy rows often pointed at a shared/CAT category. Remap (or clone) under this convention
+                // so edit/save keeps working after categories became convention-scoped.
+                $remappedId = $this->remapCategoryToConvention($category, $conventionId);
+                if ($remappedId === null) {
+                    throw ValidationException::withMessages([
+                        'category_id' => ['The selected category does not belong to this convention.'],
+                    ]);
+                }
+                $data['category_id'] = $remappedId;
             }
         }
         if ($conventionId > 0 && array_key_exists('articles', $data)) {
@@ -609,6 +622,40 @@ class IssueController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * Find or clone a category under the target convention (by name).
+     */
+    private function remapCategoryToConvention(IssueCategory $source, int $conventionId): ?int
+    {
+        $existing = IssueCategory::query()
+            ->where('convention_id', $conventionId)
+            ->where('name', $source->name)
+            ->orderByDesc('is_active')
+            ->orderBy('id')
+            ->first();
+        if ($existing) {
+            return (int) $existing->id;
+        }
+
+        try {
+            $clone = IssueCategory::query()->create([
+                'convention_id' => $conventionId,
+                'name' => $source->name,
+                'is_active' => (bool) ($source->is_active ?? true),
+            ]);
+
+            return (int) $clone->id;
+        } catch (\Throwable) {
+            $existing = IssueCategory::query()
+                ->where('convention_id', $conventionId)
+                ->where('name', $source->name)
+                ->orderBy('id')
+                ->first();
+
+            return $existing ? (int) $existing->id : null;
+        }
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\IssueCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class IssueCategoryController extends Controller
@@ -13,10 +14,12 @@ class IssueCategoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $conventionId = $request->query('convention_id');
+        $hasConvention = Schema::hasColumn('issue_categories', 'convention_id');
+
         $rows = IssueCategory::query()
-            ->with('convention:id,code,name')
+            ->when($hasConvention, fn ($q) => $q->with('convention:id,code,name'))
             ->when(
-                $conventionId !== null && $conventionId !== '',
+                $hasConvention && $conventionId !== null && $conventionId !== '',
                 fn ($q) => $q->where('convention_id', (int) $conventionId),
             )
             ->orderByDesc('updated_at')
@@ -31,6 +34,12 @@ class IssueCategoryController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if (! Schema::hasColumn('issue_categories', 'convention_id')) {
+            return response()->json([
+                'message' => 'Category convention mapping is not available until the migration has been applied.',
+            ], 503);
+        }
+
         $data = $request->validate([
             'convention_id' => ['required', 'integer', 'exists:conventions,id'],
             'name' => [
@@ -52,22 +61,25 @@ class IssueCategoryController extends Controller
 
     public function update(Request $request, IssueCategory $issue_category): JsonResponse
     {
-        $conventionId = (int) ($request->input('convention_id', $issue_category->convention_id) ?? $issue_category->convention_id);
-        $data = $request->validate([
-            'convention_id' => ['sometimes', 'required', 'integer', 'exists:conventions,id'],
-            'name' => [
-                'sometimes',
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('issue_categories', 'name')
-                    ->where('convention_id', $conventionId)
-                    ->ignore($issue_category->id),
-            ],
-            'is_active' => ['sometimes', 'boolean'],
-        ]);
+        $hasConvention = Schema::hasColumn('issue_categories', 'convention_id');
+        $conventionId = $hasConvention
+            ? (int) ($request->input('convention_id', $issue_category->convention_id) ?? $issue_category->convention_id)
+            : 0;
 
-        if (array_key_exists('convention_id', $data)) {
+        $rules = [
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'is_active' => ['sometimes', 'boolean'],
+        ];
+        if ($hasConvention) {
+            $rules['convention_id'] = ['sometimes', 'required', 'integer', 'exists:conventions,id'];
+            $rules['name'][] = Rule::unique('issue_categories', 'name')
+                ->where('convention_id', $conventionId)
+                ->ignore($issue_category->id);
+        }
+
+        $data = $request->validate($rules);
+
+        if ($hasConvention && array_key_exists('convention_id', $data)) {
             $newConventionId = (int) $data['convention_id'];
             if ($issue_category->issues()->where('convention_id', '!=', $newConventionId)->exists()) {
                 return response()->json([
@@ -77,8 +89,11 @@ class IssueCategoryController extends Controller
         }
 
         $issue_category->forceFill($data)->save();
+        if ($hasConvention) {
+            $issue_category->load('convention:id,code,name');
+        }
 
-        return response()->json(['data' => $this->serialize($issue_category->fresh(['convention:id,code,name']))]);
+        return response()->json(['data' => $this->serialize($issue_category->fresh($hasConvention ? ['convention:id,code,name'] : []))]);
     }
 
     public function destroy(IssueCategory $issue_category): JsonResponse
@@ -96,10 +111,12 @@ class IssueCategoryController extends Controller
      */
     private function serialize(IssueCategory $c): array
     {
+        $hasConvention = Schema::hasColumn('issue_categories', 'convention_id');
+
         return [
             'id' => $c->id,
-            'convention_id' => (int) $c->convention_id,
-            'convention' => $c->convention ? [
+            'convention_id' => $hasConvention && $c->convention_id !== null ? (int) $c->convention_id : null,
+            'convention' => $hasConvention && $c->relationLoaded('convention') && $c->convention ? [
                 'id' => $c->convention->id,
                 'code' => $c->convention->code,
                 'name' => $c->convention->name,
