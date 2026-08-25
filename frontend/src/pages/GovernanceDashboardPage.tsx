@@ -13,6 +13,7 @@ import {
   fetchReportIndicators,
   fetchReportIssueCategories,
   type ReportLookupIndicator,
+  reportCategoryLabel,
 } from '../api/reports'
 import { useAuth } from '../auth/AuthContext'
 import { GovernancePrefixedChartsSection } from '../components/governance/GovernancePrefixedChartsSection'
@@ -132,10 +133,15 @@ export function GovernanceDashboardPage() {
 
   const conventionSelected = Boolean(filters.convention)
 
-  const categorySelectOptions = useMemo(
-    () => categories.map((c) => ({ value: String(c.id), label: c.name })),
-    [categories],
-  )
+  const categorySelectOptions = useMemo(() => {
+    const list = filters.convention
+      ? categories.filter((c) => String(c.convention_id ?? '') === filters.convention)
+      : categories
+    return list.map((c) => ({
+      value: String(c.id),
+      label: filters.convention ? c.name : reportCategoryLabel(c),
+    }))
+  }, [categories, filters.convention])
 
   const indicatorSelectOptions = useMemo(
     () => indicators.map((i) => ({ value: String(i.id), label: i.indicator_text })),

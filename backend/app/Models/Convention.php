@@ -94,6 +94,11 @@ class Convention extends Model
         return $this->hasMany(ConventionComponent::class);
     }
 
+    public function issueCategories(): HasMany
+    {
+        return $this->hasMany(IssueCategory::class);
+    }
+
     public function issues(): HasMany
     {
         return $this->hasMany(Issue::class);

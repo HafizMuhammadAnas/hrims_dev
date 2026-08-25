@@ -30,18 +30,27 @@ class ReportLookupController extends Controller
         ]);
     }
 
-    public function issueCategories(): JsonResponse
+    public function issueCategories(Request $request): JsonResponse
     {
+        $conventionId = $request->query('convention_id');
         $q = IssueCategory::query()->orderBy('name');
         if (Schema::hasColumn('issue_categories', 'is_active')) {
             $q->where('is_active', true);
         }
-        $rows = $q->get(['id', 'name']);
+        if (Schema::hasColumn('issue_categories', 'convention_id')) {
+            $q->with('convention:id,code,name');
+            if ($conventionId !== null && $conventionId !== '') {
+                $q->where('convention_id', (int) $conventionId);
+            }
+        }
+        $rows = $q->get();
 
         return response()->json([
             'data' => $rows->map(fn (IssueCategory $c) => [
                 'id' => $c->id,
                 'name' => $c->name,
+                'convention_id' => $c->convention_id !== null ? (int) $c->convention_id : null,
+                'convention_code' => $c->convention?->code,
             ]),
         ]);
     }
@@ -209,6 +218,9 @@ class ReportLookupController extends Controller
         $catQ = IssueCategory::query();
         if (Schema::hasColumn('issue_categories', 'is_active')) {
             $catQ->where('is_active', true);
+        }
+        if ($conventionId !== null && Schema::hasColumn('issue_categories', 'convention_id')) {
+            $catQ->where('convention_id', $conventionId);
         }
         $categoriesCount = $categoryId !== null ? 1 : $catQ->count();
 

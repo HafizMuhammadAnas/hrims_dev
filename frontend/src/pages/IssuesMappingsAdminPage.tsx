@@ -304,6 +304,7 @@ export function IssuesMappingsAdminPage() {
       {view === 'categories' && (
         <IssuesCategoriesSection
           categories={categories}
+          conventions={conventions}
           busy={busy}
           setBusy={setBusy}
           setError={setError}
@@ -409,6 +410,7 @@ function catalogStatusLabel(row: CatalogRow): string {
 
 type CatalogIdNameSortKey = 'updated_at' | 'id' | 'name' | 'status'
 type ArticleCatalogSortKey = 'updated_at' | 'id' | 'convention' | 'article_name' | 'status'
+type CategoryCatalogSortKey = 'updated_at' | 'id' | 'convention' | 'name' | 'status'
 type YearCatalogSortKey = 'updated_at' | 'id' | 'label' | 'status'
 type IssuesListSortKey = 'updated_at' | 'id' | 'convention' | 'articles' | 'category' | 'issue_title' | 'status'
 
@@ -735,36 +737,53 @@ function IssuesListSection({
 
 function IssuesCategoriesSection({
   categories,
+  conventions,
   busy,
   setBusy,
   setError,
   onRefresh,
 }: {
   categories: AdminIssueCategory[]
+  conventions: AdminConvention[]
   busy: boolean
   setBusy: (v: boolean) => void
   setError: (s: string | null) => void
   onRefresh: () => Promise<void>
 }) {
+  const sortedConventions = useMemo(
+    () => [...conventions].sort((a, b) => a.code.localeCompare(b.code)),
+    [conventions],
+  )
+  const [newCategoryConventionId, setNewCategoryConventionId] = useState('')
   const [newCategory, setNewCategory] = useState('')
+  const [listConventionFilter, setListConventionFilter] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null)
+  const [editCategoryConventionId, setEditCategoryConventionId] = useState('')
   const [editCategoryName, setEditCategoryName] = useState('')
   const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
-    useClientTableState<CatalogIdNameSortKey>({
+    useClientTableState<CategoryCatalogSortKey>({
       pageSize: ISSUES_PAGE_SIZE,
       initialSortKey: 'updated_at',
       initialSortDir: 'desc',
     })
 
+  const conventionFilteredCategories = useMemo(() => {
+    if (!listConventionFilter) return categories
+    return categories.filter((c) => String(c.convention_id) === listConventionFilter)
+  }, [categories, listConventionFilter])
+
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filtered = !q
-      ? categories
-      : categories.filter(
-          (c) => c.name.toLowerCase().includes(q) || String(c.id).includes(q),
+      ? conventionFilteredCategories
+      : conventionFilteredCategories.filter(
+          (c) =>
+            c.name.toLowerCase().includes(q) ||
+            categoryConventionLabel(c, conventions).toLowerCase().includes(q) ||
+            String(c.id).includes(q),
         )
-    return sortCatalogIdNameRows(filtered, sortKey, sortDir)
-  }, [categories, search, sortKey, sortDir])
+    return sortCategoryCatalogRows(filtered, conventions, sortKey, sortDir)
+  }, [conventionFilteredCategories, search, conventions, sortKey, sortDir])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
 
@@ -773,11 +792,27 @@ function IssuesCategoriesSection({
       <div style={{ marginBottom: 16 }}>
         <TableCard padded>
           <div className="issues-catalog-add-form">
+            <FormField label="Convention">
+              <select
+                value={newCategoryConventionId}
+                onChange={(e) => setNewCategoryConventionId(e.target.value)}
+                disabled={busy}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              >
+                <option value="">Select convention</option>
+                {sortedConventions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {conventionSelectLabel(c)}
+                  </option>
+                ))}
+              </select>
+            </FormField>
             <FormField label="Category name">
               <input
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
                 placeholder="e.g. Thematic"
+                disabled={busy || !newCategoryConventionId}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
             </FormField>
@@ -785,13 +820,16 @@ function IssuesCategoriesSection({
               <Button
                 variant="primary"
                 compact
-                disabled={busy || !newCategory.trim()}
+                disabled={busy || !newCategory.trim() || !newCategoryConventionId}
                 onClick={() => {
                   void (async () => {
                     setBusy(true)
                     setError(null)
                     try {
-                      await adminCreateIssueCategory({ name: newCategory.trim() })
+                      await adminCreateIssueCategory({
+                        convention_id: Number(newCategoryConventionId),
+                        name: newCategory.trim(),
+                      })
                       setNewCategory('')
                       await onRefresh()
                     } catch (e: unknown) {
@@ -810,9 +848,25 @@ function IssuesCategoriesSection({
       </div>
 
       <TableToolbar className="issues-list-toolbar">
+        <select
+          value={listConventionFilter}
+          onChange={(e) => {
+            setListConventionFilter(e.target.value)
+            setPage(1)
+          }}
+          aria-label="Filter categories by convention"
+          disabled={busy}
+        >
+          <option value="">All conventions</option>
+          {sortedConventions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {conventionSelectLabel(c)}
+            </option>
+          ))}
+        </select>
         <input
           type="search"
-          placeholder="Search ID or category name..."
+          placeholder="Search ID, convention, or category name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search categories"
@@ -824,7 +878,7 @@ function IssuesCategoriesSection({
 
       <TableCard className="issues-catalog-list-card">
         <table className="data-table issues-catalog-table">
-          <IssuesCatalogTableColgroup />
+          <IssuesCatalogTableColgroup variant="articles" />
           <thead>
             <tr>
               <SortColumnHeader
@@ -832,6 +886,12 @@ function IssuesCategoriesSection({
                 active={sortKey === 'id'}
                 direction={sortDir}
                 onSort={() => toggleSort('id')}
+              />
+              <SortColumnHeader
+                label="Convention"
+                active={sortKey === 'convention'}
+                direction={sortDir}
+                onSort={() => toggleSort('convention')}
               />
               <SortColumnHeader
                 label="Name"
@@ -851,94 +911,121 @@ function IssuesCategoriesSection({
           <tbody>
             {pageRows.length === 0 ? (
               <EmptyStateRow
-                colSpan={4}
-                message={search.trim() ? 'No categories match your search.' : 'No categories yet.'}
+                colSpan={5}
+                message={
+                  search.trim() || listConventionFilter
+                    ? 'No categories match your search.'
+                    : 'No categories yet.'
+                }
               />
-              ) : (
-                pageRows.map((c) => (
+            ) : (
+              pageRows.map((c) => {
+                if (editingCategoryId === c.id) {
+                  return (
+                    <tr key={c.id} className="catalog-table-edit-row">
+                      <td colSpan={5}>
+                        <div className="catalog-inline-edit">
+                          <p className="catalog-inline-edit__meta muted small">ID {c.id}</p>
+                          <FormField label="Convention">
+                            <select
+                              className="catalog-inline-edit-input"
+                              value={editCategoryConventionId}
+                              onChange={(e) => setEditCategoryConventionId(e.target.value)}
+                              disabled={busy}
+                            >
+                              <option value="">Select convention</option>
+                              {sortedConventions.map((conv) => (
+                                <option key={conv.id} value={conv.id}>
+                                  {conventionSelectLabel(conv)}
+                                </option>
+                              ))}
+                            </select>
+                          </FormField>
+                          <FormField label="Category name">
+                            <input
+                              className="catalog-inline-edit-input"
+                              value={editCategoryName}
+                              onChange={(e) => setEditCategoryName(e.target.value)}
+                              aria-label="Category name"
+                            />
+                          </FormField>
+                          <CatalogInlineEditActions
+                            busy={busy}
+                            saveDisabled={!editCategoryName.trim() || !editCategoryConventionId}
+                            onCancel={() => setEditingCategoryId(null)}
+                            onSave={() => {
+                              void (async () => {
+                                setBusy(true)
+                                setError(null)
+                                try {
+                                  await adminUpdateIssueCategory(c.id, {
+                                    convention_id: Number(editCategoryConventionId),
+                                    name: editCategoryName.trim(),
+                                  })
+                                  setEditingCategoryId(null)
+                                  await onRefresh()
+                                } catch (e: unknown) {
+                                  setError(isApiError(e) ? e.message : 'Update failed')
+                                } finally {
+                                  setBusy(false)
+                                }
+                              })()
+                            }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                }
+                return (
                   <tr
                     key={c.id}
                     className={
-                      editingCategoryId === c.id
-                        ? 'catalog-table-row-editing'
-                        : catalogIsActive(c)
-                          ? undefined
-                          : 'issues-mapping-table__row--inactive'
+                      catalogIsActive(c) ? undefined : 'issues-mapping-table__row--inactive'
                     }
                   >
                     <td>{c.id}</td>
-                    <td>
-                      {editingCategoryId === c.id ? (
-                        <input
-                          className="catalog-inline-edit-input"
-                          value={editCategoryName}
-                          onChange={(e) => setEditCategoryName(e.target.value)}
-                          aria-label="Category name"
-                        />
-                      ) : (
-                        c.name
-                      )}
-                    </td>
+                    <td>{categoryConventionLabel(c, conventions)}</td>
+                    <td>{c.name}</td>
                     <td>{catalogStatusLabel(c)}</td>
                     <td className="table-actions">
-                      {editingCategoryId === c.id ? (
-                        <CatalogInlineEditActions
-                          busy={busy}
-                          saveDisabled={!editCategoryName.trim()}
-                          onCancel={() => setEditingCategoryId(null)}
-                          onSave={() => {
-                            void (async () => {
-                              setBusy(true)
-                              setError(null)
-                              try {
-                                await adminUpdateIssueCategory(c.id, { name: editCategoryName.trim() })
-                                setEditingCategoryId(null)
-                                await onRefresh()
-                              } catch (e: unknown) {
-                                setError(isApiError(e) ? e.message : 'Update failed')
-                              } finally {
-                                setBusy(false)
-                              }
-                            })()
+                      <ActionMenu>
+                        <Button
+                          variant="link"
+                          compact
+                          disabled={busy}
+                          onClick={() => {
+                            setEditingCategoryId(c.id)
+                            setEditCategoryConventionId(String(c.convention_id ?? ''))
+                            setEditCategoryName(c.name)
                           }}
-                        />
-                      ) : (
-                        <ActionMenu>
-                          <Button
-                            variant="link"
-                            compact
-                            disabled={busy}
-                            onClick={() => {
-                              setEditingCategoryId(c.id)
-                              setEditCategoryName(c.name)
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="link"
-                            compact
-                            dangerLink={catalogIsActive(c)}
-                            disabled={busy}
-                            onClick={() => {
-                              void toggleCatalogActive(
-                                `category "${c.name}"`,
-                                c,
-                                (is_active) => adminSetIssueCategoryActive(c.id, is_active),
-                                onRefresh,
-                                setError,
-                                setBusy,
-                              )
-                            }}
-                          >
-                            {catalogIsActive(c) ? 'Deactivate' : 'Activate'}
-                          </Button>
-                        </ActionMenu>
-                      )}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="link"
+                          compact
+                          dangerLink={catalogIsActive(c)}
+                          disabled={busy}
+                          onClick={() => {
+                            void toggleCatalogActive(
+                              `category "${c.name}"`,
+                              c,
+                              (is_active) => adminSetIssueCategoryActive(c.id, is_active),
+                              onRefresh,
+                              setError,
+                              setBusy,
+                            )
+                          }}
+                        >
+                          {catalogIsActive(c) ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </ActionMenu>
                     </td>
                   </tr>
-                ))
-              )}
+                )
+              })
+            )}
           </tbody>
         </table>
       </TableCard>
@@ -1899,7 +1986,55 @@ function articleConventionLabel(
     return article.convention.code
   }
   const match = conventions.find((c) => c.id === article.convention_id)
-  return match?.code ?? (article.convention_id ? String(article.convention_id) : 'â€”')
+  return match?.code ?? (article.convention_id ? String(article.convention_id) : '—')
+}
+
+function categoryConventionLabel(
+  category: AdminIssueCategory,
+  conventions: AdminConvention[],
+): string {
+  if (category.convention?.code) {
+    return category.convention.code
+  }
+  const match = conventions.find((c) => c.id === category.convention_id)
+  return match?.code ?? (category.convention_id ? String(category.convention_id) : '—')
+}
+
+function sortCategoryCatalogRows(
+  rows: AdminIssueCategory[],
+  conventions: AdminConvention[],
+  sortKey: CategoryCatalogSortKey | undefined,
+  sortDir: SortDirection,
+): AdminIssueCategory[] {
+  const key = sortKey ?? 'updated_at'
+  return [...rows].sort((a, b) => {
+    switch (key) {
+      case 'updated_at':
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          sortDir,
+        )
+      case 'id':
+        return compareNumberValues(a.id, b.id, sortDir)
+      case 'convention':
+        return compareStringValues(
+          categoryConventionLabel(a, conventions),
+          categoryConventionLabel(b, conventions),
+          sortDir,
+        )
+      case 'name':
+        return compareStringValues(a.name, b.name, sortDir)
+      case 'status':
+        return compareStringValues(catalogStatusLabel(a), catalogStatusLabel(b), sortDir)
+      default:
+        return compareTimestampValues(
+          pickActivityTimestamp(a.updated_at, a.created_at, a.id),
+          pickActivityTimestamp(b.updated_at, b.created_at, b.id),
+          'desc',
+        )
+    }
+  })
 }
 
 function sortArticleCatalogRows(
@@ -2492,6 +2627,12 @@ function IssuesCreateForm({
   const [selectedArticleIds, setSelectedArticleIds] = useState<number[]>([])
   const [indicators, setIndicators] = useState<IndicatorDraft[]>([])
   const conventionArticles = sortedArticles.filter((a) => String(a.convention_id) === conventionId)
+  const conventionCategories = categories.filter((c) => String(c.convention_id) === conventionId)
+  const selectedCategory = categories.find((c) => String(c.id) === categoryId)
+  const categoryOptions =
+    selectedCategory && !conventionCategories.some((c) => c.id === selectedCategory.id)
+      ? [selectedCategory, ...conventionCategories]
+      : conventionCategories
   const isEditing = editIssue != null
   const activeEntryKind =
     isEditing && editIssue ? coerceIssueEntryKind(editIssue.entry_kind) : entryKind
@@ -2533,6 +2674,7 @@ function IssuesCreateForm({
               onChange={(e) => {
                 setConventionId(e.target.value)
                 setSelectedArticleIds([])
+                setCategoryId('')
               }}
             >
               <option value="">Select convention</option>
@@ -2552,9 +2694,13 @@ function IssuesCreateForm({
             />
           </FormControl>
           <FormControl label="Category">
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">Select category</option>
-              {categories.map((c) => (
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              disabled={busy || !conventionId}
+            >
+              <option value="">{conventionId ? 'Select category' : 'Select convention first'}</option>
+              {categoryOptions.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Issue;
+use App\Models\IssueCategory;
 use App\Models\IssueIndicator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -280,6 +281,19 @@ class IssueController extends Controller
         ]);
 
         $conventionId = (int) ($data['convention_id'] ?? $issue?->convention_id ?? $request->input('convention_id', 0));
+        if ($conventionId > 0 && array_key_exists('category_id', $data)) {
+            $categoryId = (int) $data['category_id'];
+            $categoryOk = IssueCategory::query()
+                ->where('id', $categoryId)
+                ->where('convention_id', $conventionId)
+                ->where('is_active', true)
+                ->exists();
+            if (! $categoryOk) {
+                throw ValidationException::withMessages([
+                    'category_id' => ['The selected category does not belong to this convention.'],
+                ]);
+            }
+        }
         if ($conventionId > 0 && array_key_exists('articles', $data)) {
             foreach ($data['articles'] as $index => $row) {
                 $articleId = (int) ($row['article_id'] ?? 0);

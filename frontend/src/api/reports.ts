@@ -9,6 +9,14 @@ export type ReportLookupConvention = {
 export type ReportLookupCategory = {
   id: number
   name: string
+  convention_id?: number | null
+  convention_code?: string | null
+}
+
+export function reportCategoryLabel(category: ReportLookupCategory, withConvention = true): string {
+  const code = category.convention_code?.trim()
+  if (withConvention && code) return `${code} — ${category.name}`
+  return category.name
 }
 
 export type ReportLookupArticle = {
@@ -58,8 +66,10 @@ export async function fetchReportConventions(): Promise<ReportLookupConvention[]
   return json.data
 }
 
-export async function fetchReportIssueCategories(): Promise<ReportLookupCategory[]> {
-  const json = await getJson<{ data: ReportLookupCategory[] }>('/api/v1/report-form/issue-categories')
+export async function fetchReportIssueCategories(conventionId?: string): Promise<ReportLookupCategory[]> {
+  const json = await getJson<{ data: ReportLookupCategory[] }>(
+    `/api/v1/report-form/issue-categories${reportQuery({ convention_id: conventionId })}`,
+  )
   return json.data
 }
 

@@ -10,6 +10,7 @@ import { isApiError } from '../api/apiError'
 import {
   fetchReportIndicators,
   fetchReportIssueCategories,
+  reportCategoryLabel,
   type ReportLookupCategory,
   type ReportLookupIndicator,
 } from '../api/reports'
@@ -158,7 +159,7 @@ export function GovernanceDefaultChartsAdminPage() {
   const categoryOptions = useMemo(
     () => [
       { value: 'all', label: 'All categories' },
-      ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+      ...categories.map((c) => ({ value: String(c.id), label: reportCategoryLabel(c) })),
     ],
     [categories],
   )

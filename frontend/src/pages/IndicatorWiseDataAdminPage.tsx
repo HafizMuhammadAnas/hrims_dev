@@ -10,6 +10,7 @@ import { ClipboardList, Eye, Plus, Trash2 } from 'lucide-react'
 import {
   fetchReportIndicators,
   fetchReportIssueCategories,
+  reportCategoryLabel,
   type ReportLookupCategory,
   type ReportLookupIndicator,
 } from '../api/reports'
@@ -352,7 +353,7 @@ function CreateSection({ onSaved }: { onSaved: (id: string) => void }) {
   const categoryOptions = useMemo(
     () => [
       { value: 'all', label: 'All categories' },
-      ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+      ...categories.map((c) => ({ value: String(c.id), label: reportCategoryLabel(c) })),
     ],
     [categories],
   )

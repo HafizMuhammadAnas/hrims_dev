@@ -96,6 +96,8 @@ export type AdminKnowledgeCard = {
 
 export type AdminIssueCategory = {
   id: number
+  convention_id: number
+  convention?: { id: number; code: string; name: string } | null
   name: string
   is_active: boolean
   created_at?: string | null
@@ -520,12 +522,16 @@ export async function adminDeleteKnowledgeCard(id: number): Promise<void> {
   await throwIfNotOk(res)
 }
 
-export async function adminFetchIssueCategories(): Promise<AdminIssueCategory[]> {
-  const json = await adminGet<{ data: AdminIssueCategory[] }>('/issue-categories')
+export async function adminFetchIssueCategories(conventionId?: number): Promise<AdminIssueCategory[]> {
+  const qs = conventionId != null ? `?convention_id=${encodeURIComponent(String(conventionId))}` : ''
+  const json = await adminGet<{ data: AdminIssueCategory[] }>(`/issue-categories${qs}`)
   return json.data
 }
 
-export async function adminCreateIssueCategory(body: { name: string }): Promise<AdminIssueCategory> {
+export async function adminCreateIssueCategory(body: {
+  convention_id: number
+  name: string
+}): Promise<AdminIssueCategory> {
   const res = await adminSend('POST', '/issue-categories', body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminIssueCategory
@@ -533,7 +539,7 @@ export async function adminCreateIssueCategory(body: { name: string }): Promise<
 
 export async function adminUpdateIssueCategory(
   id: number,
-  body: { name?: string; is_active?: boolean },
+  body: { convention_id?: number; name?: string; is_active?: boolean },
 ): Promise<AdminIssueCategory> {
   const res = await adminSend('PATCH', `/issue-categories/${id}`, body)
   await throwIfNotOk(res)

@@ -32,6 +32,7 @@ import {
   fetchReportIssueArticleLinks,
   fetchReportIssueCategories,
   fetchReportSummary,
+  reportCategoryLabel,
   type ReportLookupArticle,
   type ReportLookupIndicator,
 } from '../api/reports'
@@ -377,10 +378,15 @@ export function ReportGeneratorPage() {
     [indicators],
   )
 
-  const categorySelectOptions = useMemo(
-    () => categories.map((c) => ({ value: String(c.id), label: c.name })),
-    [categories],
-  )
+  const categorySelectOptions = useMemo(() => {
+    const list = filters.convention
+      ? categories.filter((c) => String(c.convention_id ?? '') === filters.convention)
+      : categories
+    return list.map((c) => ({
+      value: String(c.id),
+      label: filters.convention ? c.name : reportCategoryLabel(c),
+    }))
+  }, [categories, filters.convention])
 
   useEffect(() => {
     if (!filters.articleId) return
