@@ -200,9 +200,13 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/issues', [AdminIssueController::class, 'index'])->name('api.v1.admin.issues.index');
             Route::post('/issues', [AdminIssueController::class, 'store'])->name('api.v1.admin.issues.store');
             Route::get('/issues/{issue}', [AdminIssueController::class, 'show'])->name('api.v1.admin.issues.show');
-            Route::patch('/issues/{issue}', [AdminIssueController::class, 'update'])->name('api.v1.admin.issues.update');
-            Route::patch('/issues/{issue}/indicators/reorder', [AdminIssueController::class, 'reorderIndicators'])->name('api.v1.admin.issues.indicators.reorder');
-            Route::patch('/issues/{issue}/indicators/{indicator}/active', [AdminIssueController::class, 'setIndicatorActive'])->name('api.v1.admin.issues.indicators.active');
+            // POST aliases: FortiGate at hrims.mohr.gov.pk blocks HTTP PATCH (Attack ID 20000001).
+            Route::post('/issues/{issue}/update', [AdminIssueController::class, 'update'])->name('api.v1.admin.issues.update');
+            Route::patch('/issues/{issue}', [AdminIssueController::class, 'update'])->name('api.v1.admin.issues.update.patch');
+            Route::post('/issues/{issue}/indicators/reorder', [AdminIssueController::class, 'reorderIndicators'])->name('api.v1.admin.issues.indicators.reorder');
+            Route::patch('/issues/{issue}/indicators/reorder', [AdminIssueController::class, 'reorderIndicators'])->name('api.v1.admin.issues.indicators.reorder.patch');
+            Route::post('/issues/{issue}/indicators/{indicator}/active', [AdminIssueController::class, 'setIndicatorActive'])->name('api.v1.admin.issues.indicators.active');
+            Route::patch('/issues/{issue}/indicators/{indicator}/active', [AdminIssueController::class, 'setIndicatorActive'])->name('api.v1.admin.issues.indicators.active.patch');
             Route::delete('/issues/{issue}', [AdminIssueController::class, 'destroy'])->name('api.v1.admin.issues.destroy');
 
             Route::get('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'index'])->name('api.v1.admin.governance.default-charts.index');

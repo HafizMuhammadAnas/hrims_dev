@@ -712,7 +712,8 @@ export async function adminUpdateIssue(
   id: number,
   body: Partial<AdminIssuePayload> & { is_active?: boolean },
 ): Promise<AdminIssue> {
-  const res = await adminSend('PATCH', `/issues/${id}`, body)
+  // POST: FortiGate in front of hrims.mohr.gov.pk blocks HTTP PATCH (Attack ID 20000001).
+  const res = await adminSend('POST', `/issues/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminIssue
 }
@@ -722,7 +723,7 @@ export async function adminReorderIssueIndicators(
   issueId: number,
   orderedIds: number[],
 ): Promise<AdminIssue> {
-  const res = await adminSend('PATCH', `/issues/${issueId}/indicators/reorder`, {
+  const res = await adminSend('POST', `/issues/${issueId}/indicators/reorder`, {
     ordered_ids: orderedIds,
   })
   await throwIfNotOk(res)
@@ -735,7 +736,7 @@ export async function adminSetIssueIndicatorActive(
   indicatorId: number,
   is_active: boolean,
 ): Promise<AdminIssue> {
-  const res = await adminSend('PATCH', `/issues/${issueId}/indicators/${indicatorId}/active`, {
+  const res = await adminSend('POST', `/issues/${issueId}/indicators/${indicatorId}/active`, {
     is_active,
   })
   await throwIfNotOk(res)
