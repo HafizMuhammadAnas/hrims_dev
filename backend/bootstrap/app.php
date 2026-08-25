@@ -10,15 +10,18 @@ use Illuminate\Support\Facades\Route;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        // Apache Alias /api (NTC VM) strips /api before index.php, so Laravel sees v1/...
-        apiPrefix: '',
         then: function (): void {
-            // Keep /api/v1/... for Vite, php artisan serve, tests, nginx, and named route URLs.
+            // Canonical /api/v1/... for Vite proxy, php artisan serve, nginx, and route() URLs.
             Route::middleware('api')
                 ->prefix('api')
+                ->group(base_path('routes/api.php'));
+
+            // Apache Alias /api (NTC VM) strips /api before index.php, so Laravel also sees v1/...
+            // Unique name prefix avoids "Another route has already been assigned name" on route:cache / optimize.
+            Route::middleware('api')
+                ->name('stripped.')
                 ->group(base_path('routes/api.php'));
         },
     )
