@@ -248,7 +248,6 @@ export function IssuesMappingsAdminPage() {
         setError={setError}
         onDone={async () => {
           await refreshIssues()
-          navigate('/admin/issues')
         }}
       />
     )
@@ -2600,6 +2599,7 @@ function IssuesCreateForm({
   busy,
   setBusy,
   setError,
+  setSuccess,
   onDone,
   onCancel,
   editIssue,
@@ -2612,6 +2612,7 @@ function IssuesCreateForm({
   busy: boolean
   setBusy: (v: boolean) => void
   setError: (s: string | null) => void
+  setSuccess?: (s: string | null) => void
   onDone: () => Promise<void>
   onCancel: () => void
   editIssue?: AdminIssue | null
@@ -2760,6 +2761,7 @@ function IssuesCreateForm({
             void (async () => {
               setBusy(true)
               setError(null)
+              setSuccess?.(null)
               try {
                 const typeErr = validateIndicatorDataTypes(indicators)
                 if (typeErr) {
@@ -2785,6 +2787,10 @@ function IssuesCreateForm({
                 }
                 if (isEditing && editIssue) {
                   await adminUpdateIssue(editIssue.id, payload)
+                  await onDone()
+                  setSuccess?.(
+                    `${issueEntryKindBadgeLabel(activeEntryKind)} updated successfully.`,
+                  )
                 } else {
                   await adminCreateIssue(payload)
                   setEntryKind('issue')
@@ -2794,8 +2800,8 @@ function IssuesCreateForm({
                   setIssueDescription('')
                   setSelectedArticleIds([])
                   setIndicators([])
+                  await onDone()
                 }
-                await onDone()
               } catch (e: unknown) {
                 setError(isApiError(e) ? e.message : 'Save failed')
               } finally {
@@ -2841,6 +2847,7 @@ function IssuesIssueEditPage({
   const navigate = useNavigate()
   const [issue, setIssue] = useState<AdminIssue | null>(null)
   const [loading, setLoading] = useState(true)
+  const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -2877,7 +2884,12 @@ function IssuesIssueEditPage({
           {error}
         </Alert>
       )}
-      {loading && <p className="muted">Loadingâ€¦</p>}
+      {success && (
+        <Alert variant="success" title="Saved" onDismiss={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
+      {loading && <p className="muted">Loading…</p>}
       {!loading && !issue && <p className="login-error">Entry not found.</p>}
       {issue && (
         <TableCard padded>
@@ -2890,8 +2902,13 @@ function IssuesIssueEditPage({
             busy={busy}
             setBusy={setBusy}
             setError={setError}
+            setSuccess={setSuccess}
             editIssue={issue}
-            onDone={onDone}
+            onDone={async () => {
+              await onDone()
+              const row = await adminFetchIssue(issueId)
+              setIssue(row)
+            }}
             onCancel={() => navigate('/admin/issues')}
           />
         </TableCard>

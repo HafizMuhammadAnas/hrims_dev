@@ -55,8 +55,9 @@ export async function updateDepartment(
   },
 ): Promise<DepartmentRow> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/departments/${id}`, {
-    method: 'PATCH',
+  // POST: FortiGate blocks HTTP PATCH on live (Attack ID 20000001).
+  const res = await fetch(`/api/v1/departments/${id}/update`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify(body),
@@ -247,8 +248,9 @@ export async function updateRegionalCompiledResponse(
   body: { title: string; content: string },
 ): Promise<RegionalResponseRow> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/regional-responses/${encodeURIComponent(id)}`, {
-    method: 'PUT',
+  // POST: FortiGate blocks HTTP PUT/PATCH on live.
+  const res = await fetch(`/api/v1/regional-responses/${encodeURIComponent(id)}/update`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify(body),
@@ -380,8 +382,9 @@ export type CompiledRecordPatchBody = {
 /** Finalize a draft national compilation or update draft fields (federal / super admin). */
 export async function updateCompiledRecord(id: string, body: CompiledRecordPatchBody): Promise<CompiledRecordRow> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/compiled-records/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
+  // POST: FortiGate blocks HTTP PATCH on live (Attack ID 20000001).
+  const res = await fetch(`/api/v1/compiled-records/${encodeURIComponent(id)}/update`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify(body),

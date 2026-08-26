@@ -57,7 +57,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/collection-years', [CollectionYearController::class, 'index'])->name('api.v1.collection-years.index');
         Route::get('/departments', [DepartmentController::class, 'index'])->name('api.v1.departments.index');
         Route::post('/departments', [DepartmentController::class, 'store'])->name('api.v1.departments.store');
-        Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('api.v1.departments.update');
+        // POST aliases: FortiGate at hrims.mohr.gov.pk blocks HTTP PATCH (Attack ID 20000001).
+        Route::post('/departments/{department}/update', [DepartmentController::class, 'update'])->name('api.v1.departments.update');
+        Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('api.v1.departments.update.patch');
         Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('api.v1.departments.destroy');
 
         Route::get('/knowledge/conventions', [KnowledgeHubController::class, 'conventions'])->name('api.v1.knowledge.conventions.index');
@@ -71,7 +73,8 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/users', [UserController::class, 'index'])->name('api.v1.users.index');
         Route::post('/users', [UserController::class, 'store'])->name('api.v1.users.store');
-        Route::patch('/users/{user}', [UserController::class, 'update'])->name('api.v1.users.update');
+        Route::post('/users/{user}/update', [UserController::class, 'update'])->name('api.v1.users.update');
+        Route::patch('/users/{user}', [UserController::class, 'update'])->name('api.v1.users.update.patch');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('api.v1.users.destroy');
         Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('api.v1.dashboard.summary');
 
@@ -87,8 +90,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/regional-responses', [RegionalResponseController::class, 'store'])->name('api.v1.regional-responses.store');
         /** POST body is reliably delivered everywhere (some stacks drop PUT/PATCH JSON bodies). */
         Route::post('/regional-responses/{regionalResponse}/review', [RegionalResponseController::class, 'review'])->name('api.v1.regional-responses.review');
-        Route::patch('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update'])->name('api.v1.regional-responses.update');
-        Route::put('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update']);
+        Route::post('/regional-responses/{regionalResponse}/update', [RegionalResponseController::class, 'update'])->name('api.v1.regional-responses.update');
+        Route::patch('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update'])->name('api.v1.regional-responses.update.patch');
+        Route::put('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'update'])->name('api.v1.regional-responses.update.put');
         Route::get('/regional-responses/{regionalResponse}', [RegionalResponseController::class, 'show'])->name('api.v1.regional-responses.show');
         Route::get('/regional-responses/{regionalResponse}/department-tasks', [RegionalResponseController::class, 'departmentTasks'])->name('api.v1.regional-responses.department-tasks');
         Route::get('/regional-responses/{regionalResponse}/revisions', [RegionalResponseController::class, 'revisions'])->name('api.v1.regional-responses.revisions');
@@ -96,7 +100,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/compiled-records/preview', [CompiledRecordController::class, 'preview'])->name('api.v1.compiled-records.preview');
         Route::get('/compiled-records', [CompiledRecordController::class, 'index'])->name('api.v1.compiled-records.index');
         Route::post('/compiled-records', [CompiledRecordController::class, 'store'])->name('api.v1.compiled-records.store');
-        Route::patch('/compiled-records/{compiledRecord}', [CompiledRecordController::class, 'update'])->name('api.v1.compiled-records.update');
+        Route::post('/compiled-records/{compiledRecord}/update', [CompiledRecordController::class, 'update'])->name('api.v1.compiled-records.update');
+        Route::patch('/compiled-records/{compiledRecord}', [CompiledRecordController::class, 'update'])->name('api.v1.compiled-records.update.patch');
         Route::get('/department-tasks', [DepartmentTaskController::class, 'index'])->name('api.v1.department-tasks.index');
         Route::post('/department-tasks', [DepartmentTaskController::class, 'store'])->name('api.v1.department-tasks.store');
         Route::post('/department-tasks/{departmentTask}/submit-response', [DepartmentTaskController::class, 'submitResponse'])->name('api.v1.department-tasks.submit-response');
@@ -113,6 +118,9 @@ Route::prefix('v1')->group(function (): void {
             ->name('api.v1.hr-requests.attachments.file');
         Route::delete('/hr-requests/{hrRequest}/attachments/{attachment}', [HrRequestController::class, 'destroyAttachment'])
             ->name('api.v1.hr-requests.attachments.destroy');
+
+        // POST update alias: FortiGate blocks HTTP PATCH on live.
+        Route::post('/hr-requests/{hrRequest}/update', [HrRequestController::class, 'update'])->name('api.v1.hr-requests.update.post');
 
         Route::apiResource('hr-requests', HrRequestController::class)->parameters([
             'hr-requests' => 'hrRequest',
@@ -133,68 +141,82 @@ Route::prefix('v1')->group(function (): void {
             ->parameters(['hr-request-clarifications' => 'hrRequestClarification']);
 
         Route::middleware('super.admin')->prefix('admin')->group(function (): void {
+            // POST .../update aliases: FortiGate blocks HTTP PATCH (Attack ID 20000001).
             Route::post('/regions', [AdminRegionController::class, 'store'])->name('api.v1.admin.regions.store');
-            Route::patch('/regions/{region}', [AdminRegionController::class, 'update'])->name('api.v1.admin.regions.update');
+            Route::post('/regions/{region}/update', [AdminRegionController::class, 'update'])->name('api.v1.admin.regions.update');
+            Route::patch('/regions/{region}', [AdminRegionController::class, 'update'])->name('api.v1.admin.regions.update.patch');
             Route::delete('/regions/{region}', [AdminRegionController::class, 'destroy'])->name('api.v1.admin.regions.destroy');
 
             Route::get('/districts', [AdminDistrictController::class, 'index'])->name('api.v1.admin.districts.index');
             Route::post('/districts', [AdminDistrictController::class, 'store'])->name('api.v1.admin.districts.store');
-            Route::patch('/districts/{district}', [AdminDistrictController::class, 'update'])->name('api.v1.admin.districts.update');
+            Route::post('/districts/{district}/update', [AdminDistrictController::class, 'update'])->name('api.v1.admin.districts.update');
+            Route::patch('/districts/{district}', [AdminDistrictController::class, 'update'])->name('api.v1.admin.districts.update.patch');
             Route::delete('/districts/{district}', [AdminDistrictController::class, 'destroy'])->name('api.v1.admin.districts.destroy');
 
             Route::get('/catalog/departments', [AdminDepartmentController::class, 'index'])->name('api.v1.admin.catalog.departments.index');
             Route::post('/catalog/departments', [AdminDepartmentController::class, 'store'])->name('api.v1.admin.catalog.departments.store');
-            Route::patch('/catalog/departments/{department}', [AdminDepartmentController::class, 'update'])->name('api.v1.admin.catalog.departments.update');
+            Route::post('/catalog/departments/{department}/update', [AdminDepartmentController::class, 'update'])->name('api.v1.admin.catalog.departments.update');
+            Route::patch('/catalog/departments/{department}', [AdminDepartmentController::class, 'update'])->name('api.v1.admin.catalog.departments.update.patch');
             Route::delete('/catalog/departments/{department}', [AdminDepartmentController::class, 'destroy'])->name('api.v1.admin.catalog.departments.destroy');
 
             Route::get('/conventions', [AdminConventionController::class, 'index'])->name('api.v1.admin.conventions.index');
             Route::post('/conventions', [AdminConventionController::class, 'store'])->name('api.v1.admin.conventions.store');
-            Route::patch('/conventions/{convention}', [AdminConventionController::class, 'update'])->name('api.v1.admin.conventions.update');
+            Route::post('/conventions/{convention}/update', [AdminConventionController::class, 'update'])->name('api.v1.admin.conventions.update');
+            Route::patch('/conventions/{convention}', [AdminConventionController::class, 'update'])->name('api.v1.admin.conventions.update.patch');
             Route::delete('/conventions/{convention}', [AdminConventionController::class, 'destroy'])->name('api.v1.admin.conventions.destroy');
 
             Route::get('/conventions/{convention}/components', [AdminConventionComponentController::class, 'index'])->name('api.v1.admin.convention-components.index');
             Route::post('/conventions/{convention}/components', [AdminConventionComponentController::class, 'store'])->name('api.v1.admin.convention-components.store');
-            Route::patch('/convention-components/{convention_component}', [AdminConventionComponentController::class, 'update'])->name('api.v1.admin.convention-components.update');
+            Route::post('/convention-components/{convention_component}/update', [AdminConventionComponentController::class, 'update'])->name('api.v1.admin.convention-components.update');
+            Route::patch('/convention-components/{convention_component}', [AdminConventionComponentController::class, 'update'])->name('api.v1.admin.convention-components.update.patch');
             Route::delete('/convention-components/{convention_component}', [AdminConventionComponentController::class, 'destroy'])->name('api.v1.admin.convention-components.destroy');
 
             Route::get('/sdg-nodes', [AdminSdgNodeController::class, 'index'])->name('api.v1.admin.sdg-nodes.index');
             Route::post('/sdg-nodes', [AdminSdgNodeController::class, 'store'])->name('api.v1.admin.sdg-nodes.store');
-            Route::patch('/sdg-nodes/{sdg_node}', [AdminSdgNodeController::class, 'update'])->name('api.v1.admin.sdg-nodes.update');
+            Route::post('/sdg-nodes/{sdg_node}/update', [AdminSdgNodeController::class, 'update'])->name('api.v1.admin.sdg-nodes.update');
+            Route::patch('/sdg-nodes/{sdg_node}', [AdminSdgNodeController::class, 'update'])->name('api.v1.admin.sdg-nodes.update.patch');
             Route::delete('/sdg-nodes/{sdg_node}', [AdminSdgNodeController::class, 'destroy'])->name('api.v1.admin.sdg-nodes.destroy');
 
             Route::get('/upr-recommendations', [AdminUprRecommendationController::class, 'index'])->name('api.v1.admin.upr.index');
             Route::post('/upr-recommendations', [AdminUprRecommendationController::class, 'store'])->name('api.v1.admin.upr.store');
-            Route::patch('/upr-recommendations/{upr_recommendation}', [AdminUprRecommendationController::class, 'update'])->name('api.v1.admin.upr.update');
+            Route::post('/upr-recommendations/{upr_recommendation}/update', [AdminUprRecommendationController::class, 'update'])->name('api.v1.admin.upr.update');
+            Route::patch('/upr-recommendations/{upr_recommendation}', [AdminUprRecommendationController::class, 'update'])->name('api.v1.admin.upr.update.patch');
             Route::delete('/upr-recommendations/{upr_recommendation}', [AdminUprRecommendationController::class, 'destroy'])->name('api.v1.admin.upr.destroy');
 
             Route::get('/knowledge-cards', [AdminKnowledgeCardController::class, 'index'])->name('api.v1.admin.knowledge-cards.index');
             Route::post('/knowledge-cards', [AdminKnowledgeCardController::class, 'store'])->name('api.v1.admin.knowledge-cards.store');
-            Route::patch('/knowledge-cards/{knowledge_card}', [AdminKnowledgeCardController::class, 'update'])->name('api.v1.admin.knowledge-cards.update');
+            Route::post('/knowledge-cards/{knowledge_card}/update', [AdminKnowledgeCardController::class, 'update'])->name('api.v1.admin.knowledge-cards.update');
+            Route::patch('/knowledge-cards/{knowledge_card}', [AdminKnowledgeCardController::class, 'update'])->name('api.v1.admin.knowledge-cards.update.patch');
             Route::delete('/knowledge-cards/{knowledge_card}', [AdminKnowledgeCardController::class, 'destroy'])->name('api.v1.admin.knowledge-cards.destroy');
 
             Route::get('/issue-categories', [AdminIssueCategoryController::class, 'index'])->name('api.v1.admin.issue-categories.index');
             Route::post('/issue-categories', [AdminIssueCategoryController::class, 'store'])->name('api.v1.admin.issue-categories.store');
-            Route::patch('/issue-categories/{issue_category}', [AdminIssueCategoryController::class, 'update'])->name('api.v1.admin.issue-categories.update');
+            Route::post('/issue-categories/{issue_category}/update', [AdminIssueCategoryController::class, 'update'])->name('api.v1.admin.issue-categories.update');
+            Route::patch('/issue-categories/{issue_category}', [AdminIssueCategoryController::class, 'update'])->name('api.v1.admin.issue-categories.update.patch');
             Route::delete('/issue-categories/{issue_category}', [AdminIssueCategoryController::class, 'destroy'])->name('api.v1.admin.issue-categories.destroy');
 
             Route::get('/articles', [AdminArticleController::class, 'index'])->name('api.v1.admin.articles.index');
             Route::post('/articles', [AdminArticleController::class, 'store'])->name('api.v1.admin.articles.store');
-            Route::patch('/articles/{article}', [AdminArticleController::class, 'update'])->name('api.v1.admin.articles.update');
+            Route::post('/articles/{article}/update', [AdminArticleController::class, 'update'])->name('api.v1.admin.articles.update');
+            Route::patch('/articles/{article}', [AdminArticleController::class, 'update'])->name('api.v1.admin.articles.update.patch');
             Route::delete('/articles/{article}', [AdminArticleController::class, 'destroy'])->name('api.v1.admin.articles.destroy');
 
             Route::get('/collection-years', [AdminCollectionYearController::class, 'index'])->name('api.v1.admin.collection-years.index');
             Route::post('/collection-years', [AdminCollectionYearController::class, 'store'])->name('api.v1.admin.collection-years.store');
-            Route::patch('/collection-years/{collection_year}', [AdminCollectionYearController::class, 'update'])->name('api.v1.admin.collection-years.update');
+            Route::post('/collection-years/{collection_year}/update', [AdminCollectionYearController::class, 'update'])->name('api.v1.admin.collection-years.update');
+            Route::patch('/collection-years/{collection_year}', [AdminCollectionYearController::class, 'update'])->name('api.v1.admin.collection-years.update.patch');
             Route::delete('/collection-years/{collection_year}', [AdminCollectionYearController::class, 'destroy'])->name('api.v1.admin.collection-years.destroy');
 
             Route::get('/collection-genders', [AdminCollectionGenderController::class, 'index'])->name('api.v1.admin.collection-genders.index');
             Route::post('/collection-genders', [AdminCollectionGenderController::class, 'store'])->name('api.v1.admin.collection-genders.store');
-            Route::patch('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'update'])->name('api.v1.admin.collection-genders.update');
+            Route::post('/collection-genders/{collection_gender}/update', [AdminCollectionGenderController::class, 'update'])->name('api.v1.admin.collection-genders.update');
+            Route::patch('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'update'])->name('api.v1.admin.collection-genders.update.patch');
             Route::delete('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'destroy'])->name('api.v1.admin.collection-genders.destroy');
 
             Route::get('/collection-religions', [AdminCollectionReligionController::class, 'index'])->name('api.v1.admin.collection-religions.index');
             Route::post('/collection-religions', [AdminCollectionReligionController::class, 'store'])->name('api.v1.admin.collection-religions.store');
-            Route::patch('/collection-religions/{collection_religion}', [AdminCollectionReligionController::class, 'update'])->name('api.v1.admin.collection-religions.update');
+            Route::post('/collection-religions/{collection_religion}/update', [AdminCollectionReligionController::class, 'update'])->name('api.v1.admin.collection-religions.update');
+            Route::patch('/collection-religions/{collection_religion}', [AdminCollectionReligionController::class, 'update'])->name('api.v1.admin.collection-religions.update.patch');
             Route::delete('/collection-religions/{collection_religion}', [AdminCollectionReligionController::class, 'destroy'])->name('api.v1.admin.collection-religions.destroy');
 
             Route::get('/issues', [AdminIssueController::class, 'index'])->name('api.v1.admin.issues.index');
@@ -210,7 +232,8 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/issues/{issue}', [AdminIssueController::class, 'destroy'])->name('api.v1.admin.issues.destroy');
 
             Route::get('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'index'])->name('api.v1.admin.governance.default-charts.index');
-            Route::put('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'sync'])->name('api.v1.admin.governance.default-charts.sync');
+            Route::post('/governance/default-charts/sync', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'sync'])->name('api.v1.admin.governance.default-charts.sync');
+            Route::put('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'sync'])->name('api.v1.admin.governance.default-charts.sync.put');
         });
     });
 });

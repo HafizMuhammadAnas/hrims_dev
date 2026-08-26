@@ -54,8 +54,9 @@ export async function updateUser(
   body: { name?: string; email?: string | null; is_active?: boolean; password?: string },
 ): Promise<AuthUser> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/users/${id}`, {
-    method: 'PATCH',
+  // POST: FortiGate blocks HTTP PATCH on live (Attack ID 20000001).
+  const res = await fetch(`/api/v1/users/${id}/update`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify(body),

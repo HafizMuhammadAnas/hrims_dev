@@ -245,8 +245,9 @@ export type HrRequestPatchBody = {
 
 export async function updateHrRequest(id: string, body: HrRequestPatchBody): Promise<HrRequestRow> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/hr-requests/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
+  // POST: FortiGate blocks HTTP PATCH on live (Attack ID 20000001).
+  const res = await fetch(`/api/v1/hr-requests/${encodeURIComponent(id)}/update`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify(body),
@@ -256,7 +257,7 @@ export async function updateHrRequest(id: string, body: HrRequestPatchBody): Pro
   return withCoercedStatus(json.data)
 }
 
-/** Same fields as create, but PATCH — uses multipart so new attachments can be uploaded while editing. */
+/** Same fields as create, but uses multipart so new attachments can be uploaded while editing. */
 export type HrRequestUpdateFromIssueFormInput = Omit<HrRequestCreateFromIssueFormInput, 'attachments'> & {
   attachments?: File[]
 }
@@ -313,8 +314,9 @@ export async function updateHrRequestFromIssueForm(
     fd.append('attachments[]', file)
   }
 
-  const res = await fetch(`/api/v1/hr-requests/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
+  // POST: FortiGate blocks HTTP PATCH on live (Attack ID 20000001).
+  const res = await fetch(`/api/v1/hr-requests/${encodeURIComponent(id)}/update`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiMultipartHeaders(),
     body: fd,

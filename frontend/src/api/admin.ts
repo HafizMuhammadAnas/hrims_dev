@@ -242,7 +242,8 @@ export async function adminUpdateRegion(
   id: number,
   body: { name?: string; slug?: string },
 ): Promise<AdminRegion> {
-  const res = await adminSend('PATCH', `/regions/${id}`, body)
+  // POST: FortiGate blocks HTTP PATCH on live (Attack ID 20000001).
+  const res = await adminSend('POST', `/regions/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminRegion
 }
@@ -272,7 +273,7 @@ export async function adminUpdateDistrict(
   id: number,
   body: { region_id?: number; name?: string; slug?: string | null },
 ): Promise<AdminDistrict> {
-  const res = await adminSend('PATCH', `/districts/${id}`, body)
+  const res = await adminSend('POST', `/districts/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminDistrict
 }
@@ -297,7 +298,7 @@ export async function adminUpdateDepartment(
   id: number,
   body: { region_ids?: number[]; code?: string | null; name?: string; type?: string | null },
 ): Promise<AdminCatalogDepartment> {
-  const res = await adminSend('PATCH', `/catalog/departments/${id}`, body)
+  const res = await adminSend('POST', `/catalog/departments/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminCatalogDepartment
 }
@@ -353,7 +354,7 @@ export async function adminUpdateConvention(
     is_active: boolean
   }>,
 ): Promise<AdminConvention> {
-  const res = await adminSend('PATCH', `/conventions/${id}`, body)
+  const res = await adminSend('POST', `/conventions/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminConvention
 }
@@ -388,7 +389,7 @@ export async function adminUpdateConventionComponent(
     sort_order: number
   }>,
 ): Promise<AdminConventionComponent> {
-  const res = await adminSend('PATCH', `/convention-components/${id}`, body)
+  const res = await adminSend('POST', `/convention-components/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminConventionComponent
 }
@@ -434,7 +435,7 @@ export async function adminUpdateSdgNode(
     sort_order: number
   }>,
 ): Promise<AdminSdgNode> {
-  const res = await adminSend('PATCH', `/sdg-nodes/${id}`, body)
+  const res = await adminSend('POST', `/sdg-nodes/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminSdgNode
 }
@@ -471,7 +472,7 @@ export async function adminUpdateUpr(
     sort_order: number
   }>,
 ): Promise<AdminUpr> {
-  const res = await adminSend('PATCH', `/upr-recommendations/${id}`, body)
+  const res = await adminSend('POST', `/upr-recommendations/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminUpr
 }
@@ -512,7 +513,7 @@ export async function adminUpdateKnowledgeCard(
     sort_order: number
   }>,
 ): Promise<AdminKnowledgeCard> {
-  const res = await adminSend('PATCH', `/knowledge-cards/${id}`, body)
+  const res = await adminSend('POST', `/knowledge-cards/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminKnowledgeCard
 }
@@ -541,7 +542,7 @@ export async function adminUpdateIssueCategory(
   id: number,
   body: { convention_id?: number; name?: string; is_active?: boolean },
 ): Promise<AdminIssueCategory> {
-  const res = await adminSend('PATCH', `/issue-categories/${id}`, body)
+  const res = await adminSend('POST', `/issue-categories/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminIssueCategory
 }
@@ -575,7 +576,7 @@ export async function adminUpdateArticle(
     is_active?: boolean
   },
 ): Promise<AdminArticleRow> {
-  const res = await adminSend('PATCH', `/articles/${id}`, body)
+  const res = await adminSend('POST', `/articles/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminArticleRow
 }
@@ -599,7 +600,7 @@ export async function adminUpdateCollectionYear(
   id: number,
   body: { label?: string; is_active?: boolean },
 ): Promise<AdminCollectionYear> {
-  const res = await adminSend('PATCH', `/collection-years/${id}`, body)
+  const res = await adminSend('POST', `/collection-years/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminCollectionYear
 }
@@ -623,7 +624,7 @@ export async function adminUpdateCollectionGender(
   id: number,
   body: { name?: string; is_active?: boolean },
 ): Promise<AdminCollectionGender> {
-  const res = await adminSend('PATCH', `/collection-genders/${id}`, body)
+  const res = await adminSend('POST', `/collection-genders/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminCollectionGender
 }
@@ -647,7 +648,7 @@ export async function adminUpdateCollectionReligion(
   id: number,
   body: { name?: string; is_active?: boolean },
 ): Promise<AdminCollectionReligion> {
-  const res = await adminSend('PATCH', `/collection-religions/${id}`, body)
+  const res = await adminSend('POST', `/collection-religions/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminCollectionReligion
 }
@@ -790,7 +791,8 @@ export async function adminFetchGovernanceDefaultCharts(): Promise<AdminGovernan
 export async function adminSyncGovernanceDefaultCharts(
   charts: AdminGovernanceDefaultChartPayload[],
 ): Promise<AdminGovernanceDefaultChart[]> {
-  const res = await adminSend('PUT', '/governance/default-charts', { charts })
+  // POST: FortiGate may also block HTTP PUT; use sync action path.
+  const res = await adminSend('POST', '/governance/default-charts/sync', { charts })
   await throwIfNotOk(res)
   return ((await res.json()) as { data: AdminGovernanceDefaultChart[] }).data
 }
