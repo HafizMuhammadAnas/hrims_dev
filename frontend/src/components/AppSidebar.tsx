@@ -61,6 +61,15 @@ import {
   LABEL_USER_MANAGEMENT,
 } from '../lib/uiLabels'
 import {
+  SUPER_ADMIN_CONVENTIONS,
+  SUPER_ADMIN_GOVERNANCE_CHARTS,
+  SUPER_ADMIN_INDICATOR_WISE_DATA,
+  SUPER_ADMIN_ISSUES,
+  SUPER_ADMIN_REGIONS_DISTRICTS,
+  SUPER_ADMIN_SDG_NODES,
+  SUPER_ADMIN_UPR_RECOMMENDATIONS,
+} from '../lib/superAdminRoutes'
+import {
   isDepartmentAdmin,
   isFederalAdmin,
   isRegionalAdmin,
@@ -129,13 +138,13 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
           <>
             <div className="nav-section-title">{LABEL_SUPER_ADMIN}</div>
             <div className="nav-sub">
-              <NavItem to="/admin/issues" icon={GitBranch} label={issuesNavLabel()} onPick={onPick} />
-              <NavItem to="/admin/regions-districts" icon={MapPin} label={LABEL_REGIONS_AND_DISTRICTS} onPick={onPick} />
-              <NavItem to="/admin/conventions" icon={Scale} label={LABEL_CONVENTIONS_AND_COMPONENTS} onPick={onPick} />
-              <NavItem to="/admin/sdg-nodes" icon={Layers} label="SDGs" onPick={onPick} />
-              <NavItem to="/admin/upr-recommendations" icon={ScrollText} label="UPR Recommendations" onPick={onPick} />
-              <NavItem to="/admin/governance-charts" icon={BarChart2} label={LABEL_GOVERNANCE_DEFAULT_CHARTS} onPick={onPick} />
-              <NavItem to="/admin/indicator-wise-data" icon={ClipboardList} label={LABEL_INDICATOR_WISE_DATA} onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_ISSUES} icon={GitBranch} label={issuesNavLabel()} onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_REGIONS_DISTRICTS} icon={MapPin} label={LABEL_REGIONS_AND_DISTRICTS} onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_CONVENTIONS} icon={Scale} label={LABEL_CONVENTIONS_AND_COMPONENTS} onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_SDG_NODES} icon={Layers} label="SDGs" onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_UPR_RECOMMENDATIONS} icon={ScrollText} label="UPR Recommendations" onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_GOVERNANCE_CHARTS} icon={BarChart2} label={LABEL_GOVERNANCE_DEFAULT_CHARTS} onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_INDICATOR_WISE_DATA} icon={ClipboardList} label={LABEL_INDICATOR_WISE_DATA} onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
             </div>
             <div className="nav-section-title">{LABEL_DASHBOARDS}</div>

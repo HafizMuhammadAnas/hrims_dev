@@ -41,6 +41,11 @@ import { isSuperAdmin } from '../lib/roles'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_HUMAN_RIGHTS_INDICATORS, LABEL_KNOWLEDGE_HUB } from '../lib/uiLabels'
 import { uprConcludingObservationsLabel } from '../lib/issueEntryKind'
+import {
+  superAdminConventionEditPath,
+  superAdminConventionsNewPath,
+  SUPER_ADMIN_ISSUES,
+} from '../lib/superAdminRoutes'
 
 type Tab =
   | 'departments'
@@ -183,7 +188,7 @@ export function SuperAdminConsolePage() {
   }
 
   if (!tab) {
-    return <Navigate to="/admin/issues" replace />
+    return <Navigate to={SUPER_ADMIN_ISSUES} replace />
   }
 
   const pageMeta = TAB_PAGE_META[tab]
@@ -334,7 +339,7 @@ export function SuperAdminConsolePage() {
             under Issues & mappings for the same convention.
           </p>
           <div style={{ marginBottom: 16 }}>
-            <Button variant="primary" compact onClick={() => navigate('/admin/conventions/new')}>
+            <Button variant="primary" compact onClick={() => navigate(superAdminConventionsNewPath())}>
               Create convention
             </Button>
           </div>
@@ -356,7 +361,7 @@ export function SuperAdminConsolePage() {
                         <Button
                           variant="link"
                           compact
-                          onClick={() => navigate(`/admin/conventions/${c.id}/edit`)}
+                          onClick={() => navigate(superAdminConventionEditPath(c.id))}
                         >
                           Edit
                         </Button>

@@ -26,6 +26,10 @@ import { StatsCards } from '../components/ui/StatsCards'
 import { TableCard } from '../components/ui/TableCard'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
+import {
+  SUPER_ADMIN_REGIONS_DISTRICTS,
+  superAdminRegionsDistrictsDistrictsPath,
+} from '../lib/superAdminRoutes'
 import { isSuperAdmin } from '../lib/roles'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 
@@ -34,10 +38,10 @@ const GEO_PAGE_SIZE = 10
 type GeoView = 'regions' | 'create-region' | 'districts' | 'create-district'
 
 const GEO_TABS: { view: GeoView; to: string; label: string; end?: boolean }[] = [
-  { view: 'regions', to: '/admin/regions-districts', label: 'Regions List', end: true },
-  { view: 'create-region', to: '/admin/regions-districts/create-region', label: 'Create Region' },
-  { view: 'districts', to: '/admin/regions-districts/districts', label: 'District List' },
-  { view: 'create-district', to: '/admin/regions-districts/create-district', label: 'Create District' },
+  { view: 'regions', to: SUPER_ADMIN_REGIONS_DISTRICTS, label: 'Regions List', end: true },
+  { view: 'create-region', to: `${SUPER_ADMIN_REGIONS_DISTRICTS}/create-region`, label: 'Create Region' },
+  { view: 'districts', to: superAdminRegionsDistrictsDistrictsPath(), label: 'District List' },
+  { view: 'create-district', to: `${SUPER_ADMIN_REGIONS_DISTRICTS}/create-district`, label: 'Create District' },
 ]
 
 function resolveGeoView(param: string | undefined): GeoView | null {
@@ -94,7 +98,7 @@ export function RegionsDistrictsAdminPage() {
   }
 
   if (!view) {
-    return <Navigate to="/admin/regions-districts" replace />
+    return <Navigate to={SUPER_ADMIN_REGIONS_DISTRICTS} replace />
   }
 
   return (
@@ -136,9 +140,9 @@ export function RegionsDistrictsAdminPage() {
             setError={setError}
             onDone={async () => {
               await refreshRegions()
-              navigate('/admin/regions-districts')
+              navigate(SUPER_ADMIN_REGIONS_DISTRICTS)
             }}
-            onCancel={() => navigate('/admin/regions-districts')}
+            onCancel={() => navigate(SUPER_ADMIN_REGIONS_DISTRICTS)}
           />
         </TableCard>
       )}
@@ -162,9 +166,9 @@ export function RegionsDistrictsAdminPage() {
             setError={setError}
             onDone={async () => {
               await refreshDistricts()
-              navigate('/admin/regions-districts/districts')
+              navigate(superAdminRegionsDistrictsDistrictsPath())
             }}
-            onCancel={() => navigate('/admin/regions-districts/districts')}
+            onCancel={() => navigate(superAdminRegionsDistrictsDistrictsPath())}
           />
         </TableCard>
       )}

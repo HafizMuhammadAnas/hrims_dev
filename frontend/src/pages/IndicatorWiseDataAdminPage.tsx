@@ -23,9 +23,10 @@ import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { TableCard } from '../components/ui/TableCard'
 import { isDepartmentAdmin, isSuperAdmin } from '../lib/roles'
 import { LABEL_INDICATOR_WISE_DATA } from '../lib/uiLabels'
+import { SUPER_ADMIN_INDICATOR_WISE_DATA } from '../lib/superAdminRoutes'
 
 const STORAGE_KEY = 'hrims_indicator_wise_wireframe_v1'
-const ADMIN_BASE = '/admin/indicator-wise-data'
+const ADMIN_BASE = SUPER_ADMIN_INDICATOR_WISE_DATA
 const DEPARTMENT_BASE = '/department-indicator-wise-data'
 
 function indicatorWiseDataBasePath(pathname: string): string {

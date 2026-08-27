@@ -6,6 +6,7 @@ import {
   adminUpdateConvention,
   type AdminConvention,
 } from '../api/admin'
+import { SUPER_ADMIN_CONVENTIONS } from '../lib/superAdminRoutes'
 import { isApiError } from '../api/apiError'
 import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
@@ -185,7 +186,7 @@ export function ConventionEditorPage() {
       } else {
         await adminCreateConvention(payload)
       }
-      navigate('/admin/conventions')
+      navigate(SUPER_ADMIN_CONVENTIONS)
     } catch (e: unknown) {
       setError(isApiError(e) ? e.message : 'Save failed')
     } finally {
@@ -198,7 +199,7 @@ export function ConventionEditorPage() {
       title={isEdit ? `Edit convention${form.code ? ` — ${form.code}` : ''}` : 'Create convention'}
       subtitle="Fill Overview, Repositories, and Optional Protocol. These sections appear as tabs on Convention Info. Articles, LOI, and Concluding Observations still come from Issues & mappings for this convention."
       leading={
-        <Button variant="link" compact onClick={() => navigate('/admin/conventions')}>
+        <Button variant="link" compact onClick={() => navigate(SUPER_ADMIN_CONVENTIONS)}>
           ← {LABEL_CONVENTIONS_AND_COMPONENTS}
         </Button>
       }
@@ -428,7 +429,7 @@ export function ConventionEditorPage() {
           </section>
 
           <div className="convention-editor__actions">
-            <Button variant="secondary" type="button" onClick={() => navigate('/admin/conventions')}>
+            <Button variant="secondary" type="button" onClick={() => navigate(SUPER_ADMIN_CONVENTIONS)}>
               Cancel
             </Button>
             <Button variant="primary" type="submit" disabled={saving}>

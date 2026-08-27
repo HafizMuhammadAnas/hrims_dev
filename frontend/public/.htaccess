@@ -1,5 +1,5 @@
-# SPA fallback for Apache (production). Without this, hard refresh on /admin/issues etc.
-# returns 404/500 instead of index.html — FortiGate may then show "Web Page Blocked".
+# SPA fallback for Apache (production). Without this, hard refresh on deep links
+# (e.g. /catalog-mgmt/issues) returns 404/500 — FortiGate may then show "Web Page Blocked".
 <IfModule mod_rewrite.c>
     RewriteEngine On
 

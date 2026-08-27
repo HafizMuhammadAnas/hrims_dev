@@ -27,8 +27,8 @@ export function workflowBackLabel(from: string): string {
   if (f.includes('federal-departments-mgmt') || f.includes('regional-departments-mgmt')) {
     return 'Back to departments list'
   }
-  if (f.includes('admin/issues')) return 'Back to issues list'
-  if (f.includes('admin/regions-districts')) return 'Back to regions & districts'
+  if (f.includes('catalog-mgmt/issues')) return 'Back to issues list'
+  if (f.includes('catalog-mgmt/regions-districts')) return 'Back to regions & districts'
   if (f.includes('requests')) return 'Back to request management'
   if (f.includes('responses')) return 'Back to regional responses'
   if (f.includes('federal-history')) return 'Back to compiled responses'

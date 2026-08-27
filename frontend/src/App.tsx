@@ -33,6 +33,7 @@ import { ConventionEditorPage } from './pages/ConventionEditorPage'
 import { SuperAdminConsolePage } from './pages/SuperAdminConsolePage'
 import { UserManagementPage } from './pages/UserManagementPage'
 import { ViolationEntriesPage } from './pages/ViolationEntriesPage'
+import { LegacyAdminRedirect } from './components/LegacyAdminRedirect'
 import { DepartmentMonitoringPage } from './pages/workflow/DepartmentMonitoringPage'
 import { FederalCompilationPage } from './pages/workflow/FederalCompilationPage'
 import { ReceivedRequestsPage } from './pages/workflow/ReceivedRequestsPage'
@@ -169,21 +170,22 @@ function App() {
               <Route path="upr" element={<UprInfoPage />} />
               <Route path="violation-entries" element={<ViolationEntriesPage />} />
               <Route path="profile" element={<ProfilePage />} />
-              <Route path="admin" element={<Navigate to="/admin/issues" replace />} />
-              <Route path="admin/issues/edit/:issueId" element={<IssuesMappingsAdminPage />} />
-              <Route path="admin/issues/view/:issueId" element={<IssuesMappingsAdminPage />} />
-              <Route path="admin/issues/articles/view/:articleId" element={<IssuesMappingsAdminPage />} />
-              <Route path="admin/issues" element={<IssuesMappingsAdminPage />} />
-              <Route path="admin/issues/:issuesView" element={<IssuesMappingsAdminPage />} />
-              <Route path="admin/regions-districts" element={<RegionsDistrictsAdminPage />} />
-              <Route path="admin/regions-districts/:geoView" element={<RegionsDistrictsAdminPage />} />
-              <Route path="admin/governance-charts" element={<GovernanceDefaultChartsAdminPage />} />
-              <Route path="admin/indicator-wise-data" element={<IndicatorWiseDataAdminPage />} />
-              <Route path="admin/indicator-wise-data/create" element={<IndicatorWiseDataAdminPage />} />
-              <Route path="admin/indicator-wise-data/view/:recordId" element={<IndicatorWiseDataAdminPage />} />
-              <Route path="admin/conventions/new" element={<ConventionEditorPage />} />
-              <Route path="admin/conventions/:conventionId/edit" element={<ConventionEditorPage />} />
-              <Route path="admin/:section" element={<SuperAdminConsolePage />} />
+              <Route path="catalog-mgmt" element={<Navigate to="/catalog-mgmt/issues" replace />} />
+              <Route path="catalog-mgmt/issues/edit/:issueId" element={<IssuesMappingsAdminPage />} />
+              <Route path="catalog-mgmt/issues/view/:issueId" element={<IssuesMappingsAdminPage />} />
+              <Route path="catalog-mgmt/issues/articles/view/:articleId" element={<IssuesMappingsAdminPage />} />
+              <Route path="catalog-mgmt/issues" element={<IssuesMappingsAdminPage />} />
+              <Route path="catalog-mgmt/issues/:issuesView" element={<IssuesMappingsAdminPage />} />
+              <Route path="catalog-mgmt/regions-districts" element={<RegionsDistrictsAdminPage />} />
+              <Route path="catalog-mgmt/regions-districts/:geoView" element={<RegionsDistrictsAdminPage />} />
+              <Route path="catalog-mgmt/governance-charts" element={<GovernanceDefaultChartsAdminPage />} />
+              <Route path="catalog-mgmt/indicator-wise-data" element={<IndicatorWiseDataAdminPage />} />
+              <Route path="catalog-mgmt/indicator-wise-data/create" element={<IndicatorWiseDataAdminPage />} />
+              <Route path="catalog-mgmt/indicator-wise-data/view/:recordId" element={<IndicatorWiseDataAdminPage />} />
+              <Route path="catalog-mgmt/conventions/new" element={<ConventionEditorPage />} />
+              <Route path="catalog-mgmt/conventions/:conventionId/edit" element={<ConventionEditorPage />} />
+              <Route path="catalog-mgmt/:section" element={<SuperAdminConsolePage />} />
+              <Route path="admin/*" element={<LegacyAdminRedirect />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

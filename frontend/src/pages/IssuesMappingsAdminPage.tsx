@@ -79,6 +79,13 @@ import {
   noIndicatorsForLoiHint,
   type IssueEntryKind,
 } from '../lib/issueEntryKind'
+import {
+  SUPER_ADMIN_ISSUES,
+  superAdminArticleViewPath,
+  superAdminIssueEditPath,
+  superAdminIssueViewPath,
+  superAdminIssuesArticlesPath,
+} from '../lib/superAdminRoutes'
 import { isSuperAdmin } from '../lib/roles'
 import type { AuthUser } from '../types/auth'
 
@@ -87,13 +94,13 @@ const ISSUES_PAGE_SIZE = 10
 type IssuesView = 'list' | 'create' | 'categories' | 'articles' | 'years' | 'genders' | 'religions'
 
 const ISSUES_TABS: { view: IssuesView; to: string; label: string; end?: boolean }[] = [
-  { view: 'list', to: '/admin/issues', label: issuesListTabLabel(), end: true },
-  { view: 'create', to: '/admin/issues/create', label: issuesCreateTabLabel() },
-  { view: 'categories', to: '/admin/issues/categories', label: 'Category' },
-  { view: 'articles', to: '/admin/issues/articles', label: 'Article' },
-  { view: 'years', to: '/admin/issues/years', label: 'Year' },
-  { view: 'genders', to: '/admin/issues/genders', label: 'Gender' },
-  { view: 'religions', to: '/admin/issues/religions', label: 'Religion' },
+  { view: 'list', to: SUPER_ADMIN_ISSUES, label: issuesListTabLabel(), end: true },
+  { view: 'create', to: `${SUPER_ADMIN_ISSUES}/create`, label: issuesCreateTabLabel() },
+  { view: 'categories', to: `${SUPER_ADMIN_ISSUES}/categories`, label: 'Category' },
+  { view: 'articles', to: `${SUPER_ADMIN_ISSUES}/articles`, label: 'Article' },
+  { view: 'years', to: `${SUPER_ADMIN_ISSUES}/years`, label: 'Year' },
+  { view: 'genders', to: `${SUPER_ADMIN_ISSUES}/genders`, label: 'Gender' },
+  { view: 'religions', to: `${SUPER_ADMIN_ISSUES}/religions`, label: 'Religion' },
 ]
 
 function resolveIssuesView(param: string | undefined): IssuesView | null {
@@ -126,9 +133,9 @@ export function IssuesMappingsAdminPage() {
     issueId?: string
     articleId?: string
   }>()
-  const isIssueEditRoute = location.pathname.includes('/admin/issues/edit/')
-  const isIssueViewRoute = location.pathname.includes('/admin/issues/view/')
-  const isArticleViewRoute = location.pathname.includes('/admin/issues/articles/view/')
+  const isIssueEditRoute = location.pathname.includes('/catalog-mgmt/issues/edit/')
+  const isIssueViewRoute = location.pathname.includes('/catalog-mgmt/issues/view/')
+  const isArticleViewRoute = location.pathname.includes('/catalog-mgmt/issues/articles/view/')
   const editIssueId =
     isIssueEditRoute && routeIssueIdParam && !Number.isNaN(Number(routeIssueIdParam))
       ? Number(routeIssueIdParam)
@@ -200,7 +207,7 @@ export function IssuesMappingsAdminPage() {
   }
 
   if (!view && !editIssueId && viewIssueId == null && viewArticleId == null) {
-    return <Navigate to="/admin/issues" replace />
+    return <Navigate to={SUPER_ADMIN_ISSUES} replace />
   }
 
   if (viewIssueId != null) {
@@ -290,9 +297,9 @@ export function IssuesMappingsAdminPage() {
             setError={setError}
             onDone={async () => {
               await refreshIssues()
-              navigate('/admin/issues')
+              navigate(SUPER_ADMIN_ISSUES)
             }}
-            onCancel={() => navigate('/admin/issues')}
+            onCancel={() => navigate(SUPER_ADMIN_ISSUES)}
           />
         </TableCard>
       )}
@@ -668,14 +675,14 @@ function IssuesListSection({
                         <Button
                           variant="link"
                           compact
-                          onClick={() => navigate(`/admin/issues/view/${i.id}`)}
+                          onClick={() => navigate(superAdminIssueViewPath(i.id))}
                         >
                           View
                         </Button>
                         <Button
                           variant="link"
                           compact
-                          onClick={() => navigate(`/admin/issues/edit/${i.id}`)}
+                          onClick={() => navigate(superAdminIssueEditPath(i.id))}
                         >
                           Edit
                         </Button>
@@ -1288,7 +1295,7 @@ function IssuesArticlesSection({
                           <Button
                             variant="link"
                             compact
-                            onClick={() => navigate(`/admin/issues/articles/view/${a.id}`)}
+                            onClick={() => navigate(superAdminArticleViewPath(a.id))}
                           >
                             View
                           </Button>
@@ -2854,7 +2861,7 @@ function IssuesIssueEditPage({
     <PageSection
       title={issue ? `Edit ${issueEntryViewPageTitle(kind, issue.id)}` : 'Edit entry'}
       leading={
-        <WorkflowPageBack to="/admin/issues" label={workflowBackLabel('/admin/issues')} placement="header" />
+        <WorkflowPageBack to={SUPER_ADMIN_ISSUES} label={workflowBackLabel(SUPER_ADMIN_ISSUES)} placement="header" />
       }
     >
       {error && (
@@ -2887,7 +2894,7 @@ function IssuesIssueEditPage({
               const row = await adminFetchIssue(issueId)
               setIssue(row)
             }}
-            onCancel={() => navigate('/admin/issues')}
+            onCancel={() => navigate(SUPER_ADMIN_ISSUES)}
           />
         </TableCard>
       )}
@@ -3020,7 +3027,7 @@ function IssuesIssueViewPage({
     <PageSection
       title={issue ? issueEntryViewPageTitle(kind, issue.id) : 'View entry'}
       leading={
-        <WorkflowPageBack to="/admin/issues" label={workflowBackLabel('/admin/issues')} placement="header" />
+        <WorkflowPageBack to={SUPER_ADMIN_ISSUES} label={workflowBackLabel(SUPER_ADMIN_ISSUES)} placement="header" />
       }
     >
       {error && (
@@ -3040,7 +3047,7 @@ function IssuesIssueViewPage({
             onSetIndicatorActive={(id, next) => void setIndicatorActive(id, next)}
           />
           <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Button variant="secondary" compact onClick={() => navigate('/admin/issues')}>
+            <Button variant="secondary" compact onClick={() => navigate(SUPER_ADMIN_ISSUES)}>
               Back to list
             </Button>
             <Button
@@ -3295,7 +3302,7 @@ function IssuesArticleViewPage({
       title={article ? article.article_name : 'View article'}
       leading={
         <WorkflowPageBack
-          to="/admin/issues/articles"
+          to={superAdminIssuesArticlesPath()}
           label="Back to article list"
           placement="header"
         />
