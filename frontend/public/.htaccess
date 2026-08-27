@@ -1,0 +1,16 @@
+# SPA fallback for Apache (production). Without this, hard refresh on /admin/issues etc.
+# returns 404/500 instead of index.html — FortiGate may then show "Web Page Blocked".
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Existing files (assets, favicon, knowledge PDFs, etc.)
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # /api is usually Aliased to Laravel — do not rewrite here if Alias is configured
+    RewriteRule ^api/ - [L]
+
+    # Client-side routes → shell
+    RewriteRule ^ index.html [L]
+</IfModule>

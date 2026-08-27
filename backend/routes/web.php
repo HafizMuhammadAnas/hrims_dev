@@ -9,6 +9,7 @@ $spaIndexPath = static function (): string {
     $candidates = [
         dirname(base_path(), 2).DIRECTORY_SEPARATOR.'public_html'.DIRECTORY_SEPARATOR.'index.html',
         public_path('index.html'),
+        dirname(base_path()).DIRECTORY_SEPARATOR.'frontend'.DIRECTORY_SEPARATOR.'dist'.DIRECTORY_SEPARATOR.'index.html',
     ];
     foreach ($candidates as $path) {
         if (is_file($path)) {
