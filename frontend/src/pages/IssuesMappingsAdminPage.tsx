@@ -70,9 +70,6 @@ import {
   issueEntryIndicatorsLinkedLabel,
   issueEntryKindBadgeLabel,
   issueEntryKindToggleAriaLabel,
-  issueEntryListShowsTitleColumn,
-  issueEntryLoiTableCellText,
-  issueEntryLoiTableTitleLabel,
   issueEntryPayloadFields,
   issueEntryTitleFieldLabel,
   issueEntryViewPageTitle,
@@ -411,7 +408,7 @@ type CatalogIdNameSortKey = 'updated_at' | 'id' | 'name' | 'status'
 type ArticleCatalogSortKey = 'updated_at' | 'id' | 'convention' | 'article_name' | 'status'
 type CategoryCatalogSortKey = 'updated_at' | 'id' | 'convention' | 'name' | 'status'
 type YearCatalogSortKey = 'updated_at' | 'id' | 'label' | 'status'
-type IssuesListSortKey = 'updated_at' | 'id' | 'convention' | 'articles' | 'category' | 'issue_title' | 'status'
+type IssuesListSortKey = 'updated_at' | 'id' | 'convention' | 'articles' | 'category' | 'status'
 
 function sortCatalogIdNameRows<
   T extends { id: number; name: string; created_at?: string | null; updated_at?: string | null } & CatalogRow,
@@ -505,8 +502,6 @@ function sortIssueListRows(
           b.category?.name ?? String(b.category_id),
           sortDir,
         )
-      case 'issue_title':
-        return compareStringValues(issueEntryLoiTableCellText(a), issueEntryLoiTableCellText(b), sortDir)
       case 'status':
         return compareStringValues(issueStatusLabel(a), issueStatusLabel(b), sortDir)
       default:
@@ -588,8 +583,7 @@ function IssuesListSection({
   }, [kindFilteredIssues, search, sortKey, sortDir])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
-  const showLoiTitleColumn = issueEntryListShowsTitleColumn(listEntryKind)
-  const tableColSpan = showLoiTitleColumn ? 6 : 5
+  const tableColSpan = 5
 
   const emptyListMessage =
     search.trim()
@@ -641,14 +635,6 @@ function IssuesListSection({
                   direction={sortDir}
                   onSort={() => toggleSort('category')}
                 />
-                {showLoiTitleColumn ? (
-                  <SortColumnHeader
-                    label={issueEntryLoiTableTitleLabel()}
-                    active={sortKey === 'issue_title'}
-                    direction={sortDir}
-                    onSort={() => toggleSort('issue_title')}
-                  />
-                ) : null}
                 <SortColumnHeader
                   label="Status"
                   active={sortKey === 'status'}
@@ -676,14 +662,6 @@ function IssuesListSection({
                       {i.articles.map((a) => a.article_name).join(', ') || 'None'}
                     </td>
                     <td className="issues-mapping-table__category">{i.category?.name ?? i.category_id}</td>
-                    {showLoiTitleColumn ? (
-                      <td
-                        className="issues-mapping-table__issue"
-                        aria-label={`${issueEntryKindBadgeLabel(entryKind)}: ${issueEntryLoiTableCellText(i)}`}
-                      >
-                        {issueEntryLoiTableCellText(i)}
-                      </td>
-                    ) : null}
                     <td className="issues-mapping-table__status">{issueStatusLabel(i)}</td>
                     <td className="issues-mapping-table__actions">
                       <ActionMenu>
