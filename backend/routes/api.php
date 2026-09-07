@@ -70,6 +70,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/knowledge/sdg-goals', [KnowledgeHubController::class, 'sdgGoals'])->name('api.v1.knowledge.sdg-goals');
         Route::get('/knowledge/indicators', [KnowledgeHubController::class, 'indicators'])->name('api.v1.knowledge.indicators');
         Route::get('/knowledge/upr-highlights', [KnowledgeHubController::class, 'uprHighlights'])->name('api.v1.knowledge.upr-highlights');
+        // Convention repository uploads (PDF/DOC) — used by Knowledge Hub Repositories tab.
+        Route::get('/repository-files/{token}', [AdminConventionController::class, 'downloadRepositoryFile'])
+            ->where('token', '[A-Za-z0-9_-]+')
+            ->name('api.v1.repository-files.download');
 
         Route::get('/users', [UserController::class, 'index'])->name('api.v1.users.index');
         Route::post('/users', [UserController::class, 'store'])->name('api.v1.users.store');
@@ -161,6 +165,8 @@ Route::prefix('v1')->group(function (): void {
 
             Route::get('/conventions', [AdminConventionController::class, 'index'])->name('api.v1.admin.conventions.index');
             Route::post('/conventions', [AdminConventionController::class, 'store'])->name('api.v1.admin.conventions.store');
+            Route::post('/conventions/repository-files', [AdminConventionController::class, 'uploadRepositoryFiles'])->name('api.v1.admin.conventions.repository-files.upload');
+            Route::post('/conventions/repository-files/delete', [AdminConventionController::class, 'deleteRepositoryFile'])->name('api.v1.admin.conventions.repository-files.delete');
             Route::post('/conventions/{convention}/update', [AdminConventionController::class, 'update'])->name('api.v1.admin.conventions.update');
             Route::patch('/conventions/{convention}', [AdminConventionController::class, 'update'])->name('api.v1.admin.conventions.update.patch');
             Route::delete('/conventions/{convention}', [AdminConventionController::class, 'destroy'])->name('api.v1.admin.conventions.destroy');

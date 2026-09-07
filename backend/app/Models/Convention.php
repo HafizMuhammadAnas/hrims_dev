@@ -72,6 +72,7 @@ class Convention extends Model
                         'type_label' => trim((string) ($doc['type_label'] ?? $doc['typeLabel'] ?? '')),
                         'icon' => trim((string) ($doc['icon'] ?? '')) ?: '📄',
                         'file_name' => trim((string) ($doc['file_name'] ?? $doc['fileName'] ?? '')),
+                        'path' => trim((string) ($doc['path'] ?? '')),
                     ];
                 }
             }

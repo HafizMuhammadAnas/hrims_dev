@@ -1,4 +1,4 @@
-import { apiJsonHeaders, ensureCsrfCookie } from './client'
+import { apiJsonHeaders, apiMultipartHeaders, ensureCsrfCookie } from './client'
 import { ApiError, parseApiErrorResponse } from './apiError'
 
 async function throwIfNotOk(res: Response): Promise<void> {
@@ -357,6 +357,55 @@ export async function adminUpdateConvention(
   const res = await adminSend('POST', `/conventions/${id}/update`, body)
   await throwIfNotOk(res)
   return (await res.json()).data as AdminConvention
+}
+
+/** Upload PDF/DOC/DOCX files for convention repository cycles. Returns document metadata to attach to a cycle. */
+export async function adminUploadConventionRepositoryFiles(
+  files: File[],
+  conventionId?: number | null,
+): Promise<import('../lib/conventionKnowledgeContent').ConventionRepositoryDocument[]> {
+  if (files.length === 0) return []
+  await ensureCsrfCookie()
+  const fd = new FormData()
+  files.forEach((file, index) => {
+    fd.append(`files[${index}]`, file)
+  })
+  if (conventionId != null && Number.isFinite(conventionId)) {
+    fd.append('convention_id', String(conventionId))
+  }
+  const res = await fetch('/api/v1/admin/conventions/repository-files', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiMultipartHeaders(),
+    body: fd,
+  })
+  await throwIfNotOk(res)
+  return ((await res.json()) as {
+    data: import('../lib/conventionKnowledgeContent').ConventionRepositoryDocument[]
+  }).data
+}
+
+/** Delete a repository file from storage (call when removing a document from a cycle). */
+export async function adminDeleteConventionRepositoryFile(doc: {
+  path?: string
+  href?: string
+}): Promise<void> {
+  const path = doc.path?.trim()
+  let token: string | undefined
+  if (!path && doc.href) {
+    const marker = '/api/v1/repository-files/'
+    const idx = doc.href.indexOf(marker)
+    if (idx >= 0) token = doc.href.slice(idx + marker.length).split(/[?#]/)[0]
+  }
+  if (!path && !token) return
+  await ensureCsrfCookie()
+  const res = await fetch('/api/v1/admin/conventions/repository-files/delete', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify(path ? { path } : { token }),
+  })
+  await throwIfNotOk(res)
 }
 
 export async function adminFetchConventionComponents(conventionId: number): Promise<AdminConventionComponent[]> {

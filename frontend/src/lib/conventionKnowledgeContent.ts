@@ -5,6 +5,8 @@ export type ConventionRepositoryDocument = {
   type_label: string
   icon: string
   file_name: string
+  /** Storage-relative path on the public disk (for delete). */
+  path?: string
 }
 
 export type ConventionRepositoryCycle = {
@@ -20,12 +22,20 @@ export function newConventionContentId(): string {
   return `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
+/** Max bytes per repository file (must stay under PHP upload_max_filesize / post_max_size). */
+export const CONVENTION_REPOSITORY_MAX_FILE_BYTES = 50 * 1024 * 1024
+
+export function conventionRepositoryFileTooLargeMessage(fileName: string, maxBytes = CONVENTION_REPOSITORY_MAX_FILE_BYTES): string {
+  const mb = Math.round(maxBytes / (1024 * 1024))
+  return `"${fileName}" is too large. Maximum upload size is ${mb} MB per file (PDF, DOC, or DOCX).`
+}
+
 export function emptyRepositoryCycle(): ConventionRepositoryCycle {
-  return { id: newConventionContentId(), title: '', documents: [emptyRepositoryDocument()] }
+  return { id: newConventionContentId(), title: '', documents: [] }
 }
 
 export function emptyRepositoryDocument(): ConventionRepositoryDocument {
-  return { id: newConventionContentId(), title: '', href: '', type_label: '', icon: '📄', file_name: '' }
+  return { id: newConventionContentId(), title: '', href: '', type_label: '', icon: '📄', file_name: '', path: '' }
 }
 
 export function normalizeRepositoryCycles(raw: unknown): ConventionRepositoryCycle[] {
@@ -45,6 +55,7 @@ export function normalizeRepositoryCycles(raw: unknown): ConventionRepositoryCyc
           type_label: String(d.type_label ?? d.typeLabel ?? ''),
           icon: String(d.icon ?? '📄') || '📄',
           file_name: String(d.file_name ?? d.fileName ?? ''),
+          path: String(d.path ?? ''),
         }
       }),
     }

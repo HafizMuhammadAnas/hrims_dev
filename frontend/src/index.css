@@ -9256,10 +9256,109 @@ textarea.response-revision-changed,
   display: flex;
   align-items: flex-end;
   padding-bottom: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.convention-editor__files-empty {
+  margin: 0 0 10px;
+}
+
+.convention-editor__file-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.convention-editor__file-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.convention-editor__file-icon {
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+
+.convention-editor__file-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.convention-editor__file-title {
+  width: 100%;
+  font-weight: 600;
+}
+
+.convention-editor__file-sub {
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+.convention-editor__file-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.convention-editor__file-link {
+  font-size: 0.9rem;
+  color: var(--primary, #1d4ed8);
+  text-decoration: none;
+}
+
+.convention-editor__file-link:hover {
+  text-decoration: underline;
 }
 
 .convention-editor__actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* Secondary buttons default to white-on-transparent (header chrome). Make them visible on white cards. */
+.convention-editor .btn.btn-secondary {
+  width: auto;
+  background: #fff;
+  color: var(--solid-blue, #1d4ed8);
+  border: 1px solid #c7d2fe;
+}
+
+.convention-editor .btn.btn-secondary:hover:not(:disabled) {
+  background: #eef2ff;
+  color: var(--solid-blue-hover, #1e40af);
+}
+
+.convention-editor .btn.btn-primary {
+  width: auto;
+}
+
+.convention-editor .btn.convention-editor__btn-danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.convention-editor .btn.convention-editor__btn-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.convention-editor__repo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 4px 0 8px;
 }

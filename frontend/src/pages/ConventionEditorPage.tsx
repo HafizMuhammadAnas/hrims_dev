@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   adminCreateConvention,
+  adminDeleteConventionRepositoryFile,
   adminFetchConventions,
   adminUpdateConvention,
+  adminUploadConventionRepositoryFiles,
   type AdminConvention,
 } from '../api/admin'
 import { SUPER_ADMIN_CONVENTIONS } from '../lib/superAdminRoutes'
@@ -17,10 +19,12 @@ import { FormGrid } from '../components/ui/FormGrid'
 import { FormRow } from '../components/ui/FormRow'
 import { PageSection } from '../components/ui/PageSection'
 import {
+  CONVENTION_REPOSITORY_MAX_FILE_BYTES,
+  conventionRepositoryFileTooLargeMessage,
   emptyRepositoryCycle,
-  emptyRepositoryDocument,
   normalizeRepositoryCycles,
   type ConventionRepositoryCycle,
+  type ConventionRepositoryDocument,
 } from '../lib/conventionKnowledgeContent'
 import { isSuperAdmin } from '../lib/roles'
 import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_OPTIONAL_PROTOCOL } from '../lib/uiLabels'
@@ -53,6 +57,8 @@ const EMPTY_FORM: FormState = {
   sort_order: '0',
 }
 
+const REPOSITORY_ACCEPT = '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
 function formFromConvention(row: AdminConvention): FormState {
   return {
     code: row.code,
@@ -63,10 +69,7 @@ function formFromConvention(row: AdminConvention): FormState {
     knowledge_articles: row.knowledge_articles ?? '',
     knowledge_implementation: row.knowledge_implementation ?? '',
     description: row.description ?? '',
-    repositories: normalizeRepositoryCycles(row.repositories ?? []).map((cycle) => ({
-      ...cycle,
-      documents: cycle.documents.length > 0 ? cycle.documents : [emptyRepositoryDocument()],
-    })),
+    repositories: normalizeRepositoryCycles(row.repositories ?? []),
     optional_protocol_body: row.optional_protocol_body ?? '',
     sort_order: String(row.sort_order ?? 0),
   }
@@ -77,10 +80,14 @@ export function ConventionEditorPage() {
   const navigate = useNavigate()
   const { conventionId } = useParams<{ conventionId: string }>()
   const isEdit = Boolean(conventionId)
+  const numericConventionId =
+    conventionId && !Number.isNaN(Number(conventionId)) ? Number(conventionId) : null
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
+  const [uploadingCycleId, setUploadingCycleId] = useState<string | null>(null)
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
     if (!conventionId) {
@@ -134,11 +141,7 @@ export function ConventionEditorPage() {
     }))
   }
 
-  function updateDocument(
-    cycleId: string,
-    docId: string,
-    next: Partial<ConventionRepositoryCycle['documents'][number]>,
-  ) {
+  function updateDocument(cycleId: string, docId: string, next: Partial<ConventionRepositoryDocument>) {
     setForm((prev) => ({
       ...prev,
       repositories: prev.repositories.map((cycle) =>
@@ -149,6 +152,91 @@ export function ConventionEditorPage() {
               documents: cycle.documents.map((doc) => (doc.id === docId ? { ...doc, ...next } : doc)),
             },
       ),
+    }))
+  }
+
+  async function uploadFilesToCycle(cycleId: string, fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return
+    const files = Array.from(fileList)
+    const tooLarge = files.find((f) => f.size > CONVENTION_REPOSITORY_MAX_FILE_BYTES)
+    if (tooLarge) {
+      setError(conventionRepositoryFileTooLargeMessage(tooLarge.name))
+      const input = fileInputRefs.current[cycleId]
+      if (input) input.value = ''
+      return
+    }
+    const badType = files.find((f) => {
+      const name = f.name.toLowerCase()
+      return !(name.endsWith('.pdf') || name.endsWith('.doc') || name.endsWith('.docx'))
+    })
+    if (badType) {
+      setError(`"${badType.name}" is not allowed. Upload PDF, DOC, or DOCX only.`)
+      const input = fileInputRefs.current[cycleId]
+      if (input) input.value = ''
+      return
+    }
+    setUploadingCycleId(cycleId)
+    setError(null)
+    try {
+      const uploaded = await adminUploadConventionRepositoryFiles(files, numericConventionId)
+      if (uploaded.length === 0) {
+        setError('No files were uploaded. Use PDF, DOC, or DOCX under 50 MB.')
+        return
+      }
+      setForm((prev) => ({
+        ...prev,
+        repositories: prev.repositories.map((cycle) =>
+          cycle.id !== cycleId
+            ? cycle
+            : { ...cycle, documents: [...cycle.documents, ...uploaded] },
+        ),
+      }))
+    } catch (e: unknown) {
+      const msg = isApiError(e) ? e.message : 'File upload failed'
+      setError(
+        /content|size|large|post_max|upload_max/i.test(msg)
+          ? `${msg} (Server PHP limit may still be too low — ask admin to raise upload_max_filesize / post_max_size.)`
+          : msg,
+      )
+    } finally {
+      setUploadingCycleId(null)
+      const input = fileInputRefs.current[cycleId]
+      if (input) input.value = ''
+    }
+  }
+
+  async function removeDocument(cycleId: string, doc: ConventionRepositoryDocument) {
+    setError(null)
+    try {
+      await adminDeleteConventionRepositoryFile({ path: doc.path, href: doc.href })
+    } catch {
+      // Still remove from the form if the file is already gone on disk.
+    }
+    setForm((prev) => ({
+      ...prev,
+      repositories: prev.repositories.map((cycle) =>
+        cycle.id !== cycleId
+          ? cycle
+          : { ...cycle, documents: cycle.documents.filter((row) => row.id !== doc.id) },
+      ),
+    }))
+  }
+
+  async function removeCycle(cycleId: string) {
+    const cycle = form.repositories.find((row) => row.id === cycleId)
+    setError(null)
+    if (cycle) {
+      for (const doc of cycle.documents) {
+        try {
+          await adminDeleteConventionRepositoryFile({ path: doc.path, href: doc.href })
+        } catch {
+          // continue removing remaining files / cycle from the form
+        }
+      }
+    }
+    setForm((prev) => ({
+      ...prev,
+      repositories: prev.repositories.filter((row) => row.id !== cycleId),
     }))
   }
 
@@ -172,9 +260,19 @@ export function ConventionEditorPage() {
       description: form.description.trim() || null,
       repositories: form.repositories
         .map((cycle) => ({
-          ...cycle,
+          id: cycle.id,
           title: cycle.title.trim(),
-          documents: cycle.documents.filter((doc) => doc.title.trim() || doc.href.trim()),
+          documents: cycle.documents
+            .filter((doc) => doc.href.trim())
+            .map((doc) => ({
+              id: doc.id,
+              title: doc.title.trim() || doc.file_name || 'Document',
+              href: doc.href.trim(),
+              type_label: doc.type_label.trim(),
+              icon: doc.icon || '📄',
+              file_name: doc.file_name.trim(),
+              path: doc.path?.trim() || '',
+            })),
         }))
         .filter((cycle) => cycle.title || cycle.documents.length > 0),
       optional_protocol_body: form.optional_protocol_body.trim() || null,
@@ -307,100 +405,15 @@ export function ConventionEditorPage() {
           <section className="convention-editor__section">
             <h3 className="convention-editor__heading">Repositories</h3>
             <p className="muted convention-editor__hint">
-              Reporting cycles and downloadable files for the Repositories tab. Use a full URL or a path such as
-              /knowledge/cat/repository/….
+              Add reporting cycles (e.g. First cycle, Second cycle), then upload one or more PDF or Word files in
+              each cycle (max 50 MB each). These appear on Convention Info → Repositories.
             </p>
-            {form.repositories.length === 0 ? (
-              <p className="muted">No cycles yet. Add a reporting cycle to attach documents.</p>
-            ) : null}
-            {form.repositories.map((cycle, cycleIndex) => (
-              <div key={cycle.id} className="convention-editor__cycle">
-                <FormRow twoCol>
-                  <FormControl label={`Cycle ${cycleIndex + 1} title`}>
-                    <input
-                      value={cycle.title}
-                      onChange={(e) => updateCycle(cycle.id, { title: e.target.value })}
-                      placeholder="e.g. First cycle"
-                    />
-                  </FormControl>
-                  <div className="convention-editor__cycle-actions">
-                    <Button
-                      variant="link"
-                      compact
-                      dangerLink
-                      type="button"
-                      onClick={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          repositories: prev.repositories.filter((row) => row.id !== cycle.id),
-                        }))
-                      }
-                    >
-                      Remove cycle
-                    </Button>
-                  </div>
-                </FormRow>
-                {cycle.documents.map((doc, docIndex) => (
-                  <div key={doc.id} className="convention-editor__document">
-                    <FormRow twoCol>
-                      <FormControl label={`Document ${docIndex + 1} title`}>
-                        <input
-                          value={doc.title}
-                          onChange={(e) => updateDocument(cycle.id, doc.id, { title: e.target.value })}
-                          placeholder="Document title"
-                        />
-                      </FormControl>
-                      <FormControl label="Type label">
-                        <input
-                          value={doc.type_label}
-                          onChange={(e) => updateDocument(cycle.id, doc.id, { type_label: e.target.value })}
-                          placeholder="PDF document"
-                        />
-                      </FormControl>
-                    </FormRow>
-                    <FormRow twoCol>
-                      <FormControl label="Link or file path">
-                        <input
-                          value={doc.href}
-                          onChange={(e) => updateDocument(cycle.id, doc.id, { href: e.target.value })}
-                          placeholder="https://… or /knowledge/…"
-                        />
-                      </FormControl>
-                  <div className="convention-editor__document-actions">
-                        <Button
-                          variant="link"
-                          compact
-                          dangerLink
-                          type="button"
-                          onClick={() =>
-                            updateCycle(cycle.id, {
-                              documents: cycle.documents.filter((row) => row.id !== doc.id),
-                            })
-                          }
-                        >
-                          Remove document
-                        </Button>
-                      </div>
-                    </FormRow>
-                  </div>
-                ))}
-                <Button
-                  variant="secondary"
-                  compact
-                  type="button"
-                  onClick={() =>
-                    updateCycle(cycle.id, { documents: [...cycle.documents, emptyRepositoryDocument()] })
-                  }
-                >
-                  Add document
-                </Button>
-              </div>
-            ))}
-            <div style={{ marginTop: 12 }}>
+            <div className="convention-editor__repo-toolbar">
               <Button
-                variant="secondary"
+                variant="primary"
                 compact
                 type="button"
+                disabled={saving || uploadingCycleId != null}
                 onClick={() =>
                   setForm((prev) => ({
                     ...prev,
@@ -408,9 +421,117 @@ export function ConventionEditorPage() {
                   }))
                 }
               >
-                Add reporting cycle
+                Add cycle
               </Button>
             </div>
+            {form.repositories.length === 0 ? (
+              <p className="muted">No cycles yet. Use Add cycle above to create the first reporting cycle.</p>
+            ) : null}
+            {form.repositories.map((cycle, cycleIndex) => {
+              const uploading = uploadingCycleId === cycle.id
+              return (
+                <div key={cycle.id} className="convention-editor__cycle">
+                  <FormRow twoCol>
+                    <FormControl label={`Cycle ${cycleIndex + 1} name`}>
+                      <input
+                        value={cycle.title}
+                        onChange={(e) => updateCycle(cycle.id, { title: e.target.value })}
+                        placeholder="e.g. First cycle"
+                        disabled={saving || uploading}
+                      />
+                    </FormControl>
+                    <div className="convention-editor__cycle-actions">
+                      <Button
+                        variant="secondary"
+                        compact
+                        type="button"
+                        className="convention-editor__btn-danger"
+                        disabled={saving || uploading}
+                        onClick={() => {
+                          void removeCycle(cycle.id)
+                        }}
+                      >
+                        Remove cycle
+                      </Button>
+                    </div>
+                  </FormRow>
+
+                  {cycle.documents.length === 0 ? (
+                    <p className="muted convention-editor__files-empty">No files in this cycle yet.</p>
+                  ) : (
+                    <ul className="convention-editor__file-list">
+                      {cycle.documents.map((doc) => (
+                        <li key={doc.id} className="convention-editor__file-row">
+                          <span className="convention-editor__file-icon" aria-hidden>
+                            {doc.icon || '📄'}
+                          </span>
+                          <div className="convention-editor__file-meta">
+                            <input
+                              className="convention-editor__file-title"
+                              value={doc.title}
+                              onChange={(e) => updateDocument(cycle.id, doc.id, { title: e.target.value })}
+                              placeholder="Document title"
+                              disabled={saving || uploading}
+                              aria-label="Document title"
+                            />
+                            <span className="muted convention-editor__file-sub">
+                              {doc.file_name || 'Uploaded file'}
+                              {doc.type_label ? ` · ${doc.type_label}` : ''}
+                            </span>
+                          </div>
+                          <div className="convention-editor__file-actions">
+                            {doc.href ? (
+                              <a
+                                className="convention-editor__file-link"
+                                href={doc.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View
+                              </a>
+                            ) : null}
+                            <Button
+                              variant="secondary"
+                              compact
+                              type="button"
+                              className="convention-editor__btn-danger"
+                              disabled={saving || uploading}
+                              onClick={() => {
+                                void removeDocument(cycle.id, doc)
+                              }}
+                            >
+                              Remove file
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <input
+                    ref={(el) => {
+                      fileInputRefs.current[cycle.id] = el
+                    }}
+                    type="file"
+                    accept={REPOSITORY_ACCEPT}
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      void uploadFilesToCycle(cycle.id, e.target.files)
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    compact
+                    type="button"
+                    disabled={saving || uploading}
+                    onClick={() => fileInputRefs.current[cycle.id]?.click()}
+                  >
+                    {uploading ? 'Uploading…' : 'Upload files'}
+                  </Button>
+                </div>
+              )
+            })}
           </section>
 
           <section className="convention-editor__section">
@@ -432,7 +553,7 @@ export function ConventionEditorPage() {
             <Button variant="secondary" type="button" onClick={() => navigate(SUPER_ADMIN_CONVENTIONS)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit" disabled={saving}>
+            <Button variant="primary" type="submit" disabled={saving || uploadingCycleId != null}>
               {saving ? 'Saving…' : isEdit ? 'Save convention' : 'Create convention'}
             </Button>
           </div>
