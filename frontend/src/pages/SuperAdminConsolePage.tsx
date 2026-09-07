@@ -365,9 +365,6 @@ export function SuperAdminConsolePage() {
                         >
                           Edit
                         </Button>
-                        <Button variant="link" onClick={() => setSelConv(c.id)}>
-                          Components
-                        </Button>
                         <Button
                           variant="link"
                           dangerLink
