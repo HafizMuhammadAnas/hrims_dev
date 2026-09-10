@@ -5255,6 +5255,23 @@ textarea.response-revision-changed,
   white-space: pre-wrap;
 }
 
+.convention-html-tracker {
+  margin-bottom: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.convention-html-tracker__frame {
+  display: block;
+  width: 100%;
+  min-height: 85vh;
+  height: 1100px;
+  border: 0;
+  background: #f8fafc;
+}
+
 .cat-tracker {
   margin-bottom: 30px;
 }

@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pakistan ICESCR Comprehensive Dashboard - Complete Data Log (All 28 Rows)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --primary: #0f172a;
+      --accent-blue: #0284c7;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --border: #cbd5e1;
+      --text-main: #334155;
+      --text-muted: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h1 { color: var(--primary); font-size: 1.8rem; font-weight: 700; margin-bottom: 6px; }
+    p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+    /* Nav Tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .tab-btn {
+      padding: 12px 20px; border: none; background: none; font-weight: 600;
+      color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.95rem;
+    }
+    .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 16px;
+    }
+
+    .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 900px) { .grid-2col { grid-template-columns: 1fr 1fr; } }
+
+    /* Controls */
+    .table-controls { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .search-input, .select-filter {
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
+    }
+    .search-input { width: 340px; }
+
+    .stats-counter { font-size: 0.9rem; font-weight: 600; color: var(--accent-blue); }
+
+    /* Tables */
+    .table-container { overflow-x: auto; max-height: 700px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+    th {
+      position: sticky; top: 0; background-color: #f1f5f9; color: var(--primary);
+      font-weight: 600; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; z-index: 10;
+    }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover { background-color: #f8fafc; }
+
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+    .badge-improving { background: #dcfce7; color: #166534; }
+    .badge-worsening { background: #fee2e2; color: #991b1b; }
+    .badge-single { background: #e0f2fe; color: #075985; }
+    .badge-baseline { background: #f3f4f6; color: #4b5563; }
+    .badge-neutral { background: #fef3c7; color: #92400e; }
+
+    .chart-container { position: relative; height: 320px; width: 100%; }
+    .note { font-size: 0.825rem; color: var(--text-muted); margin-top: 10px; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Pakistan ICESCR Compliance: Master Quantitative Tracker</h1>
+      <p class="subtitle">Complete Dataset & Visualizations: All 5 Summary Tables + Complete Row Data Log (All 28 Rows Included)</p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchView('log')">Full Quantitative Log (All 28 Metrics)</button>
+      <button class="tab-btn" onclick="switchView('flagship')">5 Flagship Summary Tables & Graphs</button>
+      <button class="tab-btn" onclick="switchView('overview')">Multi-Metric Overview Graph</button>
+    </div>
+
+    <div id="log-view">
+      <div class="card">
+        <h2 class="card-title">Full Quantitative Data Log — ICESCR Metrics (Complete 28-Metric Dataset)</h2>
+        <div class="table-controls">
+          <input type="text" id="logSearch" class="search-input" placeholder="Search metric, ID, unit, or source..." onkeyup="filterLogTable()">
+          <select id="progressFilter" class="select-filter" onchange="filterLogTable()">
+            <option value="ALL">All Progress Types (28 Metrics)</option>
+            <option value="Improved">Improved</option>
+            <option value="Worsened">Worsened</option>
+            <option value="Context-dependent">Context-dependent</option>
+            <option value="Single observation">Single observation / Baseline</option>
+          </select>
+          <div class="stats-counter" id="rowsCounter">Showing 28 of 28 rows</div>
+        </div>
+        <div class="table-container">
+          <table id="fullLogTable">
+            <thead>
+              <tr>
+                <th>ID</th><th>Issue Area</th><th>Metric Name</th><th>Unit</th>
+                <th>2013</th><th>2015</th><th>2016</th><th>2017</th><th>2018</th><th>2019</th><th>2020</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>2025</th><th>2030</th>
+                <th>Progress Status</th><th>Note</th><th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="flagship-view" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">1. NFC Total Transfers, 2018–2024</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Year</th><th>Amount (PKR Billion)</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>2018</td><td>2,463</td></tr>
+                <tr><td>2019</td><td>2,402</td></tr>
+                <tr><td>2020</td><td>2,924</td></tr>
+                <tr><td>2021</td><td>3,412</td></tr>
+                <tr><td>2022</td><td>4,129</td></tr>
+                <tr><td>2023</td><td>5,426</td></tr>
+                <tr><td>2024</td><td>7,438</td></tr>
+              </tbody>
+            </table>
+            <div class="note">NFC transfers have increased over threefold from 2018 to 2024, enhancing provincial capacity.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart1"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">2. Provincial Development Budget, 2020 vs 2024</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Amount (PKR Billion)</th></tr></thead>
+              <tbody>
+                <tr><td>2020</td><td>674</td></tr>
+                <tr><td>2024</td><td>2,095</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Provincial development budget grew substantially, directly reflecting increased devolution capacity.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart2"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">3. NCHR Final/Allocated Budget, 2015–2024</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Budget (PKR Million)</th></tr></thead>
+              <tbody>
+                <tr><td>2015</td><td>105.1</td></tr>
+                <tr><td>2016</td><td>119.4</td></tr>
+                <tr><td>2017</td><td>105.0</td></tr>
+                <tr><td>2018</td><td>92.0</td></tr>
+                <tr><td>2019</td><td>112.0</td></tr>
+                <tr><td>2020</td><td>97.7</td></tr>
+                <tr><td>2024</td><td>183.0</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Budget dipped sharply in the FY18 and FY20 periods before recovering to a high of 183 million in 2024.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart3"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">4. Poverty Rate, 2018–2024</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Poverty Rate (%)</th></tr></thead>
+              <tbody>
+                <tr><td>2018</td><td>39.8%</td></tr>
+                <tr><td>2023</td><td>37.2%</td></tr>
+                <tr><td>2024</td><td>40.0%</td></tr>
+              </tbody>
+            </table>
+            <div class="note">While the rate dropped in 2023, it rose again in 2024, resulting in a slight net worsening from 2018.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart4"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">5. Enforced Disappearances: Commission Intake vs Disposal</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Cases Received (Cumulative)</th><th>Cases Disposed (Cumulative)</th></tr></thead>
+              <tbody>
+                <tr><td>2021</td><td>8,122</td><td>5,853</td></tr>
+                <tr><td>2025</td><td>10,363</td><td>8,077</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Both cumulative intake and disposal grew concurrently; the backlog maintains its presence over time.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart5"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="overview-view" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">Multi-Metric Time Series Visualizer (Overlay of Available Series)</h2>
+        <p class="subtitle" style="margin-bottom: 15px;">Comparative view of key fiscal and operational metrics over the ICESCR reporting cycles.</p>
+        <div class="chart-container" style="height: 480px;">
+          <canvas id="overviewChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const logData = [
+      {
+        "id": 1,
+        "issue": "2. Devolution, provincial capacity & coordination",
+        "metric": "NFC total transfers",
+        "unit": "PKR billion",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "2463", "y19": "2402", "y20": "2924",
+        "y21": "3412", "y22": "4129", "y23": "5426",
+        "y24": "7438", "y25": "", "y30": "",
+        "progress": "Improved",
+        "note": "2018–2024",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 7"
+      },
+      {
+        "id": 2,
+        "issue": "2. Devolution, provincial capacity & coordination",
+        "metric": "Provincial development budget",
+        "unit": "PKR billion",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "674",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "2095", "y25": "", "y30": "",
+        "progress": "Improved",
+        "note": "2020–21 to 2024–25",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 8"
+      },
+      {
+        "id": 3,
+        "issue": "3. National Commission for Human Rights (NCHR)",
+        "metric": "NCHR final/allocated budget",
+        "unit": "PKR million",
+        "y13": "", "y15": "105.088", "y16": "119.41", "y17": "105",
+        "y18": "92", "y19": "112", "y20": "97.7",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "183", "y25": "", "y30": "",
+        "progress": "Improved",
+        "note": "2015–16 to 2024–25 where reported",
+        "source": "E/C.12/PAK/CO/1/Add.1 (2019), para. 2; E/C.12/PAK/2 (2023), para. 12; E/C.12/PAK/RQ/2 (2025), para. 11"
+      },
+      {
+        "id": 4,
+        "issue": "3. National Commission for Human Rights (NCHR)",
+        "metric": "NCHR complaints received",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "2435", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "7080", "y30": "",
+        "progress": "Context-dependent",
+        "note": "2018 and cumulative to 2025",
+        "source": "E/C.12/PAK/2 (2023), para. 13; E/C.12/PAK/RQ/2 (2025), para. 11"
+      },
+      {
+        "id": 5,
+        "issue": "3. National Commission for Human Rights (NCHR)",
+        "metric": "NCHR suo-motu cases/notices",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "77",
+        "y18": "195", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "1271", "y30": "",
+        "progress": "Context-dependent",
+        "note": "More action can mean stronger oversight or more violations",
+        "source": "E/C.12/PAK/Q/1/Add.1 (2017), para. 6; E/C.12/PAK/2 (2023), para. 13; E/C.12/PAK/RQ/2 (2025), para. 11"
+      },
+      {
+        "id": 6,
+        "issue": "4. Human rights defenders, journalists & enforced disappearances",
+        "metric": "Alleged enforced disappearance cases received",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "8122", "y22": "", "y23": "",
+        "y24": "", "y25": "10363", "y30": "",
+        "progress": "Context-dependent",
+        "note": "2021–2025",
+        "source": "E/C.12/PAK/2 (2023), para. 16; E/C.12/PAK/RQ/2 (2025), para. 13"
+      },
+      {
+        "id": 7,
+        "issue": "4. Human rights defenders, journalists & enforced disappearances",
+        "metric": "Alleged disappearance cases disposed",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "5853", "y22": "", "y23": "",
+        "y24": "", "y25": "8077", "y30": "",
+        "progress": "Improved",
+        "note": "2021–2025",
+        "source": "E/C.12/PAK/2 (2023), para. 16; E/C.12/PAK/RQ/2 (2025), para. 13"
+      },
+      {
+        "id": 8,
+        "issue": "5. Maximum available resources, poverty & fiscal policy",
+        "metric": "Poverty rate",
+        "unit": "percent",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "39.8", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "37.2",
+        "y24": "40", "y25": "", "y30": "",
+        "progress": "Worsened",
+        "note": "2018–2024",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 24"
+      },
+      {
+        "id": 9,
+        "issue": "5. Maximum available resources, poverty & fiscal policy",
+        "metric": "Population below national poverty line",
+        "unit": "percent",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "22", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2024",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 24"
+      },
+      {
+        "id": 10,
+        "issue": "5. Maximum available resources, poverty & fiscal policy",
+        "metric": "FBR net provisional collection",
+        "unit": "PKR billion",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "7164.14",
+        "y24": "10085.2", "y25": "", "y30": "",
+        "progress": "Context-dependent",
+        "note": "2023–2024",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 25"
+      },
+      {
+        "id": 11,
+        "issue": "5. Maximum available resources, poverty & fiscal policy",
+        "metric": "FBR tax-to-GDP ratio",
+        "unit": "percent",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "9.5", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "reported average",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 25"
+      },
+      {
+        "id": 12,
+        "issue": "6. Corruption, accountability & whistleblower protection",
+        "metric": "NAB conviction rate",
+        "unit": "percent",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "60", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2021",
+        "source": "E/C.12/PAK/2 (2023), para. 29"
+      },
+      {
+        "id": 13,
+        "issue": "6. Corruption, accountability & whistleblower protection",
+        "metric": "NAB inquiries registered",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "10378", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "through Dec. 2021",
+        "source": "E/C.12/PAK/2 (2023), para. 29"
+      },
+      {
+        "id": 14,
+        "issue": "6. Corruption, accountability & whistleblower protection",
+        "metric": "NAB cases filed",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "3506", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "through 2021",
+        "source": "E/C.12/PAK/2 (2023), para. 29"
+      },
+      {
+        "id": 15,
+        "issue": "12. Gender equality, women's participation & property",
+        "metric": "Punjab/Sindh women public-service quota",
+        "unit": "percent",
+        "y13": "", "y15": "", "y16": "", "y17": "15",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2017",
+        "source": "E/C.12/PAK/Q/1/Add.1 (2017), para. 23"
+      },
+      {
+        "id": 16,
+        "issue": "14. Just & favourable conditions of work, OHS & minimum wage",
+        "metric": "Brick-kiln labour inspections",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "7681", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "Jan–Apr 2016",
+        "source": "E/C.12/PAK/Q/1/Add.1 (2017), para. 35"
+      },
+      {
+        "id": 17,
+        "issue": "14. Just & favourable conditions of work, OHS & minimum wage",
+        "metric": "Minimum wage for unskilled workers in Punjab/Sindh",
+        "unit": "PKR/month",
+        "y13": "", "y15": "", "y16": "", "y17": "14000",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2017",
+        "source": "E/C.12/PAK/Q/1/Add.1 (2017), para. 32"
+      },
+      {
+        "id": 18,
+        "issue": "18. Birth registration & child labour",
+        "metric": "Brick-kiln owners arrested",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "768", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "Jan–Apr 2016",
+        "source": "E/C.12/PAK/Q/1/Add.1 (2017), para. 35"
+      },
+      {
+        "id": 19,
+        "issue": "19. Poverty, food, water & sanitation",
+        "metric": "BISP UCT allocation",
+        "unit": "PKR billion",
+        "y13": "75", "y15": "", "y16": "", "y17": "115",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Context-dependent",
+        "note": "2013–14 and 2017",
+        "source": "E/C.12/PAK/Q/1/Add.1 (2017), para. 42"
+      },
+      {
+        "id": 20,
+        "issue": "19. Poverty, food, water & sanitation",
+        "metric": "BISP UCT cumulative disbursement",
+        "unit": "PKR billion",
+        "y13": "", "y15": "", "y16": "", "y17": "436",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "by 2017",
+        "source": "E/C.12/PAK/Q/1/Add.1 (2017), para. 42"
+      },
+      {
+        "id": 21,
+        "issue": "24. Education: enrolment, attendance, quality & safety",
+        "metric": "BISP education children enrolled",
+        "unit": "million children",
+        "y13": "", "y15": "", "y16": "", "y17": "1.895",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "as of Dec. 2017",
+        "source": "E/C.12/PAK/Q/1/Add.1 (2017), para. 9; E/C.12/PAK/CO/1/Add.1 (2019), para. 9"
+      },
+      {
+        "id": 22,
+        "issue": "24. Education: enrolment, attendance, quality & safety",
+        "metric": "BISP education stipend disbursed",
+        "unit": "PKR billion",
+        "y13": "", "y15": "", "y16": "", "y17": "5.81",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "as of Dec. 2017",
+        "source": "E/C.12/PAK/CO/1/Add.1 (2019), para. 9"
+      },
+      {
+        "id": 23,
+        "issue": "24. Education: enrolment, attendance, quality & safety",
+        "metric": "Teachers trained",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "3200",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2016–17",
+        "source": "E/C.12/PAK/CO/1/Add.1 (2019), para. 11"
+      },
+      {
+        "id": 24,
+        "issue": "24. Education: enrolment, attendance, quality & safety",
+        "metric": "Principals/vice-principals trained",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "844",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2016–17",
+        "source": "E/C.12/PAK/CO/1/Add.1 (2019), para. 11"
+      },
+      {
+        "id": 25,
+        "issue": "27. Climate change, adaptation & disaster preparedness",
+        "metric": "2030 GHG reduction target",
+        "unit": "percent",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "", "y25": "", "y30": "50",
+        "progress": "Single observation",
+        "note": "2030 target",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 18"
+      },
+      {
+        "id": 26,
+        "issue": "27. Climate change, adaptation & disaster preparedness",
+        "metric": "Punjab flood compensation",
+        "unit": "PKR billion",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "10", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2022 floods",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 19"
+      },
+      {
+        "id": 27,
+        "issue": "27. Climate change, adaptation & disaster preparedness",
+        "metric": "People receiving Punjab flood compensation",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "50000", "y23": "",
+        "y24": "", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2022 floods",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 19"
+      },
+      {
+        "id": 28,
+        "issue": "28. Business & human rights / remedies",
+        "metric": "AML/CTF cases processed",
+        "unit": "count",
+        "y13": "", "y15": "", "y16": "", "y17": "",
+        "y18": "", "y19": "", "y20": "",
+        "y21": "", "y22": "", "y23": "",
+        "y24": "70", "y25": "", "y30": "",
+        "progress": "Single observation",
+        "note": "2024/2025 response",
+        "source": "E/C.12/PAK/RQ/2 (2025), para. 16"
+      }
+    ];
+
+    function switchView(view) {
+      document.getElementById('log-view').style.display = view === 'log' ? 'block' : 'none';
+      document.getElementById('flagship-view').style.display = view === 'flagship' ? 'block' : 'none';
+      document.getElementById('overview-view').style.display = view === 'overview' ? 'block' : 'none';
+
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      if (view === 'overview') initOverviewChart();
+      if (view === 'flagship') initCharts();
+    }
+
+    function getBadgeClass(prog) {
+      if (prog.includes('Improved') || prog.includes('▲')) return 'badge-improving';
+      if (prog.includes('Worsened') || prog.includes('▼')) return 'badge-worsening';
+      if (prog.includes('Single observation') || prog.includes('Baseline')) return 'badge-baseline';
+      if (prog.includes('Context-dependent')) return 'badge-single';
+      return 'badge-neutral';
+    }
+
+    function renderLogTable() {
+      const tbody = document.getElementById('logTableBody');
+      const search = document.getElementById('logSearch').value.toLowerCase();
+      const filter = document.getElementById('progressFilter').value;
+
+      tbody.innerHTML = '';
+
+      const filtered = logData.filter(d => {
+        const matchesFilter = filter === 'ALL' || d.progress.includes(filter);
+        const matchesSearch = JSON.stringify(d).toLowerCase().includes(search);
+        return matchesFilter && matchesSearch;
+      });
+
+      document.getElementById('rowsCounter').innerText = `Showing ${filtered.length} of ${logData.length} rows`;
+
+      filtered.forEach(d => {
+        tbody.innerHTML += `
+          <tr>
+            <td><b>${d.id}</b></td>
+            <td><b>${d.issue.replace(/^\d+\.\s*/, '')}</b></td>
+            <td>${d.metric}</td>
+            <td>${d.unit}</td>
+            <td>${d.y13}</td><td>${d.y15}</td><td>${d.y16}</td><td>${d.y17}</td><td>${d.y18}</td>
+            <td>${d.y19}</td><td>${d.y20}</td><td>${d.y21}</td><td>${d.y22}</td>
+            <td>${d.y23}</td><td>${d.y24}</td><td>${d.y25}</td><td>${d.y30}</td>
+            <td><span class="badge ${getBadgeClass(d.progress)}">${d.progress}</span></td>
+            <td><span style="font-size: 0.8rem; color: #64748b;">${d.note}</span></td>
+            <td>${d.source}</td>
+          </tr>`;
+      });
+    }
+
+    function filterLogTable() { renderLogTable(); }
+
+    let chartsInitialized = false;
+    function initCharts() {
+      if (chartsInitialized) return;
+      chartsInitialized = true;
+
+      // Chart 1: NFC Transfers
+      new Chart(document.getElementById('chart1'), {
+        type: 'bar',
+        data: {
+          labels: ['2018', '2019', '2020', '2021', '2022', '2023', '2024'],
+          datasets: [
+            { label: 'Amount (PKR Billion)', data: [2463, 2402, 2924, 3412, 4129, 5426, 7438], backgroundColor: '#0284c7' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 2: Provincial Development Budget
+      new Chart(document.getElementById('chart2'), {
+        type: 'bar',
+        data: {
+          labels: ['2020', '2024'],
+          datasets: [
+            { label: 'Amount (PKR Billion)', data: [674, 2095], backgroundColor: '#10b981' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 3: NCHR Budget
+      new Chart(document.getElementById('chart3'), {
+        type: 'line',
+        data: {
+          labels: ['2015', '2016', '2017', '2018', '2019', '2020', '2024'],
+          datasets: [
+            { label: 'Budget (PKR Million)', data: [105.1, 119.4, 105.0, 92.0, 112.0, 97.7, 183.0], borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.2 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 4: Poverty Rate
+      new Chart(document.getElementById('chart4'), {
+        type: 'line',
+        data: {
+          labels: ['2018', '2023', '2024'],
+          datasets: [
+            { label: 'Poverty Rate (%)', data: [39.8, 37.2, 40.0], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true, tension: 0.1 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 5: Enforced Disappearances
+      new Chart(document.getElementById('chart5'), {
+        type: 'bar',
+        data: {
+          labels: ['2021', '2025'],
+          datasets: [
+            { label: 'Received (Cumulative)', data: [8122, 10363], backgroundColor: '#f59e0b' },
+            { label: 'Disposed (Cumulative)', data: [5853, 8077], backgroundColor: '#0284c7' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    let overviewChartInstance = null;
+    function initOverviewChart() {
+      if (overviewChartInstance) return;
+      overviewChartInstance = new Chart(document.getElementById('overviewChart'), {
+        type: 'line',
+        data: {
+          labels: ['2018', '2019', '2020', '2021', '2022', '2023', '2024'],
+          datasets: [
+            { label: 'NFC Transfers (PKR Billion)', data: [2463, 2402, 2924, 3412, 4129, 5426, 7438], borderColor: '#0284c7', yAxisID: 'y', tension: 0.2, spanGaps: true },
+            { label: 'NCHR Budget (PKR Million)', data: [92.0, 112.0, 97.7, null, null, null, 183.0], borderColor: '#8b5cf6', yAxisID: 'y1', tension: 0.2, spanGaps: true },
+          ]
+        },
+        options: { 
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { type: 'linear', position: 'left' },
+            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+    }
+
+    window.onload = function() {
+      renderLogTable();
+    };
+  </script>
+</body>
+</html>

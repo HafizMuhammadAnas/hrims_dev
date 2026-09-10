@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pakistan ICERD Comprehensive Dashboard - Complete Data Log (All 27 Rows)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --primary: #0f172a;
+      --accent-blue: #0284c7;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --border: #cbd5e1;
+      --text-main: #334155;
+      --text-muted: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h1 { color: var(--primary); font-size: 1.8rem; font-weight: 700; margin-bottom: 6px; }
+    p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+    /* Nav Tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .tab-btn {
+      padding: 12px 20px; border: none; background: none; font-weight: 600;
+      color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.95rem;
+    }
+    .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 16px;
+    }
+
+    .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 900px) { .grid-2col { grid-template-columns: 1fr 1fr; } }
+
+    /* Controls */
+    .table-controls { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .search-input, .select-filter {
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
+    }
+    .search-input { width: 340px; }
+
+    .stats-counter { font-size: 0.9rem; font-weight: 600; color: var(--accent-blue); }
+
+    /* Tables */
+    .table-container { overflow-x: auto; max-height: 700px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+    th {
+      position: sticky; top: 0; background-color: #f1f5f9; color: var(--primary);
+      font-weight: 600; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; z-index: 10;
+    }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover { background-color: #f8fafc; }
+
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+    .badge-improving { background: #dcfce7; color: #166534; }
+    .badge-worsening { background: #fee2e2; color: #991b1b; }
+    .badge-single { background: #e0f2fe; color: #075985; }
+    .badge-baseline { background: #f3f4f6; color: #4b5563; }
+    .badge-neutral { background: #fef3c7; color: #92400e; }
+
+    .chart-container { position: relative; height: 320px; width: 100%; }
+    .note { font-size: 0.825rem; color: var(--text-muted); margin-top: 10px; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Pakistan ICERD Compliance: Master Quantitative Tracker (Verified)</h1>
+      <p class="subtitle">Complete Dataset & Visualizations: All 5 Summary Tables + Complete Row Data Log (All 27 Rows Included)</p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchView('log')">Full Quantitative Log (All 27 Metrics)</button>
+      <button class="tab-btn" onclick="switchView('flagship')">5 Flagship Summary Tables & Graphs</button>
+      <button class="tab-btn" onclick="switchView('overview')">Multi-Metric Overview Graph</button>
+    </div>
+
+    <div id="log-view">
+      <div class="card">
+        <h2 class="card-title">Full Quantitative Data Log — ICERD Metrics (Complete 27-Metric Dataset)</h2>
+        <div class="table-controls">
+          <input type="text" id="logSearch" class="search-input" placeholder="Search metric, ID, unit, or source..." onkeyup="filterLogTable()">
+          <select id="progressFilter" class="select-filter" onchange="filterLogTable()">
+            <option value="ALL">All Progress Types (27 Metrics)</option>
+            <option value="Single observation">Single observation / Baseline</option>
+            <option value="Worsened">Worsened</option>
+            <option value="Context-dependent">Context-dependent</option>
+          </select>
+          <div class="stats-counter" id="rowsCounter">Showing 27 of 27 rows</div>
+        </div>
+        <div class="table-container">
+          <table id="fullLogTable">
+            <thead>
+              <tr>
+                <th>ID</th><th>Issue Area</th><th>Metric Name</th><th>Unit</th>
+                <th>2015</th><th>2016</th><th>2017</th><th>2018</th><th>2020</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th>
+                <th>Progress Status</th><th>Note</th><th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="flagship-view" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">1. Population Distribution by Gender (2022 Census)</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Demographic</th><th>Count</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Men</td><td>106,449,322</td></tr>
+                <tr><td>Women</td><td>101,314,780</td></tr>
+                <tr><td>Transgender Persons</td><td>10,418</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Data extracted from the 2022 State report census data.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart1"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">2. Hate Speech and Loudspeaker Misuse Enforcement (as of 2022)</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Enforcement Area</th><th>Cases Registered</th><th>Persons Arrested</th></tr></thead>
+              <tbody>
+                <tr><td>Hate Speech / Hate Material</td><td>1,373</td><td>2,566</td></tr>
+                <tr><td>Loudspeaker Misuse</td><td>19,895</td><td>20,679</td></tr>
+              </tbody>
+            </table>
+            <div class="note">High enforcement volume observed. The number of arrests correlates strongly with cases registered.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart2"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">3. Madrasa Geo-Mapping Progress (Pre-2018 Data)</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Province/Area</th><th>Completion (%)</th></tr></thead>
+              <tbody>
+                <tr><td>ICT, Punjab, Sindh</td><td>100%</td></tr>
+                <tr><td>Khyber Pakhtunkhwa (KP)</td><td>95%</td></tr>
+                <tr><td>Balochistan</td><td>80%</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Baseline indicators set in 2018 for oversight tracking.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart3"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">4. Afghan Returns, Deportations, and Arrests (2023–2024)</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Category / Period</th><th>Count</th></tr></thead>
+              <tbody>
+                <tr><td>Deported/Returned (Through 31 Jul 2024)</td><td>700,000</td></tr>
+                <tr><td>Deported/Returned (Apr–Jun 2024)</td><td>101,000</td></tr>
+                <tr><td>Arrested/Detained (Sep–Dec 2023)</td><td>~28,500</td></tr>
+              </tbody>
+            </table>
+            <div class="note">These metrics highlight the surge in enforcement related to undocumented immigrants.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart4"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">5. Annual Blasphemy Cases</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Cases Registered</th></tr></thead>
+              <tbody>
+                <tr><td>2020</td><td>11</td></tr>
+                <tr><td>2023</td><td>213</td></tr>
+              </tbody>
+            </table>
+            <div class="note">A substantial nearly 20-fold increase in caseload over three years, noted as an adverse trend.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart5"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="overview-view" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">Multi-Metric Visualizer</h2>
+        <p class="subtitle" style="margin-bottom: 15px;">Comparative view of Hate Speech/Misuse Enforcement.</p>
+        <div class="chart-container" style="height: 480px;">
+          <canvas id="overviewChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const logData = [
+  {
+    "id": 1,
+    "issue": "4. Disaggregated statistics / census",
+    "metric": "Men in population",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "106449322", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "",
+    "source": "CERD/C/PAK/24-26 para. 26"
+  },
+  {
+    "id": 2,
+    "issue": "4. Disaggregated statistics / census",
+    "metric": "Women in population",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "101314780", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "",
+    "source": "CERD/C/PAK/24-26 para. 26"
+  },
+  {
+    "id": 3,
+    "issue": "4. Disaggregated statistics / census",
+    "metric": "Transgender persons in census",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "10418", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "",
+    "source": "CERD/C/PAK/24-26 para. 26"
+  },
+  {
+    "id": 4,
+    "issue": "5. National Commission for Human Rights",
+    "metric": "NCHR sanctioned posts",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "171", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2022 State report; date of approval not stated",
+    "source": "CERD/C/PAK/24-26 para. 28"
+  },
+  {
+    "id": 5,
+    "issue": "5. National Commission for Human Rights",
+    "metric": "NCHR budget",
+    "unit": "PKR million",
+    "y15": "", "y16": "", "y17": "105", "y18": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "",
+    "source": "CERD/C/PAK/CO/21-23/Add.1 para. 5; CERD/C/PAK/24-26 para. 29"
+  },
+  {
+    "id": 6,
+    "issue": "6. Racist hate speech and hate crimes",
+    "metric": "Hate speech / hate-material cases registered",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "1373", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2022 State report; period not stated",
+    "source": "CERD/C/PAK/24-26 para. 33"
+  },
+  {
+    "id": 7,
+    "issue": "6. Racist hate speech and hate crimes",
+    "metric": "Persons arrested for hate speech / hate material",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "2566", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2022 State report; period not stated",
+    "source": "CERD/C/PAK/24-26 para. 33"
+  },
+  {
+    "id": 8,
+    "issue": "6. Racist hate speech and hate crimes",
+    "metric": "Shops sealed for hate speech/material",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "\u226570", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2022 State report; lower bound",
+    "source": "CERD/C/PAK/24-26 para. 33"
+  },
+  {
+    "id": 9,
+    "issue": "6. Racist hate speech and hate crimes",
+    "metric": "Loudspeaker-misuse cases",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "19895", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2022 State report; period not stated",
+    "source": "CERD/C/PAK/24-26 para. 33"
+  },
+  {
+    "id": 10,
+    "issue": "6. Racist hate speech and hate crimes",
+    "metric": "Persons arrested for loudspeaker misuse",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "20679", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2022 State report; period not stated",
+    "source": "CERD/C/PAK/24-26 para. 33"
+  },
+  {
+    "id": 11,
+    "issue": "6. Racist hate speech and hate crimes",
+    "metric": "Equipment confiscated for loudspeaker misuse",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "8759", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2022 State report; period not stated",
+    "source": "CERD/C/PAK/24-26 para. 33"
+  },
+  {
+    "id": 12,
+    "issue": "6. Racist hate speech and hate crimes",
+    "metric": "Annual blasphemy cases",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "11", "y21": "", "y22": "", "y23": "213", "y24": "",
+    "progress": "Worsened (11 in 2020 \u2192 213 in 2023; higher caseload is adverse)",
+    "note": "2020 vs 2023 snapshot",
+    "source": "CERD/C/PAK/CO/24-26 para. 20(b)"
+  },
+  {
+    "id": 13,
+    "issue": "6. Racist hate speech and hate crimes",
+    "metric": "Sialkot/Jaranwala suspects arrested",
+    "unit": "percent",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "<7%",
+    "progress": "Single observation \u2014 Committee reported upper bound (<7%)",
+    "note": "Conviction outcome",
+    "source": "CERD/C/PAK/CO/24-26 para. 22"
+  },
+  {
+    "id": 14,
+    "issue": "7. Civil and political rights",
+    "metric": "Punjab DVC meetings",
+    "unit": "count",
+    "y15": "169", "y16": "152", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "Context-dependent \u2014 meeting activity is not a rights outcome",
+    "note": "2015 vs 2016",
+    "source": "CERD/C/PAK/CO/21-23/Add.1 para. 25"
+  },
+  {
+    "id": 15,
+    "issue": "7. Civil and political rights",
+    "metric": "Religious seminaries",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "30000", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "Approximate baseline 2018",
+    "source": "CERD/C/PAK/CO/21-23/Add.1 para. 26"
+  },
+  {
+    "id": 16,
+    "issue": "7. Civil and political rights",
+    "metric": "ICT/Punjab/Sindh madrasa geo-mapping",
+    "unit": "percent",
+    "y15": "", "y16": "", "y17": "", "y18": "100", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2018",
+    "source": "CERD/C/PAK/CO/21-23/Add.1 para. 26"
+  },
+  {
+    "id": 17,
+    "issue": "7. Civil and political rights",
+    "metric": "KP madrasa geo-mapping",
+    "unit": "percent",
+    "y15": "", "y16": "", "y17": "", "y18": "95", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2018",
+    "source": "CERD/C/PAK/CO/21-23/Add.1 para. 26"
+  },
+  {
+    "id": 18,
+    "issue": "7. Civil and political rights",
+    "metric": "Balochistan madrasa geo-mapping",
+    "unit": "percent",
+    "y15": "", "y16": "", "y17": "", "y18": "80", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2018",
+    "source": "CERD/C/PAK/CO/21-23/Add.1 para. 26"
+  },
+  {
+    "id": 19,
+    "issue": "10. Refugees, asylum seekers and migrants",
+    "metric": "Afghans deported/returned through 31 July 2024",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "700000",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "Through 31 July 2024",
+    "source": "CERD/C/PAK/CO/24-26 para. 29"
+  },
+  {
+    "id": 20,
+    "issue": "10. Refugees, asylum seekers and migrants",
+    "metric": "Afghans deported/returned Apr\u2013Jun 2024",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "101000",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "Phase 2 (Apr\u2013Jun 2024)",
+    "source": "CERD/C/PAK/CO/24-26 para. 29"
+  },
+  {
+    "id": 21,
+    "issue": "10. Refugees, asylum seekers and migrants",
+    "metric": "Afghans arrested/detained Sep\u2013Dec 2023",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "", "y23": "\u224828,500", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "Sep\u2013Dec 2023",
+    "source": "CERD/C/PAK/CO/24-26 para. 29"
+  },
+  {
+    "id": 22,
+    "issue": "11. Implementation of Art. 6 (legal redress and justice)",
+    "metric": "Coal miners killed in Balochistan",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "11", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "Jan 2021",
+    "source": "CERD/C/PAK/24-26 para. 73"
+  },
+  {
+    "id": 23,
+    "issue": "11. Implementation of Art. 6 (legal redress and justice)",
+    "metric": "Balochistan judges trained",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "550", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2021",
+    "source": "CERD/C/PAK/24-26 para. 87"
+  },
+  {
+    "id": 24,
+    "issue": "11. Implementation of Art. 6 (legal redress and justice)",
+    "metric": "Balochistan prosecutors trained",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "150", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2021",
+    "source": "CERD/C/PAK/24-26 para. 87"
+  },
+  {
+    "id": 25,
+    "issue": "11. Implementation of Art. 6 (legal redress and justice)",
+    "metric": "Sindh judges targeted for training",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "360", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2021 target",
+    "source": "CERD/C/PAK/24-26 para. 90"
+  },
+  {
+    "id": 26,
+    "issue": "11. Implementation of Art. 6 (legal redress and justice)",
+    "metric": "Sindh prosecutors targeted for training",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "360", "y22": "", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2021 target",
+    "source": "CERD/C/PAK/24-26 para. 90"
+  },
+  {
+    "id": 27,
+    "issue": "11. Implementation of Art. 6 (legal redress and justice)",
+    "metric": "Punjab publications forfeited as hate material",
+    "unit": "count",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y20": "", "y21": "", "y22": "67", "y23": "", "y24": "",
+    "progress": "Single observation \u2014 no longitudinal judgment",
+    "note": "2022 State report",
+    "source": "CERD/C/PAK/24-26 para. 92"
+  }
+];
+
+    function switchView(view) {
+      document.getElementById('log-view').style.display = view === 'log' ? 'block' : 'none';
+      document.getElementById('flagship-view').style.display = view === 'flagship' ? 'block' : 'none';
+      document.getElementById('overview-view').style.display = view === 'overview' ? 'block' : 'none';
+
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      if (view === 'overview') initOverviewChart();
+      if (view === 'flagship') initCharts();
+    }
+
+    function getBadgeClass(prog) {
+      if (prog.includes('Improved') || prog.includes('▲')) return 'badge-improving';
+      if (prog.includes('Worsened') || prog.includes('▼')) return 'badge-worsening';
+      if (prog.includes('Single observation') || prog.includes('Baseline')) return 'badge-baseline';
+      if (prog.includes('Context-dependent')) return 'badge-single';
+      return 'badge-neutral';
+    }
+
+    function renderLogTable() {
+      const tbody = document.getElementById('logTableBody');
+      const search = document.getElementById('logSearch').value.toLowerCase();
+      const filter = document.getElementById('progressFilter').value;
+
+      tbody.innerHTML = '';
+
+      const filtered = logData.filter(d => {
+        const matchesFilter = filter === 'ALL' || d.progress.includes(filter);
+        const matchesSearch = JSON.stringify(d).toLowerCase().includes(search);
+        return matchesFilter && matchesSearch;
+      });
+
+      document.getElementById('rowsCounter').innerText = `Showing ${filtered.length} of ${logData.length} rows`;
+
+      filtered.forEach(d => {
+        tbody.innerHTML += `
+          <tr>
+            <td><b>${d.id}</b></td>
+            <td><b>${d.issue.replace(/^\d+\.\s*/, '')}</b></td>
+            <td>${d.metric}</td>
+            <td>${d.unit}</td>
+            <td>${d.y15}</td><td>${d.y16}</td><td>${d.y17}</td><td>${d.y18}</td>
+            <td>${d.y20}</td><td>${d.y21}</td><td>${d.y22}</td>
+            <td>${d.y23}</td><td>${d.y24}</td>
+            <td><span class="badge ${getBadgeClass(d.progress)}">${d.progress}</span></td>
+            <td><span style="font-size: 0.8rem; color: #64748b;">${d.note}</span></td>
+            <td>${d.source}</td>
+          </tr>`;
+      });
+    }
+
+    function filterLogTable() { renderLogTable(); }
+
+    let chartsInitialized = false;
+    function initCharts() {
+      if (chartsInitialized) return;
+      chartsInitialized = true;
+
+      // Chart 1: Population
+      new Chart(document.getElementById('chart1'), {
+        type: 'pie',
+        data: {
+          labels: ['Men', 'Women', 'Transgender Persons (Scaled up x1000 for visibility)'],
+          datasets: [
+            { data: [106449322, 101314780, 10418000], backgroundColor: ['#0ea5e9', '#ec4899', '#f59e0b'] }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 2: Hate Speech
+      new Chart(document.getElementById('chart2'), {
+        type: 'bar',
+        data: {
+          labels: ['Hate Speech / Material', 'Loudspeaker Misuse'],
+          datasets: [
+            { label: 'Cases Registered', data: [1373, 19895], backgroundColor: '#f59e0b' },
+            { label: 'Persons Arrested', data: [2566, 20679], backgroundColor: '#ef4444' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 3: Madrasa mapping
+      new Chart(document.getElementById('chart3'), {
+        type: 'bar',
+        indexAxis: 'y',
+        data: {
+          labels: ['ICT/Punjab/Sindh', 'KP', 'Balochistan'],
+          datasets: [
+            { label: 'Completion %', data: [100, 95, 80], backgroundColor: '#10b981' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { max: 100 } } }
+      });
+
+      // Chart 4: Afghan Returns
+      new Chart(document.getElementById('chart4'), {
+        type: 'bar',
+        data: {
+          labels: ['Deported (Through Jul 2024)', 'Deported (Apr-Jun 2024)', 'Arrested (Sep-Dec 2023)'],
+          datasets: [
+            { label: 'People Count', data: [700000, 101000, 28500], backgroundColor: '#64748b' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 5: Blasphemy Cases
+      new Chart(document.getElementById('chart5'), {
+        type: 'bar',
+        data: {
+          labels: ['2020', '2023'],
+          datasets: [
+            { label: 'Cases Registered', data: [11, 213], backgroundColor: '#8b5cf6' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    let overviewChartInstance = null;
+    function initOverviewChart() {
+      if (overviewChartInstance) return;
+      overviewChartInstance = new Chart(document.getElementById('overviewChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Hate Speech Cases', 'Hate Speech Arrests', 'Loudspeaker Cases', 'Loudspeaker Arrests'],
+          datasets: [
+            { label: 'Enforcement Actions (Count)', data: [1373, 2566, 19895, 20679], backgroundColor: '#0ea5e9' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    window.onload = function() {
+      renderLogTable();
+    };
+  </script>
+</body>
+</html>

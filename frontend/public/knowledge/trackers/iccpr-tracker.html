@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pakistan ICCPR Comprehensive Dashboard - Complete Data Log (All 43 Rows)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --primary: #0f172a;
+      --accent-blue: #0284c7;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --border: #cbd5e1;
+      --text-main: #334155;
+      --text-muted: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h1 { color: var(--primary); font-size: 1.8rem; font-weight: 700; margin-bottom: 6px; }
+    p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+    /* Nav Tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .tab-btn {
+      padding: 12px 20px; border: none; background: none; font-weight: 600;
+      color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.95rem;
+    }
+    .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 16px;
+    }
+
+    .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 900px) { .grid-2col { grid-template-columns: 1fr 1fr; } }
+
+    /* Controls */
+    .table-controls { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .search-input, .select-filter {
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
+    }
+    .search-input { width: 340px; }
+
+    .stats-counter { font-size: 0.9rem; font-weight: 600; color: var(--accent-blue); }
+
+    /* Tables */
+    .table-container { overflow-x: auto; max-height: 700px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+    th {
+      position: sticky; top: 0; background-color: #f1f5f9; color: var(--primary);
+      font-weight: 600; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; z-index: 10;
+    }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover { background-color: #f8fafc; }
+
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+    .badge-improving { background: #dcfce7; color: #166534; }
+    .badge-worsening { background: #fee2e2; color: #991b1b; }
+    .badge-single { background: #e0f2fe; color: #075985; }
+    .badge-baseline { background: #f3f4f6; color: #4b5563; }
+    .badge-neutral { background: #fef3c7; color: #92400e; }
+
+    .chart-container { position: relative; height: 320px; width: 100%; }
+    .note { font-size: 0.825rem; color: var(--text-muted); margin-top: 10px; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Pakistan ICCPR Compliance: Master Quantitative Tracker</h1>
+      <p class="subtitle">Complete Dataset & Visualizations: All 5 Summary Tables + Complete Row Data Log (All 43 Rows Included)</p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchView('log')">Full Quantitative Log (All 43 Metrics)</button>
+      <button class="tab-btn" onclick="switchView('flagship')">5 Flagship Summary Tables & Graphs</button>
+      <button class="tab-btn" onclick="switchView('overview')">Multi-Metric Overview Graph</button>
+    </div>
+
+    <div id="log-view">
+      <div class="card">
+        <h2 class="card-title">Full Quantitative Data Log — ICCPR Metrics (Complete 43-Metric Dataset)</h2>
+        <div class="table-controls">
+          <input type="text" id="logSearch" class="search-input" placeholder="Search metric, ID, unit, or source..." onkeyup="filterLogTable()">
+          <select id="progressFilter" class="select-filter" onchange="filterLogTable()">
+            <option value="ALL">All Progress Types (43 Metrics)</option>
+            <option value="Improving">Improving</option>
+            <option value="Worsening">Worsening</option>
+            <option value="Context-dependent">Context-dependent</option>
+            <option value="N/A">N/A / Baseline</option>
+          </select>
+          <div class="stats-counter" id="rowsCounter">Showing 43 of 43 rows</div>
+        </div>
+        <div class="table-container">
+          <table id="fullLogTable">
+            <thead>
+              <tr>
+                <th>ID</th><th>Issue Area</th><th>Metric Name</th><th>Unit</th>
+                <th>2015</th><th>2016</th><th>2017</th><th>2018</th><th>2019</th><th>2020</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th>
+                <th>Progress Status</th><th>Note</th><th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="flagship-view" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">1. Anti-Corruption Measures (NAB), 2018–2022</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Year</th><th>Complaints Received</th><th>Prosecutions</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>2018</td><td>45,742</td><td>198</td></tr>
+                <tr><td>2019</td><td>46,289</td><td>183</td></tr>
+                <tr><td>2020</td><td>24,706</td><td>136</td></tr>
+                <tr><td>2021</td><td>34,813</td><td>93</td></tr>
+                <tr><td>2022</td><td>21,495</td><td>30</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Prosecutions fell 85% (2018-2022), far faster than the 53% fall in complaints over the same period.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart1"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">2. Violence Against Women (VAW) National Accountability, 2020–2023</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Cases Registered</th><th>Convictions</th><th>Implied Rate</th></tr></thead>
+              <tbody>
+                <tr><td>2020</td><td>2,172</td><td>76</td><td>3.5%</td></tr>
+                <tr><td>2021</td><td>2,692</td><td>100</td><td>3.7%</td></tr>
+                <tr><td>2022</td><td>2,698</td><td>50</td><td>1.9%</td></tr>
+                <tr><td>2023</td><td>2,442</td><td>25</td><td>1.0%</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Convictions fell by two-thirds (76->25) while cases registered stayed roughly flat, an unambiguous worsening in accountability.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart2"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">3. Enforced Disappearances: Commission of Inquiry</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Cumulative Received</th><th>Cumulative Disposed</th><th>Pending</th></tr></thead>
+              <tbody>
+                <tr><td>2018</td><td>4,929</td><td>3,219</td><td>1,710</td></tr>
+                <tr><td>2021</td><td>8,122</td><td>5,853</td><td>2,269</td></tr>
+                <tr><td>2023</td><td>10,014</td><td>7,749</td><td>2,265</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Pending count has stayed roughly flat (~2,265) since 2021 even as total intake kept rising.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart3"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">4. Blasphemy Accountability, 2018–2023</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Prosecutions</th><th>Convictions</th></tr></thead>
+              <tbody>
+                <tr><td>2018</td><td>16</td><td>0</td></tr>
+                <tr><td>2019</td><td>12</td><td>1</td></tr>
+                <tr><td>2020</td><td>41</td><td>1</td></tr>
+                <tr><td>2021</td><td>46</td><td>3</td></tr>
+                <tr><td>2022</td><td>71</td><td>1</td></tr>
+                <tr><td>2023</td><td>74</td><td>1</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Prosecutions quadrupled over six years, but convictions stayed in the low single digits, meaning cases are accumulating without resolution.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart4"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">5. Violence against Transgender Persons, 2018–2023</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Year</th><th>Complaints Registered</th><th>Cases Disposed</th></tr></thead>
+              <tbody>
+                <tr><td>2018</td><td>25</td><td>3</td></tr>
+                <tr><td>2019</td><td>11</td><td>0</td></tr>
+                <tr><td>2020</td><td>39</td><td>1</td></tr>
+                <tr><td>2021</td><td>102</td><td>8</td></tr>
+                <tr><td>2022</td><td>116</td><td>11</td></tr>
+                <tr><td>2023</td><td>131</td><td>38</td></tr>
+              </tbody>
+            </table>
+            <div class="note">A >5-fold rise could reflect worsening violence, or newly established reporting desks. Disposal rates improved to 29% by 2023.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart5"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="overview-view" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">Multi-Metric Time Series Visualizer (Overlay of Available Series)</h2>
+        <p class="subtitle" style="margin-bottom: 15px;">Comparative view of key metrics tracked across the ICCPR reporting cycles.</p>
+        <div class="chart-container" style="height: 480px;">
+          <canvas id="overviewChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // FULL DATA LOG (ALL 43 METRICS EXTRACTED FROM EXCEL)
+    const logData = [
+  {
+    "id": 1,
+    "metric": "Writ petitions filed under Arts. 184(3) & 199 (Supreme Court + High Courts)",
+    "unit": "cases/yr",
+    "issue": "Domestic incorporation",
+    "y15": "", "y16": "", "y17": "", "y18": "5618", "y19": "5034", "y20": "4540", "y21": "5083", "y22": "5375", "y23": "4842", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "Sum of 184(3)+199 per year. Volume is roughly stable; no outcome/remedy data given so this cannot show whether access to remedy improved.",
+    "source": "REP2 §2"
+  },
+  {
+    "id": 2,
+    "metric": "NCHR annual budget (PKR million)",
+    "unit": "PKR million",
+    "issue": "National Human Rights Institution",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "92", "y20": "112", "y21": "97.7", "y22": "70.8", "y23": "", "y24": "161",
+    "progress": "Improving",
+    "note": "Years are fiscal years. Non-monotonic: dipped sharply in FY2021-22 before more than doubling by FY2023-24.",
+    "source": "SR2 §18; REP2 §7"
+  },
+  {
+    "id": 3,
+    "metric": "NCHR complaints received / disposed (cumulative 2018-2023)",
+    "unit": "cases",
+    "issue": "National Human Rights Institution",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "2455", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Single cumulative figure for 2018-2023 (2,301 disposed, 154 in process); not a year-by-year series.",
+    "source": "REP2 §8"
+  },
+  {
+    "id": 4,
+    "metric": "NAB corruption complaints received",
+    "unit": "complaints/yr",
+    "issue": "Anti-corruption measures",
+    "y15": "", "y16": "", "y17": "", "y18": "45742", "y19": "46289", "y20": "24706", "y21": "34813", "y22": "21495", "y23": "", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "A fall in complaints could reflect less corruption, less public trust, or a change in NAB's intake practice.",
+    "source": "REP2 §11 (table)"
+  },
+  {
+    "id": 5,
+    "metric": "NAB corruption prosecutions",
+    "unit": "prosecutions/yr",
+    "issue": "Anti-corruption measures",
+    "y15": "", "y16": "", "y17": "", "y18": "198", "y19": "183", "y20": "136", "y21": "93", "y22": "30", "y23": "", "y24": "",
+    "progress": "Worsening",
+    "note": "Prosecutions fell 85% (2018-2022), far faster than the 53% fall in complaints.",
+    "source": "REP2 §11 (table)"
+  },
+  {
+    "id": 6,
+    "metric": "FIA corruption convictions",
+    "unit": "convictions/yr",
+    "issue": "Anti-corruption measures",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "302", "y21": "196", "y22": "213", "y23": "", "y24": "",
+    "progress": "Worsening",
+    "note": "Net decline 2020-2022 despite a partial recovery in 2022.",
+    "source": "REP2 §11 (table)"
+  },
+  {
+    "id": 7,
+    "metric": "Violence against transgender persons: complaints registered",
+    "unit": "complaints/yr",
+    "issue": "SOGI / LGBTI rights",
+    "y15": "", "y16": "", "y17": "", "y18": "25", "y19": "11", "y20": "39", "y21": "102", "y22": "116", "y23": "131", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "A >5-fold rise could reflect worsening violence, newly established reporting desks, or both.",
+    "source": "REP2 §21 (table)"
+  },
+  {
+    "id": 8,
+    "metric": "Violence against transgender persons: cases disposed",
+    "unit": "cases/yr",
+    "issue": "SOGI / LGBTI rights",
+    "y15": "", "y16": "", "y17": "", "y18": "3", "y19": "0", "y20": "1", "y21": "8", "y22": "11", "y23": "38", "y24": "",
+    "progress": "Improving",
+    "note": "Disposal rate rose from 12% (2018) to 29% (2023).",
+    "source": "REP2 §21 (table)"
+  },
+  {
+    "id": 9,
+    "metric": "Early and forced marriage cases registered (all provinces)",
+    "unit": "cases",
+    "issue": "Gender equality / marriage age",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "74", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Single aggregate figure for 2018-2023, not broken down by year.",
+    "source": "REP2 §150"
+  },
+  {
+    "id": 10,
+    "metric": "VAW cases registered nationally (National Police Bureau)",
+    "unit": "cases/yr",
+    "issue": "Violence against women / domestic violence",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "2172", "y21": "2692", "y22": "2698", "y23": "2442", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "Case counts stayed roughly flat/slightly rising; says nothing about underlying prevalence vs reporting.",
+    "source": "REP2 §38 (table)"
+  },
+  {
+    "id": 11,
+    "metric": "VAW convictions secured nationally",
+    "unit": "convictions/yr",
+    "issue": "Violence against women / domestic violence",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "76", "y21": "100", "y22": "50", "y23": "25", "y24": "",
+    "progress": "Worsening",
+    "note": "Convictions fell by two-thirds in three years while cases registered stayed flat.",
+    "source": "REP2 §38 (table)"
+  },
+  {
+    "id": 12,
+    "metric": "VAW implied conviction rate",
+    "unit": "%",
+    "issue": "Violence against women / domestic violence",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "3.5", "y21": "3.7", "y22": "1.9", "y23": "1", "y24": "",
+    "progress": "Worsening",
+    "note": "Falls from 3.5% to 1.0% -- worsening access to justice.",
+    "source": "Calculated from REP2 §38 table"
+  },
+  {
+    "id": 13,
+    "metric": "Modern contraceptive prevalence rate (mCPR)",
+    "unit": "%",
+    "issue": "Abortion / SRHR",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "42.8", "y20": "44.1", "y21": "46.4", "y22": "", "y23": "", "y24": "",
+    "progress": "Improving",
+    "note": "Rising trend -- genuine improvement in contraceptive access.",
+    "source": "REP2 §51"
+  },
+  {
+    "id": 14,
+    "metric": "Infant mortality rate (per 1,000 live births)",
+    "unit": "per 1,000",
+    "issue": "Abortion / SRHR",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "55.7", "y20": "54.2", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "Improving",
+    "note": "Only two years reported.",
+    "source": "REP2 §45 (table)"
+  },
+  {
+    "id": 15,
+    "metric": "Neonatal mortality rate (per 1,000 live births)",
+    "unit": "per 1,000",
+    "issue": "Abortion / SRHR",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "41.2", "y20": "40.4", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "Improving",
+    "note": "Same two-year limitation.",
+    "source": "REP2 §45 (table)"
+  },
+  {
+    "id": 16,
+    "metric": "Executions carried out",
+    "unit": "executions",
+    "issue": "Death penalty",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "93", "y20": "", "y21": "0", "y22": "", "y23": "", "y24": "",
+    "progress": "Improving",
+    "note": "93 is a 2017-2019 cumulative total; 0 covers both 2020 and 2021. No execution data for 2022-2024.",
+    "source": "SR2 §68"
+  },
+  {
+    "id": 17,
+    "metric": "Death sentences passed (all provinces, cumulative)",
+    "unit": "sentences",
+    "issue": "Death penalty",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "3219", "y23": "", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Single cumulative figure for 2018-2022; no year-by-year breakdown.",
+    "source": "REP2 §74 (table)"
+  },
+  {
+    "id": 18,
+    "metric": "Mercy petitions forwarded to the President",
+    "unit": "petitions/yr",
+    "issue": "Death penalty",
+    "y15": "", "y16": "", "y17": "", "y18": "33", "y19": "16", "y20": "27", "y21": "11", "y22": "9", "y23": "7", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "Falling from 33 to 7 could reflect fewer sentences reaching finality, or reduced access.",
+    "source": "REP2 §74 (table)"
+  },
+  {
+    "id": 19,
+    "metric": "Total cases received by the Commission of Inquiry (cumulative)",
+    "unit": "cases",
+    "issue": "Enforced disappearances",
+    "y15": "", "y16": "", "y17": "", "y18": "4929", "y19": "", "y20": "", "y21": "8122", "y22": "", "y23": "10014", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "Rising intake could reflect worsening underlying practice or growing willingness to report.",
+    "source": "LOI1-Reply §33; FU1; SR2 §72; REP2 §81"
+  },
+  {
+    "id": 20,
+    "metric": "Cases disposed / resolved",
+    "unit": "cases",
+    "issue": "Enforced disappearances",
+    "y15": "", "y16": "2416", "y17": "", "y18": "3219", "y19": "", "y20": "", "y21": "5853", "y22": "", "y23": "7749", "y24": "",
+    "progress": "Improving",
+    "note": "Treat as an approximate resolution trend (category definitions shift slightly).",
+    "source": "LOI1-Reply §33; FU1; SR2 §72; REP2 §81"
+  },
+  {
+    "id": 21,
+    "metric": "Cases pending",
+    "unit": "cases",
+    "issue": "Enforced disappearances",
+    "y15": "", "y16": "", "y17": "", "y18": "1710", "y19": "", "y20": "", "y21": "2269", "y22": "", "y23": "2265", "y24": "",
+    "progress": "Worsening",
+    "note": "Pending count roughly flat (~2,265) since 2021 even as total intake kept rising.",
+    "source": "FU1; SR2 §72; REP2 §81"
+  },
+  {
+    "id": 22,
+    "metric": "Civilians convicted by military courts",
+    "unit": "persons",
+    "issue": "Military courts",
+    "y15": "", "y16": "", "y17": "274", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Never updated with a comparable figure in any later document.",
+    "source": "CO1 §23"
+  },
+  {
+    "id": 23,
+    "metric": "Civilians sentenced to death by military courts",
+    "unit": "persons",
+    "issue": "Military courts",
+    "y15": "", "y16": "", "y17": "161", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Never updated.",
+    "source": "CO1 §23"
+  },
+  {
+    "id": 24,
+    "metric": "Torture complaints registered",
+    "unit": "complaints/yr",
+    "issue": "Torture",
+    "y15": "", "y16": "", "y17": "", "y18": "3", "y19": "1", "y20": "7", "y21": "10", "y22": "1", "y23": "1", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "Very low, volatile counts; not enough volume for a confident trend read.",
+    "source": "REP2 (table)"
+  },
+  {
+    "id": 25,
+    "metric": "Torture prosecutions",
+    "unit": "prosecutions/yr",
+    "issue": "Torture",
+    "y15": "", "y16": "", "y17": "", "y18": "3", "y19": "1", "y20": "7", "y21": "8", "y22": "1", "y23": "1", "y24": "",
+    "progress": "Worsening",
+    "note": "Tracks complaints almost 1:1, but the same table records essentially zero convictions.",
+    "source": "REP2 (table)"
+  },
+  {
+    "id": 26,
+    "metric": "Prison occupancy rate, national",
+    "unit": "%",
+    "issue": "Conditions of detention",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "154",
+    "progress": "N/A – see note",
+    "note": "Single current snapshot (103,175 population vs. 66,894 capacity).",
+    "source": "REP2 §87 (table)"
+  },
+  {
+    "id": 27,
+    "metric": "Prison occupancy rate, Punjab specifically",
+    "unit": "%",
+    "issue": "Conditions of detention",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "42", "y23": "", "y24": "171",
+    "progress": "Worsening",
+    "note": "CREDIBILITY FLAG: SR2 (2022) framed 42% as a starting point; REP2 actual shows 171%.",
+    "source": "SR2 §88; REP2 §87"
+  },
+  {
+    "id": 28,
+    "metric": "PTPA trafficking convictions (sex trafficking + forced labour combined)",
+    "unit": "convictions/yr",
+    "issue": "Trafficking / forced & bonded labour",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "0", "y22": "97", "y23": "", "y24": "",
+    "progress": "Improving",
+    "note": "Rose from 0 to 97, but off a near-zero base (5.3% conviction rate in 2022).",
+    "source": "REP2 §94 (tables)"
+  },
+  {
+    "id": 29,
+    "metric": "PPC-based trafficking convictions",
+    "unit": "convictions/yr",
+    "issue": "Trafficking / forced & bonded labour",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "542", "y22": "53", "y23": "", "y24": "",
+    "progress": "Worsening",
+    "note": "Convictions collapsed 90% (542->53) even as investigations rose 18-fold.",
+    "source": "REP2 §94 (tables)"
+  },
+  {
+    "id": 30,
+    "metric": "Names removed from the Exit Control List",
+    "unit": "names",
+    "issue": "Freedom of movement",
+    "y15": "4987", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "N/A – see note",
+    "note": "One-off administrative clean-up in 2015, not an annual figure.",
+    "source": "IR1 §115"
+  },
+  {
+    "id": 31,
+    "metric": "Registered Afghan refugees / PoR cardholders",
+    "unit": "million persons",
+    "issue": "Treatment of aliens / Afghan refugees",
+    "y15": "1.5", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "1.4", "y23": "", "y24": "1.34",
+    "progress": "Context-dependent — see note",
+    "note": "A stock count; cannot distinguish voluntary return from forced deportation.",
+    "source": "IR1 §93; SR2 §135; REP2 §114-115"
+  },
+  {
+    "id": 32,
+    "metric": "Child Registration Certificates issued (cumulative)",
+    "unit": "certificates",
+    "issue": "Birth registration & statelessness",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "64960566", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Single cumulative stock figure with no population denominator (no coverage rate).",
+    "source": "REP2 §151"
+  },
+  {
+    "id": 33,
+    "metric": "Superior courts: pending caseload",
+    "unit": "cases",
+    "issue": "Independence of judiciary / fair trial",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "392353", "y23": "382396", "y24": "",
+    "progress": "Improving",
+    "note": "Fell 2.5% in one year.",
+    "source": "REP2 §121 (table)"
+  },
+  {
+    "id": 34,
+    "metric": "District courts: pending caseload",
+    "unit": "cases",
+    "issue": "Independence of judiciary / fair trial",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "1754380", "y23": "1766633", "y24": "",
+    "progress": "Worsening",
+    "note": "Rose 0.7% in one year -- much larger backlog grew slightly.",
+    "source": "REP2 §121 (table)"
+  },
+  {
+    "id": 35,
+    "metric": "Blasphemy prosecutions",
+    "unit": "prosecutions/yr",
+    "issue": "Freedom of religion / blasphemy laws",
+    "y15": "", "y16": "", "y17": "", "y18": "16", "y19": "12", "y20": "41", "y21": "46", "y22": "71", "y23": "74", "y24": "",
+    "progress": "Worsening",
+    "note": "Rose more than four-fold over six years.",
+    "source": "REP2 (table)"
+  },
+  {
+    "id": 36,
+    "metric": "Blasphemy convictions",
+    "unit": "convictions/yr",
+    "issue": "Freedom of religion / blasphemy laws",
+    "y15": "", "y16": "", "y17": "", "y18": "0", "y19": "1", "y20": "1", "y21": "3", "y22": "1", "y23": "1", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "Stayed in the low single digits even as prosecutions quadrupled.",
+    "source": "REP2 (table)"
+  },
+  {
+    "id": 37,
+    "metric": "Madrassas issued Certificates of Registration",
+    "unit": "%",
+    "issue": "Freedom of religion / blasphemy laws",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "29.5", "y22": "", "y23": "", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Single snapshot (Dec 2021): 10,221 of 34,701 total.",
+    "source": "SR2 §104"
+  },
+  {
+    "id": 38,
+    "metric": "PEMRA programmes suspended",
+    "unit": "programmes",
+    "issue": "Freedom of expression / journalists",
+    "y15": "", "y16": "", "y17": "20", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Supplied by the Committee in 2017; no comparable government figure since.",
+    "source": "CO1 §37"
+  },
+  {
+    "id": 39,
+    "metric": "Public-assembly-ban cases registered",
+    "unit": "cases",
+    "issue": "Freedom of peaceful assembly",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "853", "y24": "",
+    "progress": "N/A – see note",
+    "note": "Cumulative figure 2018-2023. Meaning ambiguous.",
+    "source": "REP2 §144 (table)"
+  },
+  {
+    "id": 40,
+    "metric": "Domestic NGO registration applications (SECP)",
+    "unit": "applications/yr",
+    "issue": "Freedom of association",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "86", "y21": "205", "y22": "282", "y23": "355", "y24": "",
+    "progress": "Context-dependent — see note",
+    "note": "Rising application volume.",
+    "source": "REP2 §146 (table)"
+  },
+  {
+    "id": 41,
+    "metric": "Domestic NGO registration applications rejected",
+    "unit": "rejections/yr",
+    "issue": "Freedom of association",
+    "y15": "", "y16": "", "y17": "", "y18": "", "y19": "", "y20": "0", "y21": "0", "y22": "58", "y23": "37", "y24": "",
+    "progress": "Worsening",
+    "note": "Rejection RATE rose from 0% (2019-21) to ~10-21% (2021-23).",
+    "source": "REP2 §146 (table)"
+  },
+  {
+    "id": 42,
+    "metric": "Registered female voters",
+    "unit": "million persons",
+    "issue": "Participation in public affairs",
+    "y15": "", "y16": "", "y17": "", "y18": "46.8", "y19": "", "y20": "", "y21": "", "y22": "54.9", "y23": "", "y24": "",
+    "progress": "Improving",
+    "note": "Rose 17% in four years -- a genuine, well-documented improvement.",
+    "source": "REP2 §156"
+  },
+  {
+    "id": 43,
+    "metric": "Female candidates directly elected to assemblies",
+    "unit": "persons",
+    "issue": "Participation in public affairs",
+    "y15": "", "y16": "", "y17": "", "y18": "16", "y19": "", "y20": "", "y21": "", "y22": "", "y23": "", "y24": "27",
+    "progress": "Improving",
+    "note": "Rose 69% -- genuine improvement, from a very low base.",
+    "source": "REP2 §157"
+  }
+];
+
+    function switchView(view) {
+      document.getElementById('log-view').style.display = view === 'log' ? 'block' : 'none';
+      document.getElementById('flagship-view').style.display = view === 'flagship' ? 'block' : 'none';
+      document.getElementById('overview-view').style.display = view === 'overview' ? 'block' : 'none';
+
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      if (view === 'overview') initOverviewChart();
+      if (view === 'flagship') initCharts();
+    }
+
+    function getBadgeClass(prog) {
+      if (prog.includes('Improving') || prog.includes('▲')) return 'badge-improving';
+      if (prog.includes('Worsening') || prog.includes('▼')) return 'badge-worsening';
+      if (prog.includes('N/A') || prog.includes('Baseline')) return 'badge-baseline';
+      if (prog.includes('Single')) return 'badge-single';
+      return 'badge-neutral';
+    }
+
+    function renderLogTable() {
+      const tbody = document.getElementById('logTableBody');
+      const search = document.getElementById('logSearch').value.toLowerCase();
+      const filter = document.getElementById('progressFilter').value;
+
+      tbody.innerHTML = '';
+
+      const filtered = logData.filter(d => {
+        const matchesFilter = filter === 'ALL' || d.progress.includes(filter);
+        const matchesSearch = JSON.stringify(d).toLowerCase().includes(search);
+        return matchesFilter && matchesSearch;
+      });
+
+      document.getElementById('rowsCounter').innerText = `Showing ${filtered.length} of ${logData.length} rows`;
+
+      filtered.forEach(d => {
+        tbody.innerHTML += `
+          <tr>
+            <td><b>${d.id}</b></td>
+            <td><b>${d.issue}</b></td>
+            <td>${d.metric}</td>
+            <td>${d.unit}</td>
+            <td>${d.y15}</td><td>${d.y16}</td><td>${d.y17}</td><td>${d.y18}</td>
+            <td>${d.y19}</td><td>${d.y20}</td><td>${d.y21}</td><td>${d.y22}</td>
+            <td>${d.y23}</td><td>${d.y24}</td>
+            <td><span class="badge ${getBadgeClass(d.progress)}">${d.progress}</span></td>
+            <td><span style="font-size: 0.8rem; color: #64748b;">${d.note}</span></td>
+            <td>${d.source}</td>
+          </tr>`;
+      });
+    }
+
+    function filterLogTable() { renderLogTable(); }
+
+    let chartsInitialized = false;
+    function initCharts() {
+      if (chartsInitialized) return;
+      chartsInitialized = true;
+
+      // Chart 1: NAB Corruption
+      new Chart(document.getElementById('chart1'), {
+        type: 'line',
+        data: {
+          labels: ['2018', '2019', '2020', '2021', '2022'],
+          datasets: [
+            { label: 'Complaints', data: [45742, 46289, 24706, 34813, 21495], borderColor: '#f59e0b', yAxisID: 'y' },
+            { label: 'Prosecutions', data: [198, 183, 136, 93, 30], borderColor: '#ef4444', yAxisID: 'y1' }
+          ]
+        },
+        options: { 
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { type: 'linear', position: 'left' },
+            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+
+      // Chart 2: VAW
+      new Chart(document.getElementById('chart2'), {
+        type: 'bar',
+        data: {
+          labels: ['2020', '2021', '2022', '2023'],
+          datasets: [
+            { label: 'Cases Registered', data: [2172, 2692, 2698, 2442], backgroundColor: '#0284c7' },
+            { label: 'Convictions', data: [76, 100, 50, 25], backgroundColor: '#10b981' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 3: Enforced Disappearances
+      new Chart(document.getElementById('chart3'), {
+        type: 'line',
+        data: {
+          labels: ['2018', '2021', '2023'],
+          datasets: [
+            { label: 'Cumulative Received', data: [4929, 8122, 10014], borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true },
+            { label: 'Cumulative Disposed', data: [3219, 5853, 7749], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true },
+            { label: 'Pending', data: [1710, 2269, 2265], borderColor: '#ef4444' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 4: Blasphemy
+      new Chart(document.getElementById('chart4'), {
+        type: 'bar',
+        data: {
+          labels: ['2018', '2019', '2020', '2021', '2022', '2023'],
+          datasets: [
+            { label: 'Prosecutions', data: [16, 12, 41, 46, 71, 74], backgroundColor: '#ef4444' },
+            { label: 'Convictions', data: [0, 1, 1, 3, 1, 1], backgroundColor: '#0f172a' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 5: Transgender Persons
+      new Chart(document.getElementById('chart5'), {
+        type: 'line',
+        data: {
+          labels: ['2018', '2019', '2020', '2021', '2022', '2023'],
+          datasets: [
+            { label: 'Complaints', data: [25, 11, 39, 102, 116, 131], borderColor: '#f59e0b', tension: 0.1 },
+            { label: 'Disposed', data: [3, 0, 1, 8, 11, 38], borderColor: '#10b981', tension: 0.1 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    let overviewChartInstance = null;
+    function initOverviewChart() {
+      if (overviewChartInstance) return;
+      overviewChartInstance = new Chart(document.getElementById('overviewChart'), {
+        type: 'line',
+        data: {
+          labels: ['2018', '2019', '2020', '2021', '2022', '2023'],
+          datasets: [
+            { label: 'Writ Petitions (184(3)+199)', data: [5618, 5034, 4540, 5083, 5375, 4842], borderColor: '#8b5cf6', tension: 0.2, spanGaps: true },
+            { label: 'NAB Complaints Received (x0.1)', data: [4574.2, 4628.9, 2470.6, 3481.3, 2149.5, null], borderColor: '#0284c7', tension: 0.2, spanGaps: true },
+            { label: 'VAW Cases Registered', data: [null, null, 2172, 2692, 2698, 2442], borderColor: '#f59e0b', tension: 0.2, spanGaps: true },
+            { label: 'Blasphemy Prosecutions (x100)', data: [1600, 1200, 4100, 4600, 7100, 7400], borderColor: '#ef4444', tension: 0.2, spanGaps: true }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    window.onload = function() {
+      renderLogTable();
+    };
+  </script>
+</body>
+</html>

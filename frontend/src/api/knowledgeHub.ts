@@ -13,6 +13,7 @@ export type KnowledgeConventionListItem = {
   knowledge_ratified: string | null
   knowledge_articles: string | null
   knowledge_implementation: string | null
+  articles_count: number
   description: string | null
   repositories?: import('../lib/conventionKnowledgeContent').ConventionRepositoryCycle[] | null
   optional_protocol_body?: string | null

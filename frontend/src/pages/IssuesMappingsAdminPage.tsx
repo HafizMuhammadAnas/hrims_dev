@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Navigate, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, NavLink, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   adminCreateArticle,
   adminCreateIssue,
@@ -14,7 +14,6 @@ import {
   adminFetchIssue,
   adminFetchIssueCategories,
   adminFetchIssues,
-  adminDeleteIssue,
   adminSetArticleActive,
   adminSetCollectionGenderActive,
   adminSetCollectionReligionActive,
@@ -52,13 +51,16 @@ import { PageSection } from '../components/ui/PageSection'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
 import { SortColumnHeader } from '../components/ui/SortColumnHeader'
+import { StatsCards } from '../components/ui/StatsCards'
 import { TableCard } from '../components/ui/TableCard'
+import { TableExportButton } from '../components/ui/TableExportButton'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import { reorderList } from '../lib/reorderList'
 import { derivePaginatedRows, useClientTableState, type SortDirection } from '../hooks/useClientTableState'
 import { compareNumberValues, compareStringValues, compareTimestampValues, pickActivityTimestamp } from '../lib/tableRowSort'
+import type { TableExportColumn } from '../lib/tableExcelExport'
 import { filterSelectableCollectionGenders } from '../lib/collectionGenderOptions'
 import { sortCollectionYearsByLabelValue } from '../lib/collectionYearSort'
 import {
@@ -85,17 +87,19 @@ import {
   superAdminIssueEditPath,
   superAdminIssueViewPath,
   superAdminIssuesArticlesPath,
+  superAdminIssuesListPath,
 } from '../lib/superAdminRoutes'
 import { isSuperAdmin } from '../lib/roles'
 import type { AuthUser } from '../types/auth'
 
 const ISSUES_PAGE_SIZE = 10
 
-type IssuesView = 'list' | 'create' | 'categories' | 'articles' | 'years' | 'genders' | 'religions'
+type IssuesView = 'list' | 'create' | 'indicators' | 'categories' | 'articles' | 'years' | 'genders' | 'religions'
 
 const ISSUES_TABS: { view: IssuesView; to: string; label: string; end?: boolean }[] = [
   { view: 'list', to: SUPER_ADMIN_ISSUES, label: issuesListTabLabel(), end: true },
   { view: 'create', to: `${SUPER_ADMIN_ISSUES}/create`, label: issuesCreateTabLabel() },
+  { view: 'indicators', to: `${SUPER_ADMIN_ISSUES}/indicators`, label: 'Indicator list' },
   { view: 'categories', to: `${SUPER_ADMIN_ISSUES}/categories`, label: 'Category' },
   { view: 'articles', to: `${SUPER_ADMIN_ISSUES}/articles`, label: 'Article' },
   { view: 'years', to: `${SUPER_ADMIN_ISSUES}/years`, label: 'Year' },
@@ -108,6 +112,7 @@ function resolveIssuesView(param: string | undefined): IssuesView | null {
   if (
     param === 'list' ||
     param === 'create' ||
+    param === 'indicators' ||
     param === 'categories' ||
     param === 'articles' ||
     param === 'years' ||
@@ -295,13 +300,17 @@ export function IssuesMappingsAdminPage() {
             busy={busy}
             setBusy={setBusy}
             setError={setError}
-            onDone={async () => {
+            onDone={async (savedKind) => {
               await refreshIssues()
-              navigate(SUPER_ADMIN_ISSUES)
+              navigate(superAdminIssuesListPath(savedKind))
             }}
             onCancel={() => navigate(SUPER_ADMIN_ISSUES)}
           />
         </TableCard>
+      )}
+
+      {view === 'indicators' && (
+        <IssuesIndicatorsListSection issues={issues} conventions={conventions} />
       )}
 
       {view === 'categories' && (
@@ -378,22 +387,6 @@ async function toggleIssueActive(
     await onRefreshIssues()
   } catch (e: unknown) {
     setError(isApiError(e) ? e.message : `${next ? 'Activate' : 'Deactivate'} failed`)
-  }
-}
-
-async function deleteIssueEntry(
-  issue: AdminIssue,
-  onRefreshIssues: () => Promise<void>,
-  setError: (s: string | null) => void,
-): Promise<void> {
-  const kind = coerceIssueEntryKind(issue.entry_kind)
-  const label = issueEntryKindBadgeLabel(kind)
-  if (!window.confirm(`Permanently delete this ${label}? This cannot be undone.`)) return
-  try {
-    await adminDeleteIssue(issue.id)
-    await onRefreshIssues()
-  } catch (e: unknown) {
-    setError(isApiError(e) ? e.message : 'Delete failed')
   }
 }
 
@@ -554,13 +547,14 @@ function IssuesListSection({
   onRefreshIssues: () => Promise<void>
 }) {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { search, setSearch, page, setPage, pageSize, sortKey, sortDir, toggleSort } =
     useClientTableState<IssuesListSortKey>({
       pageSize: ISSUES_PAGE_SIZE,
       initialSortKey: 'updated_at',
       initialSortDir: 'desc',
     })
-  const [listEntryKind, setListEntryKind] = useState<IssueEntryKind>('issue')
+  const listEntryKind = coerceIssueEntryKind(searchParams.get('kind'))
 
   const kindFilteredIssues = useMemo(
     () => issues.filter((i) => coerceIssueEntryKind(i.entry_kind) === listEntryKind),
@@ -576,15 +570,7 @@ function IssuesListSection({
           const convName = (i.convention?.name ?? '').toLowerCase()
           const arts = i.articles.map((a) => a.article_name).join(' ').toLowerCase()
           const cat = (i.category?.name ?? String(i.category_id)).toLowerCase()
-          return (
-            String(i.id).includes(q) ||
-            (i.issue_title ?? '').toLowerCase().includes(q) ||
-            (i.description ?? '').toLowerCase().includes(q) ||
-            convCode.includes(q) ||
-            convName.includes(q) ||
-            arts.includes(q) ||
-            cat.includes(q)
-          )
+          return convCode.includes(q) || convName.includes(q) || arts.includes(q) || cat.includes(q)
         })
     return sortIssueListRows(filtered, sortKey, sortDir)
   }, [kindFilteredIssues, search, sortKey, sortDir])
@@ -604,16 +590,19 @@ function IssuesListSection({
         <IssueEntryKindToggle
           value={listEntryKind}
           onChange={(next) => {
-            setListEntryKind(next)
+            const nextParams = new URLSearchParams(searchParams)
+            if (next === 'recommendation') nextParams.set('kind', 'recommendation')
+            else nextParams.delete('kind')
+            setSearchParams(nextParams, { replace: true })
             setPage(1)
           }}
         />
         <input
           type="search"
-          placeholder="Search ID, issue, convention, category, articles..."
+          placeholder="Search convention, category, articles..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search issues"
+          aria-label="Search convention, category, articles"
         />
         <Button variant="secondary" compact onClick={() => setSearch('')}>
           Reset search
@@ -695,15 +684,6 @@ function IssuesListSection({
                         >
                           {issueIsActive(i) ? 'Deactivate' : 'Activate'}
                         </Button>
-                        <Button
-                          variant="link"
-                          dangerLink
-                          onClick={() => {
-                            void deleteIssueEntry(i, onRefreshIssues, setError)
-                          }}
-                        >
-                          Delete
-                        </Button>
                       </ActionMenu>
                     </td>
                   </tr>
@@ -718,6 +698,361 @@ function IssuesListSection({
   )
 }
 
+type IndicatorListSortKey =
+  | 'indicator'
+  | 'convention'
+  | 'entryKind'
+  | 'category'
+  | 'dataType'
+  | 'status'
+
+type IndicatorListRow = {
+  key: string
+  indicatorId: number
+  indicatorText: string
+  conventionId: number
+  conventionLabel: string
+  entryKind: IssueEntryKind
+  entryKindLabel: string
+  categoryId: number
+  categoryName: string
+  quantitative: boolean
+  qualitative: boolean
+  dataTypeLabel: string
+  isActive: boolean
+  statusLabel: string
+}
+
+type IndicatorDataTypeFilter = '' | 'quantitative' | 'qualitative'
+
+const INDICATOR_LIST_EXPORT_COLUMNS: TableExportColumn<IndicatorListRow>[] = [
+  { header: 'Indicator', value: (r) => r.indicatorText },
+  { header: 'Convention', value: (r) => r.conventionLabel },
+  { header: 'LOI / CO', value: (r) => r.entryKindLabel },
+  { header: 'Category', value: (r) => r.categoryName },
+  { header: 'Data type', value: (r) => r.dataTypeLabel },
+  { header: 'Status', value: (r) => r.statusLabel },
+]
+
+function buildIndicatorListRows(issues: AdminIssue[]): IndicatorListRow[] {
+  const rows: IndicatorListRow[] = []
+  for (const issue of issues) {
+    const entryKind = coerceIssueEntryKind(issue.entry_kind)
+    const conventionLabel = issueConventionLabel(issue)
+    const categoryName = issue.category?.name?.trim() || String(issue.category_id)
+    for (const ind of issue.indicators) {
+      const { quantitative, qualitative } = effectiveIndicatorQl(ind, issue)
+      const isActive = ind.is_active !== false
+      rows.push({
+        key: `${issue.id}-${ind.id}`,
+        indicatorId: ind.id,
+        indicatorText: ind.indicator_text?.trim() || `Indicator #${ind.id}`,
+        conventionId: issue.convention_id,
+        conventionLabel,
+        entryKind,
+        entryKindLabel: issueEntryKindBadgeLabel(entryKind),
+        categoryId: issue.category_id,
+        categoryName,
+        quantitative,
+        qualitative,
+        dataTypeLabel: indicatorDataTypeLabel(ind, issue),
+        isActive,
+        statusLabel: isActive ? 'Active' : 'Inactive',
+      })
+    }
+  }
+  return rows
+}
+
+function sortIndicatorListRows(
+  rows: IndicatorListRow[],
+  sortKey: IndicatorListSortKey | undefined,
+  sortDir: SortDirection,
+): IndicatorListRow[] {
+  const list = [...rows]
+  list.sort((a, b) => {
+    switch (sortKey) {
+      case 'convention':
+        return compareStringValues(a.conventionLabel, b.conventionLabel, sortDir)
+      case 'entryKind':
+        return compareStringValues(a.entryKindLabel, b.entryKindLabel, sortDir)
+      case 'category':
+        return compareStringValues(a.categoryName, b.categoryName, sortDir)
+      case 'dataType':
+        return compareStringValues(a.dataTypeLabel, b.dataTypeLabel, sortDir)
+      case 'status':
+        return compareStringValues(a.statusLabel, b.statusLabel, sortDir)
+      case 'indicator':
+      default:
+        return compareStringValues(a.indicatorText, b.indicatorText, sortDir)
+    }
+  })
+  return list
+}
+
+function IssuesIndicatorsListSection({
+  issues,
+  conventions,
+}: {
+  issues: AdminIssue[]
+  conventions: AdminConvention[]
+}) {
+  const allRows = useMemo(() => buildIndicatorListRows(issues), [issues])
+  const sortedConventions = useMemo(
+    () => [...conventions].sort((a, b) => a.code.localeCompare(b.code)),
+    [conventions],
+  )
+
+  const [conventionFilter, setConventionFilter] = useState('')
+  const [entryKindFilter, setEntryKindFilter] = useState<'' | IssueEntryKind>('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [dataTypeFilter, setDataTypeFilter] = useState<IndicatorDataTypeFilter>('')
+
+  const { page, setPage, pageSize, sortKey, sortDir, toggleSort } =
+    useClientTableState<IndicatorListSortKey>({
+      pageSize: ISSUES_PAGE_SIZE,
+      initialSortKey: 'indicator',
+      initialSortDir: 'asc',
+    })
+
+  const afterConvention = useMemo(() => {
+    if (!conventionFilter) return allRows
+    const id = Number(conventionFilter)
+    return allRows.filter((r) => r.conventionId === id)
+  }, [allRows, conventionFilter])
+
+  const afterEntryKind = useMemo(() => {
+    if (!entryKindFilter) return afterConvention
+    return afterConvention.filter((r) => r.entryKind === entryKindFilter)
+  }, [afterConvention, entryKindFilter])
+
+  const categoryOptions = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const row of afterEntryKind) {
+      if (!map.has(row.categoryId)) map.set(row.categoryId, row.categoryName)
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  }, [afterEntryKind])
+
+  useEffect(() => {
+    if (!categoryFilter) return
+    if (!categoryOptions.some((c) => String(c.id) === categoryFilter)) {
+      setCategoryFilter('')
+    }
+  }, [categoryFilter, categoryOptions])
+
+  const filtered = useMemo(() => {
+    let rows = afterEntryKind
+    if (categoryFilter) {
+      const id = Number(categoryFilter)
+      rows = rows.filter((r) => r.categoryId === id)
+    }
+    if (dataTypeFilter === 'quantitative') {
+      rows = rows.filter((r) => r.quantitative)
+    } else if (dataTypeFilter === 'qualitative') {
+      rows = rows.filter((r) => r.qualitative)
+    }
+    return rows
+  }, [afterEntryKind, categoryFilter, dataTypeFilter])
+
+  const processed = useMemo(
+    () => sortIndicatorListRows(filtered, sortKey, sortDir),
+    [filtered, sortKey, sortDir],
+  )
+
+  const { pageRows } = derivePaginatedRows(processed, page, pageSize)
+  const tableColSpan = 6
+
+  const kpiItems = useMemo(() => {
+    let active = 0
+    let inactive = 0
+    let quantitative = 0
+    let qualitative = 0
+    let loi = 0
+    let co = 0
+    for (const row of processed) {
+      if (row.isActive) active += 1
+      else inactive += 1
+      if (row.quantitative) quantitative += 1
+      if (row.qualitative) qualitative += 1
+      if (row.entryKind === 'recommendation') co += 1
+      else loi += 1
+    }
+    return [
+      { label: 'Total indicators', value: processed.length },
+      { label: 'Active', value: active },
+      { label: 'Inactive', value: inactive },
+      { label: 'Quantitative', value: quantitative },
+      { label: 'Qualitative', value: qualitative },
+      { label: issueEntryKindBadgeLabel('issue'), value: loi },
+      { label: issueEntryKindBadgeLabel('recommendation'), value: co },
+    ]
+  }, [processed])
+
+  const hasFilters =
+    Boolean(conventionFilter) ||
+    Boolean(entryKindFilter) ||
+    Boolean(categoryFilter) ||
+    Boolean(dataTypeFilter)
+
+  const resetFilters = () => {
+    setConventionFilter('')
+    setEntryKindFilter('')
+    setCategoryFilter('')
+    setDataTypeFilter('')
+    setPage(1)
+  }
+
+  return (
+    <>
+      <div style={{ marginTop: 16 }}>
+        <StatsCards items={kpiItems} />
+      </div>
+
+      <TableToolbar className="issues-list-toolbar">
+        <select
+          value={conventionFilter}
+          onChange={(e) => {
+            setConventionFilter(e.target.value)
+            setCategoryFilter('')
+            setPage(1)
+          }}
+          aria-label="Filter indicators by convention"
+        >
+          <option value="">All conventions</option>
+          {sortedConventions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {conventionSelectLabel(c)}
+            </option>
+          ))}
+        </select>
+        <select
+          value={entryKindFilter}
+          onChange={(e) => {
+            setEntryKindFilter(e.target.value as '' | IssueEntryKind)
+            setCategoryFilter('')
+            setPage(1)
+          }}
+          aria-label="Filter indicators by List of Issues or Concluding Observations"
+        >
+          <option value="">All LOI / CO</option>
+          <option value="issue">{issueEntryKindBadgeLabel('issue')}</option>
+          <option value="recommendation">{issueEntryKindBadgeLabel('recommendation')}</option>
+        </select>
+        <select
+          value={categoryFilter}
+          onChange={(e) => {
+            setCategoryFilter(e.target.value)
+            setPage(1)
+          }}
+          aria-label="Filter indicators by category"
+        >
+          <option value="">All categories</option>
+          {categoryOptions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={dataTypeFilter}
+          onChange={(e) => {
+            setDataTypeFilter(e.target.value as IndicatorDataTypeFilter)
+            setPage(1)
+          }}
+          aria-label="Filter indicators by data type"
+        >
+          <option value="">All data types</option>
+          <option value="quantitative">Quantitative</option>
+          <option value="qualitative">Qualitative</option>
+        </select>
+        <Button variant="secondary" compact type="button" onClick={resetFilters} disabled={!hasFilters}>
+          Reset filters
+        </Button>
+        <TableExportButton
+          fileBaseName="indicator-list"
+          columns={INDICATOR_LIST_EXPORT_COLUMNS}
+          rows={processed}
+          worksheetName="Indicators"
+        />
+      </TableToolbar>
+
+      <TableCard className="issues-mapping-list-card">
+        <table className="data-table issues-mapping-table">
+          <thead>
+            <tr>
+              <SortColumnHeader
+                label="Indicator"
+                active={sortKey === 'indicator'}
+                direction={sortDir}
+                onSort={() => toggleSort('indicator')}
+              />
+              <SortColumnHeader
+                label="Convention"
+                active={sortKey === 'convention'}
+                direction={sortDir}
+                onSort={() => toggleSort('convention')}
+              />
+              <SortColumnHeader
+                label="LOI / CO"
+                active={sortKey === 'entryKind'}
+                direction={sortDir}
+                onSort={() => toggleSort('entryKind')}
+              />
+              <SortColumnHeader
+                label="Category"
+                active={sortKey === 'category'}
+                direction={sortDir}
+                onSort={() => toggleSort('category')}
+              />
+              <SortColumnHeader
+                label="Data type"
+                active={sortKey === 'dataType'}
+                direction={sortDir}
+                onSort={() => toggleSort('dataType')}
+              />
+              <SortColumnHeader
+                label="Status"
+                active={sortKey === 'status'}
+                direction={sortDir}
+                onSort={() => toggleSort('status')}
+              />
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.length === 0 ? (
+              <EmptyStateRow
+                colSpan={tableColSpan}
+                message={
+                  hasFilters
+                    ? 'No indicators match your filters.'
+                    : 'No indicators yet. Create a List of Issues or Concluding Observation with indicators.'
+                }
+              />
+            ) : (
+              pageRows.map((row) => (
+                <tr
+                  key={row.key}
+                  className={row.isActive ? undefined : 'issues-mapping-table__row--inactive'}
+                >
+                  <td className="text-compact">{row.indicatorText}</td>
+                  <td className="text-compact">{row.conventionLabel}</td>
+                  <td className="text-compact">{row.entryKindLabel}</td>
+                  <td className="text-compact">{row.categoryName}</td>
+                  <td className="text-compact">{row.dataTypeLabel}</td>
+                  <td>{row.statusLabel}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </TableCard>
+      <PaginationBar page={page} pageSize={pageSize} totalItems={processed.length} onPageChange={setPage} />
+    </>
+  )
+}
 
 function IssuesCategoriesSection({
   categories,
@@ -1109,7 +1444,7 @@ function IssuesArticlesSection({
               rows={5}
               value={newArticleDescription}
               onChange={(e) => setNewArticleDescription(e.target.value)}
-              placeholder="Optional description shown on federal and other portalsâ€¦"
+              placeholder="Optional description shown on federal and other portals…"
               disabled={busy}
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
@@ -2075,7 +2410,7 @@ function indicatorDataTypeLabel(ind: AdminIssue['indicators'][number], issue: Ad
   const parts: string[] = []
   if (quantitative) parts.push('Quantitative')
   if (qualitative) parts.push('Qualitative')
-  return parts.length > 0 ? parts.join(' Â· ') : 'â€”'
+  return parts.length > 0 ? parts.join(' · ') : '—'
 }
 
 /** Year collection and disaggregation dimensions summary. */
@@ -2104,9 +2439,9 @@ function indicatorDisaggregationLabel(ind: AdminIssue['indicators'][number]): st
         .join('; ')}`,
     )
   }
-  if (parts.length > 0) return parts.join(' Â· ')
+  if (parts.length > 0) return parts.join(' · ')
   const text = ind.disaggregation?.trim()
-  return text || 'â€”'
+  return text || '—'
 }
 
 function CatalogInlineEditActions({
@@ -2177,7 +2512,7 @@ type IndicatorDraft = {
   collects_qualitative: boolean
   /** Quantitative disaggregation years (with genders). */
   disaggregated_years: IndicatorDisaggregatedYearRow[]
-  /** Qualitative years only â€” independent of quantitative years. */
+  /** Qualitative years only — independent of quantitative years. */
   qualitative_year_ids: number[]
   collects_by_gender: boolean
   collects_by_age: boolean
@@ -2598,7 +2933,7 @@ function IssuesCreateForm({
   setBusy: (v: boolean) => void
   setError: (s: string | null) => void
   setSuccess?: (s: string | null) => void
-  onDone: () => Promise<void>
+  onDone: (savedKind: IssueEntryKind) => Promise<void>
   onCancel: () => void
   editIssue?: AdminIssue | null
 }) {
@@ -2772,7 +3107,7 @@ function IssuesCreateForm({
                 }
                 if (isEditing && editIssue) {
                   await adminUpdateIssue(editIssue.id, payload)
-                  await onDone()
+                  await onDone(activeEntryKind)
                   setSuccess?.(
                     `${issueEntryKindBadgeLabel(activeEntryKind)} updated successfully.`,
                   )
@@ -2785,7 +3120,7 @@ function IssuesCreateForm({
                   setIssueDescription('')
                   setSelectedArticleIds([])
                   setIndicators([])
-                  await onDone()
+                  await onDone(activeEntryKind)
                 }
               } catch (e: unknown) {
                 setError(isApiError(e) ? e.message : 'Save failed')
@@ -2856,12 +3191,13 @@ function IssuesIssueEditPage({
   }
 
   const kind = issue ? coerceIssueEntryKind(issue.entry_kind) : 'issue'
+  const listPath = superAdminIssuesListPath(kind)
 
   return (
     <PageSection
       title={issue ? `Edit ${issueEntryViewPageTitle(kind, issue.id)}` : 'Edit entry'}
       leading={
-        <WorkflowPageBack to={SUPER_ADMIN_ISSUES} label={workflowBackLabel(SUPER_ADMIN_ISSUES)} placement="header" />
+        <WorkflowPageBack to={listPath} label={workflowBackLabel(SUPER_ADMIN_ISSUES)} placement="header" />
       }
     >
       {error && (
@@ -2894,7 +3230,7 @@ function IssuesIssueEditPage({
               const row = await adminFetchIssue(issueId)
               setIssue(row)
             }}
-            onCancel={() => navigate(SUPER_ADMIN_ISSUES)}
+            onCancel={() => navigate(listPath)}
           />
         </TableCard>
       )}
@@ -3022,12 +3358,13 @@ function IssuesIssueViewPage({
   }
 
   const kind = issue ? coerceIssueEntryKind(issue.entry_kind) : 'issue'
+  const listPath = superAdminIssuesListPath(kind)
 
   return (
     <PageSection
       title={issue ? issueEntryViewPageTitle(kind, issue.id) : 'View entry'}
       leading={
-        <WorkflowPageBack to={SUPER_ADMIN_ISSUES} label={workflowBackLabel(SUPER_ADMIN_ISSUES)} placement="header" />
+        <WorkflowPageBack to={listPath} label={workflowBackLabel(SUPER_ADMIN_ISSUES)} placement="header" />
       }
     >
       {error && (
@@ -3035,7 +3372,7 @@ function IssuesIssueViewPage({
           {error}
         </Alert>
       )}
-      {loading && <p className="muted">Loadingâ€¦</p>}
+      {loading && <p className="muted">Loading…</p>}
       {!loading && !issue && <p className="login-error">Entry not found.</p>}
       {issue && (
         <TableCard padded>
@@ -3047,7 +3384,7 @@ function IssuesIssueViewPage({
             onSetIndicatorActive={(id, next) => void setIndicatorActive(id, next)}
           />
           <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Button variant="secondary" compact onClick={() => navigate(SUPER_ADMIN_ISSUES)}>
+            <Button variant="secondary" compact onClick={() => navigate(listPath)}>
               Back to list
             </Button>
             <Button
@@ -3321,13 +3658,13 @@ function IssuesArticleViewPage({
             <div className="form-row">
               <span className="issue-detail-readonly__label">Convention</span>
               <p style={{ margin: 0 }}>
-                {article ? articleConventionLabel(article, conventions) : 'â€”'}
+                {article ? articleConventionLabel(article, conventions) : '—'}
               </p>
             </div>
             <div className="form-row">
               <span className="issue-detail-readonly__label">Description</span>
               <p className="issue-detail-readonly__prose" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                {article.description?.trim() || 'â€”'}
+                {article.description?.trim() || '—'}
               </p>
             </div>
           </div>

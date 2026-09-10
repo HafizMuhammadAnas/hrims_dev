@@ -36,7 +36,14 @@ import {
 } from '../../lib/uiLabels'
 import { knowledgeConventionIcon } from '../../lib/knowledgeConventionIcons'
 import { sortArticlesByNaturalName, sortIssuesByArticles } from '../../lib/articleNaturalSort'
+import {
+  conventionHtmlTrackerSrc,
+  conventionTrackerTabLabel,
+  hasConventionTracker,
+  isCatConventionCode,
+} from '../../lib/conventionTrackers'
 import { CatTrackerTab } from './CatTrackerTab'
+import { ConventionHtmlTrackerTab } from './ConventionHtmlTrackerTab'
 import { Button } from '../ui/Button'
 import { TableCard } from '../ui/TableCard'
 import {
@@ -56,25 +63,20 @@ const SHARED_CONVENTION_TABS = [
   'Repositories',
   LABEL_OPTIONAL_PROTOCOL,
 ] as const
-const CAT_ONLY_TABS = ['CAT Tracker'] as const
 
-type ConventionHubTab = (typeof SHARED_CONVENTION_TABS)[number] | (typeof CAT_ONLY_TABS)[number]
-
-function isCatConvention(code: string): boolean {
-  return code.trim().toUpperCase() === 'CAT'
-}
+type ConventionHubTab = (typeof SHARED_CONVENTION_TABS)[number] | string
 
 function conventionOverviewText(data: KnowledgeConventionDetail): string {
   const fromAdmin = data.description?.trim() || ''
   if (fromAdmin) return fromAdmin
-  if (isCatConvention(data.code)) return CAT_CONVENTION_OVERVIEW
+  if (isCatConventionCode(data.code)) return CAT_CONVENTION_OVERVIEW
   return ''
 }
 
 function conventionRepositoryCycles(data: KnowledgeConventionDetail): ConventionRepositoryCycle[] {
   const fromAdmin = normalizeRepositoryCycles(data.repositories)
   if (fromAdmin.length > 0) return fromAdmin
-  if (!isCatConvention(data.code)) return []
+  if (!isCatConventionCode(data.code)) return []
   return CAT_REPOSITORY_CYCLES.map((cycle) => ({
     id: cycle.id,
     title: cycle.title,
@@ -633,15 +635,22 @@ export function KnowledgeConventionCatDetail({
   onBack: () => void
 }) {
   const [activeTab, setActiveTab] = useState<ConventionHubTab>('Overview')
-  const isCat = isCatConvention(data.code)
-  const tabs = useMemo<ConventionHubTab[]>(
-    () => (isCat ? [...SHARED_CONVENTION_TABS, ...CAT_ONLY_TABS] : [...SHARED_CONVENTION_TABS]),
-    [isCat],
-  )
+  const isCat = isCatConventionCode(data.code)
+  const trackerTab = hasConventionTracker(data.code) ? conventionTrackerTabLabel(data.code) : null
+  const htmlTrackerSrc = conventionHtmlTrackerSrc(data.code)
+  const tabs = useMemo<ConventionHubTab[]>(() => {
+    if (!trackerTab) return [...SHARED_CONVENTION_TABS]
+    const optionalIdx = SHARED_CONVENTION_TABS.indexOf(LABEL_OPTIONAL_PROTOCOL)
+    if (optionalIdx < 0) return [...SHARED_CONVENTION_TABS, trackerTab]
+    return [
+      ...SHARED_CONVENTION_TABS.slice(0, optionalIdx),
+      trackerTab,
+      ...SHARED_CONVENTION_TABS.slice(optionalIdx),
+    ]
+  }, [trackerTab])
   const adopted = data.knowledge_adopted?.trim() || '—'
   const ratified = data.knowledge_ratified?.trim() || '—'
-  const articlesLabel = data.knowledge_articles?.trim() || '—'
-  const implementation = data.knowledge_implementation?.trim() || '—'
+  const articlesCount = Number.isFinite(data.articles_count) ? data.articles_count : 0
   const overview = conventionOverviewText(data)
   const repositoryCycles = conventionRepositoryCycles(data)
   const optionalProtocol = data.optional_protocol_body?.trim() || ''
@@ -665,8 +674,7 @@ export function KnowledgeConventionCatDetail({
         metaLines={[
           `Adopted ${adopted}`,
           `Ratified ${ratified}`,
-          `Articles ${articlesLabel}`,
-          `Implementation ${implementation}`,
+          `Articles ${articlesCount}`,
         ]}
         onBack={onBack}
       />
@@ -700,7 +708,13 @@ export function KnowledgeConventionCatDetail({
 
       {activeTab === 'Repositories' ? <ConventionRepositoriesTab cycles={repositoryCycles} /> : null}
 
-      {isCat && activeTab === 'CAT Tracker' ? <CatTrackerTab /> : null}
+      {trackerTab && activeTab === trackerTab ? (
+        isCat ? (
+          <CatTrackerTab />
+        ) : htmlTrackerSrc ? (
+          <ConventionHtmlTrackerTab conventionCode={data.code} src={htmlTrackerSrc} />
+        ) : null
+      ) : null}
 
       {activeTab === LABEL_OPTIONAL_PROTOCOL ? (
         <KnowledgeHubPanel title={LABEL_OPTIONAL_PROTOCOL}>

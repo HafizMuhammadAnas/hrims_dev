@@ -35,8 +35,6 @@ type FormState = {
   knowledge_icon: string
   knowledge_adopted: string
   knowledge_ratified: string
-  knowledge_articles: string
-  knowledge_implementation: string
   description: string
   repositories: ConventionRepositoryCycle[]
   optional_protocol_body: string
@@ -49,8 +47,6 @@ const EMPTY_FORM: FormState = {
   knowledge_icon: '',
   knowledge_adopted: '',
   knowledge_ratified: '',
-  knowledge_articles: '',
-  knowledge_implementation: '',
   description: '',
   repositories: [],
   optional_protocol_body: '',
@@ -66,8 +62,6 @@ function formFromConvention(row: AdminConvention): FormState {
     knowledge_icon: row.knowledge_icon ?? '',
     knowledge_adopted: row.knowledge_adopted ?? '',
     knowledge_ratified: row.knowledge_ratified ?? '',
-    knowledge_articles: row.knowledge_articles ?? '',
-    knowledge_implementation: row.knowledge_implementation ?? '',
     description: row.description ?? '',
     repositories: normalizeRepositoryCycles(row.repositories ?? []),
     optional_protocol_body: row.optional_protocol_body ?? '',
@@ -255,8 +249,6 @@ export function ConventionEditorPage() {
       knowledge_icon: form.knowledge_icon.trim() || null,
       knowledge_adopted: form.knowledge_adopted.trim() || null,
       knowledge_ratified: form.knowledge_ratified.trim() || null,
-      knowledge_articles: form.knowledge_articles.trim() || null,
-      knowledge_implementation: form.knowledge_implementation.trim() || null,
       description: form.description.trim() || null,
       repositories: form.repositories
         .map((cycle) => ({
@@ -369,22 +361,6 @@ export function ConventionEditorPage() {
                     value={form.knowledge_ratified}
                     onChange={(e) => patch('knowledge_ratified', e.target.value)}
                     placeholder="e.g. 23 June 2010"
-                  />
-                </FormControl>
-              </FormRow>
-              <FormRow twoCol>
-                <FormControl label="Articles (short label)">
-                  <input
-                    value={form.knowledge_articles}
-                    onChange={(e) => patch('knowledge_articles', e.target.value)}
-                    placeholder="e.g. 33"
-                  />
-                </FormControl>
-                <FormControl label="Implementation %">
-                  <input
-                    value={form.knowledge_implementation}
-                    onChange={(e) => patch('knowledge_implementation', e.target.value)}
-                    placeholder="e.g. 72%"
                   />
                 </FormControl>
               </FormRow>

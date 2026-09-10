@@ -13,6 +13,12 @@ export const SUPER_ADMIN_INDICATOR_WISE_DATA = `${SUPER_ADMIN_PREFIX}/indicator-
 export const SUPER_ADMIN_SDG_NODES = `${SUPER_ADMIN_PREFIX}/sdg-nodes`
 export const SUPER_ADMIN_UPR_RECOMMENDATIONS = `${SUPER_ADMIN_PREFIX}/upr-recommendations`
 
+/** Issues list path; preserves LOI vs Concluding Observations toggle via `?kind=`. */
+export function superAdminIssuesListPath(entryKind?: string | null): string {
+  if (entryKind === 'recommendation') return `${SUPER_ADMIN_ISSUES}?kind=recommendation`
+  return SUPER_ADMIN_ISSUES
+}
+
 export function superAdminConventionsNewPath(): string {
   return `${SUPER_ADMIN_CONVENTIONS}/new`
 }

@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pakistan CEDAW Comprehensive Dashboard - Complete Data Log (All 52 Rows)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --primary: #0f172a;
+      --accent-blue: #0284c7;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --border: #cbd5e1;
+      --text-main: #334155;
+      --text-muted: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h1 { color: var(--primary); font-size: 1.8rem; font-weight: 700; margin-bottom: 6px; }
+    p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+    /* Nav Tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .tab-btn {
+      padding: 12px 20px; border: none; background: none; font-weight: 600;
+      color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.95rem;
+    }
+    .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 16px;
+    }
+
+    .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 900px) { .grid-2col { grid-template-columns: 1fr 1fr; } }
+
+    /* Controls */
+    .table-controls { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .search-input, .select-filter {
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
+    }
+    .search-input { width: 340px; }
+
+    .stats-counter { font-size: 0.9rem; font-weight: 600; color: var(--accent-blue); }
+
+    /* Tables */
+    .table-container { overflow-x: auto; max-height: 700px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+    th {
+      position: sticky; top: 0; background-color: #f1f5f9; color: var(--primary);
+      font-weight: 600; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; z-index: 10;
+    }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover { background-color: #f8fafc; }
+
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+    .badge-improving { background: #dcfce7; color: #166534; }
+    .badge-worsening { background: #fee2e2; color: #991b1b; }
+    .badge-single { background: #e0f2fe; color: #075985; }
+    .badge-neutral { background: #fef3c7; color: #92400e; }
+
+    .chart-container { position: relative; height: 320px; width: 100%; }
+    .note { font-size: 0.825rem; color: var(--text-muted); margin-top: 10px; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Pakistan CEDAW Compliance: Master Quantitative Tracker</h1>
+      <p class="subtitle">Complete Dataset & Visualizations: All 5 Summary Tables + Complete Row Data Log (All 52 Rows Included)</p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchView('log')">Full Quantitative Log (All 52 Metrics)</button>
+      <button class="tab-btn" onclick="switchView('flagship')">5 Flagship Summary Tables & Graphs</button>
+      <button class="tab-btn" onclick="switchView('overview')">Multi-Metric Overview Graph</button>
+    </div>
+
+    <div id="log-view">
+      <div class="card">
+        <h2 class="card-title">Full Quantitative Data Log — CEDAW Metrics (Complete 52-Metric Dataset)</h2>
+        <div class="table-controls">
+          <input type="text" id="logSearch" class="search-input" placeholder="Search metric, ID, unit, or source..." onkeyup="filterLogTable()">
+          <select id="progressFilter" class="select-filter" onchange="filterLogTable()">
+            <option value="ALL">All Progress Types (52 Metrics)</option>
+            <option value="Improved">Improved</option>
+            <option value="No change">No change</option>
+          </select>
+          <div class="stats-counter" id="rowsCounter">Showing 52 of 52 rows</div>
+        </div>
+        <div class="table-container">
+          <table id="fullLogTable">
+            <thead>
+              <tr>
+                <th>ID</th><th>Issue Area</th><th>Metric Name</th><th>Unit</th>
+                <th>2011 State Rep</th><th>2013 LOI</th><th>2013 CO</th><th>2016 Follow-up</th><th>2018 State Rep</th>
+                <th>2019 LOI</th><th>2019 Reply</th><th>2020 CO</th><th>2023 Follow-up</th>
+                <th>Progress Status</th><th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="flagship-view" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">1. Total Education Enrolment, 2018–2019</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Year Report</th><th>Total Enrolment (Million)</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>2018 State Report</td><td>50.6</td></tr>
+                <tr><td>2019 Reply</td><td>55.7</td></tr>
+              </tbody>
+            </table>
+            <div class="note">A strong upward trend demonstrating improved access to education.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart1"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">2. Out-of-School Children Age 5–16</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Source</th><th>Count (Million)</th></tr></thead>
+              <tbody>
+                <tr><td>2019 LOI</td><td>22.8</td></tr>
+                <tr><td>2019 Reply</td><td>22.8</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Out-of-school numbers showed no change across the comparative reporting periods, remaining a critical challenge.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart2"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">3. Women in National Assembly & Senate (Reserved Seats)</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Legislative Body</th><th>2016 / 2018 Report</th><th>2019 LOI</th></tr></thead>
+              <tbody>
+                <tr><td>National Assembly (%)</td><td>22%</td><td>22%</td></tr>
+                <tr><td>Senate (Persons)</td><td>19 (2016)</td><td>19 (2018)</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Political participation metrics showed 'No change' in the proportion and count across consecutive documents.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart3"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">4. Maternal Health Interventions (Fistula Care)</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Service Type (2018 Report)</th><th>Count</th></tr></thead>
+              <tbody>
+                <tr><td>Surgical Treatments in Campaign</td><td>4,648</td></tr>
+                <tr><td>Rehabilitation Services</td><td>1,631</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Substantial volume of specialized maternal health services reported in 2018.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart4"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">5. Women Quotas in Public Sector Employment (Various Years)</h2>
+        <div class="grid grid-2col">
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Region / Sector</th><th>Quota (%)</th></tr></thead>
+              <tbody>
+                <tr><td>CSS / Civil Service (2011)</td><td>10%</td></tr>
+                <tr><td>Sindh Public Sector (2016)</td><td>15%</td></tr>
+                <tr><td>Punjab Public Sector (2016)</td><td>15%</td></tr>
+              </tbody>
+            </table>
+            <div class="note">Quotas saw a modest scaling from 10% federally to 15% in key provinces in subsequent updates.</div>
+          </div>
+          <div class="chart-container"><canvas id="chart5"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="overview-view" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">Multi-Metric Visualizer</h2>
+        <p class="subtitle" style="margin-bottom: 15px;">Comparative view of Education Enrolment tracking (in millions).</p>
+        <div class="chart-container" style="height: 480px;">
+          <canvas id="overviewChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const logData = [
+  {
+    "id": 6,
+    "issue": "Access to justice / informal justice systems",
+    "metric": "Musalihat Anjuman cases brought to date",
+    "unit": "cases",
+    "polarity": "Higher is not inherently better",
+    "y11": "9942", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/4 para. 164"
+  },
+  {
+    "id": 6,
+    "issue": "Access to justice / informal justice systems",
+    "metric": "Share of MA cases involving at least one woman",
+    "unit": "%",
+    "polarity": "Higher is not inherently better",
+    "y11": "39.45", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/4 para. 164"
+  },
+  {
+    "id": 6,
+    "issue": "Access to justice / informal justice systems",
+    "metric": "Share of women-involved MA cases concerning domestic violence",
+    "unit": "%",
+    "polarity": "Higher is adverse",
+    "y11": "25.53", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/4 para. 164"
+  },
+  {
+    "id": 10,
+    "issue": "Temporary special measures and quotas",
+    "metric": "Women quota in CSS / civil service",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "10", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/4 para. 21"
+  },
+  {
+    "id": 10,
+    "issue": "Temporary special measures and quotas",
+    "metric": "Women quota in Sindh public-sector employment",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "15", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 37"
+  },
+  {
+    "id": 10,
+    "issue": "Temporary special measures and quotas",
+    "metric": "Women quota in Punjab public-sector employment",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "15", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 146"
+  },
+  {
+    "id": 14,
+    "issue": "Political and public participation",
+    "metric": "Women in National Assembly (reserved seats)",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "22", "y19loi": "22", "y19": "", "y20": "", "y23": "",
+    "progress": "No change", "source": "RQ/5 para. 89; CO/5 para. 35"
+  },
+  {
+    "id": 14,
+    "issue": "Political and public participation",
+    "metric": "Women in Senate",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "19", "y18": "19", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "No change", "source": "PAK/5 para. 111; RQ/5 para. 89"
+  },
+  {
+    "id": 14,
+    "issue": "Political and public participation",
+    "metric": "Women elected in 2015 local-government elections",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "23981", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 115"
+  },
+  {
+    "id": 14,
+    "issue": "Political and public participation",
+    "metric": "Female voters added",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "4300000", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 93"
+  },
+  {
+    "id": 14,
+    "issue": "Political and public participation",
+    "metric": "Women in Foreign Service",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "20", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 92"
+  },
+  {
+    "id": 14,
+    "issue": "Political and public participation",
+    "metric": "Female representation in newly inducted diplomatic batches",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "50", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 92"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "Total education enrolment",
+    "unit": "million",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "50.6", "y19loi": "", "y19": "55.7", "y20": "", "y23": "",
+    "progress": "Improved", "source": "RQ/5 para. 94; FCO/5 para. 23"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "Education enrolment prior year",
+    "unit": "million",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "48", "y19loi": "", "y19": "53.1", "y20": "", "y23": "",
+    "progress": "Improved", "source": "RQ/5 para. 94; FCO/5 para. 23"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "Out-of-school children age 5\u201316",
+    "unit": "million",
+    "polarity": "Lower is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "22.8", "y19": "22.8", "y20": "", "y23": "",
+    "progress": "No change", "source": "CO/5 para. 39; FCO/5 para. 22"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "Girls among out-of-school children",
+    "unit": "million",
+    "polarity": "Lower is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "12.6", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/5 para. 39"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "Girls primary-to-secondary retention rate",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "52", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/5 para. 39"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "KP female share of schools",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "39", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 127"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "KP girls receiving education stipend",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "442030", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 131"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "KP girls receiving education stipend (next year)",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "465000", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 131"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "AIOU women enrolled, 2013\u201316",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "740603", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 142"
+  },
+  {
+    "id": 16,
+    "issue": "Education",
+    "metric": "Waseela-e-Taleem children enrolled",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "1300000", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 141"
+  },
+  {
+    "id": 17,
+    "issue": "Employment / pay / informal economy",
+    "metric": "Women registered with PESSI",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "37968", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 147"
+  },
+  {
+    "id": 17,
+    "issue": "Employment / pay / informal economy",
+    "metric": "Punjab interest-free-loan beneficiaries (women)",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "139087", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 148"
+  },
+  {
+    "id": 17,
+    "issue": "Employment / pay / informal economy",
+    "metric": "Female labour-force participation",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "23.9", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/5 para. 41"
+  },
+  {
+    "id": 17,
+    "issue": "Employment / pay / informal economy",
+    "metric": "Gender pay gap",
+    "unit": "%",
+    "polarity": "Lower is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "34", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/5 para. 41"
+  },
+  {
+    "id": 17,
+    "issue": "Employment / pay / informal economy",
+    "metric": "Women in senior/middle management",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "4.2", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/5 para. 41"
+  },
+  {
+    "id": 17,
+    "issue": "Employment / pay / informal economy",
+    "metric": "Women entrepreneurs",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "1", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/5 para. 41"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Punjab lady health workers",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "45486", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 160"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Punjab lady health visitors",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "1544", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 160"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Punjab family welfare centres",
+    "unit": "facilities",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "1833", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 160"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Women treated surgically for obstetric fistula (2012\u201315)",
+    "unit": "persons",
+    "polarity": "Higher is not inherently better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "349", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 161"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "ANC from skilled provider",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "86", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 134"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Women with \u22654 ANC visits",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "51", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 134"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Deliveries by skilled birth attendants",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "69", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 134"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Deliveries in health facilities",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "66", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 134"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Fistula surgical treatments in campaign",
+    "unit": "procedures",
+    "polarity": "Higher is not inherently better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "4648", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 136"
+  },
+  {
+    "id": 18,
+    "issue": "Health / reproductive health",
+    "metric": "Fistula rehabilitation services",
+    "unit": "services",
+    "polarity": "Higher is not inherently better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "1631", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 136"
+  },
+  {
+    "id": 19,
+    "issue": "Rural women / land / services",
+    "metric": "Rural women receiving poultry/cattle",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "1499273", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 184"
+  },
+  {
+    "id": 19,
+    "issue": "Rural women / land / services",
+    "metric": "PRSP credit disbursed to women",
+    "unit": "Rs billion",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "7.043", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 184"
+  },
+  {
+    "id": 19,
+    "issue": "Rural women / land / services",
+    "metric": "Women receiving 50% property-right titles in rural Katchi Abadies",
+    "unit": "persons/titles",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "100464", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 154"
+  },
+  {
+    "id": 21,
+    "issue": "Marriage and family relations",
+    "metric": "Births registered in Punjab",
+    "unit": "registrations",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "4387596", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 201"
+  },
+  {
+    "id": 21,
+    "issue": "Marriage and family relations",
+    "metric": "Births registered in Punjab, earlier year",
+    "unit": "registrations",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "3278988", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 201"
+  },
+  {
+    "id": 13,
+    "issue": "Trafficking and exploitation of prostitution",
+    "metric": "Trafficking officials trained in 2020",
+    "unit": "persons",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "", "y19": "2525", "y20": "", "y23": "",
+    "progress": "", "source": "FCO/5 para. 17"
+  },
+  {
+    "id": 13,
+    "issue": "Trafficking and exploitation of prostitution",
+    "metric": "Trafficking capacity-building sessions in 2020",
+    "unit": "sessions",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "", "y19loi": "", "y19": "31", "y20": "", "y23": "",
+    "progress": "", "source": "FCO/5 para. 17"
+  },
+  {
+    "id": 12,
+    "issue": "Gender-based violence / domestic violence / marital rape",
+    "metric": "Punjab Women's Helpline calls",
+    "unit": "calls",
+    "polarity": "Higher is not inherently better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "", "y18": "143830", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "RQ/5 para. 27"
+  },
+  {
+    "id": 6,
+    "issue": "Access to justice / informal justice systems",
+    "metric": "Women police stations / complaint infrastructure",
+    "unit": "facilities",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "9", "y16": "", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/4/Add.1 para. 6"
+  },
+  {
+    "id": 6,
+    "issue": "Access to justice / informal justice systems",
+    "metric": "Punjab women shelters",
+    "unit": "shelters",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "35", "y16": "", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/4/Add.1 para. 18"
+  },
+  {
+    "id": 6,
+    "issue": "Access to justice / informal justice systems",
+    "metric": "Punjab women crisis centres",
+    "unit": "centres",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "12", "y16": "", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/4/Add.1 para. 18"
+  },
+  {
+    "id": 6,
+    "issue": "Access to justice / informal justice systems",
+    "metric": "KP police-station women counters",
+    "unit": "police stations",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "70", "y16": "", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "CO/4/Add.1 para. 20"
+  },
+  {
+    "id": 14,
+    "issue": "Political and public participation",
+    "metric": "Women contributing individually to NA parliamentary business",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "62", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 39"
+  },
+  {
+    "id": 14,
+    "issue": "Political and public participation",
+    "metric": "Women contributing individually to Senate parliamentary business",
+    "unit": "%",
+    "polarity": "Higher is better",
+    "y11": "", "y13loi": "", "y13co": "", "y16": "13", "y18": "", "y19loi": "", "y19": "", "y20": "", "y23": "",
+    "progress": "", "source": "PAK/5 para. 39"
+  }
+];
+
+    function switchView(view) {
+      document.getElementById('log-view').style.display = view === 'log' ? 'block' : 'none';
+      document.getElementById('flagship-view').style.display = view === 'flagship' ? 'block' : 'none';
+      document.getElementById('overview-view').style.display = view === 'overview' ? 'block' : 'none';
+
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      if (view === 'overview') initOverviewChart();
+      if (view === 'flagship') initCharts();
+    }
+
+    function getBadgeClass(prog) {
+      if (!prog) return 'badge-baseline';
+      if (prog.includes('Improved') || prog.includes('▲')) return 'badge-improving';
+      if (prog.includes('Worsened') || prog.includes('▼')) return 'badge-worsening';
+      if (prog.includes('No change')) return 'badge-neutral';
+      return 'badge-single';
+    }
+
+    function renderLogTable() {
+      const tbody = document.getElementById('logTableBody');
+      const search = document.getElementById('logSearch').value.toLowerCase();
+      const filter = document.getElementById('progressFilter').value;
+
+      tbody.innerHTML = '';
+
+      const filtered = logData.filter(d => {
+        const matchesFilter = filter === 'ALL' || d.progress.includes(filter);
+        const matchesSearch = JSON.stringify(d).toLowerCase().includes(search);
+        return matchesFilter && matchesSearch;
+      });
+
+      document.getElementById('rowsCounter').innerText = `Showing ${filtered.length} of ${logData.length} rows`;
+
+      filtered.forEach(d => {
+        tbody.innerHTML += `
+          <tr>
+            <td><b>${d.id}</b></td>
+            <td><b>${d.issue}</b></td>
+            <td>${d.metric}</td>
+            <td>${d.unit}</td>
+            <td>${d.y11}</td><td>${d.y13loi}</td><td>${d.y13co}</td><td>${d.y16}</td><td>${d.y18}</td>
+            <td>${d.y19loi}</td><td>${d.y19}</td><td>${d.y20}</td><td>${d.y23}</td>
+            <td><span class="badge ${getBadgeClass(d.progress)}">${d.progress || 'Single/Baseline'}</span></td>
+            <td>${d.source}</td>
+          </tr>`;
+      });
+    }
+
+    function filterLogTable() { renderLogTable(); }
+
+    let chartsInitialized = false;
+    function initCharts() {
+      if (chartsInitialized) return;
+      chartsInitialized = true;
+
+      // Chart 1: Education
+      new Chart(document.getElementById('chart1'), {
+        type: 'bar',
+        data: {
+          labels: ['2018 State Report', '2019 Reply'],
+          datasets: [
+            { label: 'Total Enrolment (Million)', data: [50.6, 55.7], backgroundColor: '#10b981' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 2: Out of School
+      new Chart(document.getElementById('chart2'), {
+        type: 'bar',
+        data: {
+          labels: ['2019 LOI', '2019 Reply'],
+          datasets: [
+            { label: 'Out of School Children (Million)', data: [22.8, 22.8], backgroundColor: '#ef4444' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 3: Political Participation
+      new Chart(document.getElementById('chart3'), {
+        type: 'bar',
+        data: {
+          labels: ['2016/2018 Report', '2019 LOI'],
+          datasets: [
+            { label: 'National Assembly (%)', data: [22, 22], backgroundColor: '#0284c7' },
+            { label: 'Senate (Count)', data: [19, 19], backgroundColor: '#8b5cf6' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 4: Fistula Care
+      new Chart(document.getElementById('chart4'), {
+        type: 'pie',
+        data: {
+          labels: ['Surgical Treatments', 'Rehabilitation Services'],
+          datasets: [
+            { data: [4648, 1631], backgroundColor: ['#f59e0b', '#0ea5e9'] }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 5: Quotas
+      new Chart(document.getElementById('chart5'), {
+        type: 'bar',
+        data: {
+          labels: ['CSS (2011)', 'Sindh Public Sector (2016)', 'Punjab Public Sector (2016)'],
+          datasets: [
+            { label: 'Quota (%)', data: [10, 15, 15], backgroundColor: '#14b8a6' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { max: 20 } } }
+      });
+    }
+
+    let overviewChartInstance = null;
+    function initOverviewChart() {
+      if (overviewChartInstance) return;
+      overviewChartInstance = new Chart(document.getElementById('overviewChart'), {
+        type: 'line',
+        data: {
+          labels: ['2018 State Report', '2019 LOI', '2019 Reply'],
+          datasets: [
+            { label: 'Total Education Enrolment (Million)', data: [50.6, null, 55.7], borderColor: '#10b981', tension: 0.1, spanGaps: true },
+            { label: 'Out of School Children (Million)', data: [null, 22.8, 22.8], borderColor: '#ef4444', tension: 0.1, spanGaps: true }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    window.onload = function() {
+      renderLogTable();
+    };
+  </script>
+</body>
+</html>

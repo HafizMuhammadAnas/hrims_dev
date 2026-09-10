@@ -18,6 +18,7 @@ class KnowledgeHubController extends Controller
     {
         $rows = Convention::query()
             ->where('is_active', true)
+            ->withCount(['articles' => fn ($q) => $q->where('is_active', true)])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -30,6 +31,8 @@ class KnowledgeHubController extends Controller
         if (! $convention->is_active) {
             return response()->json(['message' => 'Not found'], 404);
         }
+
+        $convention->loadCount(['articles' => fn ($q) => $q->where('is_active', true)]);
 
         $components = $convention->components()
             ->orderBy('sort_order')
@@ -219,6 +222,7 @@ class KnowledgeHubController extends Controller
             'knowledge_ratified' => $c->knowledge_ratified,
             'knowledge_articles' => $c->knowledge_articles,
             'knowledge_implementation' => $c->knowledge_implementation,
+            'articles_count' => (int) ($c->articles_count ?? 0),
             'description' => $c->description,
             'repositories' => $c->normalizedRepositories(),
             'optional_protocol_body' => $c->optional_protocol_body,
