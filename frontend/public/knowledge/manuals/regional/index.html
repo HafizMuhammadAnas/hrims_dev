@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HRIMS Regional User Manual – Provincial & Department Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #1a4a8a;
+      --primary-dark: #0d2f5e;
+      --primary-light: #2874a6;
+      --accent: #1e6b4f;
+      --bg: #f0f4f8;
+      --sidebar-bg: #ffffff;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --header-h: 64px;
+      --sidebar-w: 280px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04);
+      --shadow-lg: 0 10px 40px rgba(13,47,94,.12);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.65; font-size: 15.5px; }
+
+    .top-header {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: #fff; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1.5rem; z-index: 1000; box-shadow: 0 2px 12px rgba(13,47,94,.25);
+    }
+    .top-header .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.15rem; }
+    .top-header .brand span { font-weight: 400; opacity: .85; font-size: .9rem; }
+    .top-header .meta { font-size: .8rem; opacity: .8; }
+
+    .sidebar {
+      position: fixed; top: var(--header-h); left: 0; width: var(--sidebar-w);
+      height: calc(100vh - var(--header-h)); background: var(--sidebar-bg);
+      border-right: 1px solid var(--border); overflow-y: auto; z-index: 900;
+      padding: 1.25rem 0; transition: transform .25s ease;
+    }
+    .sidebar-section { padding: 0 1rem; margin-bottom: 1.25rem; }
+    .sidebar-section h3 {
+      font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--text-muted); margin-bottom: .5rem; padding-left: .5rem;
+    }
+    .sidebar a {
+      display: flex; align-items: center; gap: 10px; padding: .55rem .75rem;
+      border-radius: var(--radius-sm); color: var(--text); text-decoration: none;
+      font-size: .875rem; font-weight: 500; transition: background .15s, color .15s;
+    }
+    .sidebar a:hover, .sidebar a.active { background: #e8f0fe; color: var(--primary); }
+    .sidebar a .icon { width: 18px; text-align: center; opacity: .7; font-size: .95rem; }
+
+    .main { margin-left: var(--sidebar-w); margin-top: var(--header-h); padding: 2rem 2.5rem 4rem; max-width: 960px; }
+
+    h1 { font-size: 1.85rem; font-weight: 700; color: var(--primary-dark); margin: 2.5rem 0 1rem;
+      padding-bottom: .6rem; border-bottom: 3px solid var(--primary); letter-spacing: -0.02em; }
+    h1:first-of-type { margin-top: 0; }
+    h2 { font-size: 1.3rem; font-weight: 600; color: var(--primary); margin: 2rem 0 .75rem; }
+    h3 { font-size: 1.05rem; font-weight: 600; color: #1a5276; margin: 1.4rem 0 .5rem; }
+    p { margin-bottom: .9rem; color: #334155; }
+    ul, ol { margin: .6rem 0 1.1rem 1.4rem; }
+    li { margin-bottom: .35rem; color: #334155; }
+    strong { color: var(--text); }
+
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1rem 0 1.5rem; }
+    .feature-card {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 1rem 1.15rem; transition: box-shadow .2s, transform .2s;
+    }
+    .feature-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+    .feature-card h4 { font-size: .9rem; font-weight: 600; color: var(--primary); margin-bottom: .35rem; }
+    .feature-card p { font-size: .82rem; margin: 0; color: var(--text-muted); }
+
+    .screenshot-wrap { margin: 1.5rem 0; text-align: center; }
+    .screenshot-wrap img {
+      max-width: 100%; height: auto; border-radius: var(--radius); box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border); cursor: zoom-in; transition: transform .2s, box-shadow .2s;
+    }
+    .screenshot-wrap img:hover { transform: scale(1.01); box-shadow: 0 16px 48px rgba(13,47,94,.18); }
+    .caption { font-size: .8rem; color: var(--text-muted); font-style: italic; margin-top: .6rem; }
+
+    .callout {
+      background: #e8f4fd; border-left: 4px solid var(--primary); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      padding: 1rem 1.25rem; margin: 1.25rem 0; font-size: .92rem;
+    }
+    .callout.tip { background: #e6f7ef; border-left-color: var(--accent); }
+
+    .badge { display: inline-block; padding: .15rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+    .badge-accepted { background: #d1fae5; color: #065f46; }
+    .badge-review { background: #dbeafe; color: #1e40af; }
+    .badge-revision { background: #fef3c7; color: #92400e; }
+    .badge-pending { background: #fee2e2; color: #991b1b; }
+    .badge-processing { background: #fef3c7; color: #92400e; }
+    .badge-delivered { background: #d1fae5; color: #065f46; }
+
+    .steps { counter-reset: step; list-style: none; margin-left: 0; padding-left: 0; }
+    .steps li { position: relative; padding-left: 3rem; margin-bottom: 1.25rem; counter-increment: step; }
+    .steps li::before {
+      content: counter(step); position: absolute; left: 0; top: 0; width: 2rem; height: 2rem;
+      background: var(--primary); color: #fff; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-weight: 700; font-size: .9rem;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
+      color: #fff; border-radius: var(--radius); padding: 3rem 2.5rem; margin-bottom: 2.5rem;
+      box-shadow: var(--shadow-lg); text-align: center;
+    }
+    .hero h1 { color: #fff; border: none; font-size: 2rem; margin: 0 0 .5rem; padding: 0; }
+    .hero p { color: rgba(255,255,255,.9); margin: 0; }
+    .hero .version { margin-top: 1.25rem; font-size: .85rem; opacity: .75; }
+
+    .lightbox {
+      display: none; position: fixed; inset: 0; background: rgba(10, 25, 47, .92); z-index: 2000;
+      align-items: center; justify-content: center; padding: 2rem; cursor: zoom-out;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img { max-width: 95%; max-height: 92vh; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.5); object-fit: contain; }
+    .lightbox-close {
+      position: absolute; top: 1.25rem; right: 1.5rem; background: rgba(255,255,255,.15); border: none;
+      color: #fff; width: 42px; height: 42px; border-radius: 50%; font-size: 1.4rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: background .15s;
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,.3); }
+
+    .menu-toggle { display: none; background: transparent; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; padding: .25rem; }
+    .page-footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); font-size: .85rem; }
+
+    @media (max-width: 900px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main { margin-left: 0; padding: 1.5rem 1.25rem 3rem; }
+      .menu-toggle { display: block; }
+      .hero { padding: 2rem 1.5rem; }
+      .hero h1 { font-size: 1.5rem; }
+    }
+    @media print {
+      .sidebar, .top-header, .menu-toggle, .lightbox { display: none !important; }
+      .main { margin: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="top-header">
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
+      <div class="brand">HRIMS <span>Regional Manual</span></div>
+    </div>
+    <div class="meta">Province Admin & Department Workspace · September 2026</div>
+  </header>
+
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <h3>Getting Started</h3>
+      <a href="#intro"><span class="icon">📖</span> Introduction</a>
+      <a href="#dashboard"><span class="icon">🏠</span> Provincial Dashboard</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Province Actions</h3>
+      <a href="#received"><span class="icon">📥</span> Received Requests</a>
+      <a href="#assign"><span class="icon">📤</span> Assign to Departments</a>
+      <a href="#dept-responses"><span class="icon">📬</span> Departmental Responses</a>
+      <a href="#dept-detail"><span class="icon">🔍</span> Response Detail</a>
+      <a href="#compilation"><span class="icon">📦</span> Response Compilation</a>
+      <a href="#compiled-list"><span class="icon">📁</span> Compiled & Submitted</a>
+      <a href="#compiled-view"><span class="icon">📄</span> Compilation View</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Department Workspace</h3>
+      <a href="#dept-home"><span class="icon">🏢</span> Department Dashboard</a>
+      <a href="#assigned-tasks"><span class="icon">📋</span> Assigned Tasks</a>
+      <a href="#respond"><span class="icon">✏️</span> Responding to Task</a>
+      <a href="#submission-history"><span class="icon">📜</span> Submission History</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Dashboards & Knowledge</h3>
+      <a href="#reporting"><span class="icon">📊</span> Reporting Dashboard</a>
+      <a href="#governance"><span class="icon">📈</span> Governance Dashboard</a>
+      <a href="#knowledge"><span class="icon">📚</span> Knowledge Hub</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Reference</h3>
+      <a href="#workflow"><span class="icon">🔄</span> End-to-End Workflow</a>
+      <a href="#tips"><span class="icon">💡</span> Tips & Best Practices</a>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <div class="hero" id="top">
+      <h1>Human Rights Information<br>Management System</h1>
+      <p>Regional / Provincial User Manual</p>
+      <div class="version">Province Admin & Department Workspace · Version 1.0 · September 2026</div>
+    </div>
+
+    <section id="intro">
+      <h1>1. Introduction – Regional Workspace</h1>
+      <p>This manual covers the <strong>Regional (Provincial)</strong> and <strong>Department-level</strong> workspaces of HRIMS. Provincial Administrators (e.g., Punjab Admin) receive federal requests, distribute them to provincial departments, review departmental submissions, compile a consolidated provincial response, and submit it to the Federal level.</p>
+      <p>Department users (e.g., Punjab Police) receive assigned tasks, enter quantitative and qualitative indicator data (with disaggregation by gender, age, religion, disability), and submit their responses back to the Provincial Admin.</p>
+
+      <h2>1.1 Key Roles</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>Provincial / Region Admin</h4>
+          <p>Manages incoming federal requests, assigns work to departments, reviews responses, compiles the provincial consolidated response, and tracks status with Federal.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Department User</h4>
+          <p>Responds to assigned tasks with indicator data and narratives; views own submission history.</p>
+        </div>
+      </div>
+
+      <h2>1.2 High-Level Regional Workflow</h2>
+      <ul>
+        <li>Federal creates and sends a request → appears under <strong>Received Requests</strong> for the province.</li>
+        <li>Provincial Admin opens the request and <strong>Assigns</strong> selected indicators to one or more departments.</li>
+        <li>Departments complete quantitative/qualitative forms and submit.</li>
+        <li>Provincial Admin reviews departmental responses (accept / request modification).</li>
+        <li>Provincial Admin compiles accepted department data into a single regional response and submits it to Federal.</li>
+        <li>Federal reviews the regional response (Accept / Revision). Status is visible under <strong>Compiled and Submitted</strong>.</li>
+      </ul>
+    </section>
+
+    <section id="dashboard">
+      <h1>2. Provincial Home Dashboard</h1>
+      <div class="screenshot-wrap">
+        <img src="images/1-regional Dashboard.png" alt="Provincial Admin Home Dashboard" loading="lazy" />
+        <div class="caption">Figure 1 – Provincial Admin Home Dashboard (Punjab)</div>
+      </div>
+      <p>After login as a Provincial Admin, the Home screen provides a province-scoped overview.</p>
+      <h2>2.1 Summary Cards</h2>
+      <ul>
+        <li><strong>Active Requests</strong> – Count of HR requests marked active for the province (e.g., 42).</li>
+        <li><strong>Accepted Rate</strong> – Percentage of accepted department responses vs total tasks (e.g., 64%).</li>
+        <li><strong>Needs Attention</strong> – Items requiring action (department responses or compilations needing revision).</li>
+      </ul>
+      <h2>2.2 Recent Requests Received</h2>
+      <p>List of recent federal requests scoped to the province, with title, due date, and status badge (<span class="badge badge-accepted">Active</span>). “View All” opens the full Received Requests list.</p>
+      <h2>2.3 Performance Overview & Navigation</h2>
+      <p>Request Status Distribution donut, New Requests trend line, and quick counters (Pending, Under Review, Revision, Accepted). Left navigation includes Province Actions, Dashboards, and Knowledge Hub.</p>
+    </section>
+
+    <section id="received">
+      <h1>3. Received Requests</h1>
+      <div class="screenshot-wrap">
+        <img src="images/2-received request.png" alt="Received Requests List" loading="lazy" />
+        <div class="caption">Figure 2 – Received Requests List</div>
+      </div>
+      <p>Lists all federal requests assigned to the province.</p>
+      <h2>3.1 Status Summary Cards</h2>
+      <p>Pending, Clarifying, Answered, Distributed, Processing, Delivered.</p>
+      <h2>3.2 Filters, Export & Table</h2>
+      <ul>
+        <li>Search by ID, title, convention, date; Status filter; Reset filters; <strong>Export Excel</strong>.</li>
+        <li>Columns: Request ID, Title, Convention, Date, Status (<span class="badge badge-delivered">Delivered</span> / <span class="badge badge-processing">Processing</span>), Actions.</li>
+      </ul>
+      <p>Scope is shown at the bottom (e.g., Scope: Punjab).</p>
+    </section>
+
+    <section id="assign">
+      <h1>4. Opening a Received Request & Assigning to Departments</h1>
+      <div class="screenshot-wrap">
+        <img src="images/3-request distribution to departments.png" alt="Request Detail and Department Assignment" loading="lazy" />
+        <div class="caption">Figure 3 – Received Request Detail & Department Assignment</div>
+      </div>
+      <p>Clicking a request opens its full details and the assignment interface.</p>
+      <h2>4.1 Request Header & Content</h2>
+      <ul>
+        <li>Title, Reporting type badge, Status, Request ID, Due date, Assigned Regions.</li>
+        <li>Full Convention & Concluding Observations / List of Issues text and category.</li>
+        <li>Relevant Articles with treaty text and Indicators for the request.</li>
+      </ul>
+      <h2>4.2 Assign to Departments</h2>
+      <p>Expandable list of provincial departments (Home Department, Punjab Police, Emergency and Environment, Infrastructure and Services, Religious and Cultural Affairs, Economic and Labour, Development and Planning, Health and Population, Education, Human Rights and Governance, Social Welfare and Protection, Justice and Law Enforcement, etc.).</p>
+      <ul>
+        <li>Open a department to select the specific indicators it should respond to.</li>
+        <li>Leave a department empty to skip it.</li>
+        <li>Optional comments/instructions for departments.</li>
+        <li><strong>Assign selected departments</strong> distributes the work.</li>
+      </ul>
+    </section>
+
+    <section id="dept-responses">
+      <h1>5. Departmental Responses (Provincial Review)</h1>
+      <div class="screenshot-wrap">
+        <img src="images/4-received departmental responses.png" alt="Departmental Responses List" loading="lazy" />
+        <div class="caption">Figure 4 – Departmental Responses List (Province Admin)</div>
+      </div>
+      <p>After departments submit, the Provincial Admin sees all departmental tasks for the province.</p>
+      <h2>Metrics & Table</h2>
+      <ul>
+        <li>Total Tasks, Pending, Under Review, Revision, Accepted.</li>
+        <li>Columns: Task ID, Request, Department, Workflow status, Assigned date, Submitted date, Actions.</li>
+      </ul>
+    </section>
+
+    <section id="dept-detail">
+      <h1>6. Viewing a Departmental Response</h1>
+      <div class="screenshot-wrap">
+        <img src="images/5-detailed view of deparment response.png" alt="Departmental Response Detail" loading="lazy" />
+        <div class="caption">Figure 5 – Departmental Response Detail</div>
+      </div>
+      <p>Shows department name (e.g., Punjab Police), status, task ID, and linked request. Quantitative data includes year totals, Grand Total, and Gender / Age / Religion / PWDs disaggregation tables.</p>
+      <p>Actions: Notes to department, <strong>Request modification</strong>, Back to list.</p>
+    </section>
+
+    <section id="compilation">
+      <h1>7. Response Compilation (Provincial)</h1>
+      <div class="screenshot-wrap">
+        <img src="images/6-response compilation from departments.png" alt="Response Compilation Screen" loading="lazy" />
+        <div class="caption">Figure 6 – Response Compilation Screen</div>
+      </div>
+      <p>Provincial Admin selects a request and builds the consolidated regional response from departmental submissions.</p>
+      <h2>7.1 Progress Cards</h2>
+      <p>Open for Compilation / Already Compiled; Departments Distributed, Pending Submission, Pending Regional Review, Resubmission Requested, Accepted by Region.</p>
+      <h2>7.2 Compilation Form</h2>
+      <ul>
+        <li>Select request ID; check departments to include (Select all / Clear all).</li>
+        <li>View quantitative and qualitative data from each selected department.</li>
+        <li>Optional compiled response narrative.</li>
+        <li><strong>Submit compiled response</strong> – sends the provincial consolidated response to Federal.</li>
+      </ul>
+    </section>
+
+    <section id="compiled-list">
+      <h1>8. Compiled and Submitted</h1>
+      <div class="screenshot-wrap">
+        <img src="images/7-compiled response listing.png" alt="Compiled and Submitted List" loading="lazy" />
+        <div class="caption">Figure 7 – Compiled and Submitted List</div>
+      </div>
+      <p>History of all regional compilations submitted by the province to Federal. Metrics: Total Compilations, Under Review, Accepted, Revision. Table columns: Response ID, Request, Title, Date, Status, Actions. Export Excel available.</p>
+    </section>
+
+    <section id="compiled-view">
+      <h1>9. Viewing a Regional Compilation</h1>
+      <div class="screenshot-wrap">
+        <img src="images/8-compiled response.png" alt="Regional Compilation Detail" loading="lazy" />
+        <div class="caption">Figure 8 – Regional Compilation Detail</div>
+      </div>
+      <p>Full provincial compilation for a given request, including the quantitative data that was submitted (gender/age disaggregations, etc.). Status badge indicates Federal review outcome.</p>
+    </section>
+
+    <section id="dept-home">
+      <h1>10. Department Workspace – Home</h1>
+      <div class="screenshot-wrap">
+        <img src="images/9-department dasboard.png" alt="Department Home Dashboard" loading="lazy" />
+        <div class="caption">Figure 9 – Department Home Dashboard (Punjab Police)</div>
+      </div>
+      <p>Department users see a focused workspace with Open Tasks, Submitted Rate, Needs Attention cards, Recent Tasks list, and Performance Overview charts.</p>
+      <h2>Department Navigation</h2>
+      <ul>
+        <li>Assigned Tasks</li>
+        <li>Submission History</li>
+        <li>Indicator-wise Data</li>
+        <li>Knowledge Hub</li>
+      </ul>
+    </section>
+
+    <section id="assigned-tasks">
+      <h1>11. Department – Assigned Tasks</h1>
+      <div class="screenshot-wrap">
+        <img src="images/10-request received from region.png" alt="Department Tasks List" loading="lazy" />
+        <div class="caption">Figure 10 – Department Tasks List</div>
+      </div>
+      <p>All tasks assigned to this department. Metrics: Total Tasks, Pending, Under Review, Revision, Accepted. Table: ID, Request, Region, Department, Status, Assigned date, Actions.</p>
+    </section>
+
+    <section id="respond">
+      <h1>12. Responding to an Assigned Task</h1>
+      <div class="screenshot-wrap">
+        <img src="images/11-responding to request.png" alt="Assigned Task Response Form" loading="lazy" />
+        <div class="caption">Figure 11 – Assigned Task Response Form (Quantitative Data Entry)</div>
+      </div>
+      <p>The core data-entry screen for department users. For each assigned indicator:</p>
+      <ul>
+        <li><strong>Year totals</strong> (multi-year if applicable) with ON/OFF toggles to include or mark N/A.</li>
+        <li><strong>Gender Disaggregate</strong> – Male, Female, Transgender, Unaccounted, Total (per year).</li>
+        <li><strong>Age Disaggregate</strong> – Under 18, 18-60, Above 60, Unaccounted, Total.</li>
+        <li><strong>Religion Disaggregate</strong> – Muslim, Christianity, Hindu, Sikh, Ahmadiyya, Others, Unaccounted, Total.</li>
+        <li><strong>PWDs Disaggregated</strong> – Hearing, Lower/Upper Limb, Mental, Speech, Visual Full/Partial, Other, etc.</li>
+      </ul>
+      <p>Multiple indicators can appear on the same form. Save / Submit finalizes the departmental response.</p>
+    </section>
+
+    <section id="submission-history">
+      <h1>13. Department – Submission History</h1>
+      <div class="screenshot-wrap">
+        <img src="images/12-submitted response to regions.png" alt="Submission History List" loading="lazy" />
+        <div class="caption">Figure 12 – Submission History List</div>
+      </div>
+      <p>Lists all tasks this department has already submitted, with current workflow status.</p>
+      <div class="screenshot-wrap">
+        <img src="images/13-response details.png" alt="Submitted Response Detail" loading="lazy" />
+        <div class="caption">Figure 13 – Submitted Response Detail View</div>
+      </div>
+      <p>Opening a submitted item shows the data that was sent (read-only quantitative tables and any narrative).</p>
+    </section>
+
+    <section id="reporting">
+      <h1>14. Reporting Dashboard</h1>
+      <div class="screenshot-wrap">
+        <img src="images/14a-reporting dashboard.png" alt="Reporting Dashboard" loading="lazy" />
+        <div class="caption">Figure 14 – Reporting Dashboard</div>
+      </div>
+      <p>Filters by Convention, Article, LOI/CO, Categories, Indicator, Year. Summary cards, Records Status bar chart, LOI/CO donut, Records by Region, Top Categories and Indicators. Save to PDF available.</p>
+    </section>
+
+    <section id="governance">
+      <h1>15. Governance Dashboard</h1>
+      <div class="screenshot-wrap">
+        <img src="images/14b-governace dasboard.png" alt="Governance Dashboard" loading="lazy" />
+        <div class="caption">Figure 15 – Governance Dashboard</div>
+      </div>
+      <p>Indicator trend charts (line, bar, pie, multi-dimension) for long-term monitoring (custodial deaths, prosecutions, legal aid, etc.). Select at least one indicator to enable custom trend charts.</p>
+    </section>
+
+    <section id="knowledge">
+      <h1>16. Knowledge Hub</h1>
+      <p>The <strong>Knowledge Hub</strong> is the reference library of HRIMS. It gives every user — Federal Admin, Provincial Admin, and Department users — a single place to consult the human rights treaties Pakistan has ratified, the exact text of their articles, the Lists of Issues and Concluding Observations issued by the treaty bodies, the official state reports and replies, and quantitative trackers that support evidence-based reporting.</p>
+      <p>Content is identical across Federal, Provincial, and Department workspaces. It is read-only for ordinary users; only a Super Administrator can add or edit convention material.</p>
+
+      <div class="callout tip">
+        <strong>Why it matters:</strong> When you create or respond to a request, the Knowledge Hub lets you verify the exact wording of an article, the scope of a Concluding Observation, or historical data already reported — reducing errors and improving consistency between provincial and federal submissions.
+      </div>
+
+      <h2>16.1 Purpose &amp; Scope</h2>
+      <ul>
+        <li>Provide authoritative treaty texts and Pakistan’s ratification status.</li>
+        <li>Map Lists of Issues (LOI) and Concluding Observations to specific articles and thematic categories.</li>
+        <li>Store official reporting-cycle documents (State reports, LOIs, replies, Concluding Observations).</li>
+        <li>Offer quantitative trackers (e.g. CAT Compliance Master Tracker) that can be cross-checked against data entered in HRIMS.</li>
+        <li>Support training and capacity-building by making the legal framework accessible inside the same system used for reporting.</li>
+      </ul>
+
+      <h2>16.2 Seven Core Conventions</h2>
+      <div class="screenshot-wrap">
+        <img src="images/15-knowledge-hub-conventions.png" alt="Seven Core Conventions" loading="lazy" />
+        <div class="caption">Figure 16 – Seven Core Conventions</div>
+      </div>
+      <p>The landing page of the Knowledge Hub displays the seven core UN human rights treaties that Pakistan has ratified. Each card shows:</p>
+      <ul>
+        <li><strong>ICERD</strong> – International Convention on the Elimination of All Forms of Racial Discrimination (Adopted 1965, Ratified 1966)</li>
+        <li><strong>ICCPR</strong> – International Covenant on Civil and Political Rights (Adopted 1966, Ratified 2010)</li>
+        <li><strong>ICESCR</strong> – International Covenant on Economic, Social and Cultural Rights (Adopted 1966, Ratified 2008)</li>
+        <li><strong>CEDAW</strong> – Convention on the Elimination of All Forms of Discrimination against Women (Adopted 1979, Ratified 1996)</li>
+        <li><strong>CAT</strong> – Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment (Adopted 1984, Ratified 2010)</li>
+        <li><strong>CRC</strong> – Convention on the Rights of the Child (Adopted 1989, Ratified 1990)</li>
+        <li><strong>CRPD</strong> – Convention on the Rights of Persons with Disabilities (Adopted 2006, Ratified 2011)</li>
+      </ul>
+      <p>Clicking any convention card opens its detailed pages (Overview, Articles, LOI, Concluding Observations, Repositories, Tracker, Optional Protocol).</p>
+
+      <h2>16.3 CAT – Convention Overview</h2>
+      <div class="screenshot-wrap">
+        <img src="images/16-knowledge-hub-cat-1.png" alt="CAT Overview" loading="lazy" />
+        <div class="caption">Figure 17 – CAT Overview Tab</div>
+      </div>
+      <p>The Overview tab explains the role of the Committee against Torture (a body of 10 independent experts), the State reporting cycle (initial report one year after accession, then every four years), the three additional monitoring mechanisms (individual communications, inquiries, inter-state complaints), the Optional Protocol and the Subcommittee on Prevention of Torture (SPT), the Committee’s session schedule, and the issuance of General Comments. It also provides a short narrative on the impact of the Convention and the continuing challenge of eradicating torture.</p>
+
+      <h2>16.4 CAT – Articles</h2>
+      <div class="screenshot-wrap">
+        <img src="images/17-knowledge-hub-cat-2.png" alt="CAT Articles" loading="lazy" />
+        <div class="caption">Figure 18 – CAT Articles Tab</div>
+      </div>
+      <p>Lists all 33 articles of the Convention. Expanding an article reveals:</p>
+      <ul>
+        <li>The full legal text of the article.</li>
+        <li>Related Lists of Issues that reference that article.</li>
+        <li>Linked Concluding Observations paragraphs.</li>
+      </ul>
+      <p>This is the primary place to confirm the exact legal obligation when mapping indicators or drafting a response.</p>
+
+      <h2>16.5 CAT – List of Issues (LOI)</h2>
+      <div class="screenshot-wrap">
+        <img src="images/18-knowledge-hub-cat-3.png" alt="CAT List of Issues" loading="lazy" />
+        <div class="caption">Figure 19 – CAT List of Issues Table</div>
+      </div>
+      <p>A searchable table of every List of Issues item linked to CAT. Columns include Related articles, Category (e.g. Criminalization of Torture, Fundamental Legal Safeguards, Gender-Based Violence, Non-Refoulement &amp; Asylum, Training &amp; Capacity Building, Prison Management, Healthcare, Redress, etc.), the LOI title itself, Status (Active), and a View action. Provincial and Federal users rely on this list when selecting which LOI a new request will address.</p>
+
+      <h2>16.6 CAT – Concluding Observations</h2>
+      <div class="screenshot-wrap">
+        <img src="images/19-knowledge-hub-cat-4.png" alt="CAT Concluding Observations" loading="lazy" />
+        <div class="caption">Figure 20 – CAT Concluding Observations Table</div>
+      </div>
+      <p>Tabular view of the Committee’s Concluding Observations, grouped by thematic category (Absolute Prohibition of Torture, Counter-Terrorism, Enforced Disappearances, Deaths in Custody, Gender-Based Violence, Training &amp; Capacity Building, etc.). Each row shows related articles, the observation text (or a summary), status, and a View link for the full paragraph. These observations form the basis of many federal information requests.</p>
+
+      <h2>16.7 CAT – Repositories</h2>
+      <div class="screenshot-wrap">
+        <img src="images/20-knowledge-hub-cat-5.png" alt="CAT Repositories" loading="lazy" />
+        <div class="caption">Figure 21 – CAT Document Repositories</div>
+      </div>
+      <p>Organises official documents by reporting cycle:</p>
+      <ul>
+        <li><strong>First cycle:</strong> Pakistan State Report 2016, Concluding observations (June 2017), Follow-up reply (2019).</li>
+        <li><strong>Second cycle:</strong> Pakistan second periodic report (December 2022), List of issues (2025), Replies of Pakistan to the list of issues (2025), Concluding Observation (2026).</li>
+      </ul>
+      <p>Documents are available for download as PDF or Word files. Users should consult these when preparing or reviewing responses so that new data is consistent with previously submitted information.</p>
+
+      <h2>16.8 CAT Tracker (Quantitative)</h2>
+      <div class="screenshot-wrap">
+        <img src="images/21-knowledge-hub-cat-6.png" alt="CAT Quantitative Tracker" loading="lazy" />
+        <div class="caption">Figure 22 – Pakistan CAT Compliance Master Quantitative Tracker</div>
+      </div>
+      <p>A set of flagship summary tables and graphs that present historical quantitative data relevant to CAT implementation, including:</p>
+      <ul>
+        <li>Torture Act Prosecutions (2022 Act), 2019–2025 – Cases Sent, Convictions, Acquittals, Pending.</li>
+        <li>Enforced Disappearances – Commission of Inquiry, 2019–2025 – Cases Received vs Disposed.</li>
+        <li>Custodial Deaths by Province, 2019–2024.</li>
+        <li>Prison Occupancy by Province (snapshot).</li>
+        <li>Gender-Based Violence: Cases Registered vs Convictions, 2022–2025.</li>
+      </ul>
+      <p>These figures can be cross-checked against the data that departments and provinces enter into HRIMS, helping to identify gaps or inconsistencies before national compilation.</p>
+
+      <h2>16.9 CAT – Optional Protocol</h2>
+      <div class="screenshot-wrap">
+        <img src="images/22-knowledge-hub-cat-7.png" alt="Optional Protocol" loading="lazy" />
+        <div class="caption">Figure 23 – Optional Protocol Tab</div>
+      </div>
+      <p>Currently shows a placeholder: content can be added by a Super Administrator from Super Admin → Conventions. When populated, this tab will describe the Optional Protocol to CAT and the mandate of the Subcommittee on Prevention of Torture (SPT).</p>
+
+      <h2>16.10 How to Use the Knowledge Hub in Daily Work</h2>
+      <ul>
+        <li><strong>Before creating a request (Federal):</strong> Open the relevant LOI or Concluding Observation to confirm the exact text and linked articles/indicators.</li>
+        <li><strong>Before assigning indicators (Provincial):</strong> Check which departments are typically responsible for the thematic category of the LOI.</li>
+        <li><strong>While entering data (Department):</strong> Refer to the article text or previous cycle figures in the Tracker if definitions or baselines are unclear.</li>
+        <li><strong>During review / compilation:</strong> Compare newly submitted numbers with the historical Tracker and with prior State report figures stored in Repositories.</li>
+      </ul>
+    </section>
+
+    <section id="workflow">
+      <h1>17. End-to-End Regional Workflow</h1>
+      <ol class="steps">
+        <li>Federal Admin creates a request and assigns it to one or more provinces.</li>
+        <li>Provincial Admin sees it under <strong>Received Requests</strong>, opens it, and <strong>Assigns</strong> selected indicators to relevant departments.</li>
+        <li>Department users complete the quantitative/qualitative forms on their <strong>Assigned Tasks</strong> and Submit.</li>
+        <li>Provincial Admin reviews submissions under <strong>Departmental Responses</strong> (Accept or Request modification).</li>
+        <li>Provincial Admin goes to <strong>Response Compilation</strong>, selects the request and accepted departments, optionally writes a summary, and Submits the compiled regional response.</li>
+        <li>The compilation appears under <strong>Compiled and Submitted</strong>; Federal reviews it (Accepted / Under Review / Revision).</li>
+        <li>Status updates are visible to the province; revisions may require re-compilation.</li>
+      </ol>
+    </section>
+
+    <section id="tips">
+      <h1>18. Tips for Regional & Department Users</h1>
+      <div class="callout tip">
+        <ul style="margin:0;padding-left:1.2rem;">
+          <li>Always check due dates on Received Requests and Assigned Tasks.</li>
+          <li>When assigning, only select indicators that the department can realistically report on.</li>
+          <li>Use the ON/OFF toggles carefully on quantitative forms – mark N/A rather than leaving zeros if data is not applicable.</li>
+          <li>Request modification early if data quality issues are found; this avoids delays at Federal review.</li>
+          <li>Keep the compiled narrative concise and focused on the indicators and any challenges.</li>
+          <li>Use Knowledge Hub LOI / Concluding Observations pages when clarifying indicator definitions.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      <p>— End of Regional User Manual —</p>
+      <p>HRIMS Regional Workspace · September 2026 · Confidential – Authorized Users Only</p>
+    </footer>
+  </main>
+
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Close">×</button>
+    <img id="lightboxImg" src="" alt="Zoomed screenshot" />
+  </div>
+
+  <script>
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+    sidebar.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => { if (window.innerWidth <= 900) sidebar.classList.remove('open'); });
+    });
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = sidebar.querySelectorAll('a[href^="#"]');
+    function highlightNav() {
+      let current = '';
+      sections.forEach(sec => { if (window.scrollY >= sec.offsetTop - 100) current = sec.getAttribute('id'); });
+      navLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === '#' + current));
+    }
+    window.addEventListener('scroll', highlightNav); highlightNav();
+
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    document.querySelectorAll('.screenshot-wrap img').forEach(img => {
+      img.addEventListener('click', () => {
+        lightboxImg.src = img.src; lightboxImg.alt = img.alt;
+        lightbox.classList.add('active'); document.body.style.overflow = 'hidden';
+      });
+    });
+    function closeLightbox() {
+      lightbox.classList.remove('active'); document.body.style.overflow = ''; lightboxImg.src = '';
+    }
+    document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+  </script>
+</body>
+</html>

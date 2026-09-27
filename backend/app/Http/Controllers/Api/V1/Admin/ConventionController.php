@@ -152,7 +152,12 @@ class ConventionController extends Controller
         $path = null;
         if (! empty($data['path'])) {
             $candidate = str_replace('\\', '/', (string) $data['path']);
-            if (str_starts_with($candidate, 'convention-repositories/') && ! str_contains($candidate, '..')) {
+            if (
+                (
+                    str_starts_with($candidate, 'convention-repositories/')
+                    || str_starts_with($candidate, 'knowledge-upr-repositories/')
+                ) && ! str_contains($candidate, '..')
+            ) {
                 $path = $candidate;
             }
         } elseif (! empty($data['token'])) {
@@ -209,7 +214,10 @@ class ConventionController extends Controller
             return null;
         }
         $normalized = str_replace('\\', '/', $decoded);
-        if (! str_starts_with($normalized, 'convention-repositories/')) {
+        if (
+            ! str_starts_with($normalized, 'convention-repositories/')
+            && ! str_starts_with($normalized, 'knowledge-upr-repositories/')
+        ) {
             return null;
         }
         if (str_contains($normalized, '..')) {

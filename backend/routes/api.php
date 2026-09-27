@@ -13,7 +13,13 @@ use App\Http\Controllers\Api\V1\Admin\IssueCategoryController as AdminIssueCateg
 use App\Http\Controllers\Api\V1\Admin\IssueController as AdminIssueController;
 use App\Http\Controllers\Api\V1\Admin\RegionController as AdminRegionController;
 use App\Http\Controllers\Api\V1\Admin\SdgNodeController as AdminSdgNodeController;
+use App\Http\Controllers\Api\V1\Admin\UprCategoryController as AdminUprCategoryController;
+use App\Http\Controllers\Api\V1\Admin\UprCycleController as AdminUprCycleController;
 use App\Http\Controllers\Api\V1\Admin\UprRecommendationController as AdminUprRecommendationController;
+use App\Http\Controllers\Api\V1\Admin\UprRecommendationEntryController as AdminUprRecommendationEntryController;
+use App\Http\Controllers\Api\V1\Admin\UprEntryController as AdminUprEntryController;
+use App\Http\Controllers\Api\V1\Admin\UprTypeController as AdminUprTypeController;
+use App\Http\Controllers\Api\V1\Admin\KnowledgeUprEntryController as AdminKnowledgeUprEntryController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompiledRecordController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -66,10 +72,13 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/knowledge/conventions/{convention}', [KnowledgeHubController::class, 'showConvention'])->name('api.v1.knowledge.conventions.show');
         Route::get('/knowledge/conventions/{convention}/articles', [KnowledgeHubController::class, 'conventionArticles'])->name('api.v1.knowledge.conventions.articles');
         Route::get('/knowledge/conventions/{convention}/issues', [KnowledgeHubController::class, 'conventionIssues'])->name('api.v1.knowledge.conventions.issues');
+        Route::get('/knowledge/conventions/{convention}/indicator-catalog', [KnowledgeHubController::class, 'conventionIndicatorCatalog'])->name('api.v1.knowledge.conventions.indicator-catalog');
         Route::get('/knowledge/issues/{issue}', [KnowledgeHubController::class, 'showIssue'])->name('api.v1.knowledge.issues.show');
         Route::get('/knowledge/sdg-goals', [KnowledgeHubController::class, 'sdgGoals'])->name('api.v1.knowledge.sdg-goals');
         Route::get('/knowledge/indicators', [KnowledgeHubController::class, 'indicators'])->name('api.v1.knowledge.indicators');
         Route::get('/knowledge/upr-highlights', [KnowledgeHubController::class, 'uprHighlights'])->name('api.v1.knowledge.upr-highlights');
+        Route::get('/knowledge/upr-entries', [KnowledgeHubController::class, 'uprEntries'])->name('api.v1.knowledge.upr-entries.index');
+        Route::get('/knowledge/upr-entries/{knowledge_upr_entry}', [KnowledgeHubController::class, 'showUprEntry'])->name('api.v1.knowledge.upr-entries.show');
         // Convention repository uploads (PDF/DOC) — used by Knowledge Hub Repositories tab.
         Route::get('/repository-files/{token}', [AdminConventionController::class, 'downloadRepositoryFile'])
             ->where('token', '[A-Za-z0-9_-]+')
@@ -188,6 +197,46 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/upr-recommendations/{upr_recommendation}/update', [AdminUprRecommendationController::class, 'update'])->name('api.v1.admin.upr.update');
             Route::patch('/upr-recommendations/{upr_recommendation}', [AdminUprRecommendationController::class, 'update'])->name('api.v1.admin.upr.update.patch');
             Route::delete('/upr-recommendations/{upr_recommendation}', [AdminUprRecommendationController::class, 'destroy'])->name('api.v1.admin.upr.destroy');
+
+            Route::get('/upr-types', [AdminUprTypeController::class, 'index'])->name('api.v1.admin.upr-types.index');
+            Route::post('/upr-types', [AdminUprTypeController::class, 'store'])->name('api.v1.admin.upr-types.store');
+            Route::post('/upr-types/{upr_type}/update', [AdminUprTypeController::class, 'update'])->name('api.v1.admin.upr-types.update');
+            Route::patch('/upr-types/{upr_type}', [AdminUprTypeController::class, 'update'])->name('api.v1.admin.upr-types.update.patch');
+            Route::delete('/upr-types/{upr_type}', [AdminUprTypeController::class, 'destroy'])->name('api.v1.admin.upr-types.destroy');
+
+            Route::get('/upr-cycles', [AdminUprCycleController::class, 'index'])->name('api.v1.admin.upr-cycles.index');
+            Route::post('/upr-cycles', [AdminUprCycleController::class, 'store'])->name('api.v1.admin.upr-cycles.store');
+            Route::post('/upr-cycles/{upr_cycle}/update', [AdminUprCycleController::class, 'update'])->name('api.v1.admin.upr-cycles.update');
+            Route::patch('/upr-cycles/{upr_cycle}', [AdminUprCycleController::class, 'update'])->name('api.v1.admin.upr-cycles.update.patch');
+            Route::delete('/upr-cycles/{upr_cycle}', [AdminUprCycleController::class, 'destroy'])->name('api.v1.admin.upr-cycles.destroy');
+
+            Route::get('/upr-categories', [AdminUprCategoryController::class, 'index'])->name('api.v1.admin.upr-categories.index');
+            Route::post('/upr-categories', [AdminUprCategoryController::class, 'store'])->name('api.v1.admin.upr-categories.store');
+            Route::post('/upr-categories/{upr_category}/update', [AdminUprCategoryController::class, 'update'])->name('api.v1.admin.upr-categories.update');
+            Route::patch('/upr-categories/{upr_category}', [AdminUprCategoryController::class, 'update'])->name('api.v1.admin.upr-categories.update.patch');
+            Route::delete('/upr-categories/{upr_category}', [AdminUprCategoryController::class, 'destroy'])->name('api.v1.admin.upr-categories.destroy');
+
+            Route::get('/upr-recommendation-entries', [AdminUprRecommendationEntryController::class, 'index'])->name('api.v1.admin.upr-recommendation-entries.index');
+            Route::post('/upr-recommendation-entries', [AdminUprRecommendationEntryController::class, 'store'])->name('api.v1.admin.upr-recommendation-entries.store');
+            Route::post('/upr-recommendation-entries/{upr_recommendation_entry}/update', [AdminUprRecommendationEntryController::class, 'update'])->name('api.v1.admin.upr-recommendation-entries.update');
+            Route::patch('/upr-recommendation-entries/{upr_recommendation_entry}', [AdminUprRecommendationEntryController::class, 'update'])->name('api.v1.admin.upr-recommendation-entries.update.patch');
+            Route::delete('/upr-recommendation-entries/{upr_recommendation_entry}', [AdminUprRecommendationEntryController::class, 'destroy'])->name('api.v1.admin.upr-recommendation-entries.destroy');
+
+            Route::get('/upr-entries', [AdminUprEntryController::class, 'index'])->name('api.v1.admin.upr-entries.index');
+            Route::post('/upr-entries', [AdminUprEntryController::class, 'store'])->name('api.v1.admin.upr-entries.store');
+            Route::get('/upr-entries/{upr_entry}', [AdminUprEntryController::class, 'show'])->name('api.v1.admin.upr-entries.show');
+            Route::post('/upr-entries/{upr_entry}/update', [AdminUprEntryController::class, 'update'])->name('api.v1.admin.upr-entries.update');
+            Route::patch('/upr-entries/{upr_entry}', [AdminUprEntryController::class, 'update'])->name('api.v1.admin.upr-entries.update.patch');
+            Route::delete('/upr-entries/{upr_entry}', [AdminUprEntryController::class, 'destroy'])->name('api.v1.admin.upr-entries.destroy');
+
+            Route::get('/knowledge-upr-entries', [AdminKnowledgeUprEntryController::class, 'index'])->name('api.v1.admin.knowledge-upr-entries.index');
+            Route::post('/knowledge-upr-entries', [AdminKnowledgeUprEntryController::class, 'store'])->name('api.v1.admin.knowledge-upr-entries.store');
+            Route::get('/knowledge-upr-entries/{knowledge_upr_entry}', [AdminKnowledgeUprEntryController::class, 'show'])->name('api.v1.admin.knowledge-upr-entries.show');
+            Route::post('/knowledge-upr-entries/{knowledge_upr_entry}/update', [AdminKnowledgeUprEntryController::class, 'update'])->name('api.v1.admin.knowledge-upr-entries.update');
+            Route::patch('/knowledge-upr-entries/{knowledge_upr_entry}', [AdminKnowledgeUprEntryController::class, 'update'])->name('api.v1.admin.knowledge-upr-entries.update.patch');
+            Route::delete('/knowledge-upr-entries/{knowledge_upr_entry}', [AdminKnowledgeUprEntryController::class, 'destroy'])->name('api.v1.admin.knowledge-upr-entries.destroy');
+            Route::post('/knowledge-upr-entries/files', [AdminKnowledgeUprEntryController::class, 'uploadFiles'])->name('api.v1.admin.knowledge-upr-entries.files.upload');
+            Route::post('/knowledge-upr-entries/files/delete', [AdminKnowledgeUprEntryController::class, 'deleteFile'])->name('api.v1.admin.knowledge-upr-entries.files.delete');
 
             Route::get('/knowledge-cards', [AdminKnowledgeCardController::class, 'index'])->name('api.v1.admin.knowledge-cards.index');
             Route::post('/knowledge-cards', [AdminKnowledgeCardController::class, 'store'])->name('api.v1.admin.knowledge-cards.store');

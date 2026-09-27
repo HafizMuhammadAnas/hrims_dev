@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HRIMS User Manual – Human Rights Information Management System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #1a4a8a;
+      --primary-dark: #0d2f5e;
+      --primary-light: #2874a6;
+      --accent: #1e6b4f;
+      --accent-light: #2d9b6f;
+      --bg: #f0f4f8;
+      --sidebar-bg: #ffffff;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --header-h: 64px;
+      --sidebar-w: 280px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04);
+      --shadow-lg: 0 10px 40px rgba(13,47,94,.12);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 15.5px;
+    }
+
+    /* ===== TOP HEADER ===== */
+    .top-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--header-h);
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+      z-index: 1000;
+      box-shadow: 0 2px 12px rgba(13,47,94,.25);
+    }
+    .top-header .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+    .top-header .brand span {
+      font-weight: 400;
+      opacity: .85;
+      font-size: .9rem;
+    }
+    .top-header .meta {
+      font-size: .8rem;
+      opacity: .8;
+    }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      width: var(--sidebar-w);
+      height: calc(100vh - var(--header-h));
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      z-index: 900;
+      padding: 1.25rem 0;
+      transition: transform .25s ease;
+    }
+    .sidebar-section {
+      padding: 0 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .sidebar-section h3 {
+      font-size: .68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      margin-bottom: .5rem;
+      padding-left: .5rem;
+    }
+    .sidebar a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: .55rem .75rem;
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      text-decoration: none;
+      font-size: .875rem;
+      font-weight: 500;
+      transition: background .15s, color .15s;
+    }
+    .sidebar a:hover,
+    .sidebar a.active {
+      background: #e8f0fe;
+      color: var(--primary);
+    }
+    .sidebar a .icon {
+      width: 18px;
+      text-align: center;
+      opacity: .7;
+      font-size: .95rem;
+    }
+
+    /* ===== MAIN CONTENT ===== */
+    .main {
+      margin-left: var(--sidebar-w);
+      margin-top: var(--header-h);
+      padding: 2rem 2.5rem 4rem;
+      max-width: 960px;
+    }
+
+    /* Typography */
+    h1 {
+      font-size: 1.85rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin: 2.5rem 0 1rem;
+      padding-bottom: .6rem;
+      border-bottom: 3px solid var(--primary);
+      letter-spacing: -0.02em;
+    }
+    h1:first-of-type { margin-top: 0; }
+    h2 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin: 2rem 0 .75rem;
+    }
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #1a5276;
+      margin: 1.4rem 0 .5rem;
+    }
+    p { margin-bottom: .9rem; color: #334155; }
+    ul, ol { margin: .6rem 0 1.1rem 1.4rem; }
+    li { margin-bottom: .35rem; color: #334155; }
+    strong { color: var(--text); }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin: 1.25rem 0;
+      border: 1px solid var(--border);
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .feature-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.15rem;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .feature-card:hover {
+      box-shadow: var(--shadow);
+      transform: translateY(-2px);
+    }
+    .feature-card h4 {
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: .35rem;
+    }
+    .feature-card p {
+      font-size: .82rem;
+      margin: 0;
+      color: var(--text-muted);
+    }
+
+    /* Screenshots */
+    .screenshot-wrap {
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+    .screenshot-wrap img {
+      max-width: 100%;
+      height: auto;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      cursor: zoom-in;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .screenshot-wrap img:hover {
+      transform: scale(1.01);
+      box-shadow: 0 16px 48px rgba(13,47,94,.18);
+    }
+    .caption {
+      font-size: .8rem;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-top: .6rem;
+    }
+
+    /* Callout boxes */
+    .callout {
+      background: #e8f4fd;
+      border-left: 4px solid var(--primary);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      font-size: .92rem;
+    }
+    .callout.tip {
+      background: #e6f7ef;
+      border-left-color: var(--accent);
+    }
+    .callout.warning {
+      background: #fef9e7;
+      border-left-color: #d4a017;
+    }
+
+    /* Status badges */
+    .badge {
+      display: inline-block;
+      padding: .15rem .55rem;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .badge-accepted { background: #d1fae5; color: #065f46; }
+    .badge-review { background: #dbeafe; color: #1e40af; }
+    .badge-revision { background: #fef3c7; color: #92400e; }
+    .badge-pending { background: #fee2e2; color: #991b1b; }
+
+    /* Workflow steps */
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      margin-left: 0;
+      padding-left: 0;
+    }
+    .steps li {
+      position: relative;
+      padding-left: 3rem;
+      margin-bottom: 1.25rem;
+      counter-increment: step;
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 2rem;
+      height: 2rem;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: .9rem;
+    }
+
+    /* Cover hero */
+    .hero {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 3rem 2.5rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow-lg);
+      text-align: center;
+    }
+    .hero h1 {
+      color: #fff;
+      border: none;
+      font-size: 2rem;
+      margin: 0 0 .5rem;
+      padding: 0;
+    }
+    .hero p { color: rgba(255,255,255,.9); margin: 0; }
+    .hero .version {
+      margin-top: 1.25rem;
+      font-size: .85rem;
+      opacity: .75;
+    }
+
+    /* Lightbox */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 25, 47, .92);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      cursor: zoom-out;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img {
+      max-width: 95%;
+      max-height: 92vh;
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+      object-fit: contain;
+    }
+    .lightbox-close {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.5rem;
+      background: rgba(255,255,255,.15);
+      border: none;
+      color: #fff;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      font-size: 1.4rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s;
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,.3); }
+
+    /* Mobile toggle */
+    .menu-toggle {
+      display: none;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: .25rem;
+    }
+
+    /* Footer */
+    .page-footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: .85rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .main { margin-left: 0; padding: 1.5rem 1.25rem 3rem; }
+      .menu-toggle { display: block; }
+      .hero { padding: 2rem 1.5rem; }
+      .hero h1 { font-size: 1.5rem; }
+    }
+
+    /* Print */
+    @media print {
+      .sidebar, .top-header, .menu-toggle, .lightbox { display: none !important; }
+      .main { margin: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header class="top-header">
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
+      <div class="brand">
+        HRIMS
+        <span>User Manual</span>
+      </div>
+    </div>
+    <div class="meta">Federal Admin Workspace · September 2026</div>
+  </header>
+
+  <!-- Sidebar Navigation -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <h3>Getting Started</h3>
+      <a href="#intro"><span class="icon">📖</span> Introduction</a>
+      <a href="#login"><span class="icon">🔐</span> Login Screen</a>
+      <a href="#dashboard"><span class="icon">🏠</span> Federal Dashboard</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Federal Actions</h3>
+      <a href="#request-mgmt"><span class="icon">📋</span> Request Management</a>
+      <a href="#new-request"><span class="icon">➕</span> New Request</a>
+      <a href="#regional-responses"><span class="icon">📬</span> Regional Responses</a>
+      <a href="#response-detail"><span class="icon">🔍</span> Response Detail</a>
+      <a href="#compilation"><span class="icon">📦</span> Compilation Center</a>
+      <a href="#compiled-list"><span class="icon">📁</span> Compiled Records</a>
+      <a href="#compiled-detail"><span class="icon">📄</span> Compiled Record View</a>
+      <a href="#users"><span class="icon">👥</span> User Management</a>
+      <a href="#departments"><span class="icon">🏛️</span> Manage Departments</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Department Actions</h3>
+      <a href="#dept-responses"><span class="icon">🏢</span> Departmental Responses</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Dashboards</h3>
+      <a href="#reporting"><span class="icon">📊</span> Reporting Dashboard</a>
+      <a href="#governance"><span class="icon">📈</span> Governance Dashboard</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Knowledge Hub</h3>
+      <a href="#knowledge"><span class="icon">📚</span> Core Conventions</a>
+      <a href="#cat-overview"><span class="icon">🛡️</span> CAT Overview</a>
+      <a href="#cat-articles"><span class="icon">📑</span> CAT Articles</a>
+      <a href="#cat-loi"><span class="icon">📝</span> List of Issues</a>
+      <a href="#cat-co"><span class="icon">📌</span> Concluding Observations</a>
+      <a href="#cat-repo"><span class="icon">🗄️</span> Repositories</a>
+      <a href="#cat-tracker"><span class="icon">📉</span> CAT Tracker</a>
+      <a href="#cat-op"><span class="icon">🔗</span> Optional Protocol</a>
+    </div>
+    <div class="sidebar-section">
+      <h3>Reference</h3>
+      <a href="#workflow"><span class="icon">🔄</span> End-to-End Workflow</a>
+      <a href="#tips"><span class="icon">💡</span> Tips & Best Practices</a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- HERO -->
+    <div class="hero" id="top">
+      <h1>Human Rights Information<br>Management System</h1>
+      <p>Comprehensive User Manual for the Federal Admin Workspace</p>
+      <div class="version">Version 1.0 · September 2026 · For authorized users only</div>
+    </div>
+
+    <!-- 1. INTRODUCTION -->
+    <section id="intro">
+      <h1>1. Introduction</h1>
+      <p>The <strong>Human Rights Information Management System (HRIMS)</strong> is a national-level platform designed to manage, track, compile, and report on human rights treaty body obligations, concluding observations, list of issues, and related indicators for Pakistan. It supports the full workflow from creation of federal information requests, regional and departmental responses, federal review and acceptance, national compilation, through to analytical dashboards and a knowledge hub of core conventions.</p>
+      <p>This manual describes every major screen and feature available in the Federal Admin workspace, based on the system interface as of September 2026.</p>
+
+      <h2>1.1 Purpose of HRIMS</h2>
+      <ul>
+        <li>Centralize collection of quantitative and qualitative human rights data from provinces and federal departments.</li>
+        <li>Map requests to treaty articles, List of Issues (LOI), and Concluding Observations.</li>
+        <li>Support review, revision, and acceptance workflows between federal and regional/departmental actors.</li>
+        <li>Produce compiled national records and exportable reports (PDF, Word, Excel).</li>
+        <li>Provide dashboards for performance monitoring and indicator trends.</li>
+        <li>Offer a Knowledge Hub with convention texts, LOIs, concluding observations, repositories, and trackers.</li>
+      </ul>
+
+      <h2>1.2 User Roles (Overview)</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>Federal Admin</h4>
+          <p>Full control over request creation, regional response review, compilation, user & department management, and all dashboards.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Department Admin</h4>
+          <p>ICT / Federal line ministries. Respond to departmental tasks linked to requests.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Regional Users</h4>
+          <p>Submit consolidated provincial responses (visible to Federal Admin for review).</p>
+        </div>
+      </div>
+      <div class="callout">This manual focuses on the <strong>Federal Admin</strong> view.</div>
+    </section>
+
+    <!-- 2. LOGIN -->
+    <section id="login">
+      <h1>2. Login Screen</h1>
+      <div class="screenshot-wrap">
+        <img src="images/1-login.png" alt="HRIMS Login Screen" loading="lazy" />
+        <div class="caption">Figure 1 – HRIMS Login Screen</div>
+      </div>
+      <p>The login page is the entry point to HRIMS. It displays the system name “HRIMS” and the full title “Human Rights Information Management System”.</p>
+      <h3>Features</h3>
+      <ul>
+        <li><strong>Username</strong> – Enter the assigned username.</li>
+        <li><strong>Password</strong> – Enter the password. An eye icon allows showing/hiding the password.</li>
+        <li><strong>Sign in</strong> – Authenticates the user and opens the appropriate workspace (Federal Admin, Department, or Regional).</li>
+        <li><strong>Reset password</strong> – Allows a user to initiate a password reset process.</li>
+      </ul>
+      <p>After successful authentication, Federal Admin users are taken to the Home Dashboard.</p>
+    </section>
+
+    <!-- 3. DASHBOARD -->
+    <section id="dashboard">
+      <h1>3. Federal Dashboard (Home)</h1>
+      <div class="screenshot-wrap">
+        <img src="images/2-federal Dashboard.png" alt="Federal Admin Home Dashboard" loading="lazy" />
+        <div class="caption">Figure 2 – Federal Admin Home Dashboard</div>
+      </div>
+      <p>The Home screen is the central control center for national requests, reviews, and reporting. It greets the logged-in user (“Welcome, Federal Admin”) and shows the current date.</p>
+
+      <h2>3.1 Summary Cards</h2>
+      <ul>
+        <li><strong>Total Requests</strong> – Overall count of requests in scope (e.g., 58), with a breakdown of draft vs active.</li>
+        <li><strong>Pending Requests</strong> – Number of requests still awaiting completion or review (e.g., 18 pending).</li>
+        <li><strong>Compiled Records / Completed Requests</strong> – National records already saved from federal compilation (e.g., 39).</li>
+      </ul>
+
+      <h2>3.2 Recent Responses Received</h2>
+      <p>A list of the most recent consolidated responses from regions, showing title, region, date, and status badges such as <span class="badge badge-review">Under Review</span>, <span class="badge badge-revision">Revision</span>, or <span class="badge badge-accepted">Accepted</span>. A “View All” button opens the full Regional Responses list.</p>
+
+      <h2>3.3 Performance Overview</h2>
+      <ul>
+        <li><strong>Request Status Distribution</strong> – Donut chart summarizing overall request statuses.</li>
+        <li><strong>New Requests in Scope (6 Months)</strong> – Line chart showing request volume trend over recent months.</li>
+        <li>Quick status counters: Pending Responses, Under Review, Accepted, Needs Modification.</li>
+      </ul>
+
+      <h2>3.4 Knowledge & Frameworks Shortcuts</h2>
+      <div class="feature-grid">
+        <div class="feature-card"><h4>Core Conventions</h4><p>Human rights treaties ratified by Pakistan and how they map into HRIMS.</p></div>
+        <div class="feature-card"><h4>Human Rights Indicators</h4><p>Key performance indicators across sectors and monitoring themes.</p></div>
+        <div class="feature-card"><h4>Sustainable Development Goals</h4><p>SDG links and progress framing for national reporting.</p></div>
+        <div class="feature-card"><h4>Universal Periodic Review</h4><p>UPR cycle context and Concluding Observations tracking.</p></div>
+      </div>
+
+      <h2>3.5 Left Navigation Sidebar</h2>
+      <p>The persistent left menu is organized into:</p>
+      <ul>
+        <li><strong>FEDERAL ACTIONS</strong> – Request Management, Regional Responses, Compilation Center, Compiled Records, User Management, Manage Departments.</li>
+        <li><strong>FEDERAL DEPARTMENT ACTIONS</strong> – Departmental Responses, Response Compilation, Compiled Record.</li>
+        <li><strong>DASHBOARDS</strong> – Reporting Dashboard, Governance Dashboard.</li>
+        <li><strong>KNOWLEDGE HUB</strong> – Convention Info, Human Rights Indicators, Sustainable Development Goals, Universal Periodic Review.</li>
+      </ul>
+      <p>The top bar shows notification count, current user (Federal Admin – Federal workspace), Profile, and Logout.</p>
+    </section>
+
+    <!-- 4. REQUEST MANAGEMENT -->
+    <section id="request-mgmt">
+      <h1>4. Request Management</h1>
+      <div class="screenshot-wrap">
+        <img src="images/3-request-management-main.png" alt="Request Management – Requests List" loading="lazy" />
+        <div class="caption">Figure 3 – Request Management – Requests List</div>
+      </div>
+      <p>Request Management is the primary module for creating and tracking human rights information requests sent to regions and departments.</p>
+
+      <h2>4.1 Tabs</h2>
+      <ul>
+        <li><strong>Requests List</strong> – Main table of all requests.</li>
+        <li><strong>New Request</strong> – Form to create a new request.</li>
+        <li><strong>Clarifications</strong> – Area for clarification exchanges.</li>
+        <li><strong>Regional Responses</strong> – Shortcut to the regional responses view.</li>
+      </ul>
+
+      <h2>4.2 Summary Metrics</h2>
+      <p>Three cards show <strong>Total Requests</strong>, <strong>Active</strong>, and <strong>Draft</strong> counts.</p>
+
+      <h2>4.3 Filters and Actions</h2>
+      <ul>
+        <li>Search box – Search by ID, title, convention, region, etc.</li>
+        <li>Status filter dropdown – Filter by All statuses or specific status.</li>
+        <li>Reset filters button.</li>
+        <li><strong>Export Excel</strong> – Download the current list as an Excel file.</li>
+      </ul>
+
+      <h2>4.4 Requests Table Columns</h2>
+      <ul>
+        <li><strong>ID</strong> – Unique request identifier (e.g., REQ-2026-0064).</li>
+        <li><strong>Title</strong> – Short descriptive title of the request.</li>
+        <li><strong>Convention</strong> – Treaty abbreviation (e.g., CAT).</li>
+        <li><strong>Region(s)</strong> – Province(s) or ICT assigned.</li>
+        <li><strong>Due</strong> – Due date for responses.</li>
+        <li><strong>Status</strong> – Badge such as Active, Draft, etc.</li>
+        <li><strong>Actions</strong> – Dropdown for view, edit, or other operations on the request.</li>
+      </ul>
+      <p>Pagination controls appear at the bottom (page size, Prev/Next).</p>
+    </section>
+
+    <!-- 5. NEW REQUEST -->
+    <section id="new-request">
+      <h1>5. Creating a New Request</h1>
+      <div class="screenshot-wrap">
+        <img src="images/4-newrequest.png" alt="New Request Form" loading="lazy" />
+        <div class="caption">Figure 4 – New Request Form</div>
+      </div>
+      <p>Clicking the “New Request” tab opens a comprehensive form used by Federal Admin to define a new information request.</p>
+
+      <h3>Key Fields</h3>
+      <ul>
+        <li><strong>Request ID</strong> – Assigned automatically on save in the format REQ-YYYY-####.</li>
+        <li><strong>Title</strong> – Free-text title for the request.</li>
+        <li><strong>Reporting type</strong> – Dropdown (e.g., Treaty Body Reporting – Obligatory).</li>
+        <li><strong>Convention</strong> – Select the relevant convention (e.g., CAT – Convention against Torture…).</li>
+        <li><strong>List of Issues or Concluding Observations</strong> – Radio choice between “List of Issues” and “Concluding Observations”.</li>
+        <li><strong>List of Issues title</strong> – Dropdown of available LOI / observation titles.</li>
+      </ul>
+
+      <h3>List of Issues mapping</h3>
+      <p>Shows the selected category (e.g., Training & Capacity Building) and expandable sections for description and relevant articles (e.g., Article 10).</p>
+
+      <h3>Indicators for this request</h3>
+      <p>Checkboxes for quantitative/qualitative indicators linked to the selected LOI/observation. Buttons allow Select all / Deselect all.</p>
+
+      <h3>Regions</h3>
+      <p>Multi-select checkboxes for Balochistan, ICT, Khyber Pakhtunkhwa, Punjab, Sindh. At least one region must be selected. ICT can be linked for national-level requests.</p>
+      <ul>
+        <li><strong>Due date</strong> – Date picker for the response deadline.</li>
+        <li><strong>Attachments</strong> – File upload area (up to 15 MB per batch).</li>
+        <li><strong>Request notes</strong> – Optional free-text context for reviewers.</li>
+      </ul>
+
+      <h3>Actions</h3>
+      <ul>
+        <li><strong>Cancel</strong> – Discard and close the form.</li>
+        <li><strong>Save as Draft</strong> – Save without submitting to regions.</li>
+        <li><strong>Submit</strong> – Finalize and dispatch the request to selected regions/departments.</li>
+      </ul>
+    </section>
+
+    <!-- 6. REGIONAL RESPONSES -->
+    <section id="regional-responses">
+      <h1>6. Regional Responses</h1>
+      <div class="screenshot-wrap">
+        <img src="images/5-regionalrespone-main.png" alt="Regional Responses List" loading="lazy" />
+        <div class="caption">Figure 5 – Regional Responses List</div>
+      </div>
+      <p>This screen lists all consolidated responses received from provinces. Federal Admin uses it to review, accept, or request revision.</p>
+
+      <h2>6.1 Status Summary Cards</h2>
+      <p>Cards show counts for: Pending, Responses (total), Under Review, Accepted, Revision.</p>
+
+      <h2>6.2 Filters</h2>
+      <ul>
+        <li>Search by request, region, title…</li>
+        <li>Review status filter.</li>
+        <li>Request ID filter.</li>
+        <li>Reset filters and <strong>Export Excel</strong>.</li>
+      </ul>
+
+      <h2>6.3 Table Columns</h2>
+      <ul>
+        <li><strong>Request</strong> – Linked request ID.</li>
+        <li><strong>Region</strong> – Province that submitted.</li>
+        <li><strong>Title</strong> – Response title (often “– consolidated response”).</li>
+        <li><strong>Submitted</strong> – Date of submission.</li>
+        <li><strong>Status</strong> – Accepted / Under Review / Revision, etc.</li>
+        <li><strong>Actions</strong> – Open the detailed response view or perform review actions.</li>
+      </ul>
+    </section>
+
+    <!-- 7. RESPONSE DETAIL -->
+    <section id="response-detail">
+      <h1>7. Viewing a Regional Response</h1>
+      <div class="screenshot-wrap">
+        <img src="images/6-respone-view.png" alt="Regional Response Detail – Quantitative Data" loading="lazy" />
+        <div class="caption">Figure 6 – Regional Response Detail (Quantitative Data)</div>
+      </div>
+      <p>Opening a response shows a header with the region name (e.g., Punjab), status badge (<span class="badge badge-accepted">Accepted</span>), and request ID. Tabs typically include Responses, Request, and Changes.</p>
+
+      <h2>7.1 Department submission</h2>
+      <p>Displays the submitting department (e.g., Punjab Police), task ID, and submission date.</p>
+
+      <h2>7.2 Quantitative data</h2>
+      <p>For each indicator (e.g., “#3 Number of detainees provided access to legal counsel within 24 hours”):</p>
+      <ul>
+        <li>Year totals and Grand Total.</li>
+        <li>Gender Disaggregate table (Male, Female, Transgender, Unaccounted, Total).</li>
+        <li>Age Disaggregate table (Under 18, 18-60, Above 60, Unaccounted, Total).</li>
+      </ul>
+      <p>Additional disaggregations (Religion, PWDs, etc.) may appear depending on the indicator design. A “Back to regional responses” button returns to the list.</p>
+    </section>
+
+    <!-- 8. COMPILATION -->
+    <section id="compilation">
+      <h1>8. Compilation Center</h1>
+      <div class="screenshot-wrap">
+        <img src="images/7-compilation.png" alt="Compilation Center" loading="lazy" />
+        <div class="caption">Figure 7 – Compilation Center</div>
+      </div>
+      <p>The Compilation Center is where Federal Admin creates national-level compiled records from accepted regional (and departmental) responses.</p>
+
+      <h2>8.1 Main Compilation Area</h2>
+      <ul>
+        <li>Select an HR request from the dropdown.</li>
+        <li>Warning banner appears if no regional responses have been accepted yet – user is guided to accept them first.</li>
+        <li>Provincial submissions summary cards: Provinces Assigned, Submitted, Pending, Accepted (Review), Pending Review, Needs Modification.</li>
+        <li>List of provincial responses with checkboxes and status badges (only accepted provinces can be included).</li>
+        <li>Federal summary text area – Write the national summary drawing on provincial data and any ICT departmental submissions.</li>
+        <li><strong>Save draft</strong> / <strong>Submit</strong> buttons. Submission requires at least one accepted province (or ICT national line) selected.</li>
+      </ul>
+
+      <h2>8.2 Temporary compilation</h2>
+      <p>Allows on-the-fly compilation of any Under Review or Accepted provincial responses for requests not yet nationally compiled. Used for runtime PDF/Excel download only; nothing is saved to Compiled Records.</p>
+
+      <h2>8.3 Merge compiled records</h2>
+      <p>Select two or more already compiled records and download a single combined PDF or Word file containing each record’s full content.</p>
+    </section>
+
+    <!-- 9. COMPILED LIST -->
+    <section id="compiled-list">
+      <h1>9. Compiled Records List</h1>
+      <div class="screenshot-wrap">
+        <img src="images/8-compiled-records-list.png" alt="Compiled Records List" loading="lazy" />
+        <div class="caption">Figure 8 – Compiled Records List</div>
+      </div>
+      <p>Lists all national compiled records that have been submitted or saved as draft.</p>
+      <h2>9.1 Metrics</h2>
+      <p>Cards for Total Records, Submitted, and Draft.</p>
+      <h2>9.2 Filters & Export</h2>
+      <ul>
+        <li>Search by ID, request, title, regions, status…</li>
+        <li>Status filter, Reset filters, Export Excel.</li>
+      </ul>
+      <h2>9.3 Table Columns</h2>
+      <ul>
+        <li><strong>Record ID</strong> – Unique compiled record identifier (e.g., COMP-FIAR89OEPC).</li>
+        <li><strong>HR request</strong> – Linked original request ID (clickable).</li>
+        <li><strong>Title</strong> – “Compiled Report – …”.</li>
+        <li><strong>Regions</strong> – Provinces included.</li>
+        <li><strong>Status</strong> – Submitted / Draft.</li>
+        <li><strong>Compilation date</strong>.</li>
+        <li><strong>Actions</strong> – View, download, etc.</li>
+      </ul>
+    </section>
+
+    <!-- 10. COMPILED DETAIL -->
+    <section id="compiled-detail">
+      <h1>10. Viewing a Compiled Record</h1>
+      <div class="screenshot-wrap">
+        <img src="images/9-single-compiled record.png" alt="Detailed Compiled Record View" loading="lazy" />
+        <div class="caption">Figure 9 – Detailed Compiled Record View</div>
+      </div>
+      <p>A compiled record presents a complete national picture for a given request.</p>
+      <h2>10.1 Header</h2>
+      <p>Shows “NATIONAL COMPILATION”, title, status (Submitted), and linked request ID.</p>
+      <h2>10.2 Original request section</h2>
+      <ul>
+        <li>Request ID, Title, Reporting type, Due date, Assigned regions.</li>
+        <li>Convention & Concluding Observations / List of Issues with full description text.</li>
+        <li>Relevant Articles and Indicators for the request (with type Quantitative/Qualitative).</li>
+      </ul>
+      <h2>10.3 Regional response data</h2>
+      <p>Full quantitative tables with year totals, gender, age, religion, PWDs disaggregations, narrative fields, qualitative data, and “Other information (challenges)”.</p>
+      <h2>10.4 Summary & Downloads</h2>
+      <p>Federal summary text (or note if none was saved). Download options: <strong>PDF</strong>, <strong>Word</strong>, <strong>Excel</strong>.</p>
+    </section>
+
+    <!-- 11. USERS -->
+    <section id="users">
+      <h1>11. User Management</h1>
+      <div class="screenshot-wrap">
+        <img src="images/10-usermeangment.png" alt="User Management" loading="lazy" />
+        <div class="caption">Figure 10 – User Management</div>
+      </div>
+      <p>Federal Admin can view and manage users within the system scope.</p>
+      <h2>11.1 Tabs</h2>
+      <ul>
+        <li>Users List – Current users.</li>
+        <li>Create User – Form to add a new user.</li>
+      </ul>
+      <h2>11.2 Metrics & Filters</h2>
+      <p>Cards for Users in Scope, Active Users, Inactive Users. Search by name, username, email, region; filter by role and status.</p>
+      <h2>11.3 Users Table</h2>
+      <p>Columns: Name, Username, Role (e.g., department_admin), Region (ICT), Department, Status (Active), Action dropdown. Typical accounts include Ministry of Human Rights, Law & Justice, Education, Health, etc.</p>
+    </section>
+
+    <!-- 12. DEPARTMENTS -->
+    <section id="departments">
+      <h1>12. Manage Departments</h1>
+      <div class="screenshot-wrap">
+        <img src="images/11-department management.png" alt="Manage Departments" loading="lazy" />
+        <div class="caption">Figure 11 – Manage Departments</div>
+      </div>
+      <p>Allows administration of the organizational units that respond to requests.</p>
+      <h2>12.1 Tabs & Metrics</h2>
+      <p>Departments List / Create Department. Cards for Total Departments and Regions Represented.</p>
+      <h2>12.2 Table Columns</h2>
+      <ul>
+        <li><strong>Code</strong> (e.g., FED-LAW, FED-HEALTH, FED-EDU)</li>
+        <li><strong>Name</strong> (full ministry/department name)</li>
+        <li><strong>Type</strong> (law, health, education, or “–”)</li>
+        <li><strong>Region</strong> (predominantly ICT for federal line ministries)</li>
+        <li><strong>Action</strong> dropdown</li>
+      </ul>
+      <p>Examples include Election Commission of Pakistan, Ministry of Interior, Ministry of Law and Justice, Ministry of National Health Services, etc.</p>
+    </section>
+
+    <!-- 13. DEPT RESPONSES -->
+    <section id="dept-responses">
+      <h1>13. Departmental Responses</h1>
+      <div class="screenshot-wrap">
+        <img src="images/12-federal-deparment-responses.png" alt="Departmental Responses" loading="lazy" />
+        <div class="caption">Figure 12 – Departmental Responses</div>
+      </div>
+      <p>Tracks tasks assigned to federal departments (ICT line ministries) that form part of national responses.</p>
+      <h2>Metrics</h2>
+      <p>Total Tasks, Pending, Under Review, Revision, Accepted.</p>
+      <h2>Table</h2>
+      <p>Columns: Task ID, Request, Department, Workflow status, Assigned date, Submitted date, Actions. Federal Admin can review and accept departmental submissions similarly to regional ones.</p>
+    </section>
+
+    <!-- 14. REPORTING -->
+    <section id="reporting">
+      <h1>14. Reporting Dashboard</h1>
+      <div class="screenshot-wrap">
+        <img src="images/13-reporting dashboard.png" alt="Reporting Dashboard" loading="lazy" />
+        <div class="caption">Figure 13 – Reporting Dashboard</div>
+      </div>
+      <p>Analytical view focused on treaty reporting coverage and indicator response rates.</p>
+      <h2>14.1 Report Filters</h2>
+      <p>Convention, Article, List of Issues / Concluding Observations, Categories, Indicator, Year. Buttons: Reset filters / Apply filters / Save to PDF.</p>
+      <h2>14.2 Summary Cards & Charts</h2>
+      <ul>
+        <li>Articles count, List of Issues, Concluding Observations, Categories, Response Rate.</li>
+        <li>Records Status – Bar chart (Request data / Response data / Compiled data).</li>
+        <li>List of Issues / Concluding Observations – Donut chart.</li>
+        <li>Records by Region – Bar chart (Punjab, Sindh, KP, Balochistan).</li>
+      </ul>
+      <h2>14.3 Rankings</h2>
+      <p>Categories – Top 10 and Indicators – Top 10 with percentage bars.</p>
+    </section>
+
+    <!-- 15. GOVERNANCE -->
+    <section id="governance">
+      <h1>15. Governance Dashboard</h1>
+      <div class="screenshot-wrap">
+        <img src="images/14-governace dasboard.png" alt="Governance Dashboard" loading="lazy" />
+        <div class="caption">Figure 14 – Governance Dashboard</div>
+      </div>
+      <p>Focuses on long-term indicator trends and multi-dimensional analysis.</p>
+      <h2>Filters</h2>
+      <p>Convention, List of Issues / Concluding Observations, Categories, Indicators. At least one indicator must be selected to enable custom trend charts.</p>
+      <h2>Indicator Trends Visualizations</h2>
+      <ul>
+        <li>Line chart – e.g., Total number of deaths recorded in custody database (by year).</li>
+        <li>Bar chart – Number of prosecutions initiated following custodial deaths.</li>
+        <li>Pie chart – Number of survivors receiving legal aid (by year).</li>
+        <li>Multi-series line chart – Same metric broken down by dimensions (Age, Gender, Religion, Disability, Consolidated Data).</li>
+      </ul>
+    </section>
+
+    <!-- 16. KNOWLEDGE HUB -->
+    <section id="knowledge">
+      <h1>16. Knowledge Hub</h1>
+      <p>The Knowledge Hub provides reference material on the core human rights conventions, their articles, lists of issues, concluding observations, document repositories, and quantitative trackers.</p>
+
+      <h2>16.1 Seven Core Conventions</h2>
+      <div class="screenshot-wrap">
+        <img src="images/15-knowledge-hub-conventions.png" alt="Knowledge Hub – Core Conventions" loading="lazy" />
+        <div class="caption">Figure 15 – Knowledge Hub – Core Conventions Overview</div>
+      </div>
+      <p>Cards for each of the seven core treaties ratified by Pakistan:</p>
+      <ul>
+        <li><strong>ICERD</strong> – International Convention on the Elimination of All Forms of Racial Discrimination (Adopted 1965, Ratified 1966)</li>
+        <li><strong>ICCPR</strong> – International Covenant on Civil and Political Rights (1966 / 2010)</li>
+        <li><strong>ICESCR</strong> – International Covenant on Economic, Social and Cultural Rights (1966 / 2008)</li>
+        <li><strong>CEDAW</strong> – Convention on the Elimination of All Forms of Discrimination against Women (1979 / 1996)</li>
+        <li><strong>CAT</strong> – Convention against Torture… (1984 / 2010)</li>
+        <li><strong>CRC</strong> – Convention on the Rights of the Child (1989 / 1990)</li>
+        <li><strong>CRPD</strong> – Convention on the Rights of Persons with Disabilities (2006 / 2011)</li>
+      </ul>
+      <p>Clicking a convention opens its detailed pages.</p>
+    </section>
+
+    <section id="cat-overview">
+      <h2>16.2 CAT – Convention Overview</h2>
+      <div class="screenshot-wrap">
+        <img src="images/16-knowledge-hub-cat-1.png" alt="CAT Overview Tab" loading="lazy" />
+        <div class="caption">Figure 16 – CAT Overview Tab</div>
+      </div>
+      <p>Provides a narrative overview of the Committee against Torture, reporting obligations, individual communications, inquiries, inter-state complaints, the Optional Protocol and SPT, session schedule, and general comments.</p>
+    </section>
+
+    <section id="cat-articles">
+      <h2>16.3 CAT – Articles</h2>
+      <div class="screenshot-wrap">
+        <img src="images/17-knowledge-hub-cat-2.png" alt="CAT Articles Tab" loading="lazy" />
+        <div class="caption">Figure 17 – CAT Articles Tab (expandable list)</div>
+      </div>
+      <p>Lists all 33 articles of the Convention. Expanding an article shows its full text, related List of Issues, and linked Concluding Observations paragraphs.</p>
+    </section>
+
+    <section id="cat-loi">
+      <h2>16.4 CAT – List of Issues (LOI)</h2>
+      <div class="screenshot-wrap">
+        <img src="images/18-knowledge-hub-cat-3.png" alt="CAT List of Issues Table" loading="lazy" />
+        <div class="caption">Figure 18 – CAT List of Issues Table</div>
+      </div>
+      <p>Searchable table of LOIs with columns: Related articles, Category, List of Issues title, Status (Active), and View action. Categories include Criminalization of Torture, Fundamental Legal Safeguards, Gender-Based Violence, Non-Refoulement & Asylum, Training & Capacity Building, Prison Management, Healthcare, Redress, etc.</p>
+    </section>
+
+    <section id="cat-co">
+      <h2>16.5 CAT – Concluding Observations</h2>
+      <div class="screenshot-wrap">
+        <img src="images/19-knowledge-hub-cat-4.png" alt="CAT Concluding Observations Table" loading="lazy" />
+        <div class="caption">Figure 19 – CAT Concluding Observations Table</div>
+      </div>
+      <p>Table of concluding observation paragraphs linked to articles and thematic categories (Absolute Prohibition of Torture, Counter-Terrorism, Enforced Disappearances, Deaths in Custody, Gender-Based Violence, Training & Capacity Building, etc.). Each row has a View link for full text.</p>
+    </section>
+
+    <section id="cat-repo">
+      <h2>16.6 CAT – Repositories</h2>
+      <div class="screenshot-wrap">
+        <img src="images/20-knowledge-hub-cat-5.png" alt="CAT Document Repositories" loading="lazy" />
+        <div class="caption">Figure 20 – CAT Document Repositories</div>
+      </div>
+      <p>Organized by reporting cycle:</p>
+      <ul>
+        <li><strong>First cycle:</strong> Pakistan State Report 2016, Concluding observations (June 2017), Follow-up reply (2019).</li>
+        <li><strong>Second cycle:</strong> Pakistan second periodic report (Dec 2022), List of issues (2025), Replies of Pakistan (2025), Concluding Observation (2026).</li>
+      </ul>
+      <p>Documents are available as PDF or Word downloads.</p>
+    </section>
+
+    <section id="cat-tracker">
+      <h2>16.7 CAT Tracker (Quantitative)</h2>
+      <div class="screenshot-wrap">
+        <img src="images/21-knowledge-hub-cat-6.png" alt="Pakistan CAT Compliance Master Quantitative Tracker" loading="lazy" />
+        <div class="caption">Figure 21 – Pakistan CAT Compliance Master Quantitative Tracker</div>
+      </div>
+      <p>Provides flagship summary tables and graphs, including:</p>
+      <ul>
+        <li>Torture Act Prosecutions (2022 Act), 2019–2025 – Cases Sent, Convictions, Acquittals, Pending with bar chart.</li>
+        <li>Enforced Disappearances – Commission of Inquiry, 2019–2025 – Cases Received vs Disposed with line chart.</li>
+        <li>Custodial Deaths by Province, 2019–2024 – Provincial breakdown with multi-line chart.</li>
+        <li>Prison Occupancy by Province (2025 Snapshot) – Capacity, Population, Occupancy % with bar chart.</li>
+        <li>Gender-Based Violence: Cases Registered vs Convictions, 2022–2025.</li>
+      </ul>
+    </section>
+
+    <section id="cat-op">
+      <h2>16.8 CAT – Optional Protocol</h2>
+      <div class="screenshot-wrap">
+        <img src="images/22-knowledge-hub-cat-7.png" alt="Optional Protocol Tab" loading="lazy" />
+        <div class="caption">Figure 22 – Optional Protocol Tab</div>
+      </div>
+      <p>Currently shows a placeholder message: “No optional protocol content is available yet. A super administrator can add it from Super Admin → Conventions.”</p>
+    </section>
+
+    <!-- 17. WORKFLOW -->
+    <section id="workflow">
+      <h1>17. Typical End-to-End Workflow</h1>
+      <ol class="steps">
+        <li>Federal Admin creates a <strong>New Request</strong>, selects Convention, LOI or Concluding Observation, indicators, regions, and due date, then <strong>Submits</strong>.</li>
+        <li>Regions (and optionally ICT departments) receive tasks and submit consolidated quantitative/qualitative responses.</li>
+        <li>Federal Admin reviews responses in <strong>Regional Responses</strong> / <strong>Departmental Responses</strong>, accepts them or requests revision.</li>
+        <li>Once sufficient responses are Accepted, Federal Admin goes to <strong>Compilation Center</strong>, selects the request, checks accepted provinces, writes a federal summary, and <strong>Submits</strong> the national compiled record.</li>
+        <li>The compiled record appears under <strong>Compiled Records</strong> and can be downloaded in PDF, Word, or Excel.</li>
+        <li>Dashboards and the Knowledge Hub support ongoing monitoring, reporting, and reference.</li>
+      </ol>
+    </section>
+
+    <!-- 18. TIPS -->
+    <section id="tips">
+      <h1>18. Tips & Best Practices</h1>
+      <div class="callout tip">
+        <ul style="margin:0;padding-left:1.2rem;">
+          <li>Always accept regional responses before attempting national compilation; the system will warn otherwise.</li>
+          <li>Use “Save as Draft” liberally when building complex requests or compilations.</li>
+          <li>Leverage the Knowledge Hub LOI and Concluding Observations tables when mapping new requests to ensure correct article and indicator linkage.</li>
+          <li>Export Excel from list screens for offline analysis or archival.</li>
+          <li>Check the Governance Dashboard trends regularly to spot emerging patterns in key indicators such as custodial deaths or GBV cases.</li>
+          <li>Keep user and department lists up to date so that tasks are routed to the correct organizational units.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      <p>— End of User Manual —</p>
+      <p>HRIMS Federal Admin Workspace · September 2026 · Confidential – For Authorized Users Only</p>
+    </footer>
+  </main>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Close">×</button>
+    <img id="lightboxImg" src="" alt="Zoomed screenshot" />
+  </div>
+
+  <script>
+    // Mobile menu toggle
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+
+    // Close sidebar when clicking a link on mobile
+    sidebar.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        if (window.innerWidth <= 900) sidebar.classList.remove('open');
+      });
+    });
+
+    // Active link highlighting on scroll
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = sidebar.querySelectorAll('a[href^="#"]');
+    function highlightNav() {
+      let current = '';
+      sections.forEach(sec => {
+        const top = sec.offsetTop - 100;
+        if (window.scrollY >= top) current = sec.getAttribute('id');
+      });
+      navLinks.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+      });
+    }
+    window.addEventListener('scroll', highlightNav);
+    highlightNav();
+
+    // Lightbox zoom
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    const lightboxClose = document.getElementById('lightboxClose');
+
+    document.querySelectorAll('.screenshot-wrap img').forEach(img => {
+      img.addEventListener('click', () => {
+        lightboxImg.src = img.src;
+        lightboxImg.alt = img.alt;
+        lightbox.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      });
+    });
+
+    function closeLightbox() {
+      lightbox.classList.remove('active');
+      document.body.style.overflow = '';
+      lightboxImg.src = '';
+    }
+    lightboxClose.addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', e => {
+      if (e.target === lightbox) closeLightbox();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  </script>
+</body>
+</html>

@@ -50,12 +50,16 @@ import {
   LABEL_ACTIVE_REQUESTS,
   LABEL_ACTIVE_SHARE,
   LABEL_COMPILED_REPORTS,
+  LABEL_CONVENTION_INFO,
+  LABEL_DEPARTMENTAL_RESPONSES,
   LABEL_HUMAN_RIGHTS_INDICATORS,
+  LABEL_HRIMS_USER_MANUAL,
   LABEL_NEEDS_ATTENTION,
   LABEL_NEW_REQUESTS_SCOPE_6MO,
   LABEL_OPEN_TASKS,
   LABEL_PENDING_REQUESTS,
   LABEL_PERFORMANCE_OVERVIEW,
+  LABEL_REGIONAL_RESPONSE_PIPELINE,
   LABEL_REGIONAL_RESPONSES,
   LABEL_REPORTING_DASHBOARD,
   LABEL_REQUEST_MANAGEMENT,
@@ -289,6 +293,34 @@ export function DashboardPage() {
     variant === 'department' || variant === 'viewer'
       ? LABEL_TASKS_ASSIGNED_6MO
       : LABEL_NEW_REQUESTS_SCOPE_6MO
+
+  const statusStatsHeading = useMemo(() => {
+    if (variant === 'federal') {
+      return {
+        title: LABEL_REGIONAL_RESPONSE_PIPELINE,
+        subtitle:
+          'Provincial compilation responses on your federal requests — pending submission, under review, accepted, or needs modification.',
+      }
+    }
+    if (variant === 'regional') {
+      return {
+        title: LABEL_DEPARTMENTAL_RESPONSES,
+        subtitle:
+          'Department tasks in your province — pending, under review, revision, or accepted.',
+      }
+    }
+    if (variant === 'department' || variant === 'viewer') {
+      return {
+        title: 'Assigned Task Status',
+        subtitle:
+          'Your department’s assigned tasks — pending, under review, revision, or accepted.',
+      }
+    }
+    return {
+      title: 'Request Status',
+      subtitle: 'HR requests in your current scope — draft, active, and urgent queue.',
+    }
+  }, [variant])
 
   return (
     <div className="page-shell">
@@ -708,44 +740,52 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {variant === 'federal' ? (
-            <StatsCards
-              className="dashboard-status-stats"
-              items={[
-                { label: 'Pending Responses', value: pendingResponses, accent: '#ffb300' },
-                { label: 'Under Review', value: count(review, 'pending'), accent: '#5b8def' },
-                { label: 'Accepted', value: count(review, 'accepted'), accent: '#4caf50' },
-                {
-                  label: 'Needs Modification',
-                  value: count(review, 'needs-modification'),
-                  accent: '#00bcd4',
-                },
-              ]}
-            />
-          ) : variant === 'regional' || variant === 'department' || variant === 'viewer' ? (
-            <StatsCards
-              className="dashboard-status-stats"
-              items={[
-                { label: 'Pending', value: workflowPending, accent: '#ffb300' },
-                { label: 'Under Review', value: workflowReview, accent: '#00bcd4' },
-                { label: 'Revision', value: workflowRevision, accent: '#f44336' },
-                { label: 'Accepted', value: workflowAccepted, accent: '#4caf50' },
-              ]}
-            />
-          ) : (
-            <StatsCards
-              className="dashboard-status-stats"
-              items={[
-                {
-                  label: variant === 'minimal' ? 'Requests in scope' : 'HR requests',
-                  value: summary.hr_requests_total,
-                },
-                { label: 'Draft', value: draft, accent: '#ffb300' },
-                { label: 'Active', value: active, accent: '#00bcd4' },
-                { label: 'Urgent queue', value: urgentRequestCount, accent: '#4caf50' },
-              ]}
-            />
-          )}
+          <section className="dashboard-status-section">
+            <div className="dashboard-panel-head" style={{ marginBottom: 8 }}>
+              <div>
+                <h3 className="dashboard-panel-title">{statusStatsHeading.title}</h3>
+                <p className="dashboard-status-section__subtitle muted">{statusStatsHeading.subtitle}</p>
+              </div>
+            </div>
+            {variant === 'federal' ? (
+              <StatsCards
+                className="dashboard-status-stats"
+                items={[
+                  { label: 'Pending Responses', value: pendingResponses, accent: '#ffb300' },
+                  { label: 'Under Review', value: count(review, 'pending'), accent: '#5b8def' },
+                  { label: 'Accepted', value: count(review, 'accepted'), accent: '#4caf50' },
+                  {
+                    label: 'Needs Modification',
+                    value: count(review, 'needs-modification'),
+                    accent: '#00bcd4',
+                  },
+                ]}
+              />
+            ) : variant === 'regional' || variant === 'department' || variant === 'viewer' ? (
+              <StatsCards
+                className="dashboard-status-stats"
+                items={[
+                  { label: 'Pending', value: workflowPending, accent: '#ffb300' },
+                  { label: 'Under Review', value: workflowReview, accent: '#00bcd4' },
+                  { label: 'Revision', value: workflowRevision, accent: '#f44336' },
+                  { label: 'Accepted', value: workflowAccepted, accent: '#4caf50' },
+                ]}
+              />
+            ) : (
+              <StatsCards
+                className="dashboard-status-stats"
+                items={[
+                  {
+                    label: variant === 'minimal' ? 'Requests in scope' : 'HR requests',
+                    value: summary.hr_requests_total,
+                  },
+                  { label: 'Draft', value: draft, accent: '#ffb300' },
+                  { label: 'Active', value: active, accent: '#00bcd4' },
+                  { label: 'Urgent queue', value: urgentRequestCount, accent: '#4caf50' },
+                ]}
+              />
+            )}
+          </section>
 
           <section>
             <div className="dashboard-panel-head" style={{ marginBottom: 12 }}>
@@ -761,8 +801,15 @@ export function DashboardPage() {
                 <div className="card-icon" style={{ color: '#fff' }}>
                   <BookOpen size={28} />
                 </div>
-                <h3 className="card-title">Core Conventions</h3>
+                <h3 className="card-title">{LABEL_CONVENTION_INFO}</h3>
                 <p className="card-desc">Human rights treaties ratified by Pakistan and how they map into HRIMS.</p>
+              </button>
+              <button type="button" className="card" onClick={() => navigate('/upr')}>
+                <div className="card-icon" style={{ color: '#fff' }}>
+                  <RefreshCcw size={28} />
+                </div>
+                <h3 className="card-title">{LABEL_UNIVERSAL_PERIODIC_REVIEW}</h3>
+                <p className="card-desc">UPR cycle context and Concluding Observations tracking.</p>
               </button>
               <button
                 type="button"
@@ -775,19 +822,19 @@ export function DashboardPage() {
                 <h3 className="card-title">{LABEL_HUMAN_RIGHTS_INDICATORS}</h3>
                 <p className="card-desc">Key performance indicators across sectors and monitoring themes.</p>
               </button>
+              <button type="button" className="card" onClick={() => navigate('/user-manual')}>
+                <div className="card-icon" style={{ color: '#fff' }}>
+                  <FileText size={28} />
+                </div>
+                <h3 className="card-title">{LABEL_HRIMS_USER_MANUAL}</h3>
+                <p className="card-desc">Guidance for signing in, roles, requests, and using the Knowledge Hub.</p>
+              </button>
               <button type="button" className="card" onClick={() => navigate('/sdgs')}>
                 <div className="card-icon" style={{ color: '#fff' }}>
                   <Globe size={28} />
                 </div>
                 <h3 className="card-title">{LABEL_SUSTAINABLE_DEVELOPMENT_GOALS}</h3>
                 <p className="card-desc">SDG links and progress framing for national reporting.</p>
-              </button>
-              <button type="button" className="card" onClick={() => navigate('/upr')}>
-                <div className="card-icon" style={{ color: '#fff' }}>
-                  <RefreshCcw size={28} />
-                </div>
-                <h3 className="card-title">{LABEL_UNIVERSAL_PERIODIC_REVIEW}</h3>
-                <p className="card-desc">UPR cycle context and Concluding Observations tracking.</p>
               </button>
               </div>
             </div>

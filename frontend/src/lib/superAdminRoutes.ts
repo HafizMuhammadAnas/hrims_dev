@@ -6,6 +6,7 @@
 export const SUPER_ADMIN_PREFIX = '/catalog-mgmt'
 
 export const SUPER_ADMIN_ISSUES = `${SUPER_ADMIN_PREFIX}/issues`
+export const SUPER_ADMIN_UPR_MANAGEMENT = `${SUPER_ADMIN_PREFIX}/upr-management`
 export const SUPER_ADMIN_REGIONS_DISTRICTS = `${SUPER_ADMIN_PREFIX}/regions-districts`
 export const SUPER_ADMIN_CONVENTIONS = `${SUPER_ADMIN_PREFIX}/conventions`
 export const SUPER_ADMIN_GOVERNANCE_CHARTS = `${SUPER_ADMIN_PREFIX}/governance-charts`
@@ -27,6 +28,14 @@ export function superAdminConventionEditPath(conventionId: number | string): str
   return `${SUPER_ADMIN_CONVENTIONS}/${conventionId}/edit`
 }
 
+export function superAdminUprKnowledgeNewPath(): string {
+  return `${SUPER_ADMIN_UPR_RECOMMENDATIONS}/new`
+}
+
+export function superAdminUprKnowledgeEditPath(id: number | string): string {
+  return `${SUPER_ADMIN_UPR_RECOMMENDATIONS}/${id}/edit`
+}
+
 export function superAdminIssueViewPath(issueId: number): string {
   return `${SUPER_ADMIN_ISSUES}/view/${issueId}`
 }
@@ -41,6 +50,54 @@ export function superAdminArticleViewPath(articleId: number): string {
 
 export function superAdminIssuesArticlesPath(): string {
   return `${SUPER_ADMIN_ISSUES}/articles`
+}
+
+export function superAdminUprManagementCyclesPath(): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/cycles`
+}
+
+export function superAdminUprManagementCategoriesPath(): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/categories`
+}
+
+export function superAdminUprManagementTypeViewPath(id: number): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/types/view/${id}`
+}
+
+export function superAdminUprManagementCycleViewPath(id: number): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/cycles/view/${id}`
+}
+
+export function superAdminUprManagementCategoryViewPath(id: number): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/categories/view/${id}`
+}
+
+export function superAdminUprManagementRecommendationsPath(): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/recommendations`
+}
+
+export function superAdminUprManagementRecommendationViewPath(id: number): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/recommendations/view/${id}`
+}
+
+export function superAdminUprManagementCreatePath(): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/create`
+}
+
+export function superAdminUprManagementListPath(): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/list`
+}
+
+export function superAdminUprManagementIndicatorsPath(): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/indicators`
+}
+
+export function superAdminUprEntryViewPath(id: number): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/entries/view/${id}`
+}
+
+export function superAdminUprEntryEditPath(id: number): string {
+  return `${SUPER_ADMIN_UPR_MANAGEMENT}/entries/edit/${id}`
 }
 
 export function superAdminRegionsDistrictsDistrictsPath(): string {

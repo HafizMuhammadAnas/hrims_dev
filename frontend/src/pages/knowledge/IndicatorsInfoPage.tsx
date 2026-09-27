@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchKnowledgeIndicators, type KnowledgeStatCard } from '../../api/knowledgeHub'
+import {
+  fetchKnowledgeConventionIndicatorCatalog,
+  fetchKnowledgeConventions,
+  type KnowledgeConventionIndicatorCatalog,
+  type KnowledgeConventionListItem,
+} from '../../api/knowledgeHub'
+import { isApiError } from '../../api/apiError'
 import {
   KnowledgeHubCardsGrid,
   KnowledgeHubCard,
@@ -8,127 +14,132 @@ import {
   KnowledgeHubMutedProse,
   KnowledgeHubPage,
   KnowledgeHubPanel,
-  KnowledgeHubProse,
-  KnowledgeHubRecList,
   KnowledgeHubStateMessage,
-  KnowledgeHubTabs,
 } from '../../components/knowledge/KnowledgeHubUi'
-import { knowledgeStatCardIcon } from '../../lib/knowledgeCardIcons'
+import { TableCard } from '../../components/ui/TableCard'
+import { LABEL_HUMAN_RIGHTS_INDICATORS } from '../../lib/uiLabels'
+import { knowledgeConventionIcon } from '../../lib/knowledgeConventionIcons'
 
-const INDICATOR_TABS = ['Overview', 'Provincial context', 'Policies'] as const
-type IndicatorTab = (typeof INDICATOR_TABS)[number]
-
-function IndicatorDetail({ data, onBack }: { data: KnowledgeStatCard; onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<IndicatorTab>('Overview')
+function ConventionIndicatorsDetail({
+  data,
+  onBack,
+}: {
+  data: KnowledgeConventionIndicatorCatalog
+  onBack: () => void
+}) {
+  const { convention, categories_count, indicators_count, rows } = data
 
   return (
     <KnowledgeHubPage>
       <KnowledgeHubDetailHeader
-        title={data.title}
-        subtitle={data.summary}
-        icon={data.icon}
-        fallback="📊"
-        fallbackIcon={knowledgeStatCardIcon('indicators', data.title)}
+        title={convention.code}
+        subtitle={convention.name}
+        icon={convention.knowledge_icon}
+        fallback="📜"
+        fallbackIcon={knowledgeConventionIcon(convention.code)}
+        metaLines={[`Categories ${categories_count}`, `Indicators ${indicators_count}`]}
         onBack={onBack}
       />
 
-      <KnowledgeHubTabs
-        tabs={[...INDICATOR_TABS]}
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab as IndicatorTab)}
-      />
-
-      {activeTab === 'Overview' && (
-        <KnowledgeHubPanel title="About this indicator">
-          <KnowledgeHubProse>{data.summary?.trim() || data.title}</KnowledgeHubProse>
-          {data.body?.trim() ? (
-            <KnowledgeHubProse>{data.body.trim()}</KnowledgeHubProse>
-          ) : (
-            <KnowledgeHubMutedProse>
-              Time series, benchmarks, and comparative figures will appear here only when linked to approved official
-              sources in HRIMS.
-            </KnowledgeHubMutedProse>
-          )}
-        </KnowledgeHubPanel>
-      )}
-
-      {activeTab === 'Provincial context' && (
-        <KnowledgeHubPanel title="Provincial context">
+      <KnowledgeHubPanel title="Indicators by category">
+        {rows.length === 0 ? (
           <KnowledgeHubMutedProse>
-            Province-level breakdowns for this indicator are not shown until verified subnational data is provided and
-            configured for the knowledge hub.
+            No active indicators are linked to this convention yet. Categories and indicators are managed under Super
+            Admin → Issues & mappings.
           </KnowledgeHubMutedProse>
-        </KnowledgeHubPanel>
-      )}
-
-      {activeTab === 'Policies' && (
-        <KnowledgeHubPanel title="Related Policies & Acts">
-          <KnowledgeHubRecList
-            items={[
-              {
-                key: 'policy-1',
-                title: 'National Policy 2021',
-                details: `Framework for improving ${data.title.toLowerCase()} standards across all provinces.`,
-              },
-              {
-                key: 'policy-2',
-                title: 'Provincial Implementation Acts',
-                details: 'Specific legislative measures adopted by provincial assemblies.',
-              },
-            ]}
-          />
-        </KnowledgeHubPanel>
-      )}
+        ) : (
+          <TableCard className="knowledge-hub-indicator-catalog-card">
+            <table className="data-table knowledge-hub-indicator-catalog-table">
+              <thead>
+                <tr>
+                  <th scope="col">Category</th>
+                  <th scope="col">Indicator</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.indicator_id}>
+                    <td>{row.category_name}</td>
+                    <td>{row.indicator_text}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableCard>
+        )}
+      </KnowledgeHubPanel>
     </KnowledgeHubPage>
   )
 }
 
 export function IndicatorsInfoPage() {
-  const [cards, setCards] = useState<KnowledgeStatCard[]>([])
-  const [selected, setSelected] = useState<KnowledgeStatCard | null>(null)
+  const [rows, setRows] = useState<KnowledgeConventionListItem[]>([])
+  const [selected, setSelected] = useState<KnowledgeConventionIndicatorCatalog | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [openingId, setOpeningId] = useState<number | null>(null)
 
-  const load = useCallback(async () => {
+  const loadList = useCallback(async () => {
     setLoadError(null)
     setLoading(true)
     try {
-      setCards(await fetchKnowledgeIndicators())
-    } catch {
-      setCards([])
-      setLoadError('Could not load indicators from the server.')
+      setRows(await fetchKnowledgeConventions())
+    } catch (e: unknown) {
+      setLoadError(isApiError(e) ? e.message : 'Could not load conventions')
+      setRows([])
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void loadList()
+  }, [loadList])
+
+  async function openDetail(id: number) {
+    setLoadError(null)
+    setOpeningId(id)
+    try {
+      setSelected(await fetchKnowledgeConventionIndicatorCatalog(id))
+    } catch (e: unknown) {
+      setLoadError(isApiError(e) ? e.message : 'Could not load indicators for this convention')
+    } finally {
+      setOpeningId(null)
+    }
+  }
 
   if (selected) {
-    return <IndicatorDetail data={selected} onBack={() => setSelected(null)} />
+    return (
+      <ConventionIndicatorsDetail
+        key={selected.convention.id}
+        data={selected}
+        onBack={() => setSelected(null)}
+      />
+    )
   }
 
   return (
     <KnowledgeHubPage>
-      <KnowledgeHubListSection title="Human Rights Indicators">
-        <KnowledgeHubStateMessage error={loadError} loading={loading} empty={!loading && cards.length === 0} />
-        {!loading && cards.length > 0 ? (
+      <KnowledgeHubListSection title={LABEL_HUMAN_RIGHTS_INDICATORS}>
+        <KnowledgeHubStateMessage error={loadError} loading={loading} empty={!loading && rows.length === 0} />
+        {!loading && rows.length > 0 ? (
           <KnowledgeHubCardsGrid>
-            {cards.map((item) => (
+            {rows.map((c) => (
               <KnowledgeHubCard
-                key={item.id}
-                icon={item.icon}
-                fallback="📊"
-                fallbackIcon={knowledgeStatCardIcon('indicators', item.title)}
-                title={item.title}
-                description={item.summary}
-                stat1Value={item.stat_1_value}
-                stat1Label={item.stat_1_label}
-                stat2Value={item.stat_2_value}
-                stat2Label={item.stat_2_label}
-                onClick={() => setSelected(item)}
+                key={c.id}
+                icon={c.knowledge_icon}
+                fallback="📜"
+                fallbackIcon={knowledgeConventionIcon(c.code)}
+                title={c.code}
+                description={c.name}
+                stat1Value={String(c.categories_count ?? 0)}
+                stat1Label="Categories"
+                stat2Value={String(c.indicators_count ?? 0)}
+                stat2Label="Indicators"
+                onClick={() => {
+                  if (openingId != null) return
+                  void openDetail(c.id)
+                }}
               />
             ))}
           </KnowledgeHubCardsGrid>

@@ -14,6 +14,8 @@ export type KnowledgeConventionListItem = {
   knowledge_articles: string | null
   knowledge_implementation: string | null
   articles_count: number
+  categories_count?: number
+  indicators_count?: number
   description: string | null
   repositories?: import('../lib/conventionKnowledgeContent').ConventionRepositoryCycle[] | null
   optional_protocol_body?: string | null
@@ -135,6 +137,32 @@ export async function fetchKnowledgeConvention(id: number): Promise<KnowledgeCon
   return ((await res.json()) as { data: KnowledgeConventionDetail }).data
 }
 
+export type KnowledgeIndicatorCatalogRow = {
+  category_id: number | null
+  category_name: string
+  indicator_id: number
+  indicator_text: string
+  issue_id: number
+}
+
+export type KnowledgeConventionIndicatorCatalog = {
+  convention: KnowledgeConventionListItem
+  categories_count: number
+  indicators_count: number
+  rows: KnowledgeIndicatorCatalogRow[]
+}
+
+export async function fetchKnowledgeConventionIndicatorCatalog(
+  conventionId: number,
+): Promise<KnowledgeConventionIndicatorCatalog> {
+  const res = await fetch(`/api/v1/knowledge/conventions/${conventionId}/indicator-catalog`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  await throwIfNotOk(res)
+  return ((await res.json()) as { data: KnowledgeConventionIndicatorCatalog }).data
+}
+
 export async function fetchKnowledgeConventionArticles(
   conventionId: number,
 ): Promise<KnowledgeConventionArticle[]> {
@@ -193,4 +221,46 @@ export async function fetchKnowledgeUprHighlights(): Promise<KnowledgeStatCard[]
   })
   await throwIfNotOk(res)
   return ((await res.json()) as { data: KnowledgeStatCard[] }).data
+}
+
+export type KnowledgeUprDocument = {
+  id: string
+  title: string
+  href: string
+  type_label: string
+  icon: string
+  file_name: string
+  path?: string
+}
+
+export type KnowledgeUprEntry = {
+  id: number
+  kind: string
+  title: string | null
+  display_title: string
+  upr_cycle_id: number | null
+  cycle?: { id: number; name: string } | null
+  introduction: string | null
+  repositories: Record<string, KnowledgeUprDocument | null>
+  repository_labels: Record<string, string>
+  analysis_files: KnowledgeUprDocument[]
+  sort_order: number
+}
+
+export async function fetchKnowledgeUprEntries(): Promise<KnowledgeUprEntry[]> {
+  const res = await fetch('/api/v1/knowledge/upr-entries', {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  await throwIfNotOk(res)
+  return ((await res.json()) as { data: KnowledgeUprEntry[] }).data
+}
+
+export async function fetchKnowledgeUprEntry(id: number): Promise<KnowledgeUprEntry> {
+  const res = await fetch(`/api/v1/knowledge/upr-entries/${id}`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  await throwIfNotOk(res)
+  return ((await res.json()) as { data: KnowledgeUprEntry }).data
 }

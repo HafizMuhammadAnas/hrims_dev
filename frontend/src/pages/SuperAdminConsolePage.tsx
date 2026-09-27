@@ -16,9 +16,11 @@ import {
   adminFetchConventionComponents,
   adminFetchConventions,
   adminFetchKnowledgeCards,
+  adminFetchKnowledgeUprEntries,
   adminFetchRegionsPublic,
   adminFetchSdgNodes,
   adminFetchUpr,
+  adminDeleteKnowledgeUprEntry,
   adminUpdateConventionComponent,
   adminUpdateDepartment,
   adminUpdateKnowledgeCard,
@@ -44,8 +46,11 @@ import { uprConcludingObservationsLabel } from '../lib/issueEntryKind'
 import {
   superAdminConventionEditPath,
   superAdminConventionsNewPath,
+  superAdminUprKnowledgeEditPath,
+  superAdminUprKnowledgeNewPath,
   SUPER_ADMIN_ISSUES,
 } from '../lib/superAdminRoutes'
+import { knowledgeUprKindLabel } from '../lib/knowledgeUprContent'
 
 type Tab =
   | 'departments'
@@ -76,8 +81,9 @@ const TAB_PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
     subtitle: 'Sustainable Development Goal, target, and indicator nodes for mapping and knowledge hub goals.',
   },
   upr: {
-    title: uprConcludingObservationsLabel(),
-    subtitle: 'Universal Periodic Review Concluding Observation rows for workflows and LOI mapping.',
+    title: 'UPR for Knowledge Hub',
+    subtitle:
+      'Create Supported / Noted / Others entries with Overview, Repositories, and Analysis for Knowledge Hub → Universal Periodic Review.',
   },
   hub: {
     title: `${LABEL_KNOWLEDGE_HUB} Pages`,
@@ -99,7 +105,7 @@ export function SuperAdminConsolePage() {
   const [convComponents, setConvComponents] = useState<Awaited<ReturnType<typeof adminFetchConventionComponents>>>([])
   const [selConv, setSelConv] = useState<number | ''>('')
   const [sdgNodes, setSdgNodes] = useState<Awaited<ReturnType<typeof adminFetchSdgNodes>>>([])
-  const [uprRows, setUprRows] = useState<Awaited<ReturnType<typeof adminFetchUpr>>>([])
+  const [uprRows, setUprRows] = useState<Awaited<ReturnType<typeof adminFetchKnowledgeUprEntries>>>([])
 
   const [editingDeptId, setEditingDeptId] = useState<number | null>(null)
   const [editDeptRegionIds, setEditDeptRegionIds] = useState<number[]>([])
@@ -161,7 +167,7 @@ export function SuperAdminConsolePage() {
         }
       }
       if (tab === 'sdg') setSdgNodes(await adminFetchSdgNodes())
-      if (tab === 'upr') setUprRows(await adminFetchUpr())
+      if (tab === 'upr') setUprRows(await adminFetchKnowledgeUprEntries())
       if (tab === 'hub') {
         setKnowledgeIndicatorCards(await adminFetchKnowledgeCards('indicators'))
         setKnowledgeUprCards(await adminFetchKnowledgeCards('upr'))
@@ -699,98 +705,46 @@ export function SuperAdminConsolePage() {
 
       {tab === 'upr' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>{uprConcludingObservationsLabel()}</h3>
+          <h3 style={{ marginTop: 0 }}>UPR for Knowledge Hub</h3>
           <p className="text-muted">
-            Use <strong>Edit</strong> to add narrative <strong>Body</strong> text shown with each Concluding Observation where
-            the app links to UPR content.
+            Create a UPR entry (Supported, Noted, or Others), then use <strong>Edit</strong> to fill Overview,
+            Repositories, and Analysis. Those sections appear as tabs on Knowledge Hub → Universal Periodic Review.
           </p>
-          <UprForm
-            busy={busy}
-            setBusy={setBusy}
-            setError={setError}
-            onDone={async () => setUprRows(await adminFetchUpr())}
-          />
+          <div style={{ marginBottom: 16 }}>
+            <Button variant="primary" compact onClick={() => navigate(superAdminUprKnowledgeNewPath())}>
+              Create UPR
+            </Button>
+          </div>
           <table className="data-table" style={{ marginTop: 16 }}>
             <thead>
               <tr>
-                <th>Session</th>
-                <th>Code</th>
+                <th>Kind</th>
                 <th>Title</th>
+                <th>Cycle</th>
+                <th>Status</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {uprRows.map((u) =>
-                editingUprId === u.id ? (
+              {uprRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="muted">
+                    No UPR Knowledge Hub entries yet.
+                  </td>
+                </tr>
+              ) : (
+                uprRows.map((u) => (
                   <tr key={u.id}>
-                    <td colSpan={3}>
-                      <FormGrid>
-                        <FormRow twoCol>
-                          <FormControl label="Session">
-                            <input value={editUprSession} onChange={(e) => setEditUprSession(e.target.value)} />
-                          </FormControl>
-                          <FormControl label="Code">
-                            <input value={editUprCode} onChange={(e) => setEditUprCode(e.target.value)} />
-                          </FormControl>
-                        </FormRow>
-                        <FormField label="Title">
-                          <input value={editUprTitle} onChange={(e) => setEditUprTitle(e.target.value)} />
-                        </FormField>
-                        <FormField label="Body / extended information">
-                          <textarea
-                            rows={4}
-                            placeholder="Body / extended information"
-                            value={editUprBody}
-                            onChange={(e) => setEditUprBody(e.target.value)}
-                          />
-                        </FormField>
-                      </FormGrid>
-                    </td>
-                    <td>
-                      <Button
-                        variant="primary"
-                        compact
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await adminUpdateUpr(u.id, {
-                                session_label: editUprSession.trim(),
-                                code: editUprCode.trim(),
-                                title: editUprTitle.trim(),
-                                body: editUprBody.trim() || null,
-                              })
-                              setEditingUprId(null)
-                              setUprRows(await adminFetchUpr())
-                            } catch (e: unknown) {
-                              setError(isApiError(e) ? e.message : 'Update failed')
-                            }
-                          })()
-                        }}
-                      >
-                        Save
-                      </Button>{' '}
-                      <Button variant="link" compact onClick={() => setEditingUprId(null)}>
-                        Cancel
-                      </Button>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={u.id}>
-                    <td>{u.session_label}</td>
-                    <td>{u.code}</td>
-                    <td>{u.title}</td>
+                    <td>{knowledgeUprKindLabel(u.kind)}</td>
+                    <td>{u.display_title}</td>
+                    <td>{u.cycle?.name || '—'}</td>
+                    <td>{u.is_active !== false ? 'Active' : 'Inactive'}</td>
                     <td>
                       <ActionMenu>
                         <Button
                           variant="link"
                           compact
-                          onClick={() => {
-                            setEditingUprId(u.id)
-                            setEditUprSession(u.session_label)
-                            setEditUprCode(u.code)
-                            setEditUprTitle(u.title)
-                            setEditUprBody(u.body ?? '')
-                          }}
+                          onClick={() => navigate(superAdminUprKnowledgeEditPath(u.id))}
                         >
                           Edit
                         </Button>
@@ -798,10 +752,11 @@ export function SuperAdminConsolePage() {
                           variant="link"
                           dangerLink
                           onClick={() => {
+                            if (!window.confirm(`Delete “${u.display_title}”?`)) return
                             void (async () => {
                               try {
-                                await adminDeleteUpr(u.id)
-                                setUprRows(await adminFetchUpr())
+                                await adminDeleteKnowledgeUprEntry(u.id)
+                                setUprRows(await adminFetchKnowledgeUprEntries())
                               } catch (e: unknown) {
                                 setError(isApiError(e) ? e.message : 'Delete failed')
                               }
@@ -813,7 +768,7 @@ export function SuperAdminConsolePage() {
                       </ActionMenu>
                     </td>
                   </tr>
-                ),
+                ))
               )}
             </tbody>
           </table>

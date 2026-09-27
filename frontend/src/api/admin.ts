@@ -80,6 +80,51 @@ export type AdminUpr = {
   body: string | null
   sort_order: number
 }
+
+export type AdminUprType = {
+  id: number
+  name: string
+  sort_order: number
+  is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type AdminUprCycle = {
+  id: number
+  upr_type_id: number | null
+  type?: { id: number; name: string } | null
+  name: string
+  sort_order: number
+  is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type AdminUprCategory = {
+  id: number
+  upr_cycle_id: number | null
+  cycle?: { id: number; name: string; upr_type_id?: number | null } | null
+  name: string
+  sort_order: number
+  is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type AdminUprRecommendationEntry = {
+  id: number
+  upr_cycle_id: number
+  upr_category_id: number
+  cycle?: { id: number; name: string; upr_type_id?: number | null } | null
+  category?: { id: number; name: string; upr_cycle_id?: number | null } | null
+  name: string
+  sort_order: number
+  is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 export type AdminKnowledgeCard = {
   id: number
   section: string
@@ -525,6 +570,379 @@ export async function adminUpdateUpr(
   await throwIfNotOk(res)
   return (await res.json()).data as AdminUpr
 }
+
+export async function adminFetchUprTypes(): Promise<AdminUprType[]> {
+  const json = await adminGet<{ data: AdminUprType[] }>('/upr-types')
+  return json.data
+}
+
+export async function adminCreateUprType(body: {
+  name: string
+  sort_order?: number
+  is_active?: boolean
+}): Promise<AdminUprType> {
+  const res = await adminSend('POST', '/upr-types', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprType
+}
+
+export async function adminUpdateUprType(
+  id: number,
+  body: Partial<{
+    name: string
+    sort_order: number
+    is_active: boolean
+  }>,
+): Promise<AdminUprType> {
+  const res = await adminSend('POST', `/upr-types/${id}/update`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprType
+}
+
+export async function adminDeleteUprType(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/upr-types/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchUprCycles(typeId?: number): Promise<AdminUprCycle[]> {
+  const qs = typeId != null ? `?upr_type_id=${encodeURIComponent(String(typeId))}` : ''
+  const json = await adminGet<{ data: AdminUprCycle[] }>(`/upr-cycles${qs}`)
+  return json.data
+}
+
+export async function adminCreateUprCycle(body: {
+  name: string
+  upr_type_id: number
+  sort_order?: number
+  is_active?: boolean
+}): Promise<AdminUprCycle> {
+  const res = await adminSend('POST', '/upr-cycles', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprCycle
+}
+
+export async function adminUpdateUprCycle(
+  id: number,
+  body: Partial<{
+    name: string
+    upr_type_id: number
+    sort_order: number
+    is_active: boolean
+  }>,
+): Promise<AdminUprCycle> {
+  const res = await adminSend('POST', `/upr-cycles/${id}/update`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprCycle
+}
+
+export async function adminDeleteUprCycle(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/upr-cycles/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchUprCategories(cycleId?: number): Promise<AdminUprCategory[]> {
+  const qs = cycleId != null ? `?upr_cycle_id=${encodeURIComponent(String(cycleId))}` : ''
+  const json = await adminGet<{ data: AdminUprCategory[] }>(`/upr-categories${qs}`)
+  return json.data
+}
+
+export async function adminCreateUprCategory(body: {
+  name: string
+  upr_cycle_id?: number | null
+  sort_order?: number
+  is_active?: boolean
+}): Promise<AdminUprCategory> {
+  const res = await adminSend('POST', '/upr-categories', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprCategory
+}
+
+export async function adminUpdateUprCategory(
+  id: number,
+  body: Partial<{
+    name: string
+    upr_cycle_id: number | null
+    sort_order: number
+    is_active: boolean
+  }>,
+): Promise<AdminUprCategory> {
+  const res = await adminSend('POST', `/upr-categories/${id}/update`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprCategory
+}
+
+export async function adminDeleteUprCategory(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/upr-categories/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminFetchUprRecommendationEntries(filters?: {
+  cycleId?: number
+  categoryId?: number
+}): Promise<AdminUprRecommendationEntry[]> {
+  const q = new URLSearchParams()
+  if (filters?.cycleId != null) q.set('upr_cycle_id', String(filters.cycleId))
+  if (filters?.categoryId != null) q.set('upr_category_id', String(filters.categoryId))
+  const qs = q.toString() ? `?${q}` : ''
+  const json = await adminGet<{ data: AdminUprRecommendationEntry[] }>(`/upr-recommendation-entries${qs}`)
+  return json.data
+}
+
+export async function adminCreateUprRecommendationEntry(body: {
+  upr_cycle_id: number
+  upr_category_id: number
+  name: string
+  sort_order?: number
+  is_active?: boolean
+}): Promise<AdminUprRecommendationEntry> {
+  const res = await adminSend('POST', '/upr-recommendation-entries', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprRecommendationEntry
+}
+
+export async function adminUpdateUprRecommendationEntry(
+  id: number,
+  body: Partial<{
+    upr_cycle_id: number
+    upr_category_id: number
+    name: string
+    sort_order: number
+    is_active: boolean
+  }>,
+): Promise<AdminUprRecommendationEntry> {
+  const res = await adminSend('POST', `/upr-recommendation-entries/${id}/update`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprRecommendationEntry
+}
+
+export async function adminDeleteUprRecommendationEntry(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/upr-recommendation-entries/${id}`)
+  await throwIfNotOk(res)
+}
+
+export type AdminUprEntryIndicator = {
+  id: number
+  indicator_text: string
+  has_quantitative: boolean
+  has_qualitative: boolean
+  collects_by_gender: boolean
+  collects_by_age: boolean
+  collects_by_location: boolean
+  collects_by_disability: boolean
+  collects_by_religion: boolean
+  collects_by_consolidated: boolean
+  sort_order: number
+  is_active: boolean
+}
+
+export type AdminUprEntry = {
+  id: number
+  upr_type_id: number
+  upr_cycle_id: number
+  upr_category_id: number
+  is_dummy: boolean
+  has_quantitative: boolean
+  has_qualitative: boolean
+  is_active: boolean
+  type?: { id: number; name: string } | null
+  cycle?: { id: number; name: string; upr_type_id?: number | null } | null
+  category?: { id: number; name: string; upr_cycle_id?: number | null } | null
+  recommendations: Array<{
+    id: number
+    name: string
+    upr_cycle_id: number
+    upr_category_id: number
+  }>
+  recommendation_ids: number[]
+  indicators: AdminUprEntryIndicator[]
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type AdminUprEntryPayload = {
+  upr_type_id: number
+  upr_cycle_id: number
+  upr_category_id: number
+  is_dummy?: boolean
+  has_quantitative?: boolean
+  has_qualitative?: boolean
+  indicators?: Array<{
+    indicator_text: string
+    has_quantitative?: boolean
+    has_qualitative?: boolean
+    collects_by_gender?: boolean
+    collects_by_age?: boolean
+    collects_by_location?: boolean
+    collects_by_disability?: boolean
+    collects_by_religion?: boolean
+    collects_by_consolidated?: boolean
+  }>
+}
+
+export async function adminFetchUprEntries(): Promise<AdminUprEntry[]> {
+  const json = await adminGet<{ data: AdminUprEntry[] }>('/upr-entries')
+  return json.data
+}
+
+export async function adminFetchUprEntry(id: number): Promise<AdminUprEntry> {
+  const json = await adminGet<{ data: AdminUprEntry }>(`/upr-entries/${id}`)
+  return json.data
+}
+
+export async function adminCreateUprEntry(body: AdminUprEntryPayload): Promise<AdminUprEntry> {
+  const res = await adminSend('POST', '/upr-entries', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprEntry
+}
+
+export async function adminUpdateUprEntry(
+  id: number,
+  body: Partial<AdminUprEntryPayload> & {
+    is_active?: boolean
+    indicators?: Array<{
+      id?: number
+      indicator_text: string
+      has_quantitative?: boolean
+      has_qualitative?: boolean
+      collects_by_gender?: boolean
+      collects_by_age?: boolean
+      collects_by_location?: boolean
+      collects_by_disability?: boolean
+      collects_by_religion?: boolean
+      collects_by_consolidated?: boolean
+    }>
+  },
+): Promise<AdminUprEntry> {
+  const res = await adminSend('POST', `/upr-entries/${id}/update`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminUprEntry
+}
+
+export async function adminDeleteUprEntry(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/upr-entries/${id}`)
+  await throwIfNotOk(res)
+}
+
+export type AdminKnowledgeUprKind = 'supported' | 'noted' | 'others'
+
+export type AdminKnowledgeUprDocument = {
+  id: string
+  title: string
+  href: string
+  type_label: string
+  icon: string
+  file_name: string
+  path?: string
+}
+
+export type AdminKnowledgeUprEntry = {
+  id: number
+  kind: AdminKnowledgeUprKind | string
+  title: string | null
+  display_title: string
+  upr_cycle_id: number | null
+  cycle?: { id: number; name: string; upr_type_id?: number | null } | null
+  introduction: string | null
+  repositories: Record<string, AdminKnowledgeUprDocument | null>
+  repository_labels: Record<string, string>
+  analysis_files: AdminKnowledgeUprDocument[]
+  sort_order: number
+  is_active: boolean
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type AdminKnowledgeUprEntryPayload = {
+  kind: AdminKnowledgeUprKind
+  title?: string | null
+  upr_cycle_id: number | null
+  introduction?: string | null
+  repositories?: Record<string, AdminKnowledgeUprDocument | null>
+  analysis_files?: AdminKnowledgeUprDocument[]
+  sort_order?: number
+  is_active?: boolean
+}
+
+export async function adminFetchKnowledgeUprEntries(): Promise<AdminKnowledgeUprEntry[]> {
+  const json = await adminGet<{ data: AdminKnowledgeUprEntry[] }>('/knowledge-upr-entries')
+  return json.data
+}
+
+export async function adminFetchKnowledgeUprEntry(id: number): Promise<AdminKnowledgeUprEntry> {
+  const json = await adminGet<{ data: AdminKnowledgeUprEntry }>(`/knowledge-upr-entries/${id}`)
+  return json.data
+}
+
+export async function adminCreateKnowledgeUprEntry(
+  body: AdminKnowledgeUprEntryPayload,
+): Promise<AdminKnowledgeUprEntry> {
+  const res = await adminSend('POST', '/knowledge-upr-entries', body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminKnowledgeUprEntry
+}
+
+export async function adminUpdateKnowledgeUprEntry(
+  id: number,
+  body: Partial<AdminKnowledgeUprEntryPayload>,
+): Promise<AdminKnowledgeUprEntry> {
+  const res = await adminSend('POST', `/knowledge-upr-entries/${id}/update`, body)
+  await throwIfNotOk(res)
+  return (await res.json()).data as AdminKnowledgeUprEntry
+}
+
+export async function adminDeleteKnowledgeUprEntry(id: number): Promise<void> {
+  const res = await adminSend('DELETE', `/knowledge-upr-entries/${id}`)
+  await throwIfNotOk(res)
+}
+
+export async function adminUploadKnowledgeUprFiles(
+  files: File[],
+  purpose: 'repository' | 'analysis',
+  entryId?: number | null,
+): Promise<AdminKnowledgeUprDocument[]> {
+  if (files.length === 0) return []
+  await ensureCsrfCookie()
+  const fd = new FormData()
+  files.forEach((file, index) => {
+    fd.append(`files[${index}]`, file)
+  })
+  fd.append('purpose', purpose)
+  if (entryId != null && Number.isFinite(entryId)) {
+    fd.append('knowledge_upr_entry_id', String(entryId))
+  }
+  const res = await fetch('/api/v1/admin/knowledge-upr-entries/files', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiMultipartHeaders(),
+    body: fd,
+  })
+  await throwIfNotOk(res)
+  return ((await res.json()) as { data: AdminKnowledgeUprDocument[] }).data
+}
+
+export async function adminDeleteKnowledgeUprFile(doc: {
+  path?: string
+  href?: string
+}): Promise<void> {
+  const path = doc.path?.trim()
+  let token: string | undefined
+  if (!path && doc.href) {
+    const marker = '/api/v1/repository-files/'
+    const idx = doc.href.indexOf(marker)
+    if (idx >= 0) token = doc.href.slice(idx + marker.length).split(/[?#]/)[0]
+  }
+  if (!path && !token) return
+  await ensureCsrfCookie()
+  const res = await fetch('/api/v1/admin/knowledge-upr-entries/files/delete', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify(path ? { path } : { token }),
+  })
+  await throwIfNotOk(res)
+}
+
+
 
 export async function adminFetchKnowledgeCards(section: 'indicators' | 'upr'): Promise<AdminKnowledgeCard[]> {
   const json = await adminGet<{ data: AdminKnowledgeCard[] }>(`/knowledge-cards?section=${section}`)

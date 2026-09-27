@@ -13,6 +13,7 @@ import { ConventionsInfoPage } from './pages/knowledge/ConventionsInfoPage'
 import { IndicatorsInfoPage } from './pages/knowledge/IndicatorsInfoPage'
 import { SdgsInfoPage } from './pages/knowledge/SdgsInfoPage'
 import { UprInfoPage } from './pages/knowledge/UprInfoPage'
+import { UserManualInfoPage } from './pages/knowledge/UserManualInfoPage'
 import { UprRequestsPage } from './pages/UprRequestsPage'
 import { LoginPage } from './pages/LoginPage'
 import { ManageDepartmentsPage } from './pages/ManageDepartmentsPage'
@@ -31,6 +32,8 @@ import { IssuesMappingsAdminPage } from './pages/IssuesMappingsAdminPage'
 import { RegionsDistrictsAdminPage } from './pages/RegionsDistrictsAdminPage'
 import { ConventionEditorPage } from './pages/ConventionEditorPage'
 import { SuperAdminConsolePage } from './pages/SuperAdminConsolePage'
+import { UprKnowledgeEditorPage } from './pages/UprKnowledgeEditorPage'
+import { UprManagementAdminPage } from './pages/UprManagementAdminPage'
 import { UserManagementPage } from './pages/UserManagementPage'
 import { ViolationEntriesPage } from './pages/ViolationEntriesPage'
 import { LegacyAdminRedirect } from './components/LegacyAdminRedirect'
@@ -165,9 +168,10 @@ function App() {
               <Route path="governance-dashboard" element={<GovernanceDashboardPage />} />
               <Route path="analysis" element={<Navigate to="/report-generator" replace />} />
               <Route path="conventions" element={<ConventionsInfoPage />} />
-              <Route path="indicators" element={<IndicatorsInfoPage />} />
-              <Route path="sdgs" element={<SdgsInfoPage />} />
               <Route path="upr" element={<UprInfoPage />} />
+              <Route path="indicators" element={<IndicatorsInfoPage />} />
+              <Route path="user-manual" element={<UserManualInfoPage />} />
+              <Route path="sdgs" element={<SdgsInfoPage />} />
               <Route path="violation-entries" element={<ViolationEntriesPage />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="catalog-mgmt" element={<Navigate to="/catalog-mgmt/issues" replace />} />
@@ -176,6 +180,26 @@ function App() {
               <Route path="catalog-mgmt/issues/articles/view/:articleId" element={<IssuesMappingsAdminPage />} />
               <Route path="catalog-mgmt/issues" element={<IssuesMappingsAdminPage />} />
               <Route path="catalog-mgmt/issues/:issuesView" element={<IssuesMappingsAdminPage />} />
+              <Route path="catalog-mgmt/upr-management" element={<UprManagementAdminPage />} />
+              <Route path="catalog-mgmt/upr-management/types/view/:recordId" element={<UprManagementAdminPage />} />
+              <Route path="catalog-mgmt/upr-management/cycles/view/:recordId" element={<UprManagementAdminPage />} />
+              <Route
+                path="catalog-mgmt/upr-management/categories/view/:recordId"
+                element={<UprManagementAdminPage />}
+              />
+              <Route
+                path="catalog-mgmt/upr-management/recommendations/view/:recordId"
+                element={<UprManagementAdminPage />}
+              />
+              <Route
+                path="catalog-mgmt/upr-management/entries/view/:recordId"
+                element={<UprManagementAdminPage />}
+              />
+              <Route
+                path="catalog-mgmt/upr-management/entries/edit/:recordId"
+                element={<UprManagementAdminPage />}
+              />
+              <Route path="catalog-mgmt/upr-management/:uprView" element={<UprManagementAdminPage />} />
               <Route path="catalog-mgmt/regions-districts" element={<RegionsDistrictsAdminPage />} />
               <Route path="catalog-mgmt/regions-districts/:geoView" element={<RegionsDistrictsAdminPage />} />
               <Route path="catalog-mgmt/governance-charts" element={<GovernanceDefaultChartsAdminPage />} />
@@ -184,6 +208,8 @@ function App() {
               <Route path="catalog-mgmt/indicator-wise-data/view/:recordId" element={<IndicatorWiseDataAdminPage />} />
               <Route path="catalog-mgmt/conventions/new" element={<ConventionEditorPage />} />
               <Route path="catalog-mgmt/conventions/:conventionId/edit" element={<ConventionEditorPage />} />
+              <Route path="catalog-mgmt/upr-recommendations/new" element={<UprKnowledgeEditorPage />} />
+              <Route path="catalog-mgmt/upr-recommendations/:entryId/edit" element={<UprKnowledgeEditorPage />} />
               <Route path="catalog-mgmt/:section" element={<SuperAdminConsolePage />} />
               <Route path="admin/*" element={<LegacyAdminRedirect />} />
             </Route>

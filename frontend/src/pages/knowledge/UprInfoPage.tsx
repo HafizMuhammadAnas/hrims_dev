@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchKnowledgeUprHighlights, type KnowledgeStatCard } from '../../api/knowledgeHub'
+import {
+  fetchKnowledgeUprEntries,
+  type KnowledgeUprDocument,
+  type KnowledgeUprEntry,
+} from '../../api/knowledgeHub'
 import {
   KnowledgeHubCardsGrid,
   KnowledgeHubCard,
@@ -9,86 +13,157 @@ import {
   KnowledgeHubPage,
   KnowledgeHubPanel,
   KnowledgeHubProse,
-  KnowledgeHubRecList,
   KnowledgeHubStateMessage,
   KnowledgeHubTabs,
 } from '../../components/knowledge/KnowledgeHubUi'
-import { knowledgeStatCardIcon } from '../../lib/knowledgeCardIcons'
+import {
+  KNOWLEDGE_UPR_REPOSITORY_KEYS,
+  KNOWLEDGE_UPR_REPOSITORY_LABELS,
+  knowledgeUprKindLabel,
+  type KnowledgeUprRepositoryKey,
+} from '../../lib/knowledgeUprContent'
 
-const UPR_TABS = ['Breakdown', 'Response', 'Action Plan'] as const
+const UPR_TABS = ['Overview', 'Repositories', 'Analysis'] as const
 type UprTab = (typeof UPR_TABS)[number]
 
-function UprDetail({ data, onBack }: { data: KnowledgeStatCard; onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<UprTab>('Breakdown')
+function repositoryEntries(entry: KnowledgeUprEntry): Array<{
+  key: KnowledgeUprRepositoryKey
+  label: string
+  doc: KnowledgeUprDocument | null
+}> {
+  return KNOWLEDGE_UPR_REPOSITORY_KEYS.map((key) => ({
+    key,
+    label: entry.repository_labels?.[key] || KNOWLEDGE_UPR_REPOSITORY_LABELS[key],
+    doc: entry.repositories?.[key] ?? null,
+  }))
+}
+
+function UprDetail({ data, onBack }: { data: KnowledgeUprEntry; onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<UprTab>('Overview')
+  const [activeHtml, setActiveHtml] = useState<KnowledgeUprDocument | null>(
+    data.analysis_files[0] ?? null,
+  )
+  const repos = repositoryEntries(data)
+  const cycleLabel = data.cycle?.name?.trim() || 'UPR'
 
   return (
     <KnowledgeHubPage>
       <KnowledgeHubDetailHeader
-        title={data.title}
-        subtitle="Universal Periodic Review — thematic area (4th cycle)"
-        icon={data.icon}
+        title={data.display_title}
+        subtitle={`${knowledgeUprKindLabel(data.kind)} — ${cycleLabel}`}
+        icon="📋"
         fallback="📋"
-        fallbackIcon={knowledgeStatCardIcon('upr', data.title)}
         onBack={onBack}
       />
 
-      <KnowledgeHubTabs tabs={[...UPR_TABS]} activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab as UprTab)} />
+      <KnowledgeHubTabs
+        tabs={[...UPR_TABS]}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as UprTab)}
+      />
 
-      {activeTab === 'Breakdown' && (
-        <KnowledgeHubPanel title="Thematic breakdown">
-          <KnowledgeHubProse>{data.summary?.trim() || data.title}</KnowledgeHubProse>
-          {data.body?.trim() ? (
-            <KnowledgeHubProse>{data.body.trim()}</KnowledgeHubProse>
+      {activeTab === 'Overview' && (
+        <KnowledgeHubPanel title="Overview">
+          {data.introduction?.trim() ? (
+            <KnowledgeHubProse>{data.introduction.trim()}</KnowledgeHubProse>
           ) : (
-            <KnowledgeHubMutedProse>
-              Recommendation counts and category-level statistics will be listed here when sourced from the official UPR
-              outcome documents for the relevant cycle.
-            </KnowledgeHubMutedProse>
+            <KnowledgeHubMutedProse>No introduction has been added for this UPR entry yet.</KnowledgeHubMutedProse>
           )}
         </KnowledgeHubPanel>
       )}
 
-      {activeTab === 'Response' && (
-        <KnowledgeHubPanel title="State Response">
-          <KnowledgeHubProse>
-            Pakistan has accepted the majority of recommendations received during the 4th UPR cycle, demonstrating its
-            commitment to international human rights obligations.
-          </KnowledgeHubProse>
-          <div className="state-response-box">
-            <h4>Official Statement</h4>
-            <p>
-              &ldquo;We are committed to implementing the accepted recommendations through a coordinated effort involving
-              federal and provincial stakeholders.&rdquo;
-            </p>
-          </div>
+      {activeTab === 'Repositories' && (
+        <KnowledgeHubPanel title="Repositories">
+          {repos.every((r) => !r.doc) ? (
+            <KnowledgeHubMutedProse>No repository documents attached yet.</KnowledgeHubMutedProse>
+          ) : (
+            <ul className="knowledge-hub-repo-list">
+              {repos.map((r) => (
+                <li key={r.key} style={{ marginBottom: 12 }}>
+                  <strong>{r.label}</strong>
+                  {r.doc ? (
+                    <div className="text-compact" style={{ marginTop: 4 }}>
+                      {r.doc.icon}{' '}
+                      {r.doc.href ? (
+                        <a href={r.doc.href} target="_blank" rel="noreferrer">
+                          {r.doc.file_name || r.doc.title || 'Open document'}
+                        </a>
+                      ) : (
+                        r.doc.file_name || r.doc.title || 'Document'
+                      )}
+                    </div>
+                  ) : (
+                    <div className="muted text-compact" style={{ marginTop: 4 }}>
+                      Not attached
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </KnowledgeHubPanel>
       )}
 
-      {activeTab === 'Action Plan' && (
-        <KnowledgeHubPanel title="Action Plan Steps">
-          <KnowledgeHubRecList
-            items={[
-              {
-                key: 'step-1',
-                title: 'Phase 1: Dissemination',
-                details: 'Sharing recommendations with all provincial departments and stakeholders.',
-              },
-              {
-                key: 'step-2',
-                title: 'Phase 2: Implementation Matrix',
-                details: 'Developing a tracking matrix to monitor progress on accepted recommendations.',
-              },
-            ]}
-          />
+      {activeTab === 'Analysis' && (
+        <KnowledgeHubPanel title="Analysis">
+          {data.analysis_files.length === 0 ? (
+            <KnowledgeHubMutedProse>No analysis HTML files attached yet.</KnowledgeHubMutedProse>
+          ) : (
+            <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {data.analysis_files.map((file) => (
+                  <ButtonLikeTab
+                    key={file.id}
+                    active={activeHtml?.id === file.id}
+                    label={file.title || file.file_name || 'HTML'}
+                    onClick={() => setActiveHtml(file)}
+                  />
+                ))}
+              </div>
+              {activeHtml?.href ? (
+                <iframe
+                  title={activeHtml.title || activeHtml.file_name || 'Analysis'}
+                  src={activeHtml.href}
+                  className="knowledge-hub-tracker-frame"
+                  style={{ width: '100%', minHeight: 520, border: '1px solid var(--border, #ddd)' }}
+                />
+              ) : (
+                <KnowledgeHubMutedProse>Select an HTML file to preview.</KnowledgeHubMutedProse>
+              )}
+            </>
+          )}
         </KnowledgeHubPanel>
       )}
     </KnowledgeHubPage>
   )
 }
 
+function ButtonLikeTab({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={
+        'compiled-record-modal-tab issues-admin-tab' +
+        (active ? ' compiled-record-modal-tab--active' : '')
+      }
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  )
+}
+
 export function UprInfoPage() {
-  const [cards, setCards] = useState<KnowledgeStatCard[]>([])
-  const [selected, setSelected] = useState<KnowledgeStatCard | null>(null)
+  const [entries, setEntries] = useState<KnowledgeUprEntry[]>([])
+  const [selected, setSelected] = useState<KnowledgeUprEntry | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -96,10 +171,10 @@ export function UprInfoPage() {
     setLoadError(null)
     setLoading(true)
     try {
-      setCards(await fetchKnowledgeUprHighlights())
+      setEntries(await fetchKnowledgeUprEntries())
     } catch {
-      setCards([])
-      setLoadError('Could not load UPR highlights from the server.')
+      setEntries([])
+      setLoadError('Could not load UPR entries from the server.')
     } finally {
       setLoading(false)
     }
@@ -115,22 +190,21 @@ export function UprInfoPage() {
 
   return (
     <KnowledgeHubPage>
-      <KnowledgeHubListSection title="Universal Periodic Review - Pakistan (4th Cycle)">
-        <KnowledgeHubStateMessage error={loadError} loading={loading} empty={!loading && cards.length === 0} />
-        {!loading && cards.length > 0 ? (
+      <KnowledgeHubListSection title="Universal Periodic Review">
+        <KnowledgeHubStateMessage error={loadError} loading={loading} empty={!loading && entries.length === 0} />
+        {!loading && entries.length > 0 ? (
           <KnowledgeHubCardsGrid>
-            {cards.map((item) => (
+            {entries.map((item) => (
               <KnowledgeHubCard
                 key={item.id}
-                icon={item.icon}
+                icon="📋"
                 fallback="📋"
-                fallbackIcon={knowledgeStatCardIcon('upr', item.title)}
-                title={item.title}
-                description={item.summary}
-                stat1Value={item.stat_1_value}
-                stat1Label={item.stat_1_label}
-                stat2Value={item.stat_2_value}
-                stat2Label={item.stat_2_label}
+                title={item.display_title}
+                description={
+                  item.cycle?.name
+                    ? `${knowledgeUprKindLabel(item.kind)} · ${item.cycle.name}`
+                    : knowledgeUprKindLabel(item.kind)
+                }
                 onClick={() => setSelected(item)}
               />
             ))}

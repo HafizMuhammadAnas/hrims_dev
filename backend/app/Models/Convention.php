@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Convention extends Model
 {
@@ -108,6 +109,18 @@ class Convention extends Model
     public function articles(): HasMany
     {
         return $this->hasMany(Article::class);
+    }
+
+    public function issueIndicators(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            IssueIndicator::class,
+            Issue::class,
+            'convention_id',
+            'issue_id',
+            'id',
+            'id',
+        );
     }
 
     public function hrRequests(): HasMany

@@ -8,9 +8,12 @@ use App\Models\Convention;
 use App\Models\Issue;
 use App\Models\IssueIndicator;
 use App\Models\KnowledgeCard;
+use App\Models\KnowledgeUprEntry;
 use App\Models\SdgNode;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class KnowledgeHubController extends Controller
 {
@@ -18,7 +21,7 @@ class KnowledgeHubController extends Controller
     {
         $rows = Convention::query()
             ->where('is_active', true)
-            ->withCount(['articles' => fn ($q) => $q->where('is_active', true)])
+            ->withCount($this->conventionCountRelations())
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -32,7 +35,7 @@ class KnowledgeHubController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        $convention->loadCount(['articles' => fn ($q) => $q->where('is_active', true)]);
+        $convention->loadCount($this->conventionCountRelations());
 
         $components = $convention->components()
             ->orderBy('sort_order')
@@ -49,6 +52,63 @@ class KnowledgeHubController extends Controller
                     'title' => $x->title,
                     'body' => $x->body,
                     'sort_order' => $x->sort_order,
+                ])->all(),
+            ],
+        ]);
+    }
+
+    /**
+     * Category | Indicator catalog for Knowledge Hub → Human Rights Indicators.
+     */
+    public function conventionIndicatorCatalog(Convention $convention): JsonResponse
+    {
+        if (! $convention->is_active) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $convention->loadCount($this->conventionCountRelations());
+
+        $q = DB::table('issue_indicators')
+            ->join('issues', 'issues.id', '=', 'issue_indicators.issue_id')
+            ->leftJoin('issue_categories', 'issue_categories.id', '=', 'issues.category_id')
+            ->where('issues.convention_id', $convention->id)
+            ->select([
+                'issue_categories.id as category_id',
+                'issue_categories.name as category_name',
+                'issue_indicators.id as indicator_id',
+                'issue_indicators.indicator_text',
+                'issues.id as issue_id',
+            ]);
+
+        if (Schema::hasColumn('issues', 'is_active')) {
+            $q->where('issues.is_active', true);
+        }
+        if (Schema::hasColumn('issue_indicators', 'is_active')) {
+            $q->where('issue_indicators.is_active', true);
+        }
+
+        $q->orderBy('issue_categories.name')
+            ->orderBy('issues.id');
+        if (Schema::hasColumn('issue_indicators', 'sort_order')) {
+            $q->orderBy('issue_indicators.sort_order');
+        }
+        $q->orderBy('issue_indicators.id');
+
+        $rows = $q->get();
+
+        return response()->json([
+            'data' => [
+                'convention' => $this->serializeConvention($convention),
+                'categories_count' => (int) ($convention->categories_count ?? 0),
+                'indicators_count' => (int) ($convention->indicators_count ?? 0),
+                'rows' => $rows->map(fn ($r) => [
+                    'category_id' => $r->category_id !== null ? (int) $r->category_id : null,
+                    'category_name' => trim((string) ($r->category_name ?? '')) !== ''
+                        ? (string) $r->category_name
+                        : 'Uncategorized',
+                    'indicator_id' => (int) $r->indicator_id,
+                    'indicator_text' => (string) $r->indicator_text,
+                    'issue_id' => (int) $r->issue_id,
                 ])->all(),
             ],
         ]);
@@ -197,6 +257,53 @@ class KnowledgeHubController extends Controller
         return $this->cardsForSection('upr');
     }
 
+    public function uprEntries(): JsonResponse
+    {
+        $rows = KnowledgeUprEntry::query()
+            ->where('is_active', true)
+            ->with(['cycle:id,name,upr_type_id'])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'data' => $rows->map(fn (KnowledgeUprEntry $row) => $this->serializeUprEntry($row)),
+        ]);
+    }
+
+    public function showUprEntry(KnowledgeUprEntry $knowledgeUprEntry): JsonResponse
+    {
+        if (! (bool) ($knowledgeUprEntry->is_active ?? true)) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+        $knowledgeUprEntry->load(['cycle:id,name,upr_type_id']);
+
+        return response()->json(['data' => $this->serializeUprEntry($knowledgeUprEntry)]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeUprEntry(KnowledgeUprEntry $row): array
+    {
+        return [
+            'id' => $row->id,
+            'kind' => $row->kind,
+            'title' => $row->title,
+            'display_title' => $row->displayTitle(),
+            'upr_cycle_id' => $row->upr_cycle_id !== null ? (int) $row->upr_cycle_id : null,
+            'cycle' => $row->relationLoaded('cycle') && $row->cycle ? [
+                'id' => $row->cycle->id,
+                'name' => $row->cycle->name,
+            ] : null,
+            'introduction' => $row->introduction,
+            'repositories' => KnowledgeUprEntry::normalizeRepositories($row->repositories),
+            'repository_labels' => KnowledgeUprEntry::REPOSITORY_LABELS,
+            'analysis_files' => KnowledgeUprEntry::normalizeAnalysisFiles($row->analysis_files),
+            'sort_order' => (int) ($row->sort_order ?? 0),
+        ];
+    }
+
     private function cardsForSection(string $section): JsonResponse
     {
         $rows = KnowledgeCard::query()
@@ -223,6 +330,8 @@ class KnowledgeHubController extends Controller
             'knowledge_articles' => $c->knowledge_articles,
             'knowledge_implementation' => $c->knowledge_implementation,
             'articles_count' => (int) ($c->articles_count ?? 0),
+            'categories_count' => (int) ($c->categories_count ?? 0),
+            'indicators_count' => (int) ($c->indicators_count ?? 0),
             'description' => $c->description,
             'repositories' => $c->normalizedRepositories(),
             'optional_protocol_body' => $c->optional_protocol_body,
@@ -332,5 +441,27 @@ class KnowledgeHubController extends Controller
             : [];
 
         return $base;
+    }
+
+    /**
+     * @return array<string, \Closure>
+     */
+    private function conventionCountRelations(): array
+    {
+        $relations = [
+            'articles' => fn ($q) => $q->where('is_active', true),
+            'issueCategories as categories_count' => fn ($q) => $q->where('is_active', true),
+        ];
+
+        $relations['issueIndicators as indicators_count'] = function ($q): void {
+            if (Schema::hasColumn('issues', 'is_active')) {
+                $q->where('issues.is_active', true);
+            }
+            if (IssueIndicator::hasIsActiveColumn()) {
+                $q->where('issue_indicators.is_active', true);
+            }
+        };
+
+        return $relations;
     }
 }

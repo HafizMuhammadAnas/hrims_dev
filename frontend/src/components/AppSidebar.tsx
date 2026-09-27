@@ -31,8 +31,6 @@ import {
   LABEL_ASSIGNED_TASKS,
   LABEL_COMPILED_AND_SUBMITTED,
   LABEL_COMPILATION_CENTER,
-  LABEL_COMPILED_RECORD,
-  LABEL_COMPILED_RECORDS,
   LABEL_CONVENTION_INFO,
   LABEL_CONVENTIONS_AND_COMPONENTS,
   LABEL_DEPARTMENT_ACTIONS,
@@ -40,17 +38,16 @@ import {
   LABEL_FEDERAL_ACTIONS,
   LABEL_FEDERAL_DEPARTMENT_ACTIONS,
   LABEL_HUMAN_RIGHTS_INDICATORS,
+  LABEL_HRIMS_USER_MANUAL,
   LABEL_KNOWLEDGE_HUB,
   LABEL_MANAGE_DEPARTMENTS,
   LABEL_PROVINCE_ACTIONS,
   LABEL_READ_ONLY_ACCESS,
-  LABEL_RECEIVED_REQUESTS,
   LABEL_REGIONAL_RESPONSES,
   LABEL_REGIONS_AND_DISTRICTS,
   LABEL_DASHBOARDS,
   LABEL_GOVERNANCE_DASHBOARD,
   LABEL_GOVERNANCE_DEFAULT_CHARTS,
-  LABEL_INDICATOR_WISE_DATA,
   LABEL_REPORTING_DASHBOARD,
   LABEL_REQUEST_MANAGEMENT,
   LABEL_RESPONSE_COMPILATION,
@@ -63,10 +60,10 @@ import {
 import {
   SUPER_ADMIN_CONVENTIONS,
   SUPER_ADMIN_GOVERNANCE_CHARTS,
-  SUPER_ADMIN_INDICATOR_WISE_DATA,
   SUPER_ADMIN_ISSUES,
   SUPER_ADMIN_REGIONS_DISTRICTS,
   SUPER_ADMIN_SDG_NODES,
+  SUPER_ADMIN_UPR_MANAGEMENT,
   SUPER_ADMIN_UPR_RECOMMENDATIONS,
 } from '../lib/superAdminRoutes'
 import {
@@ -139,12 +136,12 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-section-title">{LABEL_SUPER_ADMIN}</div>
             <div className="nav-sub">
               <NavItem to={SUPER_ADMIN_ISSUES} icon={GitBranch} label={issuesNavLabel()} onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_UPR_MANAGEMENT} icon={ScrollText} label="UPR Management" onPick={onPick} />
               <NavItem to={SUPER_ADMIN_REGIONS_DISTRICTS} icon={MapPin} label={LABEL_REGIONS_AND_DISTRICTS} onPick={onPick} />
               <NavItem to={SUPER_ADMIN_CONVENTIONS} icon={Scale} label={LABEL_CONVENTIONS_AND_COMPONENTS} onPick={onPick} />
               <NavItem to={SUPER_ADMIN_SDG_NODES} icon={Layers} label="SDGs" onPick={onPick} />
-              <NavItem to={SUPER_ADMIN_UPR_RECOMMENDATIONS} icon={ScrollText} label="UPR Recommendations" onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_UPR_RECOMMENDATIONS} icon={RefreshCcw} label="UPR for Knowledge Hub" onPick={onPick} />
               <NavItem to={SUPER_ADMIN_GOVERNANCE_CHARTS} icon={BarChart2} label={LABEL_GOVERNANCE_DEFAULT_CHARTS} onPick={onPick} />
-              <NavItem to={SUPER_ADMIN_INDICATOR_WISE_DATA} icon={ClipboardList} label={LABEL_INDICATOR_WISE_DATA} onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
             </div>
             <div className="nav-section-title">{LABEL_DASHBOARDS}</div>
@@ -162,7 +159,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/requests" icon={Send} label={LABEL_REQUEST_MANAGEMENT} onPick={onPick} />
               <NavItem to="/responses" icon={Inbox} label={LABEL_REGIONAL_RESPONSES} onPick={onPick} />
               <NavItem to="/compilation" icon={Layers} label={LABEL_COMPILATION_CENTER} onPick={onPick} />
-              <NavItem to="/compiled-records" icon={FileCheck} label={LABEL_COMPILED_RECORDS} onPick={onPick} />
+              <NavItem to="/compiled-records" icon={FileCheck} label={LABEL_COMPILED_AND_SUBMITTED} onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
               <NavItem to="/federal-departments-mgmt" icon={Building2} label={LABEL_MANAGE_DEPARTMENTS} onPick={onPick} />
             </div>
@@ -170,7 +167,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-sub">
               <NavItem to="/federal-department-requests" icon={Activity} label={LABEL_DEPARTMENTAL_RESPONSES} onPick={onPick} />
               <NavItem to="/federal-compilation" icon={FileText} label={LABEL_RESPONSE_COMPILATION} onPick={onPick} />
-              <NavItem to="/federal-history" icon={History} label={LABEL_COMPILED_RECORD} onPick={onPick} />
+              <NavItem to="/federal-history" icon={History} label={LABEL_COMPILED_AND_SUBMITTED} onPick={onPick} />
             </div>
             <div className="nav-section-title">{LABEL_DASHBOARDS}</div>
             <div className="nav-sub">
@@ -184,9 +181,9 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
           <>
             <div className="nav-section-title">{LABEL_PROVINCE_ACTIONS}</div>
             <div className="nav-sub">
-              <NavItem to="/region-received" icon={List} label={LABEL_RECEIVED_REQUESTS} onPick={onPick} />
+              <NavItem to="/region-received" icon={List} label={LABEL_REQUEST_MANAGEMENT} onPick={onPick} />
               <NavItem to="/region-monitoring" icon={Activity} label={LABEL_DEPARTMENTAL_RESPONSES} onPick={onPick} />
-              <NavItem to="/region-compilation" icon={FileText} label={LABEL_RESPONSE_COMPILATION} onPick={onPick} />
+              <NavItem to="/region-compilation" icon={FileText} label={LABEL_COMPILATION_CENTER} onPick={onPick} />
               <NavItem to="/region-history" icon={History} label={LABEL_COMPILED_AND_SUBMITTED} onPick={onPick} />
               <NavItem to="/regional-users-mgmt" icon={Users} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
               <NavItem to="/regional-departments-mgmt" icon={Building2} label={LABEL_MANAGE_DEPARTMENTS} onPick={onPick} />
@@ -205,12 +202,6 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
             <div className="nav-sub">
               <NavItem to="/department-tasks" icon={ClipboardList} label={LABEL_ASSIGNED_TASKS} onPick={onPick} />
               <NavItem to="/department-history" icon={History} label={LABEL_SUBMISSION_HISTORY} onPick={onPick} />
-              <NavItem
-                to="/department-indicator-wise-data"
-                icon={ClipboardList}
-                label={LABEL_INDICATOR_WISE_DATA}
-                onPick={onPick}
-              />
             </div>
           </>
         )}
@@ -230,9 +221,10 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
 
         <div className="nav-section-title">{LABEL_KNOWLEDGE_HUB}</div>
         <NavItem to="/conventions" icon={BookOpen} label={LABEL_CONVENTION_INFO} onPick={onPick} />
-        <NavItem to="/indicators" icon={Target} label={LABEL_HUMAN_RIGHTS_INDICATORS} onPick={onPick} />
-        <NavItem to="/sdgs" icon={Globe} label={LABEL_SUSTAINABLE_DEVELOPMENT_GOALS} onPick={onPick} />
         <NavItem to="/upr" icon={RefreshCcw} label={LABEL_UNIVERSAL_PERIODIC_REVIEW} onPick={onPick} />
+        <NavItem to="/indicators" icon={Target} label={LABEL_HUMAN_RIGHTS_INDICATORS} onPick={onPick} />
+        <NavItem to="/user-manual" icon={ScrollText} label={LABEL_HRIMS_USER_MANUAL} onPick={onPick} />
+        <NavItem to="/sdgs" icon={Globe} label={LABEL_SUSTAINABLE_DEVELOPMENT_GOALS} onPick={onPick} />
       </nav>
     </aside>
   )
