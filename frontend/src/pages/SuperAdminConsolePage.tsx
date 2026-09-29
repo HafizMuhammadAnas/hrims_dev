@@ -5,13 +5,12 @@ import {
   adminCreateDepartment,
   adminCreateKnowledgeCard,
   adminCreateSdgNode,
-  adminCreateUpr,
   adminDeleteConvention,
   adminDeleteConventionComponent,
   adminDeleteDepartment,
   adminDeleteKnowledgeCard,
+  adminDeleteKnowledgeUprEntry,
   adminDeleteSdgNode,
-  adminDeleteUpr,
   adminFetchCatalogDepartments,
   adminFetchConventionComponents,
   adminFetchConventions,
@@ -19,13 +18,10 @@ import {
   adminFetchKnowledgeUprEntries,
   adminFetchRegionsPublic,
   adminFetchSdgNodes,
-  adminFetchUpr,
-  adminDeleteKnowledgeUprEntry,
   adminUpdateConventionComponent,
   adminUpdateDepartment,
   adminUpdateKnowledgeCard,
   adminUpdateSdgNode,
-  adminUpdateUpr,
   type AdminKnowledgeCard,
 } from '../api/admin'
 import { isApiError } from '../api/apiError'
@@ -42,7 +38,6 @@ import { FormRow } from '../components/ui/FormRow'
 import { isSuperAdmin } from '../lib/roles'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_HUMAN_RIGHTS_INDICATORS, LABEL_KNOWLEDGE_HUB } from '../lib/uiLabels'
-import { uprConcludingObservationsLabel } from '../lib/issueEntryKind'
 import {
   superAdminConventionEditPath,
   superAdminConventionsNewPath,
@@ -131,12 +126,6 @@ export function SuperAdminConsolePage() {
   const [editSdgS1l, setEditSdgS1l] = useState('')
   const [editSdgS2v, setEditSdgS2v] = useState('')
   const [editSdgS2l, setEditSdgS2l] = useState('')
-
-  const [editingUprId, setEditingUprId] = useState<number | null>(null)
-  const [editUprSession, setEditUprSession] = useState('')
-  const [editUprCode, setEditUprCode] = useState('')
-  const [editUprTitle, setEditUprTitle] = useState('')
-  const [editUprBody, setEditUprBody] = useState('')
 
   const [hubSection, setHubSection] = useState<'indicators' | 'upr'>('indicators')
   const [knowledgeIndicatorCards, setKnowledgeIndicatorCards] = useState<AdminKnowledgeCard[]>([])
@@ -1122,68 +1111,6 @@ function SdgForm({
           </Button>
         </div>
       </FormRow>
-    </FormGrid>
-  )
-}
-
-function UprForm({
-  busy,
-  setBusy,
-  setError,
-  onDone,
-}: {
-  busy: boolean
-  setBusy: (v: boolean) => void
-  setError: (s: string | null) => void
-  onDone: () => Promise<void>
-}) {
-  const [session, setSession] = useState('')
-  const [code, setCode] = useState('')
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  return (
-    <FormGrid>
-      <FormRow twoCol>
-        <FormControl label="Session label">
-          <input placeholder="Session label" value={session} onChange={(e) => setSession(e.target.value)} />
-        </FormControl>
-        <FormControl label="Code">
-          <input placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} />
-        </FormControl>
-      </FormRow>
-      <FormField label="Title">
-        <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-      </FormField>
-      <FormField label="Body (optional)">
-        <textarea rows={2} placeholder="Body (optional)" value={body} onChange={(e) => setBody(e.target.value)} />
-      </FormField>
-      <div>
-        <Button
-          variant="primary"
-          compact
-          disabled={busy || !session || !code || !title}
-          onClick={() => {
-            void (async () => {
-              setBusy(true)
-              setError(null)
-              try {
-                await adminCreateUpr({ session_label: session, code, title, body: body.trim() || null })
-                setSession('')
-                setCode('')
-                setTitle('')
-                setBody('')
-                await onDone()
-              } catch (e: unknown) {
-                setError(isApiError(e) ? e.message : 'Save failed')
-              } finally {
-                setBusy(false)
-              }
-            })()
-          }}
-        >
-          Add UPR row
-        </Button>
-      </div>
     </FormGrid>
   )
 }

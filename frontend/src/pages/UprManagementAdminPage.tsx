@@ -126,7 +126,6 @@ function formatTimestamp(value?: string | null): string {
 
 export function UprManagementAdminPage() {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const location = useLocation()
   const { uprView: uprViewParam, recordId: recordIdParam } = useParams<{
     uprView?: string
