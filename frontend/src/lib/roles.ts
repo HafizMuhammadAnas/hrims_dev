@@ -16,6 +16,15 @@ export function isFederalAdmin(user: AuthUser | null): boolean {
   return hasRole(user, 'federal_admin')
 }
 
+export function isFederalSubAdmin(user: AuthUser | null): boolean {
+  return hasRole(user, 'federal_sub_admin')
+}
+
+/** Federal operational access (full admin or sub-admin). */
+export function isFederalStaff(user: AuthUser | null): boolean {
+  return isFederalAdmin(user) || isFederalSubAdmin(user)
+}
+
 export function isRegionalAdmin(user: AuthUser | null): boolean {
   return hasRole(user, 'regional_admin')
 }

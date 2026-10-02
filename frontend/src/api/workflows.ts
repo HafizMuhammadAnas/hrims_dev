@@ -144,12 +144,17 @@ export async function createDepartmentTask(
   hr_request_id: string,
   department_id: number,
   options?: {
+    due_date: string
     assignment_instructions?: string | null
     issue_indicator_ids?: number[]
   },
 ): Promise<DepartmentTaskRow> {
   await ensureCsrfCookie()
-  const body: Record<string, unknown> = { hr_request_id, department_id }
+  const body: Record<string, unknown> = {
+    hr_request_id,
+    department_id,
+    due_date: options?.due_date,
+  }
   const notes = options?.assignment_instructions?.trim()
   if (notes) body.assignment_instructions = notes
   if (options?.issue_indicator_ids && options.issue_indicator_ids.length > 0) {

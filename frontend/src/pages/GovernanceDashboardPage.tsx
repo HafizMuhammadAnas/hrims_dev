@@ -41,7 +41,7 @@ import {
   LOI_LABEL,
   issueEntryTitleColumnLabel,
 } from '../lib/issueEntryKind'
-import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
+import { isFederalStaff, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
 import { LABEL_GOVERNANCE_DASHBOARD } from '../lib/uiLabels'
 
 function createDefaultFilters(): GovernanceFilters {
@@ -64,7 +64,7 @@ function filtersAreDirty(current: GovernanceFilters, defaults: GovernanceFilters
 
 export function GovernanceDashboardPage() {
   const { user } = useAuth()
-  const federalPortal = isFederalAdmin(user) || isSuperAdmin(user)
+  const federalPortal = isFederalStaff(user) || isSuperAdmin(user)
   const regionalPortal = isRegionalAdmin(user)
   const canAccess = Boolean(user && (federalPortal || regionalPortal))
 

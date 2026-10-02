@@ -298,7 +298,7 @@ class HrRequestController extends Controller
             ?? ($model->issue_id ? 'loi' : '')
         );
         if ($requestType === 'other_issue') {
-            if (! $request->user()->hasRole('federal_admin')) {
+            if (! HrimsAccess::isFederalStaff($request->user())) {
                 return response()->json([
                     'message' => 'Only federal administrators may edit Other Issues requests.',
                 ], 403);
@@ -682,7 +682,7 @@ class HrRequestController extends Controller
         $issue = null;
         $indicatorPayload = [];
         if ($requestType === 'other_issue') {
-            if (! $request->user()->hasRole('federal_admin')) {
+            if (! HrimsAccess::isFederalStaff($request->user())) {
                 return response()->json([
                     'message' => 'Only federal administrators may create Other Issues requests.',
                 ], 403);
@@ -1222,6 +1222,7 @@ class HrRequestController extends Controller
                 'department_id' => (int) $deptId,
                 'status' => 'assigned',
                 'assigned_date' => now()->toDateString(),
+                'due_date' => $hrRequest->due_date?->toDateString(),
             ];
             if (Schema::hasColumn('department_tasks', 'assigned_indicator_ids')) {
                 $hrRequest->loadMissing(['issue.indicators', 'indicatorResponses']);

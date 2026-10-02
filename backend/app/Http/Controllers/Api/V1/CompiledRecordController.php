@@ -17,7 +17,7 @@ class CompiledRecordController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->hasRole('super_admin') && ! $request->user()->hasRole('federal_admin')) {
+        if (! HrimsAccess::isSuperAdmin($request->user()) && ! HrimsAccess::isFederalStaff($request->user())) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -51,7 +51,7 @@ class CompiledRecordController extends Controller
 
     public function update(Request $request, string $compiledRecord): JsonResponse
     {
-        if (! $request->user()->hasRole('super_admin') && ! $request->user()->hasRole('federal_admin')) {
+        if (! HrimsAccess::isSuperAdmin($request->user()) && ! HrimsAccess::isFederalStaff($request->user())) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -101,7 +101,7 @@ class CompiledRecordController extends Controller
      */
     public function preview(Request $request): JsonResponse
     {
-        if (! $request->user()->hasRole('super_admin') && ! $request->user()->hasRole('federal_admin')) {
+        if (! HrimsAccess::isSuperAdmin($request->user()) && ! HrimsAccess::isFederalStaff($request->user())) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 

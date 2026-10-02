@@ -92,8 +92,6 @@ export type AdminUprType = {
 
 export type AdminUprCycle = {
   id: number
-  upr_type_id: number | null
-  type?: { id: number; name: string } | null
   name: string
   sort_order: number
   is_active: boolean
@@ -104,7 +102,9 @@ export type AdminUprCycle = {
 export type AdminUprCategory = {
   id: number
   upr_cycle_id: number | null
-  cycle?: { id: number; name: string; upr_type_id?: number | null } | null
+  upr_type_id: number | null
+  cycle?: { id: number; name: string } | null
+  type?: { id: number; name: string } | null
   name: string
   sort_order: number
   is_active: boolean
@@ -116,8 +116,10 @@ export type AdminUprRecommendationEntry = {
   id: number
   upr_cycle_id: number
   upr_category_id: number
-  cycle?: { id: number; name: string; upr_type_id?: number | null } | null
-  category?: { id: number; name: string; upr_cycle_id?: number | null } | null
+  upr_type_id?: number | null
+  cycle?: { id: number; name: string } | null
+  category?: { id: number; name: string; upr_cycle_id?: number | null; upr_type_id?: number | null } | null
+  type?: { id: number; name: string } | null
   name: string
   sort_order: number
   is_active: boolean
@@ -604,15 +606,13 @@ export async function adminDeleteUprType(id: number): Promise<void> {
   await throwIfNotOk(res)
 }
 
-export async function adminFetchUprCycles(typeId?: number): Promise<AdminUprCycle[]> {
-  const qs = typeId != null ? `?upr_type_id=${encodeURIComponent(String(typeId))}` : ''
-  const json = await adminGet<{ data: AdminUprCycle[] }>(`/upr-cycles${qs}`)
+export async function adminFetchUprCycles(): Promise<AdminUprCycle[]> {
+  const json = await adminGet<{ data: AdminUprCycle[] }>('/upr-cycles')
   return json.data
 }
 
 export async function adminCreateUprCycle(body: {
   name: string
-  upr_type_id: number
   sort_order?: number
   is_active?: boolean
 }): Promise<AdminUprCycle> {
@@ -625,7 +625,6 @@ export async function adminUpdateUprCycle(
   id: number,
   body: Partial<{
     name: string
-    upr_type_id: number
     sort_order: number
     is_active: boolean
   }>,
@@ -640,15 +639,22 @@ export async function adminDeleteUprCycle(id: number): Promise<void> {
   await throwIfNotOk(res)
 }
 
-export async function adminFetchUprCategories(cycleId?: number): Promise<AdminUprCategory[]> {
-  const qs = cycleId != null ? `?upr_cycle_id=${encodeURIComponent(String(cycleId))}` : ''
+export async function adminFetchUprCategories(filters?: {
+  cycleId?: number
+  typeId?: number
+}): Promise<AdminUprCategory[]> {
+  const q = new URLSearchParams()
+  if (filters?.cycleId != null) q.set('upr_cycle_id', String(filters.cycleId))
+  if (filters?.typeId != null) q.set('upr_type_id', String(filters.typeId))
+  const qs = q.toString() ? `?${q}` : ''
   const json = await adminGet<{ data: AdminUprCategory[] }>(`/upr-categories${qs}`)
   return json.data
 }
 
 export async function adminCreateUprCategory(body: {
   name: string
-  upr_cycle_id?: number | null
+  upr_cycle_id: number
+  upr_type_id: number
   sort_order?: number
   is_active?: boolean
 }): Promise<AdminUprCategory> {
@@ -661,7 +667,8 @@ export async function adminUpdateUprCategory(
   id: number,
   body: Partial<{
     name: string
-    upr_cycle_id: number | null
+    upr_cycle_id: number
+    upr_type_id: number
     sort_order: number
     is_active: boolean
   }>,
@@ -690,14 +697,17 @@ export async function adminFetchUprRecommendationEntries(filters?: {
 
 export async function adminCreateUprRecommendationEntry(body: {
   upr_cycle_id: number
+  upr_type_id: number
   upr_category_id: number
-  name: string
+  name?: string
+  names?: string[]
   sort_order?: number
   is_active?: boolean
-}): Promise<AdminUprRecommendationEntry> {
+}): Promise<AdminUprRecommendationEntry | AdminUprRecommendationEntry[]> {
   const res = await adminSend('POST', '/upr-recommendation-entries', body)
   await throwIfNotOk(res)
-  return (await res.json()).data as AdminUprRecommendationEntry
+  const data = (await res.json()).data
+  return data as AdminUprRecommendationEntry | AdminUprRecommendationEntry[]
 }
 
 export async function adminUpdateUprRecommendationEntry(
@@ -823,8 +833,6 @@ export async function adminDeleteUprEntry(id: number): Promise<void> {
   await throwIfNotOk(res)
 }
 
-export type AdminKnowledgeUprKind = 'supported' | 'noted' | 'others'
-
 export type AdminKnowledgeUprDocument = {
   id: string
   title: string
@@ -837,11 +845,13 @@ export type AdminKnowledgeUprDocument = {
 
 export type AdminKnowledgeUprEntry = {
   id: number
-  kind: AdminKnowledgeUprKind | string
+  kind: string
+  upr_type_id: number | null
+  type?: { id: number; name: string } | null
   title: string | null
   display_title: string
   upr_cycle_id: number | null
-  cycle?: { id: number; name: string; upr_type_id?: number | null } | null
+  cycle?: { id: number; name: string } | null
   introduction: string | null
   repositories: Record<string, AdminKnowledgeUprDocument | null>
   repository_labels: Record<string, string>
@@ -853,7 +863,8 @@ export type AdminKnowledgeUprEntry = {
 }
 
 export type AdminKnowledgeUprEntryPayload = {
-  kind: AdminKnowledgeUprKind
+  upr_type_id: number
+  kind?: string | null
   title?: string | null
   upr_cycle_id: number | null
   introduction?: string | null

@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   adminCreateKnowledgeUprEntry,
   adminDeleteKnowledgeUprFile,
   adminFetchKnowledgeUprEntry,
+  adminFetchUprCategories,
   adminFetchUprCycles,
+  adminFetchUprTypes,
   adminUpdateKnowledgeUprEntry,
   adminUploadKnowledgeUprFiles,
+  type AdminUprCategory,
   type AdminUprCycle,
+  type AdminUprType,
 } from '../api/admin'
 import { isApiError } from '../api/apiError'
 import { useAuth } from '../auth/AuthContext'
@@ -21,16 +25,13 @@ import { TableCard } from '../components/ui/TableCard'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import {
   emptyKnowledgeUprRepositories,
-  KNOWLEDGE_UPR_KIND_OPTIONS,
   KNOWLEDGE_UPR_MAX_FILE_BYTES,
   KNOWLEDGE_UPR_REPOSITORY_KEYS,
   KNOWLEDGE_UPR_REPOSITORY_LABELS,
   knowledgeUprFileTooLargeMessage,
-  knowledgeUprKindLabel,
   normalizeKnowledgeUprAnalysisFiles,
   normalizeKnowledgeUprRepositories,
   type KnowledgeUprDocument,
-  type KnowledgeUprKind,
   type KnowledgeUprRepositoryKey,
 } from '../lib/knowledgeUprContent'
 import { isSuperAdmin } from '../lib/roles'
@@ -39,8 +40,7 @@ import { SUPER_ADMIN_UPR_RECOMMENDATIONS } from '../lib/superAdminRoutes'
 type EditorTab = 'overview' | 'repositories' | 'analysis'
 
 type FormState = {
-  kind: KnowledgeUprKind
-  title: string
+  upr_type_id: string
   upr_cycle_id: string
   introduction: string
   repositories: Record<KnowledgeUprRepositoryKey, KnowledgeUprDocument | null>
@@ -49,8 +49,7 @@ type FormState = {
 }
 
 const EMPTY_FORM: FormState = {
-  kind: 'supported',
-  title: '',
+  upr_type_id: '',
   upr_cycle_id: '',
   introduction: '',
   repositories: emptyKnowledgeUprRepositories(),
@@ -71,7 +70,9 @@ export function UprKnowledgeEditorPage() {
 
   const [tab, setTab] = useState<EditorTab>('overview')
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [types, setTypes] = useState<AdminUprType[]>([])
   const [cycles, setCycles] = useState<AdminUprCycle[]>([])
+  const [categories, setCategories] = useState<AdminUprCategory[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
@@ -79,9 +80,17 @@ export function UprKnowledgeEditorPage() {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
-    void adminFetchUprCycles()
-      .then((rows) => setCycles(rows.filter((c) => c.is_active !== false)))
-      .catch(() => setCycles([]))
+    void Promise.all([adminFetchUprTypes(), adminFetchUprCycles(), adminFetchUprCategories()])
+      .then(([typeRows, cycleRows, categoryRows]) => {
+        setTypes(typeRows.filter((t) => t.is_active !== false))
+        setCycles(cycleRows.filter((c) => c.is_active !== false))
+        setCategories(categoryRows.filter((c) => c.is_active !== false))
+      })
+      .catch(() => {
+        setTypes([])
+        setCycles([])
+        setCategories([])
+      })
   }, [])
 
   useEffect(() => {
@@ -102,8 +111,7 @@ export function UprKnowledgeEditorPage() {
       .then((row) => {
         if (cancelled) return
         setForm({
-          kind: (row.kind as KnowledgeUprKind) || 'supported',
-          title: row.title ?? '',
+          upr_type_id: row.upr_type_id != null ? String(row.upr_type_id) : '',
           upr_cycle_id: row.upr_cycle_id != null ? String(row.upr_cycle_id) : '',
           introduction: row.introduction ?? '',
           repositories: normalizeKnowledgeUprRepositories(row.repositories),
@@ -129,6 +137,30 @@ export function UprKnowledgeEditorPage() {
   function patch<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  const selectedTypeName =
+    types.find((t) => String(t.id) === form.upr_type_id)?.name?.trim() || 'UPR'
+
+  const linkedCycles = useMemo(() => {
+    if (!form.upr_type_id) return []
+    const linkedCycleIds = new Set(
+      categories
+        .filter(
+          (c) =>
+            String(c.upr_type_id ?? '') === form.upr_type_id && c.upr_cycle_id != null,
+        )
+        .map((c) => c.upr_cycle_id as number),
+    )
+    const linked = cycles.filter((c) => linkedCycleIds.has(c.id))
+    // Keep currently saved cycle visible while editing even if mapping changed.
+    if (form.upr_cycle_id) {
+      const current = cycles.find((c) => String(c.id) === form.upr_cycle_id)
+      if (current && !linked.some((c) => c.id === current.id)) {
+        return [...linked, current]
+      }
+    }
+    return linked
+  }, [categories, cycles, form.upr_type_id, form.upr_cycle_id])
 
   async function uploadRepository(key: KnowledgeUprRepositoryKey, fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return
@@ -214,6 +246,11 @@ export function UprKnowledgeEditorPage() {
   }
 
   async function save() {
+    if (!form.upr_type_id) {
+      setError('Select a UPR type.')
+      setTab('overview')
+      return
+    }
     if (!form.upr_cycle_id) {
       setError('Select a UPR cycle.')
       setTab('overview')
@@ -223,8 +260,8 @@ export function UprKnowledgeEditorPage() {
     setError(null)
     try {
       const payload = {
-        kind: form.kind,
-        title: form.title.trim() || null,
+        upr_type_id: Number(form.upr_type_id),
+        title: null,
         upr_cycle_id: Number(form.upr_cycle_id),
         introduction: form.introduction.trim() || null,
         repositories: form.repositories,
@@ -252,7 +289,7 @@ export function UprKnowledgeEditorPage() {
 
   return (
     <PageSection
-      title={isEdit ? `Edit UPR — ${knowledgeUprKindLabel(form.kind)}` : 'Create UPR for Knowledge Hub'}
+      title={isEdit ? `Edit UPR — ${selectedTypeName}` : 'Create UPR for Knowledge Hub'}
       leading={
         <WorkflowPageBack
           placement="header"
@@ -289,15 +326,23 @@ export function UprKnowledgeEditorPage() {
           <TableCard padded>
             {tab === 'overview' ? (
               <FormGrid>
-                <FormControl label="Kind">
+                <FormControl label="UPR Type">
                   <select
-                    value={form.kind}
-                    onChange={(e) => patch('kind', e.target.value as KnowledgeUprKind)}
+                    value={form.upr_type_id}
+                    onChange={(e) => {
+                      const nextType = e.target.value
+                      setForm((prev) => ({
+                        ...prev,
+                        upr_type_id: nextType,
+                        upr_cycle_id: '',
+                      }))
+                    }}
                     disabled={saving}
                   >
-                    {KNOWLEDGE_UPR_KIND_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
+                    <option value="">Select UPR type</option>
+                    {types.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
                       </option>
                     ))}
                   </select>
@@ -306,32 +351,24 @@ export function UprKnowledgeEditorPage() {
                   <select
                     value={form.upr_cycle_id}
                     onChange={(e) => patch('upr_cycle_id', e.target.value)}
-                    disabled={saving}
+                    disabled={saving || !form.upr_type_id}
                   >
-                    <option value="">Select cycle</option>
-                    {cycles.map((c) => (
+                    <option value="">
+                      {form.upr_type_id ? 'Select cycle' : 'Select UPR type first'}
+                    </option>
+                    {linkedCycles.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
-                        {c.type?.name ? ` — ${c.type.name}` : ''}
                       </option>
                     ))}
                   </select>
                 </FormControl>
-                <FormField label="Title (optional)">
-                  <input
-                    value={form.title}
-                    onChange={(e) => patch('title', e.target.value)}
-                    placeholder={`Defaults to “${knowledgeUprKindLabel(form.kind)}”`}
-                    disabled={saving}
-                  />
-                </FormField>
                 <FormField label="Introduction">
                   <textarea
                     className="issues-description-field"
                     rows={12}
                     value={form.introduction}
                     onChange={(e) => patch('introduction', e.target.value)}
-                    placeholder="Introduction text shown on the Knowledge Hub Overview tab"
                     disabled={saving}
                   />
                 </FormField>
@@ -349,9 +386,6 @@ export function UprKnowledgeEditorPage() {
 
             {tab === 'repositories' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <p className="text-muted text-compact" style={{ margin: 0 }}>
-                  Attach one PDF/DOC/DOCX document for each repository slot.
-                </p>
                 {KNOWLEDGE_UPR_REPOSITORY_KEYS.map((key) => {
                   const doc = form.repositories[key]
                   return (
@@ -360,28 +394,15 @@ export function UprKnowledgeEditorPage() {
                         {KNOWLEDGE_UPR_REPOSITORY_LABELS[key]}
                       </strong>
                       {doc ? (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            display: 'flex',
-                            gap: 8,
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <span className="text-compact">
-                            {doc.icon} {doc.file_name || doc.title}
-                          </span>
-                          {doc.href ? (
-                            <a href={doc.href} target="_blank" rel="noreferrer">
-                              Open
-                            </a>
-                          ) : null}
+                        <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <a href={doc.href} target="_blank" rel="noreferrer" className="text-compact">
+                            {doc.file_name || doc.title || 'Open file'}
+                          </a>
                           <Button
                             variant="link"
                             compact
                             dangerLink
-                            disabled={saving || uploadingKey === key}
+                            disabled={saving || uploadingKey != null}
                             onClick={() => void removeRepository(key)}
                           >
                             Remove
@@ -399,7 +420,9 @@ export function UprKnowledgeEditorPage() {
                             onChange={(e) => void uploadRepository(key, e.target.files)}
                           />
                           {uploadingKey === key ? (
-                            <p className="muted text-compact">Uploading…</p>
+                            <p className="muted text-compact" style={{ margin: '6px 0 0' }}>
+                              Uploading…
+                            </p>
                           ) : null}
                         </div>
                       )}
@@ -411,9 +434,6 @@ export function UprKnowledgeEditorPage() {
 
             {tab === 'analysis' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <p className="text-muted text-compact" style={{ margin: 0 }}>
-                  Attach HTML files for the Analysis tab on Knowledge Hub.
-                </p>
                 <input
                   ref={(el) => {
                     fileInputRefs.current.analysis = el
@@ -424,30 +444,33 @@ export function UprKnowledgeEditorPage() {
                   disabled={saving || uploadingKey != null}
                   onChange={(e) => void uploadAnalysis(e.target.files)}
                 />
-                {uploadingKey === 'analysis' ? <p className="muted text-compact">Uploading…</p> : null}
+                {uploadingKey === 'analysis' ? (
+                  <p className="muted text-compact" style={{ margin: 0 }}>
+                    Uploading…
+                  </p>
+                ) : null}
                 {form.analysis_files.length === 0 ? (
-                  <p className="muted text-compact">No analysis HTML files yet.</p>
+                  <p className="muted text-compact" style={{ margin: 0 }}>
+                    No analysis files yet.
+                  </p>
                 ) : (
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  <ul className="issues-mapping-indicator-list" style={{ margin: 0 }}>
                     {form.analysis_files.map((doc) => (
-                      <li key={doc.id} style={{ marginBottom: 8 }}>
-                        <span className="text-compact">
-                          {doc.icon} {doc.file_name || doc.title}
-                        </span>{' '}
-                        {doc.href ? (
+                      <li key={doc.id || doc.path || doc.file_name}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                           <a href={doc.href} target="_blank" rel="noreferrer">
-                            Open
+                            {doc.file_name || doc.title || 'HTML file'}
                           </a>
-                        ) : null}{' '}
-                        <Button
-                          variant="link"
-                          compact
-                          dangerLink
-                          disabled={saving}
-                          onClick={() => void removeAnalysis(doc)}
-                        >
-                          Remove
-                        </Button>
+                          <Button
+                            variant="link"
+                            compact
+                            dangerLink
+                            disabled={saving || uploadingKey != null}
+                            onClick={() => void removeAnalysis(doc)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
                       </li>
                     ))}
                   </ul>

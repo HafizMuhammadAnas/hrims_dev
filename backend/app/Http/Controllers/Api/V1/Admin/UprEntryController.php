@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\UprCategory;
-use App\Models\UprCycle;
 use App\Models\UprEntry;
 use App\Models\UprEntryIndicator;
 use App\Models\UprRecommendationEntry;
@@ -20,7 +19,7 @@ class UprEntryController extends Controller
         $rows = UprEntry::query()
             ->with([
                 'type:id,name',
-                'cycle:id,name,upr_type_id',
+                'cycle:id,name',
                 'category:id,name,upr_cycle_id',
                 'recommendations:id,name,upr_cycle_id,upr_category_id',
                 'indicators',
@@ -37,7 +36,7 @@ class UprEntryController extends Controller
     {
         $uprEntry->load([
             'type:id,name',
-            'cycle:id,name,upr_type_id',
+            'cycle:id,name',
             'category:id,name,upr_cycle_id',
             'recommendations:id,name,upr_cycle_id,upr_category_id',
             'indicators',
@@ -67,8 +66,11 @@ class UprEntryController extends Controller
             'indicators.*.collects_by_consolidated' => ['sometimes', 'boolean'],
         ]);
 
-        $this->assertCycleBelongsToType((int) $data['upr_cycle_id'], (int) $data['upr_type_id']);
-        $this->assertCategoryBelongsToCycle((int) $data['upr_category_id'], (int) $data['upr_cycle_id']);
+        $this->assertCategoryMatchesCycleAndType(
+            (int) $data['upr_category_id'],
+            (int) $data['upr_cycle_id'],
+            (int) $data['upr_type_id'],
+        );
 
         $recommendationIds = UprRecommendationEntry::query()
             ->where('upr_cycle_id', (int) $data['upr_cycle_id'])
@@ -113,8 +115,8 @@ class UprEntryController extends Controller
 
             return $entry->fresh([
                 'type:id,name',
-                'cycle:id,name,upr_type_id',
-                'category:id,name,upr_cycle_id',
+                'cycle:id,name',
+                'category:id,name,upr_cycle_id,upr_type_id',
                 'recommendations:id,name,upr_cycle_id,upr_category_id',
                 'indicators',
             ]);
@@ -150,11 +152,12 @@ class UprEntryController extends Controller
         $cycleId = (int) ($data['upr_cycle_id'] ?? $uprEntry->upr_cycle_id);
         $categoryId = (int) ($data['upr_category_id'] ?? $uprEntry->upr_category_id);
 
-        if (array_key_exists('upr_type_id', $data) || array_key_exists('upr_cycle_id', $data)) {
-            $this->assertCycleBelongsToType($cycleId, $typeId);
-        }
-        if (array_key_exists('upr_cycle_id', $data) || array_key_exists('upr_category_id', $data)) {
-            $this->assertCategoryBelongsToCycle($categoryId, $cycleId);
+        if (
+            array_key_exists('upr_type_id', $data)
+            || array_key_exists('upr_cycle_id', $data)
+            || array_key_exists('upr_category_id', $data)
+        ) {
+            $this->assertCategoryMatchesCycleAndType($categoryId, $cycleId, $typeId);
         }
 
         $entry = DB::transaction(function () use ($uprEntry, $data, $typeId, $cycleId, $categoryId) {
@@ -214,8 +217,8 @@ class UprEntryController extends Controller
 
             return $uprEntry->fresh([
                 'type:id,name',
-                'cycle:id,name,upr_type_id',
-                'category:id,name,upr_cycle_id',
+                'cycle:id,name',
+                'category:id,name,upr_cycle_id,upr_type_id',
                 'recommendations:id,name,upr_cycle_id,upr_category_id',
                 'indicators',
             ]);
@@ -294,22 +297,7 @@ class UprEntryController extends Controller
         }
     }
 
-    private function assertCycleBelongsToType(int $cycleId, int $typeId): void
-    {
-        $cycle = UprCycle::query()->find($cycleId);
-        if ($cycle === null) {
-            throw ValidationException::withMessages([
-                'upr_cycle_id' => ['Selected cycle was not found.'],
-            ]);
-        }
-        if ((int) ($cycle->upr_type_id ?? 0) !== $typeId) {
-            throw ValidationException::withMessages([
-                'upr_cycle_id' => ['Selected cycle does not belong to the selected UPR type.'],
-            ]);
-        }
-    }
-
-    private function assertCategoryBelongsToCycle(int $categoryId, int $cycleId): void
+    private function assertCategoryMatchesCycleAndType(int $categoryId, int $cycleId, int $typeId): void
     {
         $category = UprCategory::query()->find($categoryId);
         if ($category === null) {
@@ -320,6 +308,11 @@ class UprEntryController extends Controller
         if ((int) ($category->upr_cycle_id ?? 0) !== $cycleId) {
             throw ValidationException::withMessages([
                 'upr_category_id' => ['Selected category does not belong to the selected cycle.'],
+            ]);
+        }
+        if ((int) ($category->upr_type_id ?? 0) !== $typeId) {
+            throw ValidationException::withMessages([
+                'upr_category_id' => ['Selected category does not belong to the selected UPR type.'],
             ]);
         }
     }
@@ -345,12 +338,12 @@ class UprEntryController extends Controller
             'cycle' => $row->relationLoaded('cycle') && $row->cycle ? [
                 'id' => $row->cycle->id,
                 'name' => $row->cycle->name,
-                'upr_type_id' => $row->cycle->upr_type_id !== null ? (int) $row->cycle->upr_type_id : null,
             ] : null,
             'category' => $row->relationLoaded('category') && $row->category ? [
                 'id' => $row->category->id,
                 'name' => $row->category->name,
                 'upr_cycle_id' => $row->category->upr_cycle_id !== null ? (int) $row->category->upr_cycle_id : null,
+                'upr_type_id' => $row->category->upr_type_id !== null ? (int) $row->category->upr_type_id : null,
             ] : null,
             'recommendations' => $row->relationLoaded('recommendations')
                 ? $row->recommendations->map(fn (UprRecommendationEntry $rec) => [

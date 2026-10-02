@@ -24,6 +24,7 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
   const [departments, setDepartments] = useState<DepartmentRow[]>([])
   const [selectedReq, setSelectedReq] = useState<string>('')
   const [selectedDeptIds, setSelectedDeptIds] = useState<number[]>([])
+  const [dueDate, setDueDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -54,10 +55,20 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
     setSelectedReq(preselectReqId)
   }, [preselectReqId, openRequests])
 
-  const selectedRequestLabel = useMemo(
-    () => openRequests.find((r) => r.id === selectedReq)?.title ?? '',
+  const selectedRequest = useMemo(
+    () => openRequests.find((r) => r.id === selectedReq) ?? null,
     [openRequests, selectedReq],
   )
+  const selectedRequestLabel = selectedRequest?.title ?? ''
+  const requestDueDate = selectedRequest?.date?.trim() || ''
+
+  useEffect(() => {
+    if (!selectedReq) {
+      setDueDate('')
+      return
+    }
+    setDueDate(requestDueDate)
+  }, [selectedReq, requestDueDate])
 
   const preselectUnavailable = useMemo(() => {
     if (!preselectReqId || requests.length === 0) return false
@@ -74,8 +85,15 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
       setError('Select at least one department.')
       return
     }
-    const selectedRequest = requests.find((r) => r.id === selectedReq)
-    const indicatorIds = indicatorsScopedToRequest(selectedRequest).map((i) => i.id)
+    if (!dueDate.trim()) {
+      setError('Set a department due date.')
+      return
+    }
+    if (requestDueDate && dueDate.trim() > requestDueDate) {
+      setError(`Department due date must be on or before the request due date (${requestDueDate}).`)
+      return
+    }
+    const indicatorIds = indicatorsScopedToRequest(selectedRequest ?? undefined).map((i) => i.id)
     if (indicatorIds.length === 0) {
       setError('This request has no indicators to assign.')
       return
@@ -84,10 +102,14 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
     setError(null)
     try {
       for (const id of selectedDeptIds) {
-        await createDepartmentTask(selectedReq, id, { issue_indicator_ids: indicatorIds })
+        await createDepartmentTask(selectedReq, id, {
+          due_date: dueDate.trim(),
+          issue_indicator_ids: indicatorIds,
+        })
       }
       setSelectedReq('')
       setSelectedDeptIds([])
+      setDueDate('')
       await load()
       navigate(nextPath)
     } catch (e) {
@@ -135,7 +157,31 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
         {selectedReq && (
           <p className="muted" style={{ margin: '0 0 10px' }}>
             Selected request: <strong>{selectedReq}</strong> — {selectedRequestLabel}
+            {requestDueDate ? (
+              <>
+                {' '}
+                (request due: <strong>{requestDueDate}</strong>)
+              </>
+            ) : null}
           </p>
+        )}
+
+        {selectedReq && (
+          <div className="form-row" style={{ marginBottom: 14 }}>
+            <label className="muted" htmlFor="dist-due-date">
+              Department due date
+              {requestDueDate ? ` (on or before ${requestDueDate})` : ''}
+            </label>
+            <input
+              id="dist-due-date"
+              type="date"
+              required
+              value={dueDate}
+              max={requestDueDate || undefined}
+              onChange={(e) => setDueDate(e.target.value)}
+              style={{ width: '100%', maxWidth: 280, marginTop: 6 }}
+            />
+          </div>
         )}
 
         <label className="muted">Assign departments</label>

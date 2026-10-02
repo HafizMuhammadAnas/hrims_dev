@@ -22,12 +22,24 @@ export interface MonthCountPoint {
   count: number
 }
 
+export interface DueDateAlertRow {
+  id: string
+  title: string
+  date: string | null
+  urgency: 'overdue' | 'due_today' | 'due_soon' | string
+  region_name: string | null
+  kind: 'request' | 'department_task' | string
+  department_name?: string | null
+}
+
 export interface DashboardSummary {
   hr_requests_total: number
   by_status: Record<string, number>
   urgent_requests: UrgentRequestRow[]
   /** Recent in-scope HR requests (not limited to overdue / draft). */
   recent_requests?: UrgentRequestRow[]
+  /** Overdue or due within 7 days — federal & regional dashboards. */
+  due_date_alerts?: DueDateAlertRow[]
   requests_created_by_month: MonthCountPoint[]
   regional_responses_total?: number
   regional_responses_by_review?: Record<string, number>

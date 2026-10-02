@@ -26,12 +26,22 @@ class UserController extends Controller
 
         if ($creator->hasRole('super_admin')) {
             $rows = $query
-                ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['federal_admin', 'regional_admin']))
+                ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['federal_admin', 'federal_sub_admin', 'regional_admin']))
                 ->get();
         } elseif ($creator->hasRole('federal_admin')) {
+            $ictRegionId = Region::query()->where('slug', 'ict')->value('id');
             $rows = $query
-                ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
-                ->whereHas('department.regions', fn ($r) => $r->where('slug', 'ict'))
+                ->where(function ($q) use ($ictRegionId) {
+                    $q->where(function ($inner) {
+                        $inner->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
+                            ->whereHas('department.regions', fn ($r) => $r->where('slug', 'ict'));
+                    })->orWhere(function ($inner) use ($ictRegionId) {
+                        $inner->whereHas('roles', fn ($r) => $r->where('slug', 'federal_sub_admin'));
+                        if ($ictRegionId !== null) {
+                            $inner->where('region_id', $ictRegionId);
+                        }
+                    });
+                })
                 ->get();
         } else {
             if ($creator->region_id === null) {
@@ -58,12 +68,14 @@ class UserController extends Controller
 
         $roleSlugsAllowed = $creator->hasRole('super_admin')
             ? ['federal_admin', 'regional_admin']
-            : ['department_admin', 'viewer'];
+            : ($creator->hasRole('federal_admin')
+                ? ['department_admin', 'federal_sub_admin']
+                : ['department_admin', 'viewer']);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', 'unique:users,username'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8'],
             'role_slug' => ['required', Rule::in($roleSlugsAllowed)],
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
@@ -73,6 +85,7 @@ class UserController extends Controller
             'name.required' => 'Full name is required.',
             'username.required' => 'Username is required.',
             'username.unique' => 'This username is already taken.',
+            'email.required' => 'Official email is required.',
             'email.email' => 'Enter a valid email address.',
             'email.unique' => 'This email is already registered.',
             'password.required' => 'Password is required.',
@@ -92,7 +105,13 @@ class UserController extends Controller
                 }
                 $data['department_id'] = null;
             }
+        } elseif ($data['role_slug'] === 'federal_sub_admin') {
+            $data['region_id'] = Region::query()->where('slug', 'ict')->value('id');
+            $data['department_id'] = null;
         } else {
+            if (empty($data['department_id'])) {
+                return response()->json(['message' => 'Select a department.'], 422);
+            }
             $department = Department::query()->with('regions')->findOrFail($data['department_id']);
             if ($creator->hasRole('federal_admin')) {
                 if (! $department->coversRegionSlug('ict')) {
@@ -116,7 +135,7 @@ class UserController extends Controller
         $user = User::query()->create([
             'name' => $data['name'],
             'username' => $data['username'],
-            'email' => $data['email'] ?? null,
+            'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'region_id' => $data['region_id'] ?? null,
             'department_id' => $data['department_id'] ?? null,
@@ -154,11 +173,11 @@ class UserController extends Controller
         }
 
         if ($creator->hasRole('super_admin')) {
-            if (! $model->roles()->whereIn('slug', ['federal_admin', 'regional_admin'])->exists()) {
+            if (! $model->roles()->whereIn('slug', ['federal_admin', 'federal_sub_admin', 'regional_admin'])->exists()) {
                 return response()->json(['message' => 'Only federal and regional administrator accounts can be managed here.'], 403);
             }
         } elseif ($creator->hasRole('federal_admin')) {
-            if (! $model->department?->coversRegionSlug('ict')) {
+            if (! $this->federalAdminMayManage($model)) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         } elseif ($creator->hasRole('regional_admin')) {
@@ -170,12 +189,15 @@ class UserController extends Controller
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'email' => ['sometimes', 'required', 'email', 'max:255'],
             'is_active' => ['sometimes', 'boolean'],
             'password' => ['sometimes', 'string', 'min:8'],
+        ], [
+            'email.required' => 'Official email is required.',
+            'email.email' => 'Enter a valid email address.',
         ]);
 
-        if (isset($data['email']) && $data['email'] !== null) {
+        if (array_key_exists('email', $data)) {
             $exists = User::query()->where('email', $data['email'])->where('id', '!=', $model->id)->exists();
             if ($exists) {
                 return response()->json(['message' => 'This email is already registered.'], 422);
@@ -209,7 +231,7 @@ class UserController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $model = User::query()->with(['roles', 'department'])->find($user);
+        $model = User::query()->with(['roles', 'department', 'region'])->find($user);
         if (! $model) {
             return response()->json(['message' => 'Not found'], 404);
         }
@@ -223,11 +245,11 @@ class UserController extends Controller
 
         $creator = $request->user();
         if ($creator->hasRole('super_admin')) {
-            if (! $model->roles()->whereIn('slug', ['federal_admin', 'regional_admin'])->exists()) {
+            if (! $model->roles()->whereIn('slug', ['federal_admin', 'federal_sub_admin', 'regional_admin'])->exists()) {
                 return response()->json(['message' => 'Only federal and regional administrator accounts can be managed here.'], 403);
             }
         } elseif ($creator->hasRole('federal_admin')) {
-            if (! $model->department?->coversRegionSlug('ict')) {
+            if (! $this->federalAdminMayManage($model)) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         } elseif ($creator->hasRole('regional_admin')) {
@@ -249,6 +271,17 @@ class UserController extends Controller
         );
 
         return response()->json(['message' => 'Deleted']);
+    }
+
+    private function federalAdminMayManage(User $model): bool
+    {
+        if ($model->roles()->where('slug', 'federal_sub_admin')->exists()) {
+            $ictId = Region::query()->where('slug', 'ict')->value('id');
+
+            return $ictId !== null && (int) $model->region_id === (int) $ictId;
+        }
+
+        return (bool) $model->department?->coversRegionSlug('ict');
     }
 
     /**

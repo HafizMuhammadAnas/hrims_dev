@@ -68,17 +68,22 @@ class KnowledgeHubController extends Controller
 
         $convention->loadCount($this->conventionCountRelations());
 
+        $select = [
+            'issue_categories.id as category_id',
+            'issue_categories.name as category_name',
+            'issue_indicators.id as indicator_id',
+            'issue_indicators.indicator_text',
+            'issues.id as issue_id',
+        ];
+        if (Schema::hasColumn('issues', 'entry_kind')) {
+            $select[] = 'issues.entry_kind as entry_kind';
+        }
+
         $q = DB::table('issue_indicators')
             ->join('issues', 'issues.id', '=', 'issue_indicators.issue_id')
             ->leftJoin('issue_categories', 'issue_categories.id', '=', 'issues.category_id')
             ->where('issues.convention_id', $convention->id)
-            ->select([
-                'issue_categories.id as category_id',
-                'issue_categories.name as category_name',
-                'issue_indicators.id as indicator_id',
-                'issue_indicators.indicator_text',
-                'issues.id as issue_id',
-            ]);
+            ->select($select);
 
         if (Schema::hasColumn('issues', 'is_active')) {
             $q->where('issues.is_active', true);
@@ -96,11 +101,32 @@ class KnowledgeHubController extends Controller
 
         $rows = $q->get();
 
+        $loiCategoryIds = [];
+        $coCategoryIds = [];
+        $loiIndicators = 0;
+        $coIndicators = 0;
+        foreach ($rows as $r) {
+            $kind = (string) ($r->entry_kind ?? 'issue');
+            $isCo = $kind === 'recommendation';
+            $catKey = $r->category_id !== null ? (string) $r->category_id : 'uncategorized:'.$kind;
+            if ($isCo) {
+                $coIndicators++;
+                $coCategoryIds[$catKey] = true;
+            } else {
+                $loiIndicators++;
+                $loiCategoryIds[$catKey] = true;
+            }
+        }
+
         return response()->json([
             'data' => [
                 'convention' => $this->serializeConvention($convention),
                 'categories_count' => (int) ($convention->categories_count ?? 0),
                 'indicators_count' => (int) ($convention->indicators_count ?? 0),
+                'loi_categories_count' => count($loiCategoryIds),
+                'co_categories_count' => count($coCategoryIds),
+                'loi_indicators_count' => $loiIndicators,
+                'co_indicators_count' => $coIndicators,
                 'rows' => $rows->map(fn ($r) => [
                     'category_id' => $r->category_id !== null ? (int) $r->category_id : null,
                     'category_name' => trim((string) ($r->category_name ?? '')) !== ''
@@ -109,6 +135,9 @@ class KnowledgeHubController extends Controller
                     'indicator_id' => (int) $r->indicator_id,
                     'indicator_text' => (string) $r->indicator_text,
                     'issue_id' => (int) $r->issue_id,
+                    'entry_kind' => (string) ($r->entry_kind ?? 'issue') === 'recommendation'
+                        ? 'recommendation'
+                        : 'issue',
                 ])->all(),
             ],
         ]);
@@ -261,7 +290,7 @@ class KnowledgeHubController extends Controller
     {
         $rows = KnowledgeUprEntry::query()
             ->where('is_active', true)
-            ->with(['cycle:id,name,upr_type_id'])
+            ->with(['cycle:id,name', 'type:id,name'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
@@ -276,7 +305,7 @@ class KnowledgeHubController extends Controller
         if (! (bool) ($knowledgeUprEntry->is_active ?? true)) {
             return response()->json(['message' => 'Not found'], 404);
         }
-        $knowledgeUprEntry->load(['cycle:id,name,upr_type_id']);
+        $knowledgeUprEntry->load(['cycle:id,name', 'type:id,name']);
 
         return response()->json(['data' => $this->serializeUprEntry($knowledgeUprEntry)]);
     }
@@ -289,6 +318,11 @@ class KnowledgeHubController extends Controller
         return [
             'id' => $row->id,
             'kind' => $row->kind,
+            'upr_type_id' => $row->upr_type_id !== null ? (int) $row->upr_type_id : null,
+            'type' => $row->relationLoaded('type') && $row->type ? [
+                'id' => $row->type->id,
+                'name' => $row->type->name,
+            ] : null,
             'title' => $row->title,
             'display_title' => $row->displayTitle(),
             'upr_cycle_id' => $row->upr_cycle_id !== null ? (int) $row->upr_cycle_id : null,

@@ -2,6 +2,7 @@ import type { AuthUser } from '../types/auth'
 import {
   isDepartmentAdmin,
   isFederalAdmin,
+  isFederalSubAdmin,
   isRegionalAdmin,
   isSuperAdmin,
   isViewer,
@@ -28,6 +29,8 @@ export function formatPrimaryRoleLabel(user: AuthUser | null): string {
     }
     case 'federal_admin':
       return 'Federal Admin'
+    case 'federal_sub_admin':
+      return 'Federal Sub Admin'
     case 'super_admin':
       return 'Super Admin'
     case 'department_admin':
@@ -42,7 +45,7 @@ export function formatPrimaryRoleLabel(user: AuthUser | null): string {
 /** Header subtitle under the signed-in account name. */
 export function accountPortalSubtitle(user: AuthUser): string {
   if (isSuperAdmin(user)) return 'System-wide access'
-  if (isFederalAdmin(user)) return 'Federal workspace'
+  if (isFederalAdmin(user) || isFederalSubAdmin(user)) return 'Federal workspace'
   if (isRegionalAdmin(user)) {
     const regionName = user.region?.name?.trim()
     return regionName ? `${regionName} Admin` : 'Admin portal'

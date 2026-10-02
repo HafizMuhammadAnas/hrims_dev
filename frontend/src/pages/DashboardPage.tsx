@@ -26,6 +26,7 @@ import {
 import { fetchDashboardSummary } from '../api/dashboard'
 import type {
   DashboardSummary,
+  DueDateAlertRow,
   MonthCountPoint,
   UrgentDepartmentTaskRow,
   UrgentRequestRow,
@@ -36,7 +37,7 @@ import { Alert } from '../components/ui/Alert'
 import { StatsCards } from '../components/ui/StatsCards'
 import {
   isDepartmentAdmin,
-  isFederalAdmin,
+  isFederalStaff,
   isRegionalAdmin,
   isSuperAdmin,
   isViewer,
@@ -123,7 +124,7 @@ type DashboardVariant = 'federal' | 'regional' | 'department' | 'viewer' | 'mini
 
 function dashboardVariant(user: ReturnType<typeof useAuth>['user']): DashboardVariant {
   if (!user) return 'minimal'
-  if (isSuperAdmin(user) || isFederalAdmin(user)) return 'federal'
+  if (isSuperAdmin(user) || isFederalStaff(user)) return 'federal'
   if (isRegionalAdmin(user)) return 'regional'
   if (isDepartmentAdmin(user)) return 'department'
   if (isViewer(user)) return 'viewer'
@@ -273,10 +274,17 @@ export function DashboardPage() {
   const urgentList = summary?.urgent_requests ?? []
   const recentRequestList = summary?.recent_requests ?? urgentList
   const urgentDeptTasks = summary?.urgent_department_tasks ?? []
+  const dueDateAlerts = summary?.due_date_alerts ?? []
   const urgentRequestCount = urgentList.length
   const compiledReportsTotal = summary?.compiled_records_total ?? 0
   const pendingRequests =
     summary?.hr_requests_pending_federal ?? Math.max(0, active - compiledReportsTotal)
+
+  function dueAlertLabel(urgency: string): string {
+    if (urgency === 'overdue') return 'Overdue'
+    if (urgency === 'due_today') return 'Due today'
+    return 'Due soon'
+  }
 
   const requestsPanelRows: (UrgentRequestRow | (UrgentDepartmentTaskRow & { task_id: string }))[] =
     variant === 'department' || variant === 'viewer'
@@ -667,6 +675,51 @@ export function DashboardPage() {
             </div>
 
             <div className="table-card table-card-padded">
+              {(variant === 'federal' || variant === 'regional') && (
+                <div className="dashboard-due-alerts" role="region" aria-label="Due date notifications">
+                  <div className="dashboard-due-alerts__head">
+                    <AlertCircle size={18} aria-hidden />
+                    <h3 className="dashboard-panel-title" style={{ margin: 0 }}>
+                      Due date notifications
+                    </h3>
+                  </div>
+                  {dueDateAlerts.length > 0 ? (
+                    <ul className="dashboard-due-alerts__list">
+                      {dueDateAlerts.map((alert: DueDateAlertRow, idx) => (
+                        <li key={`${alert.kind}-${alert.id}-${alert.date ?? ''}-${idx}`}>
+                          <button
+                            type="button"
+                            className="dashboard-due-alerts__item"
+                            onClick={() =>
+                              navigate(
+                                `/requests/${encodeURIComponent(alert.id)}?from=${encodeURIComponent(
+                                  variant === 'federal' ? '/requests' : '/region-received',
+                                )}`,
+                              )
+                            }
+                          >
+                            <span className={`dashboard-due-alerts__badge dashboard-due-alerts__badge--${alert.urgency}`}>
+                              {dueAlertLabel(alert.urgency)}
+                            </span>
+                            <span className="dashboard-due-alerts__body">
+                              <strong>{alert.title}</strong>
+                              <span className="muted small">
+                                {alert.date ? `Due ${formatAppDate(alert.date)}` : 'No due date'}
+                                {alert.department_name ? ` · ${alert.department_name}` : ''}
+                                {alert.region_name && !alert.department_name ? ` · ${alert.region_name}` : ''}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted dashboard-due-alerts__empty">
+                      No overdue or upcoming due dates in the next 7 days.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="dashboard-panel-head">
                 <h3 className="dashboard-panel-title">{LABEL_PERFORMANCE_OVERVIEW}</h3>
                 {(variant === 'federal' || variant === 'regional') && (

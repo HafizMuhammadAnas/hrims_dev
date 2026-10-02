@@ -143,12 +143,17 @@ export type KnowledgeIndicatorCatalogRow = {
   indicator_id: number
   indicator_text: string
   issue_id: number
+  entry_kind: 'issue' | 'recommendation'
 }
 
 export type KnowledgeConventionIndicatorCatalog = {
   convention: KnowledgeConventionListItem
   categories_count: number
   indicators_count: number
+  loi_categories_count: number
+  co_categories_count: number
+  loi_indicators_count: number
+  co_indicators_count: number
   rows: KnowledgeIndicatorCatalogRow[]
 }
 
@@ -236,6 +241,8 @@ export type KnowledgeUprDocument = {
 export type KnowledgeUprEntry = {
   id: number
   kind: string
+  upr_type_id?: number | null
+  type?: { id: number; name: string } | null
   title: string | null
   display_title: string
   upr_cycle_id: number | null

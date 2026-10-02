@@ -9,9 +9,9 @@ async function throwIfNotOk(res: Response): Promise<void> {
 export type UserCreateInput = {
   name: string
   username: string
-  email?: string | null
+  email: string
   password: string
-  role_slug: 'federal_admin' | 'regional_admin' | 'department_admin' | 'viewer'
+  role_slug: 'federal_admin' | 'regional_admin' | 'department_admin' | 'federal_sub_admin' | 'viewer'
   region_id?: number | null
   department_id?: number | null
 }

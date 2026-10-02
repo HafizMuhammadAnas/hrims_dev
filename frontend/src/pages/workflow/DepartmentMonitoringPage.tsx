@@ -127,6 +127,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
               <th>Department</th>
               <th>Workflow</th>
               <th>Assigned</th>
+              <th>Due</th>
               <th>Submitted</th>
               <th className="table-actions">Actions</th>
             </tr>
@@ -143,6 +144,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
                     <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
                   </td>
                   <td>{formatAppDate(t.assigned_date)}</td>
+                  <td>{formatAppDate(t.due_date)}</td>
                   <td>{formatAppDate(t.submission_date)}</td>
                   <td className="table-actions">
                     <RowActionsMenu
@@ -165,7 +167,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
                 </tr>
               )
             })}
-            {pageRows.length === 0 && <EmptyStateRow colSpan={7} message="No department tasks found." />}
+            {pageRows.length === 0 && <EmptyStateRow colSpan={8} message="No department tasks found." />}
           </tbody>
         </table>
       </TableCard>

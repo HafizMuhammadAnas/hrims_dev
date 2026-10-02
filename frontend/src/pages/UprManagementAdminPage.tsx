@@ -45,6 +45,7 @@ import { TableCard } from '../components/ui/TableCard'
 import { TableExportButton } from '../components/ui/TableExportButton'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
+import { PageSection } from '../components/ui/PageSection'
 import { derivePaginatedRows, useClientTableState, type SortDirection } from '../hooks/useClientTableState'
 import { reorderList } from '../lib/reorderList'
 import { isSuperAdmin } from '../lib/roles'
@@ -60,7 +61,6 @@ import {
   superAdminUprManagementCyclesPath,
   superAdminUprManagementCycleViewPath,
   superAdminUprManagementIndicatorsPath,
-  superAdminUprManagementListPath,
   superAdminUprManagementRecommendationsPath,
   superAdminUprManagementRecommendationViewPath,
   superAdminUprManagementTypeViewPath,
@@ -68,15 +68,14 @@ import {
 
 const PAGE_SIZE = 10
 
-type UprMgmtView = 'types' | 'cycles' | 'categories' | 'recommendations' | 'list' | 'create' | 'indicators'
+type UprMgmtView = 'types' | 'cycles' | 'categories' | 'recommendations' | 'create' | 'indicators'
 
 const UPR_MGMT_TABS: { view: UprMgmtView; to: string; label: string; end?: boolean }[] = [
   { view: 'types', to: SUPER_ADMIN_UPR_MANAGEMENT, label: 'UPR Types', end: true },
   { view: 'cycles', to: superAdminUprManagementCyclesPath(), label: 'Cycles' },
   { view: 'categories', to: superAdminUprManagementCategoriesPath(), label: 'Categories' },
   { view: 'recommendations', to: superAdminUprManagementRecommendationsPath(), label: 'Recommendation' },
-  { view: 'list', to: superAdminUprManagementListPath(), label: 'List of UPR' },
-  { view: 'create', to: superAdminUprManagementCreatePath(), label: 'Create UPR' },
+  { view: 'create', to: superAdminUprManagementCreatePath(), label: 'Create Indicator' },
   { view: 'indicators', to: superAdminUprManagementIndicatorsPath(), label: 'Indicator list' },
 ]
 
@@ -85,14 +84,14 @@ function resolveUprMgmtView(param: string | undefined, pathname: string): UprMgm
   if (pathname.includes('/cycles/view/')) return 'cycles'
   if (pathname.includes('/categories/view/')) return 'categories'
   if (pathname.includes('/recommendations/view/')) return 'recommendations'
-  if (pathname.includes('/entries/view/') || pathname.includes('/entries/edit/')) return 'list'
+  if (pathname.includes('/entries/view/') || pathname.includes('/entries/edit/')) return 'create'
   if (!param) return 'types'
+  if (param === 'list') return 'create'
   if (
     param === 'types' ||
     param === 'cycles' ||
     param === 'categories' ||
     param === 'recommendations' ||
-    param === 'list' ||
     param === 'create' ||
     param === 'indicators'
   ) {
@@ -192,6 +191,10 @@ export function UprManagementAdminPage() {
     return <Navigate to={SUPER_ADMIN_UPR_MANAGEMENT} replace />
   }
 
+  if (uprViewParam === 'list') {
+    return <Navigate to={superAdminUprManagementCreatePath()} replace />
+  }
+
   if (isEditRoute && viewRecordId != null) {
     return (
       <div className="page-shell">
@@ -202,8 +205,8 @@ export function UprManagementAdminPage() {
         ) : null}
         <WorkflowPageBack
           placement="header"
-          label="Back to List of UPR"
-          to={superAdminUprManagementListPath()}
+          label="Back to Create Indicator"
+          to={superAdminUprManagementCreatePath()}
         />
         <TableCard padded>
           <UprCreateForm
@@ -386,7 +389,6 @@ export function UprManagementAdminPage() {
       {view === 'cycles' ? (
         <UprCyclesSection
           rows={cycles}
-          types={types}
           busy={busy}
           setBusy={setBusy}
           setError={setError}
@@ -398,6 +400,7 @@ export function UprManagementAdminPage() {
         <UprCategoriesSection
           rows={categories}
           cycles={cycles}
+          types={types}
           busy={busy}
           setBusy={setBusy}
           setError={setError}
@@ -409,19 +412,12 @@ export function UprManagementAdminPage() {
         <UprRecommendationsSection
           rows={recommendations}
           cycles={cycles}
+          types={types}
           categories={categories}
           busy={busy}
           setBusy={setBusy}
           setError={setError}
           onRefresh={refreshRecommendations}
-        />
-      ) : null}
-
-      {view === 'list' ? (
-        <UprEntriesListSection
-          rows={entries}
-          setError={setError}
-          onRefresh={refreshEntries}
         />
       ) : null}
 
@@ -533,10 +529,6 @@ function UprCycleViewCard({
           <dd>{row.name}</dd>
         </div>
         <div>
-          <dt>UPR Type</dt>
-          <dd>{row.type?.name || '—'}</dd>
-        </div>
-        <div>
           <dt>Status</dt>
           <dd>
             <span className={catalogIsActive(row) ? 'status-badge success' : 'status-badge default'}>
@@ -604,6 +596,10 @@ function UprCategoryViewCard({
         <div>
           <dt>Cycle</dt>
           <dd>{row.cycle?.name || '—'}</dd>
+        </div>
+        <div>
+          <dt>UPR Type</dt>
+          <dd>{row.type?.name || '—'}</dd>
         </div>
         <div>
           <dt>Status</dt>
@@ -906,52 +902,35 @@ function UprTypesSection({
 
 function UprCyclesSection({
   rows,
-  types,
   busy,
   setBusy,
   setError,
   onRefresh,
 }: {
   rows: AdminUprCycle[]
-  types: AdminUprType[]
   busy: boolean
   setBusy: (v: boolean) => void
   setError: (s: string | null) => void
   onRefresh: () => Promise<void>
 }) {
   const navigate = useNavigate()
-  const activeTypes = useMemo(() => types.filter(catalogIsActive), [types])
-  const [typeId, setTypeId] = useState('')
   const [name, setName] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [listTypeFilter, setListTypeFilter] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editTypeId, setEditTypeId] = useState('')
   const [editName, setEditName] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: PAGE_SIZE })
 
-  const filtered = useMemo(() => {
-    if (!listTypeFilter) return rows
-    return rows.filter((r) => String(r.upr_type_id ?? '') === listTypeFilter)
-  }, [rows, listTypeFilter])
-
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return filtered
-    return filtered.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        (r.type?.name ?? '').toLowerCase().includes(q) ||
-        String(r.id).includes(q),
-    )
-  }, [filtered, search])
+    if (!q) return rows
+    return rows.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q))
+  }, [rows, search])
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
   const activeCount = rows.filter(catalogIsActive).length
 
   function resetCreateForm() {
     setName('')
-    setTypeId('')
   }
 
   return (
@@ -975,16 +954,6 @@ function UprCyclesSection({
         <div style={{ marginBottom: 16 }}>
           <TableCard padded>
             <div className="issues-catalog-add-form">
-              <FormField label="UPR Type">
-                <select value={typeId} onChange={(e) => setTypeId(e.target.value)} disabled={busy}>
-                  <option value="">Select UPR type</option>
-                  {activeTypes.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
               <FormField label="Cycle name">
                 <input
                   value={name}
@@ -997,16 +966,13 @@ function UprCyclesSection({
                 <Button
                   variant="primary"
                   compact
-                  disabled={busy || !name.trim() || !typeId}
+                  disabled={busy || !name.trim()}
                   onClick={() => {
                     void (async () => {
                       setBusy(true)
                       setError(null)
                       try {
-                        await adminCreateUprCycle({
-                          name: name.trim(),
-                          upr_type_id: Number(typeId),
-                        })
+                        await adminCreateUprCycle({ name: name.trim() })
                         resetCreateForm()
                         setCreateOpen(false)
                         await onRefresh()
@@ -1048,33 +1014,14 @@ function UprCyclesSection({
       </div>
 
       <TableToolbar className="issues-list-toolbar">
-        <select
-          value={listTypeFilter}
-          onChange={(e) => setListTypeFilter(e.target.value)}
-          aria-label="Filter by UPR type"
-        >
-          <option value="">All UPR types</option>
-          {types.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
         <input
           type="search"
-          placeholder="Search ID, name, type…"
+          placeholder="Search ID, name…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search UPR cycles"
         />
-        <Button
-          variant="secondary"
-          compact
-          onClick={() => {
-            setSearch('')
-            setListTypeFilter('')
-          }}
-        >
+        <Button variant="secondary" compact onClick={() => setSearch('')}>
           Reset filters
         </Button>
       </TableToolbar>
@@ -1085,7 +1032,6 @@ function UprCyclesSection({
             <thead>
               <tr>
                 <th>ID</th>
-                <th>UPR Type</th>
                 <th>Name</th>
                 <th>Status</th>
                 <th className="table-actions">Actions</th>
@@ -1094,12 +1040,8 @@ function UprCyclesSection({
             <tbody>
               {pageRows.length === 0 ? (
                 <EmptyStateRow
-                  colSpan={5}
-                  message={
-                    search.trim() || listTypeFilter
-                      ? 'No cycles match your filters.'
-                      : 'No UPR cycles yet. Add one above.'
-                  }
+                  colSpan={4}
+                  message={search.trim() ? 'No cycles match your filters.' : 'No UPR cycles yet. Add one above.'}
                 />
               ) : (
                 pageRows.map((r) => (
@@ -1107,16 +1049,6 @@ function UprCyclesSection({
                     {editingId === r.id ? (
                       <>
                         <td>{r.id}</td>
-                        <td>
-                          <select value={editTypeId} onChange={(e) => setEditTypeId(e.target.value)}>
-                            <option value="">Select UPR type</option>
-                            {types.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
                         <td>
                           <input value={editName} onChange={(e) => setEditName(e.target.value)} />
                         </td>
@@ -1129,14 +1061,11 @@ function UprCyclesSection({
                           <Button
                             variant="primary"
                             compact
-                            disabled={!editName.trim() || !editTypeId}
+                            disabled={!editName.trim()}
                             onClick={() => {
                               void (async () => {
                                 try {
-                                  await adminUpdateUprCycle(r.id, {
-                                    name: editName.trim(),
-                                    upr_type_id: Number(editTypeId),
-                                  })
+                                  await adminUpdateUprCycle(r.id, { name: editName.trim() })
                                   setEditingId(null)
                                   await onRefresh()
                                 } catch (e: unknown) {
@@ -1155,7 +1084,6 @@ function UprCyclesSection({
                     ) : (
                       <>
                         <td>{r.id}</td>
-                        <td>{r.type?.name || '—'}</td>
                         <td>{r.name}</td>
                         <td>
                           <span className={catalogIsActive(r) ? 'status-badge success' : 'status-badge default'}>
@@ -1177,7 +1105,6 @@ function UprCyclesSection({
                               onClick={() => {
                                 setEditingId(r.id)
                                 setEditName(r.name)
-                                setEditTypeId(r.upr_type_id != null ? String(r.upr_type_id) : '')
                               }}
                             >
                               Edit
@@ -1235,6 +1162,7 @@ function UprCyclesSection({
 function UprCategoriesSection({
   rows,
   cycles,
+  types,
   busy,
   setBusy,
   setError,
@@ -1242,6 +1170,7 @@ function UprCategoriesSection({
 }: {
   rows: AdminUprCategory[]
   cycles: AdminUprCycle[]
+  types: AdminUprType[]
   busy: boolean
   setBusy: (v: boolean) => void
   setError: (s: string | null) => void
@@ -1249,19 +1178,29 @@ function UprCategoriesSection({
 }) {
   const navigate = useNavigate()
   const activeCycles = useMemo(() => cycles.filter(catalogIsActive), [cycles])
+  const activeTypes = useMemo(() => types.filter(catalogIsActive), [types])
   const [cycleId, setCycleId] = useState('')
+  const [typeId, setTypeId] = useState('')
   const [name, setName] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [listCycleFilter, setListCycleFilter] = useState('')
+  const [listTypeFilter, setListTypeFilter] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editCycleId, setEditCycleId] = useState('')
+  const [editTypeId, setEditTypeId] = useState('')
   const [editName, setEditName] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: PAGE_SIZE })
 
   const filtered = useMemo(() => {
-    if (!listCycleFilter) return rows
-    return rows.filter((r) => String(r.upr_cycle_id ?? '') === listCycleFilter)
-  }, [rows, listCycleFilter])
+    let next = rows
+    if (listCycleFilter) {
+      next = next.filter((r) => String(r.upr_cycle_id ?? '') === listCycleFilter)
+    }
+    if (listTypeFilter) {
+      next = next.filter((r) => String(r.upr_type_id ?? '') === listTypeFilter)
+    }
+    return next
+  }, [rows, listCycleFilter, listTypeFilter])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -1270,6 +1209,7 @@ function UprCategoriesSection({
       (r) =>
         r.name.toLowerCase().includes(q) ||
         (r.cycle?.name ?? '').toLowerCase().includes(q) ||
+        (r.type?.name ?? '').toLowerCase().includes(q) ||
         String(r.id).includes(q),
     )
   }, [filtered, search])
@@ -1280,6 +1220,7 @@ function UprCategoriesSection({
   function resetCreateForm() {
     setName('')
     setCycleId('')
+    setTypeId('')
   }
 
   return (
@@ -1303,13 +1244,22 @@ function UprCategoriesSection({
         <div style={{ marginBottom: 16 }}>
           <TableCard padded>
             <div className="issues-catalog-add-form">
-              <FormField label="Cycle (optional)">
+              <FormField label="Cycle">
                 <select value={cycleId} onChange={(e) => setCycleId(e.target.value)} disabled={busy}>
-                  <option value="">No cycle</option>
+                  <option value="">Select cycle</option>
                   {activeCycles.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
-                      {c.type?.name ? ` — ${c.type.name}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label="UPR Type">
+                <select value={typeId} onChange={(e) => setTypeId(e.target.value)} disabled={busy}>
+                  <option value="">Select UPR type</option>
+                  {activeTypes.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
                     </option>
                   ))}
                 </select>
@@ -1326,7 +1276,7 @@ function UprCategoriesSection({
                 <Button
                   variant="primary"
                   compact
-                  disabled={busy || !name.trim()}
+                  disabled={busy || !name.trim() || !cycleId || !typeId}
                   onClick={() => {
                     void (async () => {
                       setBusy(true)
@@ -1334,7 +1284,8 @@ function UprCategoriesSection({
                       try {
                         await adminCreateUprCategory({
                           name: name.trim(),
-                          upr_cycle_id: cycleId ? Number(cycleId) : null,
+                          upr_cycle_id: Number(cycleId),
+                          upr_type_id: Number(typeId),
                         })
                         resetCreateForm()
                         setCreateOpen(false)
@@ -1389,9 +1340,21 @@ function UprCategoriesSection({
             </option>
           ))}
         </select>
+        <select
+          value={listTypeFilter}
+          onChange={(e) => setListTypeFilter(e.target.value)}
+          aria-label="Filter by UPR type"
+        >
+          <option value="">All UPR types</option>
+          {types.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
         <input
           type="search"
-          placeholder="Search ID, name, cycle…"
+          placeholder="Search ID, name, cycle, type…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search UPR categories"
@@ -1402,6 +1365,7 @@ function UprCategoriesSection({
           onClick={() => {
             setSearch('')
             setListCycleFilter('')
+            setListTypeFilter('')
           }}
         >
           Reset filters
@@ -1415,6 +1379,7 @@ function UprCategoriesSection({
               <tr>
                 <th>ID</th>
                 <th>Cycle</th>
+                <th>UPR Type</th>
                 <th>Name</th>
                 <th>Status</th>
                 <th className="table-actions">Actions</th>
@@ -1423,9 +1388,9 @@ function UprCategoriesSection({
             <tbody>
               {pageRows.length === 0 ? (
                 <EmptyStateRow
-                  colSpan={5}
+                  colSpan={6}
                   message={
-                    search.trim() || listCycleFilter
+                    search.trim() || listCycleFilter || listTypeFilter
                       ? 'No categories match your filters.'
                       : 'No UPR categories yet. Add one above.'
                   }
@@ -1438,10 +1403,20 @@ function UprCategoriesSection({
                         <td>{r.id}</td>
                         <td>
                           <select value={editCycleId} onChange={(e) => setEditCycleId(e.target.value)}>
-                            <option value="">No cycle</option>
+                            <option value="">Select cycle</option>
                             {cycles.map((c) => (
                               <option key={c.id} value={c.id}>
                                 {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <select value={editTypeId} onChange={(e) => setEditTypeId(e.target.value)}>
+                            <option value="">Select UPR type</option>
+                            {types.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
                               </option>
                             ))}
                           </select>
@@ -1458,13 +1433,14 @@ function UprCategoriesSection({
                           <Button
                             variant="primary"
                             compact
-                            disabled={!editName.trim()}
+                            disabled={!editName.trim() || !editCycleId || !editTypeId}
                             onClick={() => {
                               void (async () => {
                                 try {
                                   await adminUpdateUprCategory(r.id, {
                                     name: editName.trim(),
-                                    upr_cycle_id: editCycleId ? Number(editCycleId) : null,
+                                    upr_cycle_id: Number(editCycleId),
+                                    upr_type_id: Number(editTypeId),
                                   })
                                   setEditingId(null)
                                   await onRefresh()
@@ -1485,6 +1461,7 @@ function UprCategoriesSection({
                       <>
                         <td>{r.id}</td>
                         <td>{r.cycle?.name || '—'}</td>
+                        <td>{r.type?.name || '—'}</td>
                         <td>{r.name}</td>
                         <td>
                           <span className={catalogIsActive(r) ? 'status-badge success' : 'status-badge default'}>
@@ -1506,6 +1483,7 @@ function UprCategoriesSection({
                               onClick={() => {
                                 setEditingId(r.id)
                                 setEditCycleId(r.upr_cycle_id != null ? String(r.upr_cycle_id) : '')
+                                setEditTypeId(r.upr_type_id != null ? String(r.upr_type_id) : '')
                                 setEditName(r.name)
                               }}
                             >
@@ -1587,6 +1565,10 @@ function UprRecommendationViewCard({
           <dd>{row.cycle?.name || '—'}</dd>
         </div>
         <div>
+          <dt>UPR Type</dt>
+          <dd>{row.type?.name || '—'}</dd>
+        </div>
+        <div>
           <dt>Category</dt>
           <dd>{row.category?.name || '—'}</dd>
         </div>
@@ -1637,6 +1619,7 @@ function UprRecommendationViewCard({
 function UprRecommendationsSection({
   rows,
   cycles,
+  types,
   categories,
   busy,
   setBusy,
@@ -1645,6 +1628,7 @@ function UprRecommendationsSection({
 }: {
   rows: AdminUprRecommendationEntry[]
   cycles: AdminUprCycle[]
+  types: AdminUprType[]
   categories: AdminUprCategory[]
   busy: boolean
   setBusy: (v: boolean) => void
@@ -1654,39 +1638,71 @@ function UprRecommendationsSection({
   const navigate = useNavigate()
   const activeCycles = useMemo(() => cycles.filter(catalogIsActive), [cycles])
   const [cycleId, setCycleId] = useState('')
+  const [typeId, setTypeId] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [name, setName] = useState('')
+  const [names, setNames] = useState<string[]>([''])
   const [createOpen, setCreateOpen] = useState(false)
   const [listCycleFilter, setListCycleFilter] = useState('')
+  const [listTypeFilter, setListTypeFilter] = useState('')
   const [listCategoryFilter, setListCategoryFilter] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editCycleId, setEditCycleId] = useState('')
+  const [editTypeId, setEditTypeId] = useState('')
   const [editCategoryId, setEditCategoryId] = useState('')
   const [editName, setEditName] = useState('')
   const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: PAGE_SIZE })
 
-  const createCategories = useMemo(() => {
+  const createTypes = useMemo(() => {
     if (!cycleId) return []
-    return categories.filter(
-      (c) => catalogIsActive(c) && String(c.upr_cycle_id ?? '') === cycleId,
+    const linkedTypeIds = new Set(
+      categories
+        .filter((c) => catalogIsActive(c) && String(c.upr_cycle_id ?? '') === cycleId && c.upr_type_id != null)
+        .map((c) => c.upr_type_id as number),
     )
-  }, [categories, cycleId])
+    return types.filter((t) => linkedTypeIds.has(t.id) && catalogIsActive(t))
+  }, [categories, cycleId, types])
+
+  const createCategories = useMemo(() => {
+    if (!cycleId || !typeId) return []
+    return categories.filter(
+      (c) =>
+        catalogIsActive(c) &&
+        String(c.upr_cycle_id ?? '') === cycleId &&
+        String(c.upr_type_id ?? '') === typeId,
+    )
+  }, [categories, cycleId, typeId])
+
+  const editTypes = useMemo(() => {
+    if (!editCycleId) return []
+    const linkedTypeIds = new Set(
+      categories
+        .filter((c) => String(c.upr_cycle_id ?? '') === editCycleId && c.upr_type_id != null)
+        .map((c) => c.upr_type_id as number),
+    )
+    return types.filter((t) => linkedTypeIds.has(t.id))
+  }, [categories, editCycleId, types])
 
   const editCategories = useMemo(() => {
-    if (!editCycleId) return []
-    return categories.filter((c) => String(c.upr_cycle_id ?? '') === editCycleId)
-  }, [categories, editCycleId])
+    if (!editCycleId || !editTypeId) return []
+    return categories.filter(
+      (c) =>
+        String(c.upr_cycle_id ?? '') === editCycleId && String(c.upr_type_id ?? '') === editTypeId,
+    )
+  }, [categories, editCycleId, editTypeId])
 
   const filtered = useMemo(() => {
     let next = rows
     if (listCycleFilter) {
       next = next.filter((r) => String(r.upr_cycle_id) === listCycleFilter)
     }
+    if (listTypeFilter) {
+      next = next.filter((r) => String(r.upr_type_id ?? r.category?.upr_type_id ?? '') === listTypeFilter)
+    }
     if (listCategoryFilter) {
       next = next.filter((r) => String(r.upr_category_id) === listCategoryFilter)
     }
     return next
-  }, [rows, listCycleFilter, listCategoryFilter])
+  }, [rows, listCycleFilter, listTypeFilter, listCategoryFilter])
 
   const processed = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -1695,6 +1711,7 @@ function UprRecommendationsSection({
       (r) =>
         r.name.toLowerCase().includes(q) ||
         (r.cycle?.name ?? '').toLowerCase().includes(q) ||
+        (r.type?.name ?? '').toLowerCase().includes(q) ||
         (r.category?.name ?? '').toLowerCase().includes(q) ||
         String(r.id).includes(q),
     )
@@ -1702,10 +1719,12 @@ function UprRecommendationsSection({
 
   const { pageRows } = derivePaginatedRows(processed, page, pageSize)
   const activeCount = rows.filter(catalogIsActive).length
+  const canSubmitCreate = names.some((n) => n.trim()) && !!cycleId && !!typeId && !!categoryId
 
   function resetCreateForm() {
-    setName('')
+    setNames([''])
     setCycleId('')
+    setTypeId('')
     setCategoryId('')
   }
 
@@ -1735,6 +1754,7 @@ function UprRecommendationsSection({
                   value={cycleId}
                   onChange={(e) => {
                     setCycleId(e.target.value)
+                    setTypeId('')
                     setCategoryId('')
                   }}
                   disabled={busy}
@@ -1743,7 +1763,23 @@ function UprRecommendationsSection({
                   {activeCycles.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
-                      {c.type?.name ? ` — ${c.type.name}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label="UPR Type">
+                <select
+                  value={typeId}
+                  onChange={(e) => {
+                    setTypeId(e.target.value)
+                    setCategoryId('')
+                  }}
+                  disabled={busy || !cycleId}
+                >
+                  <option value="">{cycleId ? 'Select UPR type' : 'Select a cycle first'}</option>
+                  {createTypes.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
                     </option>
                   ))}
                 </select>
@@ -1752,9 +1788,9 @@ function UprRecommendationsSection({
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  disabled={busy || !cycleId}
+                  disabled={busy || !typeId}
                 >
-                  <option value="">{cycleId ? 'Select category' : 'Select a cycle first'}</option>
+                  <option value="">{typeId ? 'Select category' : 'Select a type first'}</option>
                   {createCategories.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -1762,27 +1798,59 @@ function UprRecommendationsSection({
                   ))}
                 </select>
               </FormField>
-              <FormField label="Recommendation name">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Strengthen independent monitoring"
-                  disabled={busy}
-                />
+              <FormField label="Recommendation name(s)">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {names.map((n, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        value={n}
+                        onChange={(e) => {
+                          const next = [...names]
+                          next[idx] = e.target.value
+                          setNames(next)
+                        }}
+                        placeholder="e.g. Strengthen independent monitoring"
+                        disabled={busy}
+                        style={{ flex: 1 }}
+                      />
+                      {names.length > 1 ? (
+                        <Button
+                          variant="link"
+                          compact
+                          dangerLink
+                          disabled={busy}
+                          onClick={() => setNames(names.filter((_, i) => i !== idx))}
+                        >
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                  <Button
+                    variant="secondary"
+                    compact
+                    disabled={busy}
+                    onClick={() => setNames([...names, ''])}
+                  >
+                    + Add
+                  </Button>
+                </div>
               </FormField>
               <div className="issues-catalog-add-form__actions">
                 <Button
                   variant="primary"
                   compact
-                  disabled={busy || !name.trim() || !cycleId || !categoryId}
+                  disabled={busy || !canSubmitCreate}
                   onClick={() => {
                     void (async () => {
                       setBusy(true)
                       setError(null)
                       try {
+                        const trimmed = names.map((n) => n.trim()).filter(Boolean)
                         await adminCreateUprRecommendationEntry({
-                          name: name.trim(),
+                          names: trimmed,
                           upr_cycle_id: Number(cycleId),
+                          upr_type_id: Number(typeId),
                           upr_category_id: Number(categoryId),
                         })
                         resetCreateForm()
@@ -1796,7 +1864,7 @@ function UprRecommendationsSection({
                     })()
                   }}
                 >
-                  Add recommendation
+                  Add recommendation{names.filter((n) => n.trim()).length > 1 ? 's' : ''}
                 </Button>
                 <Button
                   variant="secondary"
@@ -1830,6 +1898,7 @@ function UprRecommendationsSection({
           value={listCycleFilter}
           onChange={(e) => {
             setListCycleFilter(e.target.value)
+            setListTypeFilter('')
             setListCategoryFilter('')
           }}
           aria-label="Filter by cycle"
@@ -1842,13 +1911,41 @@ function UprRecommendationsSection({
           ))}
         </select>
         <select
+          value={listTypeFilter}
+          onChange={(e) => {
+            setListTypeFilter(e.target.value)
+            setListCategoryFilter('')
+          }}
+          aria-label="Filter by UPR type"
+        >
+          <option value="">All UPR types</option>
+          {types
+            .filter((t) => {
+              if (!listCycleFilter) return true
+              return categories.some(
+                (c) =>
+                  String(c.upr_cycle_id ?? '') === listCycleFilter &&
+                  String(c.upr_type_id ?? '') === String(t.id),
+              )
+            })
+            .map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+        </select>
+        <select
           value={listCategoryFilter}
           onChange={(e) => setListCategoryFilter(e.target.value)}
           aria-label="Filter by category"
         >
           <option value="">All categories</option>
           {categories
-            .filter((c) => !listCycleFilter || String(c.upr_cycle_id ?? '') === listCycleFilter)
+            .filter((c) => {
+              if (listCycleFilter && String(c.upr_cycle_id ?? '') !== listCycleFilter) return false
+              if (listTypeFilter && String(c.upr_type_id ?? '') !== listTypeFilter) return false
+              return true
+            })
             .map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -1857,7 +1954,7 @@ function UprRecommendationsSection({
         </select>
         <input
           type="search"
-          placeholder="Search ID, name, cycle, category…"
+          placeholder="Search ID, name, cycle, type, category…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search recommendations"
@@ -1868,6 +1965,7 @@ function UprRecommendationsSection({
           onClick={() => {
             setSearch('')
             setListCycleFilter('')
+            setListTypeFilter('')
             setListCategoryFilter('')
           }}
         >
@@ -1882,6 +1980,7 @@ function UprRecommendationsSection({
               <tr>
                 <th>ID</th>
                 <th>Cycle</th>
+                <th>UPR Type</th>
                 <th>Category</th>
                 <th>Name</th>
                 <th>Status</th>
@@ -1891,9 +1990,9 @@ function UprRecommendationsSection({
             <tbody>
               {pageRows.length === 0 ? (
                 <EmptyStateRow
-                  colSpan={6}
+                  colSpan={7}
                   message={
-                    search.trim() || listCycleFilter || listCategoryFilter
+                    search.trim() || listCycleFilter || listTypeFilter || listCategoryFilter
                       ? 'No recommendations match your filters.'
                       : 'No recommendations yet. Add one above.'
                   }
@@ -1909,6 +2008,7 @@ function UprRecommendationsSection({
                             value={editCycleId}
                             onChange={(e) => {
                               setEditCycleId(e.target.value)
+                              setEditTypeId('')
                               setEditCategoryId('')
                             }}
                           >
@@ -1921,8 +2021,24 @@ function UprRecommendationsSection({
                           </select>
                         </td>
                         <td>
+                          <select
+                            value={editTypeId}
+                            onChange={(e) => {
+                              setEditTypeId(e.target.value)
+                              setEditCategoryId('')
+                            }}
+                          >
+                            <option value="">{editCycleId ? 'Select UPR type' : 'Select a cycle first'}</option>
+                            {editTypes.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
                           <select value={editCategoryId} onChange={(e) => setEditCategoryId(e.target.value)}>
-                            <option value="">{editCycleId ? 'Select category' : 'Select a cycle first'}</option>
+                            <option value="">{editTypeId ? 'Select category' : 'Select a type first'}</option>
                             {editCategories.map((c) => (
                               <option key={c.id} value={c.id}>
                                 {c.name}
@@ -1942,7 +2058,7 @@ function UprRecommendationsSection({
                           <Button
                             variant="primary"
                             compact
-                            disabled={!editName.trim() || !editCycleId || !editCategoryId}
+                            disabled={!editName.trim() || !editCycleId || !editTypeId || !editCategoryId}
                             onClick={() => {
                               void (async () => {
                                 try {
@@ -1970,6 +2086,7 @@ function UprRecommendationsSection({
                       <>
                         <td>{r.id}</td>
                         <td>{r.cycle?.name || '—'}</td>
+                        <td>{r.type?.name || '—'}</td>
                         <td>{r.category?.name || '—'}</td>
                         <td>{r.name}</td>
                         <td>
@@ -1992,6 +2109,13 @@ function UprRecommendationsSection({
                               onClick={() => {
                                 setEditingId(r.id)
                                 setEditCycleId(String(r.upr_cycle_id))
+                                setEditTypeId(
+                                  r.upr_type_id != null
+                                    ? String(r.upr_type_id)
+                                    : r.category?.upr_type_id != null
+                                      ? String(r.category.upr_type_id)
+                                      : '',
+                                )
                                 setEditCategoryId(String(r.upr_category_id))
                                 setEditName(r.name)
                               }}
@@ -2095,7 +2219,7 @@ function validateUprIndicatorDataTypes(rows: UprIndicatorDraft[]): string | null
   return null
 }
 
-type UprIndicatorListSortKey = 'indicator' | 'type' | 'cycle' | 'category' | 'dataType' | 'status' | 'uprId'
+type UprIndicatorListSortKey = 'indicator' | 'type' | 'cycle' | 'category' | 'dataType' | 'status'
 
 type UprIndicatorListRow = {
   key: string
@@ -2119,7 +2243,6 @@ type UprIndicatorDataTypeFilter = '' | 'quantitative' | 'qualitative'
 
 const UPR_INDICATOR_LIST_EXPORT_COLUMNS: TableExportColumn<UprIndicatorListRow>[] = [
   { header: 'Indicator', value: (r) => r.indicatorText },
-  { header: 'UPR ID', value: (r) => r.uprEntryId },
   { header: 'Type', value: (r) => r.typeName },
   { header: 'Cycle', value: (r) => r.cycleName },
   { header: 'Category', value: (r) => r.categoryName },
@@ -2179,8 +2302,6 @@ function sortUprIndicatorListRows(
         return compareStringValues(a.dataTypeLabel, b.dataTypeLabel, sortDir)
       case 'status':
         return compareStringValues(a.statusLabel, b.statusLabel, sortDir)
-      case 'uprId':
-        return sortDir === 'asc' ? a.uprEntryId - b.uprEntryId : b.uprEntryId - a.uprEntryId
       case 'indicator':
       default:
         return compareStringValues(a.indicatorText, b.indicatorText, sortDir)
@@ -2405,12 +2526,6 @@ function UprIndicatorsListSection({ entries }: { entries: AdminUprEntry[] }) {
                   onSort={() => toggleSort('indicator')}
                 />
                 <SortColumnHeader
-                  label="UPR ID"
-                  active={sortKey === 'uprId'}
-                  direction={sortDir}
-                  onSort={() => toggleSort('uprId')}
-                />
-                <SortColumnHeader
                   label="Type"
                   active={sortKey === 'type'}
                   direction={sortDir}
@@ -2446,7 +2561,7 @@ function UprIndicatorsListSection({ entries }: { entries: AdminUprEntry[] }) {
             <tbody>
               {pageRows.length === 0 ? (
                 <EmptyStateRow
-                  colSpan={8}
+                  colSpan={7}
                   message={
                     hasFilters
                       ? 'No indicators match your filters.'
@@ -2460,7 +2575,6 @@ function UprIndicatorsListSection({ entries }: { entries: AdminUprEntry[] }) {
                     className={row.isActive ? undefined : 'issues-mapping-table__row--inactive'}
                   >
                     <td className="text-compact">{row.indicatorText}</td>
-                    <td className="text-compact">{row.uprEntryId}</td>
                     <td className="text-compact">{row.typeName}</td>
                     <td className="text-compact">{row.cycleName}</td>
                     <td className="text-compact">{row.categoryName}</td>
@@ -2485,206 +2599,6 @@ function UprIndicatorsListSection({ entries }: { entries: AdminUprEntry[] }) {
                           onClick={() => navigate(superAdminUprEntryEditPath(row.uprEntryId))}
                         >
                           Edit UPR
-                        </Button>
-                      </ActionMenu>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </TableCard>
-      <PaginationBar page={page} pageSize={pageSize} totalItems={processed.length} onPageChange={setPage} />
-    </div>
-  )
-}
-
-function UprEntriesListSection({
-  rows,
-  setError,
-  onRefresh,
-}: {
-  rows: AdminUprEntry[]
-  setError: (s: string | null) => void
-  onRefresh: () => Promise<void>
-}) {
-  const navigate = useNavigate()
-  const { search, setSearch, page, setPage, pageSize } = useClientTableState({ pageSize: PAGE_SIZE })
-  const [typeFilter, setTypeFilter] = useState('')
-  const [cycleFilter, setCycleFilter] = useState('')
-
-  const processed = useMemo(() => {
-    let next = rows
-    if (typeFilter) {
-      next = next.filter((r) => String(r.upr_type_id) === typeFilter)
-    }
-    if (cycleFilter) {
-      next = next.filter((r) => String(r.upr_cycle_id) === cycleFilter)
-    }
-    const q = search.trim().toLowerCase()
-    if (!q) return next
-    return next.filter(
-      (r) =>
-        String(r.id).includes(q) ||
-        (r.type?.name ?? '').toLowerCase().includes(q) ||
-        (r.cycle?.name ?? '').toLowerCase().includes(q) ||
-        (r.category?.name ?? '').toLowerCase().includes(q),
-    )
-  }, [rows, search, typeFilter, cycleFilter])
-
-  const { pageRows } = derivePaginatedRows(processed, page, pageSize)
-  const activeCount = rows.filter(catalogIsActive).length
-  const typeOptions = useMemo(() => {
-    const map = new Map<number, string>()
-    for (const r of rows) {
-      if (r.type) map.set(r.upr_type_id, r.type.name)
-    }
-    return [...map.entries()].map(([id, name]) => ({ id, name }))
-  }, [rows])
-  const cycleOptions = useMemo(() => {
-    const map = new Map<number, string>()
-    for (const r of rows) {
-      if (r.cycle && (!typeFilter || String(r.upr_type_id) === typeFilter)) {
-        map.set(r.upr_cycle_id, r.cycle.name)
-      }
-    }
-    return [...map.entries()].map(([id, name]) => ({ id, name }))
-  }, [rows, typeFilter])
-
-  return (
-    <div className="issues-catalog-page">
-      <div style={{ marginTop: 8, marginBottom: 12 }}>
-        <StatsCards
-          items={[
-            { label: 'Total UPRs', value: rows.length },
-            { label: 'Active', value: activeCount },
-            { label: 'Inactive', value: rows.length - activeCount },
-          ]}
-        />
-      </div>
-
-      <TableToolbar className="issues-list-toolbar">
-        <select
-          value={typeFilter}
-          onChange={(e) => {
-            setTypeFilter(e.target.value)
-            setCycleFilter('')
-          }}
-          aria-label="Filter by type"
-        >
-          <option value="">All types</option>
-          {typeOptions.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={cycleFilter}
-          onChange={(e) => setCycleFilter(e.target.value)}
-          aria-label="Filter by cycle"
-        >
-          <option value="">All cycles</option>
-          {cycleOptions.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <input
-          type="search"
-          placeholder="Search ID, type, cycle, category…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search UPRs"
-        />
-        <Button
-          variant="secondary"
-          compact
-          onClick={() => {
-            setSearch('')
-            setTypeFilter('')
-            setCycleFilter('')
-          }}
-        >
-          Reset filters
-        </Button>
-      </TableToolbar>
-
-      <TableCard>
-        <div className="table-card-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Type</th>
-                <th>Cycle</th>
-                <th>Category</th>
-                <th>Recommendations</th>
-                <th>Indicators</th>
-                <th>Status</th>
-                <th className="table-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.length === 0 ? (
-                <EmptyStateRow
-                  colSpan={8}
-                  message={
-                    search.trim() || typeFilter || cycleFilter
-                      ? 'No UPRs match your filters.'
-                      : 'No UPRs yet. Use Create UPR to add one.'
-                  }
-                />
-              ) : (
-                pageRows.map((r) => (
-                  <tr
-                    key={r.id}
-                    className={catalogIsActive(r) ? undefined : 'issues-mapping-table__row--inactive'}
-                  >
-                    <td>{r.id}</td>
-                    <td>{r.type?.name || '—'}</td>
-                    <td>{r.cycle?.name || '—'}</td>
-                    <td>{r.category?.name || '—'}</td>
-                    <td>{r.recommendations?.length ?? 0}</td>
-                    <td>{r.indicators?.length ?? 0}</td>
-                    <td>
-                      <span className={catalogIsActive(r) ? 'status-badge success' : 'status-badge default'}>
-                        {statusLabel(r)}
-                      </span>
-                    </td>
-                    <td className="table-actions">
-                      <ActionMenu>
-                        <Button
-                          variant="link"
-                          compact
-                          onClick={() => navigate(superAdminUprEntryViewPath(r.id))}
-                        >
-                          View
-                        </Button>
-                        <Button
-                          variant="link"
-                          compact
-                          onClick={() => navigate(superAdminUprEntryEditPath(r.id))}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="link"
-                          compact
-                          onClick={() => {
-                            void (async () => {
-                              try {
-                                await adminUpdateUprEntry(r.id, { is_active: !catalogIsActive(r) })
-                                await onRefresh()
-                              } catch (e: unknown) {
-                                setError(isApiError(e) ? e.message : 'Update failed')
-                              }
-                            })()
-                          }}
-                        >
-                          {catalogIsActive(r) ? 'Deactivate' : 'Activate'}
                         </Button>
                       </ActionMenu>
                     </td>
@@ -2740,14 +2654,10 @@ function UprIndicatorsEditor({
   rows,
   onChange,
   disabled,
-  dummyChecked,
-  onDummyChange,
 }: {
   rows: UprIndicatorDraft[]
   onChange: (rows: UprIndicatorDraft[]) => void
   disabled?: boolean
-  dummyChecked: boolean
-  onDummyChange: (checked: boolean) => void
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -2777,11 +2687,6 @@ function UprIndicatorsEditor({
       {rows.length > 1 && !disabled ? (
         <p className="text-muted text-compact" style={{ margin: 0 }}>
           Drag indicators to set the list order.
-        </p>
-      ) : null}
-      {rows.length === 0 ? (
-        <p className="text-muted text-compact" style={{ margin: 0 }}>
-          No indicators yet. Use + Add indicator below.
         </p>
       ) : null}
       {rows.map((row, idx) => (
@@ -2877,15 +2782,6 @@ function UprIndicatorsEditor({
           </div>
         </div>
       ))}
-      <label className="checkbox-label" style={{ marginTop: 4 }}>
-        <input
-          type="checkbox"
-          checked={dummyChecked}
-          disabled={disabled}
-          onChange={(e) => onDummyChange(e.target.checked)}
-        />
-        Dummy
-      </label>
       <Button variant="link" compact disabled={disabled} onClick={() => onChange([...rows, emptyUprIndicator()])}>
         + Add indicator
       </Button>
@@ -2918,7 +2814,6 @@ function UprCreateForm({
   const [typeId, setTypeId] = useState<number | null>(null)
   const [cycleId, setCycleId] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [isDummy, setIsDummy] = useState(false)
   const [indicators, setIndicators] = useState<UprIndicatorDraft[]>([])
   const [success, setSuccess] = useState<string | null>(null)
   const [loadingEdit, setLoadingEdit] = useState(isEditing)
@@ -2933,7 +2828,6 @@ function UprCreateForm({
         setTypeId(row.upr_type_id)
         setCycleId(String(row.upr_cycle_id))
         setCategoryId(String(row.upr_category_id))
-        setIsDummy(Boolean(row.is_dummy))
         setIndicators(
           (row.indicators ?? []).filter((ind) => ind.is_active !== false).map(indicatorDraftFromAdmin),
         )
@@ -2957,24 +2851,29 @@ function UprCreateForm({
 
   const typeCycles = useMemo(() => {
     if (typeId == null) return []
+    const linkedCycleIds = new Set(
+      categories
+        .filter((c) => catalogIsActive(c) && String(c.upr_type_id ?? '') === String(typeId) && c.upr_cycle_id != null)
+        .map((c) => c.upr_cycle_id as number),
+    )
     return cycles.filter((c) => {
-      if (c.upr_type_id !== typeId) return false
+      if (!linkedCycleIds.has(c.id)) return false
       return catalogIsActive(c) || String(c.id) === cycleId
     })
-  }, [cycles, typeId, cycleId])
+  }, [categories, cycles, typeId, cycleId])
 
   const cycleCategories = useMemo(() => {
-    if (!cycleId) return []
+    if (!cycleId || typeId == null) return []
     return categories.filter((c) => {
       if (String(c.upr_cycle_id ?? '') !== cycleId) return false
+      if (String(c.upr_type_id ?? '') !== String(typeId)) return false
       return catalogIsActive(c) || String(c.id) === categoryId
     })
-  }, [categories, cycleId, categoryId])
+  }, [categories, cycleId, typeId, categoryId])
 
   function resetForm() {
     setCycleId('')
     setCategoryId('')
-    setIsDummy(false)
     setIndicators([])
   }
 
@@ -3034,9 +2933,15 @@ function UprCreateForm({
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              disabled={busy || !cycleId}
+              disabled={busy || !cycleId || typeId == null}
             >
-              <option value="">{cycleId ? 'Select category' : 'Select cycle first'}</option>
+              <option value="">
+                {!cycleId
+                  ? 'Select cycle first'
+                  : typeId == null
+                    ? 'Select UPR type first'
+                    : 'Select category'}
+              </option>
               {cycleCategories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -3046,16 +2951,7 @@ function UprCreateForm({
           </FormControl>
         </div>
       </FormGrid>
-      <strong className="font-semibold text-compact" style={{ display: 'block', marginTop: 16 }}>
-        Indicators linked to this UPR
-      </strong>
-      <UprIndicatorsEditor
-        rows={indicators}
-        onChange={setIndicators}
-        disabled={busy}
-        dummyChecked={isDummy}
-        onDummyChange={setIsDummy}
-      />
+      <UprIndicatorsEditor rows={indicators} onChange={setIndicators} disabled={busy} />
       <div className="issues-create-form__actions" style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <Button
           variant="secondary"
@@ -3063,7 +2959,7 @@ function UprCreateForm({
           disabled={busy}
           onClick={() => {
             if (isEditing) {
-              navigate(superAdminUprManagementListPath())
+              navigate(superAdminUprManagementCreatePath())
               return
             }
             resetForm()
@@ -3093,7 +2989,7 @@ function UprCreateForm({
                   upr_type_id: typeId!,
                   upr_cycle_id: Number(cycleId),
                   upr_category_id: Number(categoryId),
-                  is_dummy: isDummy,
+                  is_dummy: false,
                   has_quantitative: filled.some((x) => x.collects_quantitative),
                   has_qualitative: filled.some((x) => x.collects_qualitative),
                   indicators: filled.map((x) => ({
@@ -3128,7 +3024,7 @@ function UprCreateForm({
             })()
           }}
         >
-          {isEditing ? 'Save changes' : 'Save UPR'}
+          {isEditing ? 'Save changes' : 'Create Indicator'}
         </Button>
       </div>
     </div>
@@ -3177,53 +3073,119 @@ function UprEntryViewPage({
     }
   }, [entryId, setError])
 
+  const activeIndicators = entry?.indicators.filter((ind) => ind.is_active !== false) ?? []
+  const typeName = entry?.type?.name?.trim() || 'UPR'
+
   return (
-    <div className="page-shell">
+    <PageSection
+      title={entry ? `${typeName} #${entry.id}` : 'View UPR'}
+      subtitle={
+        entry
+          ? [entry.cycle?.name, entry.category?.name].filter(Boolean).join(' · ') || undefined
+          : undefined
+      }
+      leading={
+        <WorkflowPageBack
+          placement="header"
+          label="Back to Create Indicator"
+          to={superAdminUprManagementCreatePath()}
+        />
+      }
+    >
       {error ? (
         <Alert variant="error" title="Error" onDismiss={() => setError(null)}>
           {error}
         </Alert>
       ) : null}
-      <WorkflowPageBack
-        placement="header"
-        label="Back to List of UPR"
-        to={superAdminUprManagementListPath()}
-      />
       {loading ? <p className="muted">Loading…</p> : null}
       {!loading && !entry ? <p className="muted">UPR entry not found.</p> : null}
       {entry ? (
         <TableCard padded>
-          <h2 style={{ marginTop: 0 }}>UPR #{entry.id}</h2>
-          <dl className="upr-mgmt-view-dl">
-            <div>
-              <dt>Type</dt>
-              <dd>{entry.type?.name || '—'}</dd>
-            </div>
-            <div>
-              <dt>Cycle</dt>
-              <dd>{entry.cycle?.name || '—'}</dd>
-            </div>
-            <div>
-              <dt>Category</dt>
-              <dd>{entry.category?.name || '—'}</dd>
-            </div>
-            <div>
-              <dt>Dummy</dt>
-              <dd>{entry.is_dummy ? 'Yes' : 'No'}</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>
-                <span className={catalogIsActive(entry) ? 'status-badge success' : 'status-badge default'}>
-                  {statusLabel(entry)}
-                </span>
-              </dd>
-            </div>
-            <div>
-              <dt>Created</dt>
-              <dd>{formatTimestamp(entry.created_at)}</dd>
-            </div>
-          </dl>
+          <div className="issue-detail-readonly">
+            <dl className="issue-detail-readonly__grid">
+              <div>
+                <dt>Type</dt>
+                <dd>{entry.type?.name || '—'}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>
+                  <span className={catalogIsActive(entry) ? 'status-badge success' : 'status-badge default'}>
+                    {statusLabel(entry)}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>Cycle</dt>
+                <dd>{entry.cycle?.name || '—'}</dd>
+              </div>
+              <div>
+                <dt>Category</dt>
+                <dd>{entry.category?.name || '—'}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatTimestamp(entry.created_at)}</dd>
+              </div>
+              <div>
+                <dt>Updated</dt>
+                <dd>{formatTimestamp(entry.updated_at)}</dd>
+              </div>
+              <div className="issue-detail-readonly__full">
+                <dt>Recommendations</dt>
+                <dd>
+                  {entry.recommendations.length === 0 ? (
+                    '—'
+                  ) : (
+                    <ul className="issues-mapping-indicator-list issues-article-detail-list">
+                      {entry.recommendations.map((r) => (
+                        <li key={r.id}>
+                          <strong>{r.name}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </dd>
+              </div>
+            </dl>
+
+            <h4 className="font-semibold text-compact" style={{ margin: '20px 0 10px' }}>
+              Indicators
+            </h4>
+            {activeIndicators.length === 0 ? (
+              <p className="muted text-compact">No indicators linked.</p>
+            ) : (
+              <table className="data-table issue-detail-indicators-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Indicator</th>
+                    <th>Data type</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeIndicators.map((ind, idx) => (
+                    <tr key={ind.id}>
+                      <td className="text-compact">{idx + 1}</td>
+                      <td className="text-compact">{ind.indicator_text}</td>
+                      <td className="text-compact">
+                        {[
+                          ind.has_quantitative ? 'Quantitative' : null,
+                          ind.has_qualitative ? 'Qualitative' : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' / ') || '—'}
+                      </td>
+                      <td>
+                        <span className="status-badge success">Active</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
 
           <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button
@@ -3235,8 +3197,9 @@ function UprEntryViewPage({
               Edit
             </Button>
             <Button
-              variant="secondary"
+              variant="link"
               compact
+              dangerLink={catalogIsActive(entry)}
               disabled={busy}
               onClick={() => {
                 void (async () => {
@@ -3257,40 +3220,8 @@ function UprEntryViewPage({
               {catalogIsActive(entry) ? 'Deactivate' : 'Activate'}
             </Button>
           </div>
-
-          <h3 style={{ marginTop: 24 }}>Recommendations</h3>
-          {entry.recommendations.length === 0 ? (
-            <p className="muted text-compact">No recommendations were attached for this cycle and category.</p>
-          ) : (
-            <ul>
-              {entry.recommendations.map((r) => (
-                <li key={r.id}>{r.name}</li>
-              ))}
-            </ul>
-          )}
-
-          <h3 style={{ marginTop: 24 }}>Indicators</h3>
-          {entry.indicators.length === 0 ? (
-            <p className="muted text-compact">No indicators linked.</p>
-          ) : (
-            <ol>
-              {entry.indicators.map((ind) => (
-                <li key={ind.id} style={{ marginBottom: 8 }}>
-                  {ind.indicator_text}
-                  <span className="muted text-compact" style={{ marginLeft: 8 }}>
-                    {[
-                      ind.has_quantitative ? 'Quantitative' : null,
-                      ind.has_qualitative ? 'Qualitative' : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' / ')}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
         </TableCard>
       ) : null}
-    </div>
+    </PageSection>
   )
 }

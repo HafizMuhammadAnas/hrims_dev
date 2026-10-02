@@ -117,6 +117,7 @@ export function DepartmentTasksPage() {
               <th>Department</th>
               <th>Status</th>
               <th>Assigned</th>
+              <th>Due</th>
               <th className="table-actions">Actions</th>
             </tr>
           </thead>
@@ -133,6 +134,7 @@ export function DepartmentTasksPage() {
                     <StatusBadge tone={wf.tone}>{wf.label}</StatusBadge>
                   </td>
                   <td>{formatAppDate(t.assigned_date)}</td>
+                  <td>{formatAppDate(t.due_date)}</td>
                   <td className="table-actions">
                     <RowActionsMenu
                       isOpen={openActionId === t.id}
@@ -156,7 +158,7 @@ export function DepartmentTasksPage() {
             })}
             {pageRows.length === 0 && (
               <EmptyStateRow
-                colSpan={ictDeptPortal ? 6 : 7}
+                colSpan={ictDeptPortal ? 7 : 8}
                 message={
                   search.trim() || workflowFilter
                     ? 'No tasks match your filters.'

@@ -57,7 +57,7 @@ import {
 import { reportDashboardChartColor, reportTop10BarColor } from '../lib/reportChartTheme'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { LABEL_REPORTING_DASHBOARD } from '../lib/uiLabels'
-import { isFederalAdmin, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
+import { isFederalStaff, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
 import { ReportingIndicatorCompiledFocus } from '../components/ReportingIndicatorCompiledFocus'
 import { Button } from '../components/ui/Button'
 import { PageSection } from '../components/ui/PageSection'
@@ -270,7 +270,7 @@ function ReportingSummaryCards({ cards }: { cards: ReportingDashboardSummaryCard
 
 export function ReportGeneratorPage() {
   const { user } = useAuth()
-  const federalPortal = isFederalAdmin(user) || isSuperAdmin(user)
+  const federalPortal = isFederalStaff(user) || isSuperAdmin(user)
   const regionalPortal = isRegionalAdmin(user)
   const canAccessReportGenerator = federalPortal || regionalPortal
 

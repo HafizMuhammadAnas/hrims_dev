@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   fetchKnowledgeConventionIndicatorCatalog,
   fetchKnowledgeConventions,
   type KnowledgeConventionIndicatorCatalog,
   type KnowledgeConventionListItem,
+  type KnowledgeIndicatorCatalogRow,
 } from '../../api/knowledgeHub'
 import { isApiError } from '../../api/apiError'
 import {
@@ -15,10 +16,54 @@ import {
   KnowledgeHubPage,
   KnowledgeHubPanel,
   KnowledgeHubStateMessage,
+  KnowledgeHubTabs,
 } from '../../components/knowledge/KnowledgeHubUi'
 import { TableCard } from '../../components/ui/TableCard'
+import {
+  CONCLUDING_OBSERVATIONS_LABEL,
+  LOI_LABEL,
+  coerceIssueEntryKind,
+  type IssueEntryKind,
+} from '../../lib/issueEntryKind'
 import { LABEL_HUMAN_RIGHTS_INDICATORS } from '../../lib/uiLabels'
 import { knowledgeConventionIcon } from '../../lib/knowledgeConventionIcons'
+
+const INDICATOR_KIND_TABS = [LOI_LABEL, CONCLUDING_OBSERVATIONS_LABEL] as const
+
+function rowsForKind(rows: KnowledgeIndicatorCatalogRow[], kind: IssueEntryKind): KnowledgeIndicatorCatalogRow[] {
+  return rows.filter((row) => coerceIssueEntryKind(row.entry_kind) === kind)
+}
+
+function IndicatorCatalogTable({ rows }: { rows: KnowledgeIndicatorCatalogRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <KnowledgeHubMutedProse>
+        No active indicators are linked for this type yet.
+      </KnowledgeHubMutedProse>
+    )
+  }
+
+  return (
+    <TableCard className="knowledge-hub-indicator-catalog-card">
+      <table className="data-table knowledge-hub-indicator-catalog-table">
+        <thead>
+          <tr>
+            <th scope="col">Category</th>
+            <th scope="col">Indicator</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.entry_kind}-${row.indicator_id}`}>
+              <td>{row.category_name}</td>
+              <td>{row.indicator_text}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableCard>
+  )
+}
 
 function ConventionIndicatorsDetail({
   data,
@@ -27,7 +72,24 @@ function ConventionIndicatorsDetail({
   data: KnowledgeConventionIndicatorCatalog
   onBack: () => void
 }) {
-  const { convention, categories_count, indicators_count, rows } = data
+  const {
+    convention,
+    rows,
+    loi_categories_count,
+    co_categories_count,
+    loi_indicators_count,
+    co_indicators_count,
+  } = data
+  const [activeTab, setActiveTab] = useState<string>(LOI_LABEL)
+
+  const activeKind: IssueEntryKind =
+    activeTab === CONCLUDING_OBSERVATIONS_LABEL ? 'recommendation' : 'issue'
+  const filteredRows = useMemo(() => rowsForKind(rows, activeKind), [rows, activeKind])
+
+  const panelTitle =
+    activeKind === 'recommendation'
+      ? `${CONCLUDING_OBSERVATIONS_LABEL} indicators by category`
+      : `${LOI_LABEL} indicators by category`
 
   return (
     <KnowledgeHubPage>
@@ -37,36 +99,23 @@ function ConventionIndicatorsDetail({
         icon={convention.knowledge_icon}
         fallback="📜"
         fallbackIcon={knowledgeConventionIcon(convention.code)}
-        metaLines={[`Categories ${categories_count}`, `Indicators ${indicators_count}`]}
+        metaLines={[
+          `LOI categories ${loi_categories_count ?? 0}`,
+          `CO categories ${co_categories_count ?? 0}`,
+          `LOI indicators ${loi_indicators_count ?? 0}`,
+          `CO indicators ${co_indicators_count ?? 0}`,
+        ]}
         onBack={onBack}
       />
 
-      <KnowledgeHubPanel title="Indicators by category">
-        {rows.length === 0 ? (
-          <KnowledgeHubMutedProse>
-            No active indicators are linked to this convention yet. Categories and indicators are managed under Super
-            Admin → Issues & mappings.
-          </KnowledgeHubMutedProse>
-        ) : (
-          <TableCard className="knowledge-hub-indicator-catalog-card">
-            <table className="data-table knowledge-hub-indicator-catalog-table">
-              <thead>
-                <tr>
-                  <th scope="col">Category</th>
-                  <th scope="col">Indicator</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.indicator_id}>
-                    <td>{row.category_name}</td>
-                    <td>{row.indicator_text}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableCard>
-        )}
+      <KnowledgeHubTabs
+        tabs={[...INDICATOR_KIND_TABS]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+
+      <KnowledgeHubPanel title={panelTitle}>
+        <IndicatorCatalogTable rows={filteredRows} />
       </KnowledgeHubPanel>
     </KnowledgeHubPage>
   )

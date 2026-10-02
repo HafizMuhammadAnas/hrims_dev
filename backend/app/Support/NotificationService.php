@@ -21,7 +21,7 @@ class NotificationService
     {
         $user->loadMissing('roles');
 
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
+        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin') || $user->hasRole('federal_sub_admin')) {
             // Federal: regional submit/resubmit + clarifications + ICT department responses they review.
             return [
                 'regional_response.created',
@@ -436,7 +436,7 @@ class NotificationService
     {
         return User::query()
             ->with('roles')
-            ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['super_admin', 'federal_admin']))
+            ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['super_admin', 'federal_admin', 'federal_sub_admin']))
             ->get();
     }
 
@@ -626,7 +626,7 @@ class NotificationService
     {
         $user->loadMissing('roles');
         $slugs = $user->roles->pluck('slug')->all();
-        foreach (['super_admin', 'federal_admin', 'regional_admin', 'department_admin', 'viewer'] as $slug) {
+        foreach (['super_admin', 'federal_admin', 'federal_sub_admin', 'regional_admin', 'department_admin', 'viewer'] as $slug) {
             if (in_array($slug, $slugs, true)) {
                 return $slug;
             }

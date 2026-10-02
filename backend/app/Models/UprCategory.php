@@ -9,6 +9,7 @@ class UprCategory extends Model
 {
     protected $fillable = [
         'upr_cycle_id',
+        'upr_type_id',
         'name',
         'sort_order',
         'is_active',
@@ -25,5 +26,10 @@ class UprCategory extends Model
     public function cycle(): BelongsTo
     {
         return $this->belongsTo(UprCycle::class, 'upr_cycle_id');
+    }
+
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(UprType::class, 'upr_type_id');
     }
 }

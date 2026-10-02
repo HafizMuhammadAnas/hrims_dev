@@ -27,7 +27,7 @@ class DepartmentController extends Controller
             ]);
         }
 
-        if ($user->hasRole('federal_admin')) {
+        if ($user->hasRole('federal_admin') || $user->hasRole('federal_sub_admin')) {
             $query->whereHas('regions', fn ($q) => $q->where('slug', 'ict'));
         } elseif ($user->hasRole('regional_admin')) {
             if ($user->region_id === null) {

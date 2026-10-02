@@ -69,6 +69,7 @@ import {
 import {
   isDepartmentAdmin,
   isFederalAdmin,
+  isFederalStaff,
   isRegionalAdmin,
   isSuperAdmin,
   isViewer,
@@ -109,7 +110,8 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
 
   const viewer = isViewer(user)
   const superAdmin = isSuperAdmin(user)
-  const federal = isFederalAdmin(user)
+  const federal = isFederalStaff(user)
+  const federalAdmin = isFederalAdmin(user)
   const regional = isRegionalAdmin(user)
   const dept = isDepartmentAdmin(user)
 
@@ -160,8 +162,12 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to="/responses" icon={Inbox} label={LABEL_REGIONAL_RESPONSES} onPick={onPick} />
               <NavItem to="/compilation" icon={Layers} label={LABEL_COMPILATION_CENTER} onPick={onPick} />
               <NavItem to="/compiled-records" icon={FileCheck} label={LABEL_COMPILED_AND_SUBMITTED} onPick={onPick} />
-              <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
-              <NavItem to="/federal-departments-mgmt" icon={Building2} label={LABEL_MANAGE_DEPARTMENTS} onPick={onPick} />
+              {federalAdmin && (
+                <>
+                  <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
+                  <NavItem to="/federal-departments-mgmt" icon={Building2} label={LABEL_MANAGE_DEPARTMENTS} onPick={onPick} />
+                </>
+              )}
             </div>
             <div className="nav-section-title">{LABEL_FEDERAL_DEPARTMENT_ACTIONS}</div>
             <div className="nav-sub">

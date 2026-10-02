@@ -21,6 +21,7 @@ class DepartmentTask extends Model
         'regional_review_comments',
         'pending_revision_origin',
         'assigned_date',
+        'due_date',
         'assignment_instructions',
         'assigned_indicator_ids',
         'submission_date',
@@ -35,6 +36,7 @@ class DepartmentTask extends Model
     {
         return [
             'assigned_date' => 'date',
+            'due_date' => 'date',
             'submission_date' => 'date',
             'assigned_indicator_ids' => 'array',
         ];

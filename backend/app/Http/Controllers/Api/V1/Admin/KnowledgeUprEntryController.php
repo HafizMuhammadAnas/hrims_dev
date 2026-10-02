@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\KnowledgeUprEntry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,7 @@ class KnowledgeUprEntryController extends Controller
     public function index(): JsonResponse
     {
         $rows = KnowledgeUprEntry::query()
-            ->with(['cycle:id,name,upr_type_id'])
+            ->with(['cycle:id,name', 'type:id,name'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
@@ -27,7 +28,7 @@ class KnowledgeUprEntryController extends Controller
 
     public function show(KnowledgeUprEntry $knowledgeUprEntry): JsonResponse
     {
-        $knowledgeUprEntry->load(['cycle:id,name,upr_type_id']);
+        $knowledgeUprEntry->load(['cycle:id,name', 'type:id,name']);
 
         return response()->json(['data' => $this->serialize($knowledgeUprEntry)]);
     }
@@ -36,7 +37,7 @@ class KnowledgeUprEntryController extends Controller
     {
         $data = $this->validatePayload($request, false);
         $row = KnowledgeUprEntry::query()->create($data);
-        $row->load(['cycle:id,name,upr_type_id']);
+        $row->load(['cycle:id,name', 'type:id,name']);
 
         return response()->json(['data' => $this->serialize($row)], 201);
     }
@@ -46,9 +47,9 @@ class KnowledgeUprEntryController extends Controller
         $data = $this->validatePayload($request, true);
         $knowledgeUprEntry->fill($data);
         $knowledgeUprEntry->save();
-        $knowledgeUprEntry->load(['cycle:id,name,upr_type_id']);
+        $knowledgeUprEntry->load(['cycle:id,name', 'type:id,name']);
 
-        return response()->json(['data' => $this->serialize($knowledgeUprEntry->fresh(['cycle:id,name,upr_type_id']))]);
+        return response()->json(['data' => $this->serialize($knowledgeUprEntry->fresh(['cycle:id,name', 'type:id,name']))]);
     }
 
     public function destroy(KnowledgeUprEntry $knowledgeUprEntry): JsonResponse
@@ -160,11 +161,8 @@ class KnowledgeUprEntryController extends Controller
         $req = $partial ? 'sometimes' : 'required';
 
         $data = $request->validate([
-            'kind' => [$req, 'string', Rule::in([
-                KnowledgeUprEntry::KIND_SUPPORTED,
-                KnowledgeUprEntry::KIND_NOTED,
-                KnowledgeUprEntry::KIND_OTHERS,
-            ])],
+            'upr_type_id' => [$req, 'integer', 'exists:upr_types,id'],
+            'kind' => ['sometimes', 'nullable', 'string', 'max:64'],
             'title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'upr_cycle_id' => [$partial ? 'sometimes' : 'required', 'nullable', 'integer', 'exists:upr_cycles,id'],
             'introduction' => ['sometimes', 'nullable', 'string'],
@@ -173,6 +171,13 @@ class KnowledgeUprEntryController extends Controller
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
+
+        if (array_key_exists('upr_type_id', $data)) {
+            $typeName = DB::table('upr_types')->where('id', (int) $data['upr_type_id'])->value('name');
+            if (is_string($typeName) && $typeName !== '') {
+                $data['kind'] = strtolower($typeName);
+            }
+        }
 
         if (array_key_exists('repositories', $data)) {
             $data['repositories'] = KnowledgeUprEntry::normalizeRepositories($data['repositories']);
@@ -218,13 +223,17 @@ class KnowledgeUprEntryController extends Controller
         return [
             'id' => $row->id,
             'kind' => $row->kind,
+            'upr_type_id' => $row->upr_type_id !== null ? (int) $row->upr_type_id : null,
+            'type' => $row->relationLoaded('type') && $row->type ? [
+                'id' => $row->type->id,
+                'name' => $row->type->name,
+            ] : null,
             'title' => $row->title,
             'display_title' => $row->displayTitle(),
             'upr_cycle_id' => $row->upr_cycle_id !== null ? (int) $row->upr_cycle_id : null,
             'cycle' => $row->relationLoaded('cycle') && $row->cycle ? [
                 'id' => $row->cycle->id,
                 'name' => $row->cycle->name,
-                'upr_type_id' => $row->cycle->upr_type_id !== null ? (int) $row->cycle->upr_type_id : null,
             ] : null,
             'introduction' => $row->introduction,
             'repositories' => KnowledgeUprEntry::normalizeRepositories($row->repositories),

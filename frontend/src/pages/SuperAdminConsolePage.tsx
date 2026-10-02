@@ -37,7 +37,7 @@ import { FormGrid } from '../components/ui/FormGrid'
 import { FormRow } from '../components/ui/FormRow'
 import { isSuperAdmin } from '../lib/roles'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
-import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_HUMAN_RIGHTS_INDICATORS, LABEL_KNOWLEDGE_HUB } from '../lib/uiLabels'
+import { LABEL_CONVENTIONS_AND_COMPONENTS, LABEL_KNOWLEDGE_HUB } from '../lib/uiLabels'
 import {
   superAdminConventionEditPath,
   superAdminConventionsNewPath,
@@ -45,7 +45,6 @@ import {
   superAdminUprKnowledgeNewPath,
   SUPER_ADMIN_ISSUES,
 } from '../lib/superAdminRoutes'
-import { knowledgeUprKindLabel } from '../lib/knowledgeUprContent'
 
 type Tab =
   | 'departments'
@@ -61,28 +60,21 @@ const ADMIN_SECTION_TO_TAB: Record<string, Tab> = {
   'knowledge-hub': 'hub',
 }
 
-const TAB_PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
+const TAB_PAGE_META: Record<Tab, { title: string }> = {
   departments: {
     title: 'Departments',
-    subtitle:
-      'Define departments and link each to one or more regions (for filtering and access). Federal and regional admins assign users to these slots.',
   },
   conventions: {
     title: LABEL_CONVENTIONS_AND_COMPONENTS,
-    subtitle: 'Treaty catalog and structured components; content can feed the public Conventions knowledge page.',
   },
   sdg: {
     title: 'SDG Nodes',
-    subtitle: 'Sustainable Development Goal, target, and indicator nodes for mapping and knowledge hub goals.',
   },
   upr: {
     title: 'UPR for Knowledge Hub',
-    subtitle:
-      'Create Supported / Noted / Others entries with Overview, Repositories, and Analysis for Knowledge Hub → Universal Periodic Review.',
   },
   hub: {
     title: `${LABEL_KNOWLEDGE_HUB} Pages`,
-    subtitle: `Indicator and UPR highlight tiles shown on the ${LABEL_HUMAN_RIGHTS_INDICATORS} and UPR knowledge pages.`,
   },
 }
 
@@ -189,7 +181,7 @@ export function SuperAdminConsolePage() {
   const pageMeta = TAB_PAGE_META[tab]
 
   return (
-    <PageSection title={pageMeta.title} subtitle={pageMeta.subtitle}>
+    <PageSection title={pageMeta.title}>
       {error && (
         <Alert variant="error" title="Error" onDismiss={() => setError(null)}>
           {error}
@@ -198,7 +190,6 @@ export function SuperAdminConsolePage() {
 
       {tab === 'departments' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>Departments</h3>
           <DeptForm
             regions={regions}
             busy={busy}
@@ -327,12 +318,6 @@ export function SuperAdminConsolePage() {
 
       {tab === 'conventions' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>Conventions</h3>
-          <p className="text-muted">
-            Create a convention, then use <strong>Edit</strong> to fill Overview, Repositories, and Optional Protocol.
-            Those sections appear as tabs on Convention Info. Articles, LOI, and Concluding Observations are managed
-            under Issues & mappings for the same convention.
-          </p>
           <div style={{ marginBottom: 16 }}>
             <Button variant="primary" compact onClick={() => navigate(superAdminConventionsNewPath())}>
               Create convention
@@ -386,10 +371,6 @@ export function SuperAdminConsolePage() {
           {selConv !== '' && (
             <>
               <h3 style={{ marginTop: 24 }}>Components (convention #{selConv})</h3>
-              <p className="text-muted">
-                Optional catalog parts for this convention. Overview, Repositories, and Optional Protocol are edited
-                on the convention form. Articles, LOI, and Concluding Observations come from Issues & mappings.
-              </p>
               <ConvCompForm
                 conventionId={Number(selConv)}
                 busy={busy}
@@ -511,11 +492,6 @@ export function SuperAdminConsolePage() {
 
       {tab === 'sdg' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>SDG reference nodes</h3>
-          <p className="text-muted">
-            For <strong>goal</strong> nodes, use <strong>Edit</strong> to set icon, short summary, longer body text, and
-            stat labels for the SDGs knowledge page.
-          </p>
           <SdgForm
             nodes={sdgNodes}
             busy={busy}
@@ -694,11 +670,6 @@ export function SuperAdminConsolePage() {
 
       {tab === 'upr' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>UPR for Knowledge Hub</h3>
-          <p className="text-muted">
-            Create a UPR entry (Supported, Noted, or Others), then use <strong>Edit</strong> to fill Overview,
-            Repositories, and Analysis. Those sections appear as tabs on Knowledge Hub → Universal Periodic Review.
-          </p>
           <div style={{ marginBottom: 16 }}>
             <Button variant="primary" compact onClick={() => navigate(superAdminUprKnowledgeNewPath())}>
               Create UPR
@@ -707,8 +678,7 @@ export function SuperAdminConsolePage() {
           <table className="data-table" style={{ marginTop: 16 }}>
             <thead>
               <tr>
-                <th>Kind</th>
-                <th>Title</th>
+                <th>Type</th>
                 <th>Cycle</th>
                 <th>Status</th>
                 <th />
@@ -717,15 +687,14 @@ export function SuperAdminConsolePage() {
             <tbody>
               {uprRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="muted">
+                  <td colSpan={4} className="muted">
                     No UPR Knowledge Hub entries yet.
                   </td>
                 </tr>
               ) : (
                 uprRows.map((u) => (
                   <tr key={u.id}>
-                    <td>{knowledgeUprKindLabel(u.kind)}</td>
-                    <td>{u.display_title}</td>
+                    <td>{u.type?.name || u.display_title || u.kind}</td>
                     <td>{u.cycle?.name || '—'}</td>
                     <td>{u.is_active !== false ? 'Active' : 'Inactive'}</td>
                     <td>
@@ -766,11 +735,6 @@ export function SuperAdminConsolePage() {
 
       {tab === 'hub' && (
         <TableCard padded>
-          <h3 style={{ marginTop: 0 }}>{LABEL_KNOWLEDGE_HUB} — Indicators &amp; UPR Tiles</h3>
-          <p className="text-muted">
-            These cards populate the <strong>{LABEL_HUMAN_RIGHTS_INDICATORS}</strong> and <strong>UPR</strong> knowledge pages
-            (summary tiles). Convention and SDG pages use the Conventions and SDG tabs above.
-          </p>
           <div className="chip-list" style={{ marginBottom: 16 }}>
             {(['indicators', 'upr'] as const).map((s) => (
               <button

@@ -287,7 +287,6 @@ export function ConventionEditorPage() {
   return (
     <PageSection
       title={isEdit ? `Edit convention${form.code ? ` — ${form.code}` : ''}` : 'Create convention'}
-      subtitle="Fill Overview, Repositories, and Optional Protocol. These sections appear as tabs on Convention Info. Articles, LOI, and Concluding Observations still come from Issues & mappings for this convention."
       leading={
         <Button variant="link" compact onClick={() => navigate(SUPER_ADMIN_CONVENTIONS)}>
           ← {LABEL_CONVENTIONS_AND_COMPONENTS}
@@ -310,9 +309,6 @@ export function ConventionEditorPage() {
         >
           <section className="convention-editor__section">
             <h3 className="convention-editor__heading">Overview</h3>
-            <p className="muted convention-editor__hint">
-              Catalog identity and the narrative shown on the Overview tab.
-            </p>
             <FormGrid>
               <FormRow twoCol>
                 <FormControl label="Code">
@@ -380,10 +376,6 @@ export function ConventionEditorPage() {
 
           <section className="convention-editor__section">
             <h3 className="convention-editor__heading">Repositories</h3>
-            <p className="muted convention-editor__hint">
-              Add reporting cycles (e.g. First cycle, Second cycle), then upload one or more PDF or Word files in
-              each cycle (max 50 MB each). These appear on Convention Info → Repositories.
-            </p>
             <div className="convention-editor__repo-toolbar">
               <Button
                 variant="primary"
@@ -512,9 +504,6 @@ export function ConventionEditorPage() {
 
           <section className="convention-editor__section">
             <h3 className="convention-editor__heading">{LABEL_OPTIONAL_PROTOCOL}</h3>
-            <p className="muted convention-editor__hint">
-              Narrative for the Optional Protocol tab. Leave blank if this convention has no optional protocol yet.
-            </p>
             <FormField label={`${LABEL_OPTIONAL_PROTOCOL} text`}>
               <textarea
                 rows={10}

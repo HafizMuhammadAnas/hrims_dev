@@ -117,7 +117,7 @@ import {
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
 import { loiMetadataLoadErrorPageMessage } from '../lib/issueEntryKind'
-import { isDepartmentAdmin, isFederalAdmin, isRegionalAdmin, isViewer } from '../lib/roles'
+import { isDepartmentAdmin, isFederalStaff, isRegionalAdmin, isViewer } from '../lib/roles'
 import { indicatorsScopedToDepartmentTask, indicatorsScopedToRequest, indicatorOrdinalsForRequest } from '../lib/hrRequestIndicatorScope'
 import { reviewFeedbackLabelForTask } from '../lib/ictRegion'
 import type { AuthUser } from '../types/auth'
@@ -140,7 +140,7 @@ function pageBackLabel(from: string): string {
 
 function userMayReviewDepartmentTask(user: AuthUser | null, t: DepartmentTaskRow): boolean {
   if (!user) return false
-  if (isFederalAdmin(user)) return true
+  if (isFederalStaff(user)) return true
   if (isRegionalAdmin(user) && user.region && user.region.id === t.region_id) return true
   return false
 }
@@ -206,6 +206,7 @@ export function HrRequestViewPage() {
   const [assignDepartmentIndicators, setAssignDepartmentIndicators] = useState<Record<number, number[]>>({})
   const [assignOtherDepartmentIds, setAssignOtherDepartmentIds] = useState<number[]>([])
   const [assignRegionalNotes, setAssignRegionalNotes] = useState('')
+  const [assignDueDate, setAssignDueDate] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
   const [activeClarification, setActiveClarification] = useState<HrRequestClarificationRow | null>(null)
@@ -260,7 +261,10 @@ export function HrRequestViewPage() {
     setDetailError(null)
     void fetchHrRequest(id)
       .then((row) => {
-        if (!cancelled) setDetail(row)
+        if (!cancelled) {
+          setDetail(row)
+          setAssignDueDate(row.date?.trim() ? row.date.trim() : '')
+        }
       })
       .catch((e: unknown) => {
         if (!cancelled) {
@@ -600,6 +604,16 @@ export function HrRequestViewPage() {
       setAssignError('Select at least one indicator for a department.')
       return
     }
+    const due = assignDueDate.trim()
+    if (!due) {
+      setAssignError('Set a department due date.')
+      return
+    }
+    const requestDue = detail.date?.trim() || ''
+    if (requestDue && due > requestDue) {
+      setAssignError(`Department due date must be on or before the request due date (${requestDue}).`)
+      return
+    }
     setAssigning(true)
     setAssignError(null)
     try {
@@ -607,12 +621,14 @@ export function HrRequestViewPage() {
       if (otherIssue) {
         for (const departmentId of assignOtherDepartmentIds) {
           await createDepartmentTask(detail.id, departmentId, {
+            due_date: due,
             assignment_instructions: notes,
           })
         }
       } else {
         for (const [departmentId, indicatorIds] of byDepartment) {
           await createDepartmentTask(detail.id, departmentId, {
+            due_date: due,
             assignment_instructions: notes,
             issue_indicator_ids: indicatorIds,
           })
@@ -621,6 +637,7 @@ export function HrRequestViewPage() {
       setAssignDepartmentIndicators({})
       setAssignOtherDepartmentIds([])
       setAssignRegionalNotes('')
+      setAssignDueDate(requestDue)
       setRegionalPathChoice(null)
       await reloadTasksAndDepartments()
       await reloadClarification()
@@ -897,9 +914,9 @@ export function HrRequestViewPage() {
     taskIdFromUrl &&
       activeTask &&
       ((deptUser && (fromDepartmentTasks || fromDepartmentHistory)) ||
-        (fromFederalDeptResponses && isFederalAdmin(user)) ||
+        (fromFederalDeptResponses && isFederalStaff(user)) ||
         (fromRegionalMonitoring && userMayReviewDepartmentTask(user, activeTask)) ||
-        (fromFederalCompilation && isFederalAdmin(user)) ||
+        (fromFederalCompilation && isFederalStaff(user)) ||
         (fromRegionalCompilation && userMayReviewDepartmentTask(user, activeTask))),
   )
   const embeddedRequestPage = Boolean(
@@ -1134,6 +1151,9 @@ export function HrRequestViewPage() {
         {showRegionalAssign && (
           <RegionalAssignDepartmentsPanel
             regionName={user?.region?.name ?? 'your region'}
+            requestDueDate={detail?.date?.trim() || null}
+            dueDate={assignDueDate}
+            onChangeDueDate={setAssignDueDate}
             indicators={requestIndicatorsForAssign}
             departments={regionDepartments}
             departmentIndicators={assignDepartmentIndicators}
@@ -1917,6 +1937,9 @@ export function HrRequestViewPage() {
         {showRegionalAssign && !fromRegionReceived && (
           <RegionalAssignDepartmentsPanel
             regionName={user?.region?.name ?? 'your region'}
+            requestDueDate={detail?.date?.trim() || null}
+            dueDate={assignDueDate}
+            onChangeDueDate={setAssignDueDate}
             indicators={requestIndicatorsForAssign}
             departments={regionDepartments}
             departmentIndicators={assignDepartmentIndicators}

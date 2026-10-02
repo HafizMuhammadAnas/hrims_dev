@@ -15,7 +15,7 @@ import {
 } from '../api/hrRequests'
 import type { RegionRow } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
-import { isDepartmentAdmin, isFederalAdmin, isViewer } from '../lib/roles'
+import { isDepartmentAdmin, isFederalStaff, isViewer } from '../lib/roles'
 import { sortCollectionYearsByLabelValue } from '../lib/collectionYearSort'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import {
@@ -375,7 +375,7 @@ export function HrRequestModal({
       (isDepartmentAdmin(authUser) || isViewer(authUser)) &&
       authUser.department != null,
   )
-  const canUseOtherIssues = isFederalAdmin(authUser)
+  const canUseOtherIssues = isFederalStaff(authUser)
 
   const assignableRegions = useMemo(() => {
     const base = regions.filter((r) => r.slug !== 'federal')

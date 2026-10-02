@@ -59,6 +59,8 @@ export type DepartmentTaskRow = {
   regional_review_status?: string | null
   regional_review_comments?: string | null
   assigned_date: string
+  /** Department response deadline (must be on/before the parent request due date). */
+  due_date?: string | null
   assignment_instructions?: string | null
   /** Issue indicator IDs this department must respond to; null/omitted = full request scope (legacy). */
   assigned_indicator_ids?: number[] | null

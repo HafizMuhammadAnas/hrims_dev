@@ -21,6 +21,8 @@ import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { workflowBackLabel } from '../lib/workflowNavigation'
+import { useAuth } from '../auth/AuthContext'
+import { isFederalSubAdmin } from '../lib/roles'
 import {
   departmentsMgmtBasePath,
   departmentsMgmtEditId,
@@ -32,11 +34,18 @@ import {
 export function ManageDepartmentsPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const notify = useNotify()
   const basePath = departmentsMgmtBasePath(location.pathname)
   const view = resolveDepartmentsMgmtView(location.pathname)
   const editDepartmentId = departmentsMgmtEditId(location.pathname)
   const tabs = departmentsMgmtTabs(basePath)
+
+  useEffect(() => {
+    if (isFederalSubAdmin(user)) {
+      navigate('/', { replace: true })
+    }
+  }, [user, navigate])
 
   const [rows, setRows] = useState<DepartmentRow[]>([])
   const [createName, setCreateName] = useState('')

@@ -7,12 +7,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class KnowledgeUprEntry extends Model
 {
-    public const KIND_SUPPORTED = 'supported';
-
-    public const KIND_NOTED = 'noted';
-
-    public const KIND_OTHERS = 'others';
-
     /**
      * Fixed repository document slots shown on Knowledge Hub.
      *
@@ -43,6 +37,7 @@ class KnowledgeUprEntry extends Model
 
     protected $fillable = [
         'kind',
+        'upr_type_id',
         'title',
         'upr_cycle_id',
         'introduction',
@@ -67,19 +62,28 @@ class KnowledgeUprEntry extends Model
         return $this->belongsTo(UprCycle::class, 'upr_cycle_id');
     }
 
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(UprType::class, 'upr_type_id');
+    }
+
     public function displayTitle(): string
     {
+        if ($this->relationLoaded('type') && $this->type) {
+            $typeName = trim((string) $this->type->name);
+            if ($typeName !== '') {
+                return $typeName;
+            }
+        }
+
         $custom = trim((string) ($this->title ?? ''));
         if ($custom !== '') {
             return $custom;
         }
 
-        return match ($this->kind) {
-            self::KIND_SUPPORTED => 'Supported',
-            self::KIND_NOTED => 'Noted',
-            self::KIND_OTHERS => 'Others',
-            default => ucfirst((string) $this->kind),
-        };
+        $kind = trim((string) ($this->kind ?? ''));
+
+        return $kind !== '' ? ucfirst($kind) : 'UPR';
     }
 
     /**

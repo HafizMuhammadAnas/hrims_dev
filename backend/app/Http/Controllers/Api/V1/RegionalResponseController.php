@@ -20,8 +20,8 @@ class RegionalResponseController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->hasRole('super_admin')
-            && ! $request->user()->hasRole('federal_admin')
+        if (! HrimsAccess::isSuperAdmin($request->user())
+            && ! HrimsAccess::isFederalStaff($request->user())
             && ! $request->user()->hasRole('regional_admin')) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
@@ -79,7 +79,7 @@ class RegionalResponseController extends Controller
     public function review(Request $request, string $regionalResponse): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('super_admin') && ! $user->hasRole('federal_admin')) {
+        if (! $user->hasRole('super_admin') && ! HrimsAccess::isFederalStaff($user)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -123,7 +123,7 @@ class RegionalResponseController extends Controller
         $mayResubmit =
             ($user->hasRole('regional_admin') && $user->region_id !== null
                 && (int) $model->region_id === (int) $user->region_id)
-            || ($user->hasRole('federal_admin')
+            || (HrimsAccess::isFederalStaff($user)
                 && $model->region && in_array((string) $model->region->slug, ['ict', 'federal'], true));
 
         if ($mayResubmit) {
@@ -160,7 +160,7 @@ class RegionalResponseController extends Controller
         $query = RegionalResponse::query()->with(['region', 'hrRequest']);
         $user = $request->user();
 
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
+        if ($user->hasRole('super_admin') || HrimsAccess::isFederalStaff($user)) {
             // no filter
         } elseif ($user->hasRole('regional_admin') && $user->region_id !== null) {
             $query->where('region_id', $user->region_id);
@@ -208,7 +208,7 @@ class RegionalResponseController extends Controller
     public function departmentTasks(Request $request, string $regionalResponse): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('super_admin') && ! $user->hasRole('federal_admin')) {
+        if (! $user->hasRole('super_admin') && ! HrimsAccess::isFederalStaff($user)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -239,7 +239,7 @@ class RegionalResponseController extends Controller
 
     private function userMayView(User $user, RegionalResponse $model): bool
     {
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
+        if ($user->hasRole('super_admin') || HrimsAccess::isFederalStaff($user)) {
             return true;
         }
 
@@ -286,7 +286,7 @@ class RegionalResponseController extends Controller
             return $home;
         }
 
-        if ($user->hasRole('federal_admin') || $user->hasRole('super_admin')) {
+        if (HrimsAccess::isFederalStaff($user) || $user->hasRole('super_admin')) {
             if ($requestedRegionId !== null) {
                 $region = Region::query()->find($requestedRegionId);
                 if (! $region || ! in_array((string) $region->slug, ['ict', 'federal'], true)) {

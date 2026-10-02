@@ -24,7 +24,7 @@ import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { LABEL_CREATE_ADMIN, LABEL_CREATE_USER, LABEL_EDIT_USER, LABEL_USER_MANAGEMENT } from '../lib/uiLabels'
-import { isSuperAdmin } from '../lib/roles'
+import { isSuperAdmin, isFederalSubAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import {
   resolveUsersMgmtView,
@@ -35,9 +35,9 @@ import {
 } from '../lib/usersMgmtNavigation'
 import type { AuthUser } from '../types/auth'
 
-type RoleSlug = 'federal_admin' | 'regional_admin' | 'department_admin' | 'viewer'
+type RoleSlug = 'federal_admin' | 'regional_admin' | 'department_admin' | 'federal_sub_admin' | 'viewer'
 
-const ADMIN_ROLE_SLUGS = ['federal_admin', 'regional_admin'] as const
+const ADMIN_ROLE_SLUGS = ['federal_admin', 'federal_sub_admin', 'regional_admin'] as const
 
 export function UserManagementPage() {
   const location = useLocation()
@@ -46,7 +46,15 @@ export function UserManagementPage() {
   const notify = useNotify()
   const superUser = isSuperAdmin(user)
   const basePath = usersMgmtBasePath(location.pathname)
+  const federalPortal = basePath === '/federal-users-mgmt'
   const view = resolveUsersMgmtView(location.pathname)
+
+  useEffect(() => {
+    if (isFederalSubAdmin(user)) {
+      navigate('/', { replace: true })
+    }
+  }, [user, navigate])
+
   const editUserId = usersMgmtEditUserId(location.pathname)
   const createTabLabel = superUser ? LABEL_CREATE_ADMIN : LABEL_CREATE_USER
   const tabs = usersMgmtTabs(basePath, createTabLabel)
@@ -81,7 +89,11 @@ export function UserManagementPage() {
   useEffect(() => {
     if (superUser) {
       setForm((f) =>
-        f.role_slug === 'department_admin' || f.role_slug === 'viewer' ? { ...f, role_slug: 'federal_admin' } : f,
+        f.role_slug === 'department_admin' ||
+        f.role_slug === 'viewer' ||
+        f.role_slug === 'federal_sub_admin'
+          ? { ...f, role_slug: 'federal_admin' }
+          : f,
       )
     }
   }, [superUser])
@@ -96,27 +108,30 @@ export function UserManagementPage() {
       setError('Name, username, and password are required.')
       return
     }
+    if (!form.email.trim()) {
+      setError('Official email is required.')
+      return
+    }
     if (superUser) {
       if (form.role_slug === 'regional_admin' && !form.region_id) {
         setError('Region is required for regional administrators.')
         return
       }
-    } else {
-      if (!form.department_id) {
-        setError('Department is required.')
-        return
-      }
+    } else if (form.role_slug !== 'federal_sub_admin' && !form.department_id) {
+      setError('Department is required.')
+      return
     }
     setSaving(true)
     setError(null)
     const uname = form.username
+    const email = form.email.trim()
     try {
       if (superUser) {
         if (form.role_slug === 'federal_admin') {
           await createUser({
             name: form.name,
             username: form.username,
-            email: form.email || null,
+            email,
             password: form.password,
             role_slug: 'federal_admin',
             region_id: null,
@@ -126,18 +141,28 @@ export function UserManagementPage() {
           await createUser({
             name: form.name,
             username: form.username,
-            email: form.email || null,
+            email,
             password: form.password,
             role_slug: 'regional_admin',
             region_id: Number(form.region_id),
             department_id: null,
           })
         }
+      } else if (form.role_slug === 'federal_sub_admin') {
+        await createUser({
+          name: form.name,
+          username: form.username,
+          email,
+          password: form.password,
+          role_slug: 'federal_sub_admin',
+          region_id: null,
+          department_id: null,
+        })
       } else {
         await createUser({
           name: form.name,
           username: form.username,
-          email: form.email || null,
+          email,
           password: form.password,
           role_slug: form.role_slug as 'department_admin' | 'viewer',
           department_id: Number(form.department_id),
@@ -243,12 +268,16 @@ export function UserManagementPage() {
       setError('Name is required.')
       return
     }
+    if (!editForm.email.trim()) {
+      setError('Official email is required.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       await updateUser(editUserId, {
         name: editForm.name.trim(),
-        email: editForm.email.trim() || null,
+        email: editForm.email.trim(),
         is_active: editForm.is_active,
         ...(editForm.password.trim() ? { password: editForm.password.trim() } : {}),
       })
@@ -310,11 +339,13 @@ export function UserManagementPage() {
                   <FormControl label="Name">
                     <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
                   </FormControl>
-                  <FormControl label="Email">
+                  <FormControl label="Official email">
                     <input
+                      type="email"
+                      required
                       value={editForm.email}
                       onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-                      placeholder="email@example.com"
+                      placeholder="name@organization.gov.pk"
                     />
                   </FormControl>
                 </FormRow>
@@ -485,8 +516,14 @@ export function UserManagementPage() {
               </FormControl>
             </FormRow>
             <FormRow twoCol>
-              <FormControl label="Email">
-                <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+              <FormControl label="Official email">
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="name@organization.gov.pk"
+                />
               </FormControl>
               <FormControl label="Temporary password">
                 <input
@@ -512,7 +549,10 @@ export function UserManagementPage() {
                   {superUser && <option value="federal_admin">Federal admin</option>}
                   {superUser && <option value="regional_admin">Regional admin</option>}
                   {!superUser && <option value="department_admin">Department admin</option>}
-                  {!superUser && <option value="viewer">Viewer</option>}
+                  {!superUser && federalPortal && (
+                    <option value="federal_sub_admin">Federal sub admin</option>
+                  )}
+                  {!superUser && !federalPortal && <option value="viewer">Viewer</option>}
                 </select>
               </FormControl>
               {superUser && form.role_slug === 'regional_admin' && (
@@ -527,7 +567,7 @@ export function UserManagementPage() {
                   </select>
                 </FormControl>
               )}
-              {!superUser && (
+              {!superUser && form.role_slug !== 'federal_sub_admin' && (
                 <FormControl label="Department">
                   <select
                     value={form.department_id}

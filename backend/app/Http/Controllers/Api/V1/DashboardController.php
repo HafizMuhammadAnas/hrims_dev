@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -78,7 +79,11 @@ class DashboardController extends Controller
             'requests_created_by_month' => $createdTrend,
         ];
 
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin') || $user->hasRole('regional_admin')) {
+        if ($user->hasRole('super_admin') || HrimsAccess::isFederalStaff($user) || $user->hasRole('regional_admin')) {
+            $data['due_date_alerts'] = $this->dueDateAlertsFor($user, clone $query, $today);
+        }
+
+        if ($user->hasRole('super_admin') || HrimsAccess::isFederalStaff($user) || $user->hasRole('regional_admin')) {
             $respQ = $this->scopedRegionalResponsesQuery($user);
             $data['regional_responses_total'] = (clone $respQ)->count();
             $data['regional_responses_by_review'] = (clone $respQ)
@@ -89,7 +94,7 @@ class DashboardController extends Controller
                 ->all();
         }
 
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
+        if ($user->hasRole('super_admin') || HrimsAccess::isFederalStaff($user)) {
             $compiledTotal = CompiledRecord::query()->count();
             $activeCount = (int) ($byStatus['active'] ?? 0);
             $data['regional_responses_pending_submission'] = $this->pendingProvincialResponsesCount($user);
@@ -147,7 +152,7 @@ class DashboardController extends Controller
                         'id' => $t->hr_request_id,
                         'title' => $t->hrRequest?->title ?? $t->hr_request_id,
                         'status' => $status,
-                        'date' => $t->hrRequest?->due_date?->format('Y-m-d'),
+                        'date' => $t->due_date?->format('Y-m-d') ?? $t->hrRequest?->due_date?->format('Y-m-d'),
                         'region_name' => $t->region?->name,
                     ];
                 })->values()->all();
@@ -235,11 +240,98 @@ class DashboardController extends Controller
         ];
     }
 
+    /**
+     * Active requests (and open department tasks for regional) due within 7 days or overdue.
+     *
+     * @return list<array{id: string, title: string, date: string|null, urgency: string, region_name: string|null, kind: string, department_name?: string|null}>
+     */
+    private function dueDateAlertsFor(User $user, Builder $requestQuery, string $today): array
+    {
+        $cutoff = Carbon::parse($today)->addDays(7)->toDateString();
+        $alerts = [];
+
+        $requests = (clone $requestQuery)
+            ->where('status', 'active')
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<=', $cutoff)
+            ->orderBy('due_date')
+            ->limit(10)
+            ->with(['region:id,name'])
+            ->get(['id', 'title', 'due_date', 'region_id']);
+
+        foreach ($requests as $r) {
+            $due = $r->due_date?->format('Y-m-d');
+            if ($due === null) {
+                continue;
+            }
+            $alerts[] = [
+                'id' => $r->id,
+                'title' => $r->title,
+                'date' => $due,
+                'urgency' => $this->dueUrgencyLabel($due, $today),
+                'region_name' => $r->region?->name,
+                'kind' => 'request',
+            ];
+        }
+
+        if ($user->hasRole('regional_admin') && $user->region_id !== null && Schema::hasColumn('department_tasks', 'due_date')) {
+            $taskRows = DepartmentTask::query()
+                ->where('region_id', $user->region_id)
+                ->whereNotNull('due_date')
+                ->whereDate('due_date', '<=', $cutoff)
+                ->where(function ($q): void {
+                    $q->where('status', 'assigned')
+                        ->orWhere(function ($q2): void {
+                            $q2->where('status', 'submitted')
+                                ->where('regional_review_status', 'needs-modification');
+                        });
+                })
+                ->orderBy('due_date')
+                ->limit(10)
+                ->with(['department:id,name', 'hrRequest:id,title', 'region:id,name'])
+                ->get();
+
+            foreach ($taskRows as $t) {
+                $due = $t->due_date?->format('Y-m-d');
+                if ($due === null) {
+                    continue;
+                }
+                $alerts[] = [
+                    'id' => $t->hr_request_id,
+                    'title' => $t->hrRequest?->title ?? $t->hr_request_id,
+                    'date' => $due,
+                    'urgency' => $this->dueUrgencyLabel($due, $today),
+                    'region_name' => $t->region?->name,
+                    'kind' => 'department_task',
+                    'department_name' => $t->department?->name,
+                ];
+            }
+        }
+
+        usort($alerts, static function (array $a, array $b): int {
+            return strcmp((string) ($a['date'] ?? ''), (string) ($b['date'] ?? ''));
+        });
+
+        return array_slice(array_values($alerts), 0, 10);
+    }
+
+    private function dueUrgencyLabel(string $dueDate, string $today): string
+    {
+        if ($dueDate < $today) {
+            return 'overdue';
+        }
+        if ($dueDate === $today) {
+            return 'due_today';
+        }
+
+        return 'due_soon';
+    }
+
     private function scopedRegionalResponsesQuery(User $user): Builder
     {
         $query = RegionalResponse::query();
 
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
+        if ($user->hasRole('super_admin') || HrimsAccess::isFederalStaff($user)) {
             return $query;
         }
 

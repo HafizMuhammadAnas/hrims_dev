@@ -4,6 +4,10 @@ import { Button } from './ui/Button'
 
 type Props = {
   regionName: string
+  /** Parent HR request due date (YYYY-MM-DD); department due must be on or before this. */
+  requestDueDate: string | null
+  dueDate: string
+  onChangeDueDate: (value: string) => void
   indicators: HrRequestIssueIndicator[]
   departments: DepartmentRow[]
   /** departmentId → issue indicator ids assigned to that department */
@@ -47,6 +51,9 @@ export function assignedDepartmentIndicatorMap(
  */
 export function RegionalAssignDepartmentsPanel({
   regionName,
+  requestDueDate,
+  dueDate,
+  onChangeDueDate,
   indicators,
   departments,
   departmentIndicators,
@@ -64,7 +71,7 @@ export function RegionalAssignDepartmentsPanel({
   const byDepartment = assignedDepartmentIndicatorMap(departmentIndicators)
   const noIndicatorMode = indicators.length === 0
   const mappedDeptCount = noIndicatorMode ? selectedDepartmentIds.length : byDepartment.size
-  const canAssign = mappedDeptCount > 0 && departments.length > 0
+  const canAssign = mappedDeptCount > 0 && departments.length > 0 && Boolean(dueDate.trim())
 
   function toggleIndicator(departmentId: number, indicatorId: number, checked: boolean) {
     const current = departmentIndicators[departmentId] ?? []
@@ -92,6 +99,24 @@ export function RegionalAssignDepartmentsPanel({
           ? 'Select the departments that should provide a written response and attachment.'
           : 'Open a department to select the indicators they should respond to. Leave a department empty to skip it.'}
       </p>
+
+      <div className="form-row" style={{ marginBottom: 14 }}>
+        <label htmlFor="reg-assign-due-date">
+          Department due date
+          {requestDueDate ? (
+            <span className="muted small"> (must be on or before request due date {requestDueDate})</span>
+          ) : null}
+        </label>
+        <input
+          id="reg-assign-due-date"
+          type="date"
+          required
+          value={dueDate}
+          max={requestDueDate ?? undefined}
+          onChange={(e) => onChangeDueDate(e.target.value)}
+          style={{ width: '100%', maxWidth: 280, boxSizing: 'border-box' }}
+        />
+      </div>
 
       {departments.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
@@ -168,7 +193,7 @@ export function RegionalAssignDepartmentsPanel({
           rows={4}
           value={notes}
           onChange={(e) => onChangeNotes(e.target.value)}
-          placeholder="e.g. Prioritize disaggregated figures by district; deadline for draft input is Friday."
+          placeholder="e.g. Prioritize disaggregated figures by district."
           style={{ width: '100%', boxSizing: 'border-box' }}
         />
       </div>

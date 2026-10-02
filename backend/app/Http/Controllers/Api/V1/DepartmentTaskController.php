@@ -46,6 +46,7 @@ class DepartmentTaskController extends Controller
             'regional_review_status' => $t->regional_review_status,
             'regional_review_comments' => $t->regional_review_comments,
             'assigned_date' => $t->assigned_date?->format('Y-m-d'),
+            'due_date' => $t->due_date?->format('Y-m-d'),
             'assignment_instructions' => $redact ? null : $t->assignment_instructions,
             'assigned_indicator_ids' => self::normalizeAssignedIndicatorIds($t->assigned_indicator_ids),
             'submission_date' => $t->submission_date?->format('Y-m-d'),
@@ -88,14 +89,28 @@ class DepartmentTaskController extends Controller
         $data = $request->validate([
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
             'department_id' => ['required', 'integer', 'exists:departments,id'],
+            'due_date' => ['required', 'date'],
             'assignment_instructions' => ['nullable', 'string', 'max:20000'],
             'issue_indicator_ids' => ['sometimes', 'array'],
             'issue_indicator_ids.*' => ['integer', 'distinct', 'exists:issue_indicators,id'],
+        ], [
+            'due_date.required' => 'Set a department due date for this assignment.',
+            'due_date.date' => 'Enter a valid due date.',
         ]);
 
         $hrRequest = HrRequest::query()->with(['regions', 'issue.indicators', 'indicatorResponses'])->find($data['hr_request_id']);
         if (! $hrRequest) {
             return response()->json(['message' => 'Request not found'], 404);
+        }
+
+        $requestDue = $hrRequest->due_date?->toDateString();
+        if ($requestDue === null) {
+            return response()->json(['message' => 'This request has no due date set.'], 422);
+        }
+        if ($data['due_date'] > $requestDue) {
+            return response()->json([
+                'message' => 'Department due date must be on or before the request due date ('.$requestDue.').',
+            ], 422);
         }
 
         $allowedIndicatorIds = $this->allowedIssueIndicatorIdsForRequest($hrRequest);
@@ -183,6 +198,7 @@ class DepartmentTaskController extends Controller
             'department_id' => $data['department_id'],
             'status' => 'assigned',
             'assigned_date' => now()->toDateString(),
+            'due_date' => $data['due_date'],
         ];
         if (Schema::hasColumn('department_tasks', 'assignment_instructions')) {
             $payload['assignment_instructions'] = $instructions !== '' ? $instructions : null;
@@ -1065,7 +1081,7 @@ class DepartmentTaskController extends Controller
     public function updateReview(Request $request, DepartmentTask $departmentTask): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('regional_admin') && ! $user->hasRole('federal_admin')) {
+        if (! $user->hasRole('regional_admin') && ! HrimsAccess::isFederalStaff($user)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -1137,7 +1153,7 @@ class DepartmentTaskController extends Controller
             || $request->boolean('federal_only');
 
         // Federal portal must not see region-only department revision rounds.
-        if ($federalAudience && ! (HrimsAccess::isSuperAdmin($user) || $user->hasRole('federal_admin'))) {
+        if ($federalAudience && ! (HrimsAccess::isSuperAdmin($user) || HrimsAccess::isFederalStaff($user))) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -1184,7 +1200,7 @@ class DepartmentTaskController extends Controller
         if (! $user) {
             return false;
         }
-        if (HrimsAccess::isSuperAdmin($user) || $user->hasRole('federal_admin')) {
+        if (HrimsAccess::isSuperAdmin($user) || HrimsAccess::isFederalStaff($user)) {
             return true;
         }
         if ($user->hasRole('regional_admin') && $user->region_id !== null) {
@@ -1219,7 +1235,7 @@ class DepartmentTaskController extends Controller
             // no filter
         }
         // Federal admin: ICT/Federal line by default; all regions when national scope requested
-        elseif ($user->hasRole('federal_admin')) {
+        elseif (HrimsAccess::isFederalStaff($user)) {
             if (! $nationalScope) {
                 $query->whereHas('region', fn ($q) => $q->whereIn('slug', ['ict', 'federal']));
             }

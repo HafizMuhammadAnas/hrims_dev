@@ -14,9 +14,21 @@ final class HrimsAccess
         return $user->hasRole('super_admin');
     }
 
+    /** Full federal admin (can manage users/departments). */
+    public static function isFederalAdmin(User $user): bool
+    {
+        return $user->hasRole('federal_admin');
+    }
+
+    /** Federal operational access (admin or sub-admin). */
+    public static function isFederalStaff(User $user): bool
+    {
+        return $user->hasRole('federal_admin') || $user->hasRole('federal_sub_admin');
+    }
+
     public static function seesAllRegions(User $user): bool
     {
-        return $user->hasRole('super_admin') || $user->hasRole('federal_admin');
+        return self::isSuperAdmin($user) || self::isFederalStaff($user);
     }
 
     /**
@@ -45,7 +57,7 @@ final class HrimsAccess
      */
     public static function applyHrRequestScope(Builder $query, User $user): void
     {
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
+        if (self::isSuperAdmin($user) || self::isFederalStaff($user)) {
             return;
         }
 
@@ -95,7 +107,7 @@ final class HrimsAccess
 
     public static function userMayViewHrRequest(User $user, HrRequest $model): bool
     {
-        if ($user->hasRole('super_admin') || $user->hasRole('federal_admin')) {
+        if (self::isSuperAdmin($user) || self::isFederalStaff($user)) {
             return true;
         }
 
@@ -135,8 +147,8 @@ final class HrimsAccess
      */
     public static function canManageHrRequests(User $user): bool
     {
-        return $user->hasRole('super_admin')
-            || $user->hasRole('federal_admin')
+        return self::isSuperAdmin($user)
+            || self::isFederalStaff($user)
             || $user->hasRole('regional_admin');
     }
 }

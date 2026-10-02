@@ -13,6 +13,7 @@ class RbacSeeder extends Seeder
         $roles = [
             ['slug' => 'super_admin', 'name' => 'Super administrator', 'description' => 'System catalog and top-level user provisioning'],
             ['slug' => 'federal_admin', 'name' => 'Federal administrator', 'description' => 'National scope'],
+            ['slug' => 'federal_sub_admin', 'name' => 'Federal sub administrator', 'description' => 'Federal scope without user or department management'],
             ['slug' => 'regional_admin', 'name' => 'Regional administrator', 'description' => 'Regional focal person'],
             ['slug' => 'department_admin', 'name' => 'Department administrator', 'description' => 'Department user'],
             ['slug' => 'viewer', 'name' => 'Viewer', 'description' => 'Read-only'],
@@ -36,6 +37,7 @@ class RbacSeeder extends Seeder
         $matrix = [
             'super_admin' => ['dashboard.view', 'users.manage', 'requests.manage', 'catalog.manage'],
             'federal_admin' => ['dashboard.view', 'users.manage', 'requests.manage'],
+            'federal_sub_admin' => ['dashboard.view', 'requests.manage'],
             'regional_admin' => ['dashboard.view', 'users.manage', 'requests.manage'],
             'department_admin' => ['dashboard.view', 'requests.manage'],
             'viewer' => ['dashboard.view'],
