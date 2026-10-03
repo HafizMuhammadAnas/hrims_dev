@@ -913,6 +913,17 @@ export async function adminDeleteKnowledgeUprEntry(id: number): Promise<void> {
   await throwIfNotOk(res)
 }
 
+async function fileToBase64Payload(file: File): Promise<{ name: string; content_base64: string }> {
+  const buffer = await file.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return { name: file.name, content_base64: btoa(binary) }
+}
+
 export async function adminUploadKnowledgeUprFiles(
   files: File[],
   purpose: 'repository' | 'analysis',
@@ -920,19 +931,18 @@ export async function adminUploadKnowledgeUprFiles(
 ): Promise<AdminKnowledgeUprDocument[]> {
   if (files.length === 0) return []
   await ensureCsrfCookie()
-  const fd = new FormData()
-  files.forEach((file, index) => {
-    fd.append(`files[${index}]`, file)
-  })
-  fd.append('purpose', purpose)
+  // JSON/base64: FortiGate at hrims.mohr.gov.pk often blocks multipart HTML uploads (500),
+  // while JSON POST (same pattern as PATCH/DELETE workarounds) reaches Laravel.
+  const files_base64 = await Promise.all(files.map((f) => fileToBase64Payload(f)))
+  const body: Record<string, unknown> = { purpose, files_base64 }
   if (entryId != null && Number.isFinite(entryId)) {
-    fd.append('knowledge_upr_entry_id', String(entryId))
+    body.knowledge_upr_entry_id = entryId
   }
   const res = await fetch('/api/v1/admin/knowledge-upr-entries/files', {
     method: 'POST',
     credentials: 'include',
-    headers: apiMultipartHeaders(),
-    body: fd,
+    headers: apiJsonHeaders(),
+    body: JSON.stringify(body),
   })
   await throwIfNotOk(res)
   return ((await res.json()) as { data: AdminKnowledgeUprDocument[] }).data

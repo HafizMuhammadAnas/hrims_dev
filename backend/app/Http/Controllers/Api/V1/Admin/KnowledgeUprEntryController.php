@@ -61,6 +61,11 @@ class KnowledgeUprEntryController extends Controller
 
     public function uploadFiles(Request $request): JsonResponse
     {
+        // JSON/base64 path: FortiGate often blocks multipart HTML (and some binary) uploads.
+        if ($request->has('files_base64') || (is_array($request->input('files')) && ! $request->hasFile('files'))) {
+            return $this->uploadFilesFromBase64($request);
+        }
+
         $request->validate([
             'knowledge_upr_entry_id' => ['nullable', 'integer', 'exists:knowledge_upr_entries,id'],
             'purpose' => ['required', 'string', Rule::in(['repository', 'analysis'])],
@@ -79,43 +84,44 @@ class KnowledgeUprEntryController extends Controller
         }
         $fileList = is_array($uploaded) ? array_values($uploaded) : [$uploaded];
 
-        $allowed = $purpose === 'analysis'
-            ? ['html', 'htm']
-            : ['pdf', 'doc', 'docx'];
+        $allowed = $this->allowedExtensionsForPurpose($purpose);
+        $folder = $this->storageFolder($request, $purpose);
 
-        $folder = 'knowledge-upr-repositories';
-        if ($request->filled('knowledge_upr_entry_id')) {
-            $folder .= '/'.$request->integer('knowledge_upr_entry_id');
+        try {
+            Storage::disk('public')->makeDirectory($folder);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Storage is not writable. On the server run: php artisan storage:link && chmod -R ug+rwx storage bootstrap/cache',
+            ], 500);
         }
-        $folder .= '/'.$purpose;
 
         $documents = [];
         foreach ($fileList as $file) {
             if ($file === null || ! $file->isValid()) {
                 continue;
             }
-            $ext = strtolower((string) $file->getClientOriginalExtension());
+            $original = $file->getClientOriginalName();
+            $ext = $this->resolveExtension($original, (string) $file->getClientOriginalExtension());
             if (! in_array($ext, $allowed, true)) {
                 return response()->json([
-                    'message' => $purpose === 'analysis'
-                        ? 'Only HTML files are allowed for Analysis. Rejected: '.$file->getClientOriginalName()
-                        : 'Only PDF, DOC, and DOCX files are allowed. Rejected: '.$file->getClientOriginalName(),
+                    'message' => $this->rejectedExtensionMessage($purpose, $original),
                 ], 422);
             }
-            $original = $file->getClientOriginalName();
-            $path = $file->store($folder, 'public');
+            try {
+                $path = $file->storeAs($folder, Str::uuid()->toString().'.'.$ext, 'public');
+            } catch (\Throwable $e) {
+                report($e);
+
+                return response()->json([
+                    'message' => 'Could not store uploaded file. Check storage/app/public permissions on the server.',
+                ], 500);
+            }
             if (! is_string($path) || $path === '') {
                 return response()->json(['message' => 'Could not store uploaded file.'], 500);
             }
-            $documents[] = [
-                'id' => (string) Str::uuid(),
-                'title' => pathinfo($original, PATHINFO_FILENAME) ?: $original,
-                'href' => ConventionController::repositoryFileDownloadUrl($path),
-                'type_label' => $this->typeLabel($ext),
-                'icon' => $this->icon($ext),
-                'file_name' => $original,
-                'path' => $path,
-            ];
+            $documents[] = $this->documentPayload($original, $ext, $path);
         }
 
         if ($documents === []) {
@@ -123,6 +129,128 @@ class KnowledgeUprEntryController extends Controller
         }
 
         return response()->json(['data' => $documents], 201);
+    }
+
+    /**
+     * Accept JSON body with base64 file payloads (WAF-safe alternative to multipart).
+     */
+    private function uploadFilesFromBase64(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'knowledge_upr_entry_id' => ['nullable', 'integer', 'exists:knowledge_upr_entries,id'],
+            'purpose' => ['required', 'string', Rule::in(['repository', 'analysis'])],
+            'files_base64' => ['required', 'array', 'min:1'],
+            'files_base64.*.name' => ['required', 'string', 'max:255'],
+            'files_base64.*.content_base64' => ['required', 'string'],
+        ]);
+
+        $purpose = (string) $data['purpose'];
+        $allowed = $this->allowedExtensionsForPurpose($purpose);
+        $folder = $this->storageFolder($request, $purpose);
+
+        try {
+            Storage::disk('public')->makeDirectory($folder);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Storage is not writable. On the server run: php artisan storage:link && chmod -R ug+rwx storage bootstrap/cache',
+            ], 500);
+        }
+
+        $documents = [];
+        foreach ($data['files_base64'] as $item) {
+            $original = basename((string) $item['name']);
+            $ext = $this->resolveExtension($original, strtolower((string) pathinfo($original, PATHINFO_EXTENSION)));
+            if (! in_array($ext, $allowed, true)) {
+                return response()->json([
+                    'message' => $this->rejectedExtensionMessage($purpose, $original),
+                ], 422);
+            }
+
+            $raw = (string) $item['content_base64'];
+            if (str_contains($raw, ',')) {
+                $raw = explode(',', $raw, 2)[1] ?? '';
+            }
+            $binary = base64_decode($raw, true);
+            if ($binary === false || $binary === '') {
+                return response()->json(['message' => 'Invalid file data for: '.$original], 422);
+            }
+            // ~50 MB decoded limit (matches multipart max:51200 KB).
+            if (strlen($binary) > 51200 * 1024) {
+                return response()->json(['message' => 'File too large: '.$original], 422);
+            }
+
+            $path = $folder.'/'.Str::uuid()->toString().'.'.$ext;
+            try {
+                $ok = Storage::disk('public')->put($path, $binary);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return response()->json([
+                    'message' => 'Could not store uploaded file. Check storage/app/public permissions on the server.',
+                ], 500);
+            }
+            if (! $ok) {
+                return response()->json(['message' => 'Could not store uploaded file: '.$original], 500);
+            }
+            $documents[] = $this->documentPayload($original, $ext, $path);
+        }
+
+        return response()->json(['data' => $documents], 201);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedExtensionsForPurpose(string $purpose): array
+    {
+        return $purpose === 'analysis'
+            ? ['html', 'htm']
+            : ['pdf', 'doc', 'docx'];
+    }
+
+    private function storageFolder(Request $request, string $purpose): string
+    {
+        $folder = 'knowledge-upr-repositories';
+        if ($request->filled('knowledge_upr_entry_id')) {
+            $folder .= '/'.$request->integer('knowledge_upr_entry_id');
+        }
+
+        return $folder.'/'.$purpose;
+    }
+
+    private function resolveExtension(string $originalName, string $ext): string
+    {
+        $ext = strtolower(trim($ext));
+        if ($ext !== '') {
+            return $ext;
+        }
+
+        return strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
+    }
+
+    private function rejectedExtensionMessage(string $purpose, string $original): string
+    {
+        return $purpose === 'analysis'
+            ? 'Only HTML files are allowed for Analysis. Rejected: '.$original
+            : 'Only PDF, DOC, and DOCX files are allowed. Rejected: '.$original;
+    }
+
+    /**
+     * @return array{id: string, title: string, href: string, type_label: string, icon: string, file_name: string, path: string}
+     */
+    private function documentPayload(string $original, string $ext, string $path): array
+    {
+        return [
+            'id' => (string) Str::uuid(),
+            'title' => pathinfo($original, PATHINFO_FILENAME) ?: $original,
+            'href' => ConventionController::repositoryFileDownloadUrl($path),
+            'type_label' => $this->typeLabel($ext),
+            'icon' => $this->icon($ext),
+            'file_name' => $original,
+            'path' => $path,
+        ];
     }
 
     public function deleteFile(Request $request): JsonResponse
