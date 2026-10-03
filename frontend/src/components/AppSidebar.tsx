@@ -67,7 +67,7 @@ import {
   SUPER_ADMIN_UPR_RECOMMENDATIONS,
 } from '../lib/superAdminRoutes'
 import {
-  isDepartmentAdmin,
+  isDepartmentStaff,
   isFederalAdmin,
   isFederalStaff,
   isRegionalAdmin,
@@ -113,7 +113,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
   const federal = isFederalStaff(user)
   const federalAdmin = isFederalAdmin(user)
   const regional = isRegionalAdmin(user)
-  const dept = isDepartmentAdmin(user)
+  const dept = isDepartmentStaff(user)
 
   const onPick = autoCloseOnNavigate ? onClose : undefined
 

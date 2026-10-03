@@ -50,9 +50,11 @@ export interface DashboardSummary {
   clarifications_pending_federal?: number
   department_tasks_total?: number
   department_tasks_by_status?: Record<string, number>
-  /** Pending / Review / Revision / Accepted — same buckets as department task lists. */
+  /** Pending / Pending Validation / Validator Revision / Under Review / Regional Revision / Accepted */
   department_tasks_by_workflow?: {
     in_process: number
+    pending_validation?: number
+    validator_revision?: number
     responded: number
     revision: number
     accepted: number

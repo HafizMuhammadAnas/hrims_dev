@@ -164,7 +164,7 @@ class RegionalResponseController extends Controller
             // no filter
         } elseif ($user->hasRole('regional_admin') && $user->region_id !== null) {
             $query->where('region_id', $user->region_id);
-        } elseif (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
+        } elseif (($user->hasRole('department_admin') || $user->hasRole('department_validator') || $user->hasRole('viewer')) && $user->department_id) {
             $ids = HrimsAccess::hrRequestIdsForDepartmentUser($user);
             if ($ids === []) {
                 $query->whereRaw('1 = 0');
@@ -226,12 +226,14 @@ class RegionalResponseController extends Controller
             ->where('hr_request_id', $model->hr_request_id)
             ->where('region_id', $model->region_id)
             ->orderBy('department_id')
-            ->get();
+            ->get()
+            ->filter(fn (DepartmentTask $t) => DepartmentTaskController::isReadyForUpstreamReview($t) || $t->status === 'assigned')
+            ->values();
 
         return response()
             ->json([
                 'data' => $tasks->map(
-                    fn (DepartmentTask $t) => DepartmentTaskController::serializeDepartmentTask($t, false),
+                    fn (DepartmentTask $t) => DepartmentTaskController::serializeDepartmentTask($t, false, $user),
                 )->values()->all(),
             ])
             ->header('Cache-Control', 'no-store, private');
@@ -247,7 +249,7 @@ class RegionalResponseController extends Controller
             return (int) $model->region_id === (int) $user->region_id;
         }
 
-        if (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
+        if (($user->hasRole('department_admin') || $user->hasRole('department_validator') || $user->hasRole('viewer')) && $user->department_id) {
             $ids = HrimsAccess::hrRequestIdsForDepartmentUser($user);
 
             return in_array($model->hr_request_id, $ids, true)

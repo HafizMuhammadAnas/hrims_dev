@@ -35,8 +35,11 @@ import { fetchRegionalResponses, type RegionalResponseRow } from '../api/lists'
 import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/ui/Alert'
 import { StatsCards } from '../components/ui/StatsCards'
+import { upstreamRevisionLabelForScope } from '../lib/departmentTaskWorkflow'
+import { isIctDepartmentPortalUser } from '../lib/ictRegion'
 import {
-  isDepartmentAdmin,
+  isDepartmentStaff,
+  isDepartmentValidator,
   isFederalStaff,
   isRegionalAdmin,
   isSuperAdmin,
@@ -126,7 +129,7 @@ function dashboardVariant(user: ReturnType<typeof useAuth>['user']): DashboardVa
   if (!user) return 'minimal'
   if (isSuperAdmin(user) || isFederalStaff(user)) return 'federal'
   if (isRegionalAdmin(user)) return 'regional'
-  if (isDepartmentAdmin(user)) return 'department'
+  if (isDepartmentStaff(user)) return 'department'
   if (isViewer(user)) return 'viewer'
   return 'minimal'
 }
@@ -152,6 +155,9 @@ export function DashboardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const variant = dashboardVariant(user)
+  const deptUpstreamRevisionLabel = upstreamRevisionLabelForScope(
+    isIctDepartmentPortalUser(user) ? 'federal-ict' : 'regional',
+  )
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [recentResponses, setRecentResponses] = useState<RegionalResponseRow[]>([])
@@ -219,6 +225,8 @@ export function DashboardPage() {
   const taskAssigned = count(taskBy, 'assigned')
   const taskSubmitted = count(taskBy, 'submitted')
   const workflowPending = taskWorkflow?.in_process ?? 0
+  const workflowPendingValidation = taskWorkflow?.pending_validation ?? 0
+  const workflowValidatorRevision = taskWorkflow?.validator_revision ?? 0
   const workflowReview = taskWorkflow?.responded ?? 0
   const workflowRevision = taskWorkflow?.revision ?? 0
   const workflowAccepted = taskWorkflow?.accepted ?? 0
@@ -266,6 +274,9 @@ export function DashboardPage() {
       return `${user.region?.name ?? 'Province'} overview — manage requests and responses for your province`
     }
     if (variant === 'department' || variant === 'viewer') {
+      if (isDepartmentValidator(user)) {
+        return `Department validation — ${user.department?.name ?? 'your department'}`
+      }
       return `Department workspace — ${user.department?.name ?? user.region?.name ?? 'your assignments'}`
     }
     return 'HRIMS dashboard'
@@ -321,7 +332,7 @@ export function DashboardPage() {
       return {
         title: 'Assigned Task Status',
         subtitle:
-          'Your department’s assigned tasks — pending, under review, revision, or accepted.',
+          'Your department’s assigned tasks — pending, validation, revision, or accepted.',
       }
     }
     return {
@@ -386,12 +397,23 @@ export function DashboardPage() {
                     <AlertCircle size={22} strokeWidth={2.2} />
                   </div>
                   <div className="dashboard-card-title">{LABEL_NEEDS_ATTENTION}</div>
-                  <div className="dashboard-card-value">{workflowRevision}</div>
+                  <div className="dashboard-card-value">
+                    {workflowValidatorRevision + workflowRevision}
+                  </div>
                   <div className="dashboard-card-subtitle">
-                    {workflowRevision} response{workflowRevision === 1 ? '' : 's'} need revision
-                    {taskAssigned > 0
-                      ? ` · ${taskAssigned} open task${taskAssigned === 1 ? '' : 's'} awaiting submission`
-                      : ''}
+                    {[
+                      workflowValidatorRevision > 0
+                        ? `${workflowValidatorRevision} validator revision${workflowValidatorRevision === 1 ? '' : 's'}`
+                        : null,
+                      workflowRevision > 0
+                        ? `${workflowRevision} ${deptUpstreamRevisionLabel.toLowerCase()}${workflowRevision === 1 ? '' : 's'}`
+                        : null,
+                      taskAssigned > 0
+                        ? `${taskAssigned} open task${taskAssigned === 1 ? '' : 's'} awaiting submission`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || 'No items need attention'}
                   </div>
                 </div>
               </>
@@ -425,7 +447,7 @@ export function DashboardPage() {
                   </div>
                   <div className="dashboard-card-subtitle">
                     {workflowRevision} department response{workflowRevision === 1 ? '' : 's'} need
-                    revision
+                    regional revision
                     {regionalCompilationRevision > 0
                       ? ` · ${regionalCompilationRevision} compilation${regionalCompilationRevision === 1 ? '' : 's'} need revision`
                       : ''}
@@ -814,13 +836,25 @@ export function DashboardPage() {
                   },
                 ]}
               />
-            ) : variant === 'regional' || variant === 'department' || variant === 'viewer' ? (
+            ) : variant === 'regional' ? (
               <StatsCards
                 className="dashboard-status-stats"
                 items={[
                   { label: 'Pending', value: workflowPending, accent: '#ffb300' },
                   { label: 'Under Review', value: workflowReview, accent: '#00bcd4' },
-                  { label: 'Revision', value: workflowRevision, accent: '#f44336' },
+                  { label: 'Regional Revision', value: workflowRevision, accent: '#f44336' },
+                  { label: 'Accepted', value: workflowAccepted, accent: '#4caf50' },
+                ]}
+              />
+            ) : variant === 'department' || variant === 'viewer' ? (
+              <StatsCards
+                className="dashboard-status-stats"
+                items={[
+                  { label: 'Pending', value: workflowPending, accent: '#ffb300' },
+                  { label: 'Pending Validation', value: workflowPendingValidation, accent: '#ff9800' },
+                  { label: 'Validator Revision', value: workflowValidatorRevision, accent: '#fb8c00' },
+                  { label: 'Under Review', value: workflowReview, accent: '#00bcd4' },
+                  { label: deptUpstreamRevisionLabel, value: workflowRevision, accent: '#f44336' },
                   { label: 'Accepted', value: workflowAccepted, accent: '#4caf50' },
                 ]}
               />

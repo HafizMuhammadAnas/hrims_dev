@@ -56,6 +56,8 @@ export type DepartmentTaskRow = {
   department_id: string
   department_name: string | null
   status: string
+  department_validation_status?: string | null
+  department_validation_comments?: string | null
   regional_review_status?: string | null
   regional_review_comments?: string | null
   assigned_date: string

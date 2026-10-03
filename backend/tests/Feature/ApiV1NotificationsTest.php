@@ -275,7 +275,7 @@ class ApiV1NotificationsTest extends TestCase
             'user_id' => $departmentAdmin->id,
             'event_key' => 'department_task.needs_modification',
             'entity_id' => $taskId,
-            'title' => 'Revision requested',
+            'title' => 'Regional revision requested',
         ]);
         $this->assertDatabaseMissing('notifications', [
             'user_id' => $regionalAdmin->id,

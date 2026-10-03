@@ -1,7 +1,7 @@
 import type { AuthUser } from '../types/auth'
 import type { AppNotification } from '../types/notification'
 import {
-  isDepartmentAdmin,
+  isDepartmentStaff,
   isFederalStaff,
   isRegionalAdmin,
   isSuperAdmin,
@@ -29,7 +29,7 @@ export function resolveNotificationRoute(
   const hrRequestId = metaString(item.meta ?? {}, 'hr_request_id')
   const federal = isSuperAdmin(user) || isFederalStaff(user)
   const regional = isRegionalAdmin(user)
-  const department = isDepartmentAdmin(user) || isViewer(user)
+  const department = isDepartmentStaff(user) || isViewer(user)
   const ictDept = Boolean(
     user.department && (user.region?.slug === 'ict' || user.region?.slug === 'federal'),
   )

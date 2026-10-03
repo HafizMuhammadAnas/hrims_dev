@@ -33,7 +33,7 @@ class UserController extends Controller
             $rows = $query
                 ->where(function ($q) use ($ictRegionId) {
                     $q->where(function ($inner) {
-                        $inner->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
+                        $inner->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'department_validator', 'viewer']))
                             ->whereHas('department.regions', fn ($r) => $r->where('slug', 'ict'));
                     })->orWhere(function ($inner) use ($ictRegionId) {
                         $inner->whereHas('roles', fn ($r) => $r->where('slug', 'federal_sub_admin'));
@@ -49,7 +49,7 @@ class UserController extends Controller
             }
             $creatorSlug = Region::query()->whereKey($creator->region_id)->value('slug');
             $rows = $query
-                ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
+                ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'department_validator', 'viewer']))
                 ->whereHas('department.regions', fn ($r) => $r->where('slug', $creatorSlug))
                 ->get();
         }
@@ -69,8 +69,8 @@ class UserController extends Controller
         $roleSlugsAllowed = $creator->hasRole('super_admin')
             ? ['federal_admin', 'regional_admin']
             : ($creator->hasRole('federal_admin')
-                ? ['department_admin', 'federal_sub_admin']
-                : ['department_admin', 'viewer']);
+                ? ['department_admin', 'department_validator', 'federal_sub_admin']
+                : ['department_admin', 'department_validator', 'viewer']);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],

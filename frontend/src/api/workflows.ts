@@ -204,6 +204,37 @@ export async function updateDepartmentTaskReview(
   return json.data
 }
 
+export async function updateDepartmentTaskValidation(
+  taskId: string,
+  body: {
+    department_validation_status: 'accepted' | 'needs-modification'
+    department_validation_comments?: string | null
+  },
+): Promise<DepartmentTaskRow> {
+  await ensureCsrfCookie()
+  const payload: {
+    department_validation_status: 'accepted' | 'needs-modification'
+    department_validation_comments?: string
+  } = {
+    department_validation_status: body.department_validation_status,
+  }
+  const comments = body.department_validation_comments?.trim()
+  if (comments) payload.department_validation_comments = comments
+
+  const res = await fetch(
+    `/api/v1/department-tasks/${encodeURIComponent(taskId)}/department-validation`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: apiJsonHeaders(),
+      body: JSON.stringify(payload),
+    },
+  )
+  await throwIfNotOk(res)
+  const json = (await res.json()) as { data: DepartmentTaskRow }
+  return json.data
+}
+
 export async function createRegionalResponse(body: {
   hr_request_id: string
   title: string

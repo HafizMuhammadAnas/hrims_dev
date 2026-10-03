@@ -28,11 +28,26 @@ class DepartmentTaskController extends Controller
     private const DEPARTMENT_INDICATOR_FORMAT = 'department_indicator_v1';
 
     /**
+     * Whether a task's response is visible to regional/federal reviewers.
+     * Internal department validation must accept first.
+     */
+    public static function isReadyForUpstreamReview(DepartmentTask $t): bool
+    {
+        if ($t->regional_review_status === 'accepted' || $t->regional_review_status === 'needs-modification') {
+            return true;
+        }
+
+        return $t->department_validation_status === 'accepted';
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    public static function serializeDepartmentTask(DepartmentTask $t, bool $redact): array
+    public static function serializeDepartmentTask(DepartmentTask $t, bool $redact, $viewer = null): array
     {
         $t->loadMissing(['region', 'department']);
+
+        $maskFromUpstream = $viewer !== null && self::shouldMaskUnvalidatedFromUpstream($viewer, $t);
 
         return [
             'id' => $t->id,
@@ -42,17 +57,42 @@ class DepartmentTaskController extends Controller
             'region_name' => $t->region?->name,
             'department_id' => $t->department?->code ?? (string) $t->department_id,
             'department_name' => $t->department?->name,
-            'status' => $t->status,
-            'regional_review_status' => $t->regional_review_status,
-            'regional_review_comments' => $t->regional_review_comments,
+            'status' => $maskFromUpstream ? 'assigned' : $t->status,
+            'department_validation_status' => $maskFromUpstream ? null : $t->department_validation_status,
+            'department_validation_comments' => $maskFromUpstream ? null : $t->department_validation_comments,
+            'regional_review_status' => $maskFromUpstream ? null : $t->regional_review_status,
+            'regional_review_comments' => $maskFromUpstream ? null : $t->regional_review_comments,
             'assigned_date' => $t->assigned_date?->format('Y-m-d'),
             'due_date' => $t->due_date?->format('Y-m-d'),
             'assignment_instructions' => $redact ? null : $t->assignment_instructions,
             'assigned_indicator_ids' => self::normalizeAssignedIndicatorIds($t->assigned_indicator_ids),
-            'submission_date' => $t->submission_date?->format('Y-m-d'),
-            'response_data' => $redact ? null : $t->response_data,
-            'attachment_url' => $redact ? null : $t->attachment_url,
+            'submission_date' => $maskFromUpstream ? null : $t->submission_date?->format('Y-m-d'),
+            'response_data' => ($redact || $maskFromUpstream) ? null : $t->response_data,
+            'attachment_url' => ($redact || $maskFromUpstream) ? null : $t->attachment_url,
         ];
+    }
+
+    /**
+     * Regional/federal must not see operator submissions until departmental validation accepts them.
+     */
+    private static function shouldMaskUnvalidatedFromUpstream($viewer, DepartmentTask $t): bool
+    {
+        if (! $viewer) {
+            return false;
+        }
+        if (HrimsAccess::isDepartmentUser($viewer)) {
+            return false;
+        }
+        if (! HrimsAccess::isSuperAdmin($viewer)
+            && ! HrimsAccess::isFederalStaff($viewer)
+            && ! $viewer->hasRole('regional_admin')) {
+            return false;
+        }
+
+        return ! self::isReadyForUpstreamReview($t) && (
+            $t->status === 'submitted'
+            || $t->submission_date !== null
+        );
     }
 
     /**
@@ -73,9 +113,9 @@ class DepartmentTaskController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function serializeTask(DepartmentTask $t, bool $redact): array
+    private function serializeTask(DepartmentTask $t, bool $redact, $viewer = null): array
     {
-        return self::serializeDepartmentTask($t, $redact);
+        return self::serializeDepartmentTask($t, $redact, $viewer ?? request()->user());
     }
 
     public function store(Request $request): JsonResponse
@@ -677,7 +717,10 @@ class DepartmentTaskController extends Controller
     private function submitLegacyDepartmentTaskResponse(Request $request, DepartmentTask $departmentTask): JsonResponse
     {
         $wasResubmit = $departmentTask->status === 'submitted'
-            && $departmentTask->regional_review_status === 'needs-modification';
+            && (
+                $departmentTask->regional_review_status === 'needs-modification'
+                || $departmentTask->department_validation_status === 'needs-modification'
+            );
 
         $data = $request->validate([
             'response_data' => ['nullable', 'string', 'max:200000'],
@@ -711,18 +754,22 @@ class DepartmentTaskController extends Controller
             app(ResponseRevisionRecorder::class)->snapshotDepartmentTask($departmentTask, $request->user());
         }
 
+        $actor = $request->user();
+        // Operator (re)submit always enters Pending Validation — validator must accept separately.
         $this->persistDepartmentTask($departmentTask, [
             'response_data' => $text !== '' ? $text : $departmentTask->response_data,
             'attachment_url' => $attachmentUrl,
             'submission_date' => now()->toDateString(),
             'status' => 'submitted',
+            'department_validation_status' => null,
+            'department_validation_comments' => null,
             'regional_review_status' => null,
             'regional_review_comments' => null,
             'pending_revision_origin' => null,
         ]);
 
         $fresh = $departmentTask->fresh(['region', 'department', 'hrRequest']);
-        app(NotificationService::class)->notifyDepartmentTaskSubmitted($fresh, $request->user(), $wasResubmit);
+        $this->notifyAfterDepartmentSubmission($fresh, $actor, $wasResubmit, false);
 
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
 
@@ -734,7 +781,10 @@ class DepartmentTaskController extends Controller
     private function submitIndicatorBundleDepartmentTaskResponse(Request $request, DepartmentTask $departmentTask): JsonResponse
     {
         $wasResubmit = $departmentTask->status === 'submitted'
-            && $departmentTask->regional_review_status === 'needs-modification';
+            && (
+                $departmentTask->regional_review_status === 'needs-modification'
+                || $departmentTask->department_validation_status === 'needs-modification'
+            );
 
         $hrRequest = $departmentTask->hrRequest;
         $issue = $hrRequest?->issue;
@@ -1024,18 +1074,22 @@ class DepartmentTaskController extends Controller
             app(ResponseRevisionRecorder::class)->snapshotDepartmentTask($departmentTask, $request->user());
         }
 
+        $actor = $request->user();
+        // Operator (re)submit always enters Pending Validation — validator must accept separately.
         $this->persistDepartmentTask($departmentTask, [
             'response_data' => json_encode($payload, JSON_UNESCAPED_SLASHES),
             'attachment_url' => null,
             'submission_date' => now()->toDateString(),
             'status' => 'submitted',
+            'department_validation_status' => null,
+            'department_validation_comments' => null,
             'regional_review_status' => null,
             'regional_review_comments' => null,
             'pending_revision_origin' => null,
         ]);
 
         $fresh = $departmentTask->fresh(['region', 'department', 'hrRequest']);
-        app(NotificationService::class)->notifyDepartmentTaskSubmitted($fresh, $request->user(), $wasResubmit);
+        $this->notifyAfterDepartmentSubmission($fresh, $actor, $wasResubmit, false);
 
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
 
@@ -1047,6 +1101,7 @@ class DepartmentTaskController extends Controller
     public function submitResponse(Request $request, DepartmentTask $departmentTask): JsonResponse
     {
         $user = $request->user();
+        // Data entry only — validators forward via updateDepartmentValidation, not submit.
         if (! $user->hasRole('department_admin') && ! $user->hasRole('viewer')) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
@@ -1063,7 +1118,10 @@ class DepartmentTaskController extends Controller
             $departmentTask->status === 'assigned'
             || (
                 $departmentTask->status === 'submitted'
-                && $departmentTask->regional_review_status === 'needs-modification'
+                && (
+                    $departmentTask->regional_review_status === 'needs-modification'
+                    || $departmentTask->department_validation_status === 'needs-modification'
+                )
             );
         if (! $maySubmit) {
             return response()->json(['message' => 'This task cannot accept a submission in its current state.'], 422);
@@ -1076,6 +1134,59 @@ class DepartmentTaskController extends Controller
         }
 
         return $this->submitLegacyDepartmentTaskResponse($request, $departmentTask);
+    }
+
+    /**
+     * Departmental validator accepts or returns a submitted response before regional/federal review.
+     */
+    public function updateDepartmentValidation(Request $request, DepartmentTask $departmentTask): JsonResponse
+    {
+        $user = $request->user();
+        if (! HrimsAccess::isDepartmentValidator($user)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        if ($user->department_id === null || (int) $user->department_id !== (int) $departmentTask->department_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        if ($user->region_id !== null && (int) $user->region_id !== (int) $departmentTask->region_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $hasResponse = $departmentTask->submission_date !== null || $departmentTask->status === 'submitted';
+        if (! $hasResponse) {
+            return response()->json(['message' => 'This task has no departmental response yet.'], 422);
+        }
+        if ($departmentTask->regional_review_status === 'needs-modification') {
+            return response()->json([
+                'message' => 'Wait for the data entry operator to resubmit before validating again.',
+            ], 422);
+        }
+        if ($departmentTask->department_validation_status !== null) {
+            return response()->json(['message' => 'Only responses awaiting validation can be reviewed here.'], 422);
+        }
+
+        $data = $request->validate([
+            'department_validation_status' => ['required', 'in:accepted,needs-modification'],
+            'department_validation_comments' => ['nullable', 'string', 'max:20000'],
+        ]);
+
+        $this->persistDepartmentTask($departmentTask, [
+            'department_validation_status' => $data['department_validation_status'],
+            'department_validation_comments' => $data['department_validation_comments'] ?? null,
+        ]);
+
+        $fresh = $departmentTask->fresh(['region', 'department', 'hrRequest']) ?? $departmentTask;
+        if ($data['department_validation_status'] === 'accepted') {
+            app(NotificationService::class)->notifyDepartmentTaskSubmitted($fresh, $user, false);
+        } else {
+            app(NotificationService::class)->notifyDepartmentTaskValidationReturned($fresh, $user);
+        }
+
+        $redact = HrimsAccess::redactDepartmentTaskPayloadFor($user);
+
+        return response()->json([
+            'data' => $this->serializeTask($fresh, $redact),
+        ]);
     }
 
     public function updateReview(Request $request, DepartmentTask $departmentTask): JsonResponse
@@ -1094,6 +1205,11 @@ class DepartmentTaskController extends Controller
         $hasResponse = $departmentTask->submission_date !== null || $departmentTask->status === 'submitted';
         if (! $hasResponse) {
             return response()->json(['message' => 'This task has no departmental response yet.'], 422);
+        }
+        if ($departmentTask->department_validation_status !== 'accepted') {
+            return response()->json([
+                'message' => 'This response must be validated by the departmental validator before regional/federal review.',
+            ], 422);
         }
 
         $data = $request->validate([
@@ -1116,6 +1232,9 @@ class DepartmentTaskController extends Controller
         // 2026_08_05_070000 still lack that column, and writing null 500s the review.
         if ($data['regional_review_status'] === 'needs-modification') {
             $reviewAttributes['pending_revision_origin'] = $pendingOrigin;
+            // Clear department validation so operator → validator cycle repeats after regional return.
+            $reviewAttributes['department_validation_status'] = null;
+            $reviewAttributes['department_validation_comments'] = null;
         }
 
         try {
@@ -1206,7 +1325,7 @@ class DepartmentTaskController extends Controller
         if ($user->hasRole('regional_admin') && $user->region_id !== null) {
             return (int) $user->region_id === (int) $departmentTask->region_id;
         }
-        if (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
+        if (($user->hasRole('department_admin') || $user->hasRole('department_validator') || $user->hasRole('viewer')) && $user->department_id) {
             if ((int) $user->department_id !== (int) $departmentTask->department_id) {
                 return false;
             }
@@ -1240,8 +1359,8 @@ class DepartmentTaskController extends Controller
                 $query->whereHas('region', fn ($q) => $q->whereIn('slug', ['ict', 'federal']));
             }
         }
-        // Department admin/viewer see only their department tasks
-        elseif (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
+        // Department operator/validator/viewer see only their department tasks
+        elseif (($user->hasRole('department_admin') || $user->hasRole('department_validator') || $user->hasRole('viewer')) && $user->department_id) {
             $query->where('department_id', $user->department_id);
             if ($user->region_id) {
                 $query->where('region_id', $user->region_id);
@@ -1261,7 +1380,7 @@ class DepartmentTaskController extends Controller
         $redact = HrimsAccess::redactDepartmentTaskPayloadFor($user);
 
         return response()->json([
-            'data' => $rows->map(fn (DepartmentTask $t) => $this->serializeTask($t, $redact)),
+            'data' => $rows->map(fn (DepartmentTask $t) => $this->serializeTask($t, $redact, $user)),
         ]);
     }
 
@@ -1277,10 +1396,16 @@ class DepartmentTaskController extends Controller
         try {
             $departmentTask->update($attributes);
         } catch (QueryException $e) {
-            if (! $this->queryExceptionMentionsUnknownColumn($e, 'pending_revision_origin')) {
+            $retried = false;
+            foreach (['pending_revision_origin', 'department_validation_status', 'department_validation_comments', 'due_date'] as $column) {
+                if ($this->queryExceptionMentionsUnknownColumn($e, $column) && array_key_exists($column, $attributes)) {
+                    unset($attributes[$column]);
+                    $retried = true;
+                }
+            }
+            if (! $retried) {
                 throw $e;
             }
-            unset($attributes['pending_revision_origin']);
             $departmentTask->update($attributes);
         }
     }
@@ -1291,17 +1416,24 @@ class DepartmentTaskController extends Controller
      */
     private function withoutUnknownDepartmentTaskColumns(array $attributes): array
     {
-        if (! array_key_exists('pending_revision_origin', $attributes)) {
-            return $attributes;
-        }
+        $optional = [
+            'pending_revision_origin',
+            'department_validation_status',
+            'department_validation_comments',
+            'due_date',
+        ];
 
-        try {
-            if (! Schema::hasColumn('department_tasks', 'pending_revision_origin')) {
-                unset($attributes['pending_revision_origin']);
+        foreach ($optional as $column) {
+            if (! array_key_exists($column, $attributes)) {
+                continue;
             }
-        } catch (\Throwable) {
-            // Restricted DB users cannot always inspect information_schema.
-            unset($attributes['pending_revision_origin']);
+            try {
+                if (! Schema::hasColumn('department_tasks', $column)) {
+                    unset($attributes[$column]);
+                }
+            } catch (\Throwable) {
+                // Keep the attribute; QueryException retry in persistDepartmentTask strips only on unknown-column errors.
+            }
         }
 
         return $attributes;
@@ -1313,6 +1445,21 @@ class DepartmentTaskController extends Controller
 
         return str_contains($message, "Unknown column '{$column}'")
             || str_contains($message, 'Unknown column `'.$column.'`');
+    }
+
+    private function notifyAfterDepartmentSubmission(
+        DepartmentTask $task,
+        $actor,
+        bool $wasResubmit,
+        bool $validationAccepted,
+    ): void {
+        $notifications = app(NotificationService::class);
+        if ($validationAccepted) {
+            $notifications->notifyDepartmentTaskSubmitted($task, $actor, $wasResubmit);
+
+            return;
+        }
+        $notifications->notifyDepartmentTaskPendingValidation($task, $actor, $wasResubmit);
     }
 
     /**

@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class DepartmentUsersSeeder extends Seeder
 {
     /**
-     * Creates one active department_admin per department linked to a region (pivot row).
+     * Creates one active departmental data entry operator (slug: department_admin) per department–region.
      * Password for all: {@see DevUserSeeder} same convention — `password` (change in production).
      *
      * Username pattern: `{region_slug}_{department_code}` with hyphens in code turned into underscores,

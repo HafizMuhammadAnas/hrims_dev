@@ -18,7 +18,7 @@ export function isIctRegionalResponseRow(r: {
   return name === 'ict' || name === 'federal'
 }
 
-/** Department admin on the ICT / national-line (not a provincial region). */
+/** Departmental data entry operator on the ICT / national-line (not a provincial region). */
 export function isIctDepartmentPortalUser(
   user: { region?: { slug?: string | null } | null; department?: unknown } | null,
 ): boolean {

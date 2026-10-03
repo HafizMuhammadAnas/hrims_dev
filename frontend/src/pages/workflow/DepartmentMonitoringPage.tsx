@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { fetchDepartmentTasks, type DepartmentTaskRow } from '../../api/lists'
 import { Button } from '../../components/ui/Button'
 import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
@@ -14,11 +14,12 @@ import { derivePaginatedRows, useClientTableState } from '../../hooks/useClientT
 import { formatAppDate } from '../../lib/dateFormat'
 import {
   countDepartmentTasksByWorkflow,
+  upstreamRevisionLabelForScope,
   workflowPresentation,
 } from '../../lib/departmentTaskWorkflow'
 import {
   filterDepartmentTasks,
-  WORKFLOW_BUCKET_FILTER_OPTIONS,
+  upstreamWorkflowBucketFilterOptions,
 } from '../../lib/departmentTaskTableFilters'
 import { LABEL_TOTAL_TASKS } from '../../lib/uiLabels'
 type Props = {
@@ -27,7 +28,14 @@ type Props = {
 
 export function DepartmentMonitoringPage({ title }: Props) {
   const navigate = useNavigate()
-  const federalIctScope = title.toLowerCase().includes('federal')
+  const location = useLocation()
+  const federalIctScope = location.pathname.includes('federal-department')
+  const upstreamScope = federalIctScope ? 'federal-ict' : 'regional'
+  const revisionLabel = upstreamRevisionLabelForScope(upstreamScope)
+  const statusFilterOptions = useMemo(
+    () => upstreamWorkflowBucketFilterOptions(upstreamScope),
+    [upstreamScope],
+  )
   const fromPath = federalIctScope ? '/federal-department-requests' : '/region-monitoring'
   const fromParam = encodeURIComponent(fromPath)
   const [rows, setRows] = useState<DepartmentTaskRow[]>([])
@@ -73,7 +81,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
             { label: LABEL_TOTAL_TASKS, value: filtered.length },
             { label: 'Pending', value: workflowCounts.in_process },
             { label: 'Under Review', value: workflowCounts.responded },
-            { label: 'Revision', value: workflowCounts.revision },
+            { label: revisionLabel, value: workflowCounts.revision },
             { label: 'Accepted', value: workflowCounts.accepted },
           ]}
         />
@@ -92,7 +100,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
           onChange={(e) => setFilter('workflow', e.target.value)}
           aria-label="Filter by status"
         >
-          {WORKFLOW_BUCKET_FILTER_OPTIONS.map((opt) => (
+          {statusFilterOptions.map((opt) => (
             <option key={opt.value || 'all'} value={opt.value}>
               {opt.label}
             </option>

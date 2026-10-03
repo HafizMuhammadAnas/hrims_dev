@@ -19,6 +19,7 @@ import {
   fetchDepartments,
   submitDepartmentTaskResponse,
   updateDepartmentTaskReview,
+  updateDepartmentTaskValidation,
   type DepartmentRow,
 } from '../api/workflows'
 import { useAuth } from '../auth/AuthContext'
@@ -112,12 +113,21 @@ import {
   canDepartmentSubmitResponse,
   canRequestDepartmentTaskModification,
   canShowDepartmentTaskReviewActions,
+  canValidateDepartmentResponse,
   departmentTaskWorkflowBucket,
   hasDepartmentResponse,
+  isPendingDepartmentValidation,
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
 import { loiMetadataLoadErrorPageMessage } from '../lib/issueEntryKind'
-import { isDepartmentAdmin, isFederalStaff, isRegionalAdmin, isViewer } from '../lib/roles'
+import {
+  isDepartmentStaff,
+  isDepartmentAdmin,
+  isDepartmentValidator,
+  isFederalStaff,
+  isRegionalAdmin,
+  isViewer,
+} from '../lib/roles'
 import { indicatorsScopedToDepartmentTask, indicatorsScopedToRequest, indicatorOrdinalsForRequest } from '../lib/hrRequestIndicatorScope'
 import { reviewFeedbackLabelForTask } from '../lib/ictRegion'
 import type { AuthUser } from '../types/auth'
@@ -190,7 +200,10 @@ export function HrRequestViewPage() {
   const lockedRegionId = hrRequestLockedRegionId(user)
   const regionalUser = isRegionalAdmin(user)
   const deptUser =
+    (isDepartmentStaff(user) || isViewer(user)) && user?.department != null
+  const deptOperator =
     (isDepartmentAdmin(user) || isViewer(user)) && user?.department != null
+  const deptValidator = isDepartmentValidator(user) && user?.department != null
 
   const [regions, setRegions] = useState<RegionRow[]>([])
   const [districts, setDistricts] = useState<DistrictRow[]>([])
@@ -578,7 +591,7 @@ export function HrRequestViewPage() {
   }
 
   const showDeptResponseForm =
-    deptUser &&
+    deptOperator &&
     detail &&
     !detailLoading &&
     activeTask &&
@@ -590,7 +603,7 @@ export function HrRequestViewPage() {
     !detailLoading &&
     activeTask &&
     hasDepartmentResponse(activeTask) &&
-    !canDepartmentSubmitResponse(activeTask)
+    !(deptOperator && canDepartmentSubmitResponse(activeTask))
 
   async function assignSelectedDepartments() {
     if (!detail) return
@@ -998,6 +1011,9 @@ export function HrRequestViewPage() {
       hasDepartmentResponse(activeTask) &&
       monitorReviewBucket === 'revision',
   )
+  const showDeptValidationActions = Boolean(
+    deptValidator && activeTask && canValidateDepartmentResponse(activeTask),
+  )
 
   async function submitMonitorReview(status: 'accepted' | 'needs-modification') {
     if (!activeTask) return
@@ -1014,6 +1030,27 @@ export function HrRequestViewPage() {
       setReviewFeedback({
         kind: 'error',
         message: e instanceof Error ? e.message : 'Could not save review',
+      })
+    } finally {
+      setSavingReview(false)
+    }
+  }
+
+  async function submitDepartmentValidation(status: 'accepted' | 'needs-modification') {
+    if (!activeTask) return
+    setSavingReview(true)
+    setReviewFeedback(null)
+    try {
+      await updateDepartmentTaskValidation(activeTask.id, {
+        department_validation_status: status,
+        department_validation_comments: reviewComments.trim() || null,
+      })
+      setReviewComments('')
+      await reloadTasksAndDepartments()
+    } catch (e: unknown) {
+      setReviewFeedback({
+        kind: 'error',
+        message: e instanceof Error ? e.message : 'Could not save validation',
       })
     } finally {
       setSavingReview(false)
@@ -1265,6 +1302,20 @@ export function HrRequestViewPage() {
                           <strong>{taskReviewFeedbackLabel}:</strong> {activeTask.regional_review_comments}
                         </p>
                       ) : null}
+                      {activeTask.department_validation_comments?.trim() &&
+                      activeTask.department_validation_status === 'needs-modification' ? (
+                        <p className="muted small" style={{ margin: '0 0 12px' }}>
+                          <strong>Validator feedback:</strong> {activeTask.department_validation_comments}
+                        </p>
+                      ) : null}
+                      {isPendingDepartmentValidation(activeTask) && !deptValidator ? (
+                        <Alert variant="info" title="Awaiting departmental validation" className="hr-request-dept-portal-tabs__review-outcome">
+                          <p style={{ margin: 0 }}>
+                            Your response was submitted and is waiting for the departmental validator to approve it
+                            before regional/federal review.
+                          </p>
+                        </Alert>
+                      ) : null}
                       <DepartmentResponseDisplay
                         responseData={activeTask.response_data}
                         attachmentUrl={activeTask.attachment_url}
@@ -1272,6 +1323,51 @@ export function HrRequestViewPage() {
                         issueIndicators={detail?.issue?.indicators}
                         locationRegionIds={[activeTask.region_id]}
                       />
+                      {showDeptValidationActions ? (
+                        <div style={{ marginTop: 20 }}>
+                          <div className="form-row">
+                            <label htmlFor="dept-validation-comments">
+                              Notes to data entry operator (optional)
+                            </label>
+                            <textarea
+                              id="dept-validation-comments"
+                              rows={4}
+                              value={reviewComments}
+                              onChange={(e) => {
+                                setReviewComments(e.target.value)
+                                if (reviewFeedback) setReviewFeedback(null)
+                              }}
+                              style={{ width: '100%', boxSizing: 'border-box' }}
+                            />
+                          </div>
+                          <WorkflowActionFootback
+                            feedback={reviewFeedback}
+                            onDismiss={() => setReviewFeedback(null)}
+                            className="workflow-action-footback workflow-monitor-review-actions"
+                            style={{ marginTop: 12 }}
+                          >
+                            <Button
+                              variant="primary"
+                              compact
+                              disabled={savingReview}
+                              onClick={() => {
+                                setReviewFeedback(null)
+                                void submitDepartmentValidation('accepted')
+                              }}
+                            >
+                              {savingReview ? 'Saving…' : 'Validate & forward'}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              compact
+                              disabled={savingReview}
+                              onClick={() => void submitDepartmentValidation('needs-modification')}
+                            >
+                              Return for correction
+                            </Button>
+                          </WorkflowActionFootback>
+                        </div>
+                      ) : null}
                       {showMonitorReviewActions ? (
                         <div style={{ marginTop: 20 }}>
                           <div className="form-row">

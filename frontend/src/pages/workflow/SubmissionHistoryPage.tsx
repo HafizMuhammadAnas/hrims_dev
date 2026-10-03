@@ -20,15 +20,16 @@ import { sortRowsLatestFirst } from '../../lib/tableRowSort'
 import {
   countDepartmentTasksByWorkflow,
   hasDepartmentResponse,
+  upstreamRevisionLabelForScope,
   workflowPresentation,
 } from '../../lib/departmentTaskWorkflow'
 import {
   filterDepartmentTasks,
-  WORKFLOW_BUCKET_FILTER_OPTIONS,
+  workflowBucketFilterOptions,
 } from '../../lib/departmentTaskTableFilters'
-import { isIctRegionalResponseRow } from '../../lib/ictRegion'
+import { isIctDepartmentPortalUser, isIctRegionalResponseRow } from '../../lib/ictRegion'
 import { regionalResponseReviewPresentation } from '../../lib/regionalResponseReviewStatus'
-import { isDepartmentAdmin, isFederalStaff, isRegionalAdmin, isViewer } from '../../lib/roles'
+import { isDepartmentStaff, isFederalStaff, isRegionalAdmin, isViewer } from '../../lib/roles'
 import { regionalCompilationViewPath } from '../../lib/workflowNavigation'
 
 const REVIEW_STATUSES = ['pending', 'accepted', 'needs-modification'] as const
@@ -43,7 +44,14 @@ export function SubmissionHistoryPage({ title }: Props) {
   const location = useLocation()
   const regional = isRegionalAdmin(user)
   const deptHistoryUser =
-    (isDepartmentAdmin(user) || isViewer(user)) && user?.department != null
+    (isDepartmentStaff(user) || isViewer(user)) && user?.department != null
+  const revisionLabel = upstreamRevisionLabelForScope(
+    isIctDepartmentPortalUser(user) ? 'federal-ict' : 'regional',
+  )
+  const deptStatusFilterOptions = useMemo(
+    () => workflowBucketFilterOptions({ upstreamRevisionLabel: revisionLabel }),
+    [revisionLabel],
+  )
   const [rows, setRows] = useState<RegionalResponseRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -140,8 +148,10 @@ export function SubmissionHistoryPage({ title }: Props) {
               items={[
                 { label: 'Submitted', value: filteredDeptTasks.length },
                 { label: 'Pending', value: deptWorkflowCounts.in_process },
+                { label: 'Pending Validation', value: deptWorkflowCounts.pending_validation },
+                { label: 'Validator Revision', value: deptWorkflowCounts.validator_revision },
                 { label: 'Under Review', value: deptWorkflowCounts.responded },
-                { label: 'Revision', value: deptWorkflowCounts.revision },
+                { label: revisionLabel, value: deptWorkflowCounts.revision },
                 { label: 'Accepted', value: deptWorkflowCounts.accepted },
               ]}
             />
@@ -160,7 +170,7 @@ export function SubmissionHistoryPage({ title }: Props) {
               onChange={(e) => deptTable.setFilter('workflow', e.target.value)}
               aria-label="Filter by status"
             >
-              {WORKFLOW_BUCKET_FILTER_OPTIONS.map((opt) => (
+              {deptStatusFilterOptions.map((opt) => (
                 <option key={opt.value || 'all'} value={opt.value}>
                   {opt.label}
                 </option>

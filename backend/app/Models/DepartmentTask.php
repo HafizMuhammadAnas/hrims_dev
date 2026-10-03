@@ -17,6 +17,8 @@ class DepartmentTask extends Model
         'region_id',
         'department_id',
         'status',
+        'department_validation_status',
+        'department_validation_comments',
         'regional_review_status',
         'regional_review_comments',
         'pending_revision_origin',

@@ -209,9 +209,18 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
             items={[
               { label: 'Departments Distributed', value: selectedTasks.length },
               { label: 'Pending Submission', value: workflowCounts.in_process },
-              { label: 'Pending Regional Review', value: workflowCounts.responded },
-              { label: 'Resubmission Requested', value: workflowCounts.revision },
-              { label: 'Accepted by Region', value: workflowCounts.accepted },
+              {
+                label: ictScope ? 'Pending Federal Review' : 'Pending Regional Review',
+                value: workflowCounts.responded,
+              },
+              {
+                label: ictScope ? 'Federal Revision' : 'Regional Revision',
+                value: workflowCounts.revision,
+              },
+              {
+                label: ictScope ? 'Accepted by Federal' : 'Accepted by Region',
+                value: workflowCounts.accepted,
+              },
             ]}
           />
         </div>

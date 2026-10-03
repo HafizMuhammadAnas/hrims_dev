@@ -15,7 +15,7 @@ import {
 } from '../api/hrRequests'
 import type { RegionRow } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
-import { isDepartmentAdmin, isFederalStaff, isViewer } from '../lib/roles'
+import { isDepartmentStaff, isFederalStaff, isViewer } from '../lib/roles'
 import { sortCollectionYearsByLabelValue } from '../lib/collectionYearSort'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
 import {
@@ -372,7 +372,7 @@ export function HrRequestModal({
   const { user: authUser } = useAuth()
   const portalDeptViewer = Boolean(
     authUser &&
-      (isDepartmentAdmin(authUser) || isViewer(authUser)) &&
+      (isDepartmentStaff(authUser) || isViewer(authUser)) &&
       authUser.department != null,
   )
   const canUseOtherIssues = isFederalStaff(authUser)

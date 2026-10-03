@@ -24,6 +24,7 @@ import { useNotify } from '../context/NotificationsContext'
 import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTableState'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
 import { LABEL_CREATE_ADMIN, LABEL_CREATE_USER, LABEL_EDIT_USER, LABEL_USER_MANAGEMENT } from '../lib/uiLabels'
+import { formatRoleSlugLabel, formatUserRolesLabel } from '../lib/userDisplayLabels'
 import { isSuperAdmin, isFederalSubAdmin } from '../lib/roles'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import {
@@ -35,9 +36,17 @@ import {
 } from '../lib/usersMgmtNavigation'
 import type { AuthUser } from '../types/auth'
 
-type RoleSlug = 'federal_admin' | 'regional_admin' | 'department_admin' | 'federal_sub_admin' | 'viewer'
+type RoleSlug =
+  | 'federal_admin'
+  | 'regional_admin'
+  | 'department_admin'
+  | 'department_validator'
+  | 'federal_sub_admin'
+  | 'viewer'
 
 const ADMIN_ROLE_SLUGS = ['federal_admin', 'federal_sub_admin', 'regional_admin'] as const
+/** Default temporary password prefilled when creating a user. */
+const DEFAULT_NEW_USER_PASSWORD = 'password'
 
 export function UserManagementPage() {
   const location = useLocation()
@@ -68,7 +77,7 @@ export function UserManagementPage() {
     name: '',
     username: '',
     email: '',
-    password: '',
+    password: DEFAULT_NEW_USER_PASSWORD,
     role_slug: 'department_admin' as RoleSlug,
     region_id: '',
     department_id: '',
@@ -104,8 +113,9 @@ export function UserManagementPage() {
   }, [superUser])
 
   async function submit() {
-    if (!form.name || !form.username || !form.password) {
-      setError('Name, username, and password are required.')
+    const password = form.password.trim() || DEFAULT_NEW_USER_PASSWORD
+    if (!form.name || !form.username) {
+      setError('Name and username are required.')
       return
     }
     if (!form.email.trim()) {
@@ -132,7 +142,7 @@ export function UserManagementPage() {
             name: form.name,
             username: form.username,
             email,
-            password: form.password,
+            password,
             role_slug: 'federal_admin',
             region_id: null,
             department_id: null,
@@ -142,7 +152,7 @@ export function UserManagementPage() {
             name: form.name,
             username: form.username,
             email,
-            password: form.password,
+            password,
             role_slug: 'regional_admin',
             region_id: Number(form.region_id),
             department_id: null,
@@ -153,7 +163,7 @@ export function UserManagementPage() {
           name: form.name,
           username: form.username,
           email,
-          password: form.password,
+          password,
           role_slug: 'federal_sub_admin',
           region_id: null,
           department_id: null,
@@ -163,8 +173,8 @@ export function UserManagementPage() {
           name: form.name,
           username: form.username,
           email,
-          password: form.password,
-          role_slug: form.role_slug as 'department_admin' | 'viewer',
+          password,
+          role_slug: form.role_slug as 'department_admin' | 'department_validator' | 'viewer',
           department_id: Number(form.department_id),
         })
       }
@@ -172,7 +182,7 @@ export function UserManagementPage() {
         name: '',
         username: '',
         email: '',
-        password: '',
+        password: DEFAULT_NEW_USER_PASSWORD,
         role_slug: superUser ? 'federal_admin' : 'department_admin',
         region_id: '',
         department_id: '',
@@ -332,7 +342,7 @@ export function UserManagementPage() {
               <p className="muted" style={{ marginTop: 0 }}>
                 Username: <strong>{editingUser.username}</strong>
                 {' | '}
-                Role: {editingUser.roles.map((r) => r.slug).join(', ')}
+                Role: {formatUserRolesLabel(editingUser.roles)}
               </p>
               <FormGrid>
                 <FormRow twoCol>
@@ -406,7 +416,7 @@ export function UserManagementPage() {
           <option value="">All roles</option>
           {roleOptions.map((role) => (
             <option key={role} value={role}>
-              {role}
+              {formatRoleSlugLabel(role)}
             </option>
           ))}
         </select>
@@ -449,7 +459,7 @@ export function UserManagementPage() {
               <tr key={u.id}>
                 <td>{u.name}</td>
                 <td>{u.username}</td>
-                <td>{u.roles.map((r) => r.slug).join(', ')}</td>
+                <td>{formatUserRolesLabel(u.roles)}</td>
                 <td>{u.region?.name ?? '-'}</td>
                 {!superUser ? <td>{u.department?.name ?? '-'}</td> : null}
                 <td>
@@ -530,6 +540,7 @@ export function UserManagementPage() {
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder={DEFAULT_NEW_USER_PASSWORD}
                 />
               </FormControl>
             </FormRow>
@@ -548,9 +559,14 @@ export function UserManagementPage() {
                 >
                   {superUser && <option value="federal_admin">Federal admin</option>}
                   {superUser && <option value="regional_admin">Regional admin</option>}
-                  {!superUser && <option value="department_admin">Department admin</option>}
+                  {!superUser && (
+                    <option value="department_admin">Departmental data entry operator</option>
+                  )}
+                  {!superUser && (
+                    <option value="department_validator">Departmental validator</option>
+                  )}
                   {!superUser && federalPortal && (
-                    <option value="federal_sub_admin">Federal sub admin</option>
+                    <option value="federal_sub_admin">Federal sub user</option>
                   )}
                   {!superUser && !federalPortal && <option value="viewer">Viewer</option>}
                 </select>

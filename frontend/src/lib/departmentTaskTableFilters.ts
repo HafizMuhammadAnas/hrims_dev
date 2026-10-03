@@ -5,13 +5,33 @@ import {
 } from './departmentTaskWorkflow'
 import { pickActivityTimestamp, sortRowsLatestFirst } from './tableRowSort'
 
-export const WORKFLOW_BUCKET_FILTER_OPTIONS: { value: DepartmentTaskWorkflowBucket | ''; label: string }[] = [
-  { value: '', label: 'All statuses' },
-  { value: 'in_process', label: 'Pending' },
-  { value: 'responded', label: 'Under Review' },
-  { value: 'revision', label: 'Revision' },
-  { value: 'accepted', label: 'Accepted' },
-]
+export function workflowBucketFilterOptions(opts?: {
+  upstreamRevisionLabel?: string
+}): { value: DepartmentTaskWorkflowBucket | ''; label: string }[] {
+  const revisionLabel = opts?.upstreamRevisionLabel ?? 'Regional Revision'
+  return [
+    { value: '', label: 'All statuses' },
+    { value: 'in_process', label: 'Pending' },
+    { value: 'pending_validation', label: 'Pending Validation' },
+    { value: 'validator_revision', label: 'Validator Revision' },
+    { value: 'responded', label: 'Under Review' },
+    { value: 'revision', label: revisionLabel },
+    { value: 'accepted', label: 'Accepted' },
+  ]
+}
+
+export const WORKFLOW_BUCKET_FILTER_OPTIONS = workflowBucketFilterOptions()
+
+/** Filters shown on regional/federal monitoring (internal validation stages hidden). */
+export function upstreamWorkflowBucketFilterOptions(scope: 'regional' | 'federal-ict') {
+  const revisionLabel = scope === 'federal-ict' ? 'Federal Revision' : 'Regional Revision'
+  return workflowBucketFilterOptions({ upstreamRevisionLabel: revisionLabel }).filter(
+    (opt) => opt.value !== 'pending_validation' && opt.value !== 'validator_revision',
+  )
+}
+
+/** @deprecated Prefer upstreamWorkflowBucketFilterOptions(scope) */
+export const UPSTREAM_WORKFLOW_BUCKET_FILTER_OPTIONS = upstreamWorkflowBucketFilterOptions('regional')
 
 export function departmentTaskMatchesWorkflowFilter(
   task: DepartmentTaskRow,

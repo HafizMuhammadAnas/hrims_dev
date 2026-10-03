@@ -11,7 +11,13 @@ export type UserCreateInput = {
   username: string
   email: string
   password: string
-  role_slug: 'federal_admin' | 'regional_admin' | 'department_admin' | 'federal_sub_admin' | 'viewer'
+  role_slug:
+    | 'federal_admin'
+    | 'regional_admin'
+    | 'department_admin'
+    | 'department_validator'
+    | 'federal_sub_admin'
+    | 'viewer'
   region_id?: number | null
   department_id?: number | null
 }

@@ -26,6 +26,19 @@ final class HrimsAccess
         return $user->hasRole('federal_admin') || $user->hasRole('federal_sub_admin');
     }
 
+    /** Department operator, validator, or legacy viewer with a department. */
+    public static function isDepartmentUser(User $user): bool
+    {
+        return $user->hasRole('department_admin')
+            || $user->hasRole('department_validator')
+            || $user->hasRole('viewer');
+    }
+
+    public static function isDepartmentValidator(User $user): bool
+    {
+        return $user->hasRole('department_validator');
+    }
+
     public static function seesAllRegions(User $user): bool
     {
         return self::isSuperAdmin($user) || self::isFederalStaff($user);
@@ -40,7 +53,7 @@ final class HrimsAccess
             return null;
         }
 
-        if ($user->hasRole('department_admin') || $user->hasRole('viewer')) {
+        if (self::isDepartmentUser($user)) {
             return null;
         }
 
@@ -74,7 +87,7 @@ final class HrimsAccess
             return;
         }
 
-        if (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
+        if (self::isDepartmentUser($user) && $user->department_id) {
             $ids = self::hrRequestIdsForDepartmentUser($user);
             if ($ids === []) {
                 $query->whereRaw('1 = 0');
@@ -122,7 +135,7 @@ final class HrimsAccess
                 || $model->regions()->where('regions.id', $rid)->exists();
         }
 
-        if (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
+        if (self::isDepartmentUser($user) && $user->department_id) {
             return DepartmentTask::query()
                 ->where('department_id', $user->department_id)
                 ->where('hr_request_id', $model->id)

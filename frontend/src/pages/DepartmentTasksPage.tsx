@@ -16,11 +16,12 @@ import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTabl
 import { formatAppDate } from '../lib/dateFormat'
 import {
   countDepartmentTasksByWorkflow,
+  upstreamRevisionLabelForScope,
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
 import {
   filterDepartmentTasks,
-  WORKFLOW_BUCKET_FILTER_OPTIONS,
+  workflowBucketFilterOptions,
 } from '../lib/departmentTaskTableFilters'
 import { isIctDepartmentPortalUser } from '../lib/ictRegion'
 
@@ -28,6 +29,11 @@ export function DepartmentTasksPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const ictDeptPortal = isIctDepartmentPortalUser(user)
+  const revisionLabel = upstreamRevisionLabelForScope(ictDeptPortal ? 'federal-ict' : 'regional')
+  const statusFilterOptions = useMemo(
+    () => workflowBucketFilterOptions({ upstreamRevisionLabel: revisionLabel }),
+    [revisionLabel],
+  )
   const [rows, setRows] = useState<DepartmentTaskRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
@@ -68,8 +74,10 @@ export function DepartmentTasksPage() {
           items={[
             { label: LABEL_TOTAL_TASKS, value: filtered.length },
             { label: 'Pending', value: workflowCounts.in_process },
+            { label: 'Pending Validation', value: workflowCounts.pending_validation },
+            { label: 'Validator Revision', value: workflowCounts.validator_revision },
             { label: 'Under Review', value: workflowCounts.responded },
-            { label: 'Revision', value: workflowCounts.revision },
+            { label: revisionLabel, value: workflowCounts.revision },
             { label: 'Accepted', value: workflowCounts.accepted },
           ]}
         />
@@ -88,7 +96,7 @@ export function DepartmentTasksPage() {
           onChange={(e) => setFilter('workflow', e.target.value)}
           aria-label="Filter by status"
         >
-          {WORKFLOW_BUCKET_FILTER_OPTIONS.map((opt) => (
+          {statusFilterOptions.map((opt) => (
             <option key={opt.value || 'all'} value={opt.value}>
               {opt.label}
             </option>
