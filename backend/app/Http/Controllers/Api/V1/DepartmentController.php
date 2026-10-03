@@ -12,8 +12,6 @@ use Illuminate\Validation\ValidationException;
 
 class DepartmentController extends Controller
 {
-    private const MANAGE_REGION_SLUGS = ['ict', 'federal', 'punjab', 'sindh', 'balochistan', 'kpk', 'gb', 'ajk'];
-
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -149,6 +147,7 @@ class DepartmentController extends Controller
     private function manageableRegionIdsFor($user): array
     {
         if ($user->hasRole('federal_admin')) {
+            // National/ICT departments: resolve from DB (legacy slug "federal" still accepted).
             return Region::query()
                 ->whereIn('slug', ['ict', 'federal'])
                 ->pluck('id')
@@ -159,16 +158,12 @@ class DepartmentController extends Controller
             if ($user->region_id === null) {
                 return [];
             }
-            $slug = Region::query()->whereKey($user->region_id)->value('slug');
-            if (! $slug || ! in_array($slug, self::MANAGE_REGION_SLUGS, true)) {
+            // Any region that exists in the catalog for this user — no hardcoded slug allowlist.
+            if (! Region::query()->whereKey($user->region_id)->exists()) {
                 return [];
             }
 
-            return Region::query()
-                ->where('slug', $slug)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+            return [(int) $user->region_id];
         }
 
         return [];

@@ -293,7 +293,7 @@ export function FederalRequestManagementPage() {
       <TableToolbar className="hr-requests-toolbar">
         <input
           type="search"
-          placeholder="Search ID, title, convention/cycle, region…"
+          placeholder="Search ID, title, convention/UPR, region…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search requests"
@@ -308,11 +308,11 @@ export function FederalRequestManagementPage() {
               convention_cycle: '',
             }))
           }}
-          aria-label="Filter by convention or cycle type"
+          aria-label="Filter by convention or UPR"
         >
-          <option value="">Convention / Cycle</option>
+          <option value="">Convention / UPR</option>
           <option value="convention">Convention</option>
-          <option value="cycle">Cycle</option>
+          <option value="cycle">UPR</option>
         </select>
         {conventionCycleKind ? (
           <select
@@ -321,11 +321,11 @@ export function FederalRequestManagementPage() {
             aria-label={
               conventionCycleKind === 'convention'
                 ? 'Filter by convention name'
-                : 'Filter by UPR cycle name'
+                : 'Filter by UPR'
             }
           >
             <option value="">
-              {conventionCycleKind === 'convention' ? 'All conventions' : 'All cycles'}
+              {conventionCycleKind === 'convention' ? 'All conventions' : 'All UPRs'}
             </option>
             {secondaryFilterOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -370,7 +370,7 @@ export function FederalRequestManagementPage() {
                 <tr>
                   <th>ID</th>
                   <th>Title</th>
-                  <th>Convention/Cycle</th>
+                  <th>Convention/UPR</th>
                   <th>Region(s)</th>
                   <th>Due</th>
                   <th>Status</th>

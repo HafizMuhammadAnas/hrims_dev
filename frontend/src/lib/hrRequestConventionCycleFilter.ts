@@ -28,7 +28,7 @@ export function rowMatchesConventionOrCycleValue(row: HrRequestRow, selected: st
   return conv === needle || upr === needle || code === needle || name === needle
 }
 
-/** Apply kind (Convention / Cycle) plus optional specific name filter. */
+/** Apply kind (Convention / UPR) plus optional specific name filter. */
 export function rowMatchesConventionCycleFilters(
   row: HrRequestRow,
   kind: ConventionCycleKindFilter | string,

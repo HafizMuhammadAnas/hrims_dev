@@ -255,7 +255,7 @@ export function ReceivedRequestsPage({
       <TableToolbar className="active-requests-toolbar">
         <input
           type="search"
-          placeholder="Search ID, title, convention/cycle, date..."
+          placeholder="Search ID, title, convention/UPR, date..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search active requests"
@@ -270,11 +270,11 @@ export function ReceivedRequestsPage({
               convention_cycle: '',
             }))
           }}
-          aria-label="Filter by convention or cycle type"
+          aria-label="Filter by convention or UPR"
         >
-          <option value="">Convention / Cycle</option>
+          <option value="">Convention / UPR</option>
           <option value="convention">Convention</option>
-          <option value="cycle">Cycle</option>
+          <option value="cycle">UPR</option>
         </select>
         {conventionCycleKind ? (
           <select
@@ -283,11 +283,11 @@ export function ReceivedRequestsPage({
             aria-label={
               conventionCycleKind === 'convention'
                 ? 'Filter by convention name'
-                : 'Filter by UPR cycle name'
+                : 'Filter by UPR'
             }
           >
             <option value="">
-              {conventionCycleKind === 'convention' ? 'All conventions' : 'All cycles'}
+              {conventionCycleKind === 'convention' ? 'All conventions' : 'All UPRs'}
             </option>
             {secondaryFilterOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -327,7 +327,7 @@ export function ReceivedRequestsPage({
             <tr>
               <th>Request ID</th>
               <th>Title</th>
-              <th>Convention/Cycle</th>
+              <th>Convention/UPR</th>
               <th>Date</th>
               <th>Status</th>
               <th>Actions</th>

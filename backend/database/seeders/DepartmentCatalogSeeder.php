@@ -24,10 +24,7 @@ class DepartmentCatalogSeeder extends Seeder
             'punjab' => 'SEC',
             'sindh' => 'SIN',
             'balochistan' => 'BAL',
-            'kpk' => 'KPK',
-            'islamabad' => 'ISB',
-            'gb' => 'GB',
-            'ajk' => 'AJK',
+            'kp' => 'KP',
         ];
 
         foreach ($provincialPrefixes as $slug => $prefix) {

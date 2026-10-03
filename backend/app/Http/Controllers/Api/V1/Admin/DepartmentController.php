@@ -81,18 +81,11 @@ class DepartmentController extends Controller
     private function normalizeAndValidateRegionIds(array $regionIds): array
     {
         $regionIds = array_values(array_unique(array_map('intval', $regionIds)));
-        $slugs = Region::query()->whereIn('id', $regionIds)->pluck('slug')->all();
-        if (count($slugs) !== count($regionIds)) {
+        $found = Region::query()->whereIn('id', $regionIds)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (count($found) !== count($regionIds)) {
             throw ValidationException::withMessages([
                 'region_ids' => ['One or more regions are invalid.'],
             ]);
-        }
-        foreach ($slugs as $slug) {
-            if (! in_array($slug, Department::REGION_SLUGS, true)) {
-                throw ValidationException::withMessages([
-                    'region_ids' => ['Departments may only be linked to catalog regions.'],
-                ]);
-            }
         }
 
         return $regionIds;

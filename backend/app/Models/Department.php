@@ -8,18 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Department extends Model
 {
-    /** Allowed region slugs (matches regions seeded for the catalog). */
-    public const REGION_SLUGS = [
-        'ict',
-        'punjab',
-        'sindh',
-        'balochistan',
-        'kpk',
-        'islamabad',
-        'gb',
-        'ajk',
-    ];
-
     protected $fillable = [
         'code',
         'name',

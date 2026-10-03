@@ -14,10 +14,7 @@ class RegionSeeder extends Seeder
             ['name' => 'Punjab', 'slug' => 'punjab'],
             ['name' => 'Sindh', 'slug' => 'sindh'],
             ['name' => 'Balochistan', 'slug' => 'balochistan'],
-            ['name' => 'KPK', 'slug' => 'kpk'],
-            ['name' => 'Islamabad', 'slug' => 'islamabad'],
-            ['name' => 'GB', 'slug' => 'gb'],
-            ['name' => 'AJK', 'slug' => 'ajk'],
+            ['name' => 'Khyber Pakhtunkhwa', 'slug' => 'kp'],
         ];
 
         foreach ($regions as $row) {

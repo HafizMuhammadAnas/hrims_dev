@@ -24,7 +24,7 @@ export const HR_REQUEST_EXPORT_COLUMNS: TableExportColumn<HrRequestRow>[] = [
   { header: 'ID', value: (row) => row.id },
   { header: 'Title', value: (row) => row.title },
   {
-    header: 'Convention/Cycle',
+    header: 'Convention/UPR',
     value: (row) => {
       const conv = (row.conv ?? '').trim()
       if (conv) return conv
@@ -45,7 +45,7 @@ export const RECEIVED_REQUEST_EXPORT_COLUMNS: TableExportColumn<ReceivedRequestE
   { header: 'Request ID', value: (row) => row.id },
   { header: 'Title', value: (row) => row.title },
   {
-    header: 'Convention/Cycle',
+    header: 'Convention/UPR',
     value: (row) => {
       const conv = (row.conv ?? '').trim()
       if (conv) return conv

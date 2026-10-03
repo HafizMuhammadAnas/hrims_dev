@@ -47,10 +47,6 @@ class PakistanDistrictsSeeder extends Seeder
     private function districtsByRegionSlug(): array
     {
         return [
-            'islamabad' => [
-                'Islamabad',
-            ],
-
             // Punjab — 41 districts (2023 administrative map, Wikipedia / provincial notification)
             'punjab' => [
                 'Bahawalnagar',
@@ -130,7 +126,7 @@ class PakistanDistrictsSeeder extends Seeder
                 ['name' => 'Qambar Shahdadkot', 'slug' => 'qambar-shahdadkot'],
             ],
 
-            'kpk' => [
+            'kp' => [
                 'Abbottabad',
                 'Bajaur',
                 'Bannu',
@@ -205,36 +201,6 @@ class PakistanDistrictsSeeder extends Seeder
                 'Kachhi',
                 'Kech',
                 'Khuzdar',
-            ],
-
-            'gb' => [
-                'Astore',
-                'Diamer',
-                'Ghanche',
-                'Ghizer',
-                'Gilgit',
-                ['name' => 'Gupis Yasin', 'slug' => 'gupis-yasin'],
-                'Hunza',
-                'Kharmang',
-                'Nagar',
-                'Shigar',
-                'Skardu',
-                ['name' => 'Roundu', 'slug' => 'roundu'],
-                ['name' => 'Tangir', 'slug' => 'tangir'],
-                ['name' => 'Darel', 'slug' => 'darel'],
-            ],
-
-            'ajk' => [
-                'Bagh',
-                'Bhimber',
-                'Hattian Bala',
-                'Haveli',
-                'Kotli',
-                'Mirpur',
-                'Muzaffarabad',
-                'Neelum',
-                'Poonch',
-                'Sudhanoti',
             ],
 
             'ict' => [],
