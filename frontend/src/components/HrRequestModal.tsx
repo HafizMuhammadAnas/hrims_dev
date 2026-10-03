@@ -1354,6 +1354,8 @@ export function HrRequestModal({
                             disaggregation: null,
                             hasQuantitative: ind.has_quantitative,
                             hasQualitative: ind.has_qualitative,
+                            quantitative_value: null,
+                            qualitative_text: null,
                           }))
                       : selectedIssue
                         ? indicatorsForMappingUi.map((ind) => {
