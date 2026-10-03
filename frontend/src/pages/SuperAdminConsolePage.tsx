@@ -678,7 +678,6 @@ export function SuperAdminConsolePage() {
           <table className="data-table" style={{ marginTop: 16 }}>
             <thead>
               <tr>
-                <th>Type</th>
                 <th>Cycle</th>
                 <th>Status</th>
                 <th />
@@ -687,15 +686,14 @@ export function SuperAdminConsolePage() {
             <tbody>
               {uprRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="muted">
+                  <td colSpan={3} className="muted">
                     No UPR Knowledge Hub entries yet.
                   </td>
                 </tr>
               ) : (
                 uprRows.map((u) => (
                   <tr key={u.id}>
-                    <td>{u.type?.name || u.display_title || u.kind}</td>
-                    <td>{u.cycle?.name || '—'}</td>
+                    <td>{u.cycle?.name || u.display_title || '—'}</td>
                     <td>{u.is_active !== false ? 'Active' : 'Inactive'}</td>
                     <td>
                       <ActionMenu>

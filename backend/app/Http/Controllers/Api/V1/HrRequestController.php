@@ -13,6 +13,11 @@ use App\Models\HrRequestIndicatorResponse;
 use App\Models\Issue;
 use App\Models\IssueIndicator;
 use App\Models\Region;
+use App\Models\UprCategory;
+use App\Models\UprCycle;
+use App\Models\UprEntry;
+use App\Models\UprRecommendationEntry;
+use App\Models\UprType;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -103,6 +108,97 @@ class HrRequestController extends Controller
                 'code' => $d->code,
                 'name' => $d->name,
             ]),
+        ]);
+    }
+
+    /**
+     * UPR Management catalog for New Request → Universal Periodic Review Reporting.
+     */
+    public function formUprCatalog(Request $request): JsonResponse
+    {
+        if (! HrimsAccess::canManageHrRequests($request->user())) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $cycles = UprCycle::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'sort_order', 'is_active']);
+
+        $types = UprType::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'sort_order', 'is_active']);
+
+        $categories = UprCategory::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'upr_cycle_id', 'upr_type_id', 'sort_order', 'is_active']);
+
+        $recommendations = UprRecommendationEntry::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'upr_cycle_id', 'upr_category_id', 'sort_order', 'is_active']);
+
+        $entries = UprEntry::query()
+            ->where('is_active', true)
+            ->with(['indicators' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('id')])
+            ->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'data' => [
+                'cycles' => $cycles->map(fn (UprCycle $c) => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'sort_order' => (int) ($c->sort_order ?? 0),
+                    'is_active' => (bool) ($c->is_active ?? true),
+                ])->values()->all(),
+                'types' => $types->map(fn (UprType $t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'sort_order' => (int) ($t->sort_order ?? 0),
+                    'is_active' => (bool) ($t->is_active ?? true),
+                ])->values()->all(),
+                'categories' => $categories->map(fn (UprCategory $c) => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'upr_cycle_id' => $c->upr_cycle_id !== null ? (int) $c->upr_cycle_id : null,
+                    'upr_type_id' => $c->upr_type_id !== null ? (int) $c->upr_type_id : null,
+                    'sort_order' => (int) ($c->sort_order ?? 0),
+                    'is_active' => (bool) ($c->is_active ?? true),
+                ])->values()->all(),
+                'recommendations' => $recommendations->map(fn (UprRecommendationEntry $r) => [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'upr_cycle_id' => (int) $r->upr_cycle_id,
+                    'upr_category_id' => (int) $r->upr_category_id,
+                    'sort_order' => (int) ($r->sort_order ?? 0),
+                    'is_active' => (bool) ($r->is_active ?? true),
+                ])->values()->all(),
+                'entries' => $entries->map(fn (UprEntry $e) => [
+                    'id' => $e->id,
+                    'upr_type_id' => (int) $e->upr_type_id,
+                    'upr_cycle_id' => (int) $e->upr_cycle_id,
+                    'upr_category_id' => (int) $e->upr_category_id,
+                    'indicators' => $e->indicators->map(fn ($ind) => [
+                        'id' => $ind->id,
+                        'indicator_text' => $ind->indicator_text,
+                        'has_quantitative' => (bool) ($ind->has_quantitative ?? false),
+                        'has_qualitative' => (bool) ($ind->has_qualitative ?? false),
+                        'sort_order' => (int) ($ind->sort_order ?? 0),
+                        'is_active' => (bool) ($ind->is_active ?? true),
+                    ])->values()->all(),
+                ])->values()->all(),
+            ],
         ]);
     }
 
@@ -257,11 +353,12 @@ class HrRequestController extends Controller
                 'treaty_body_optional_protocol',
                 'other_issue',
             ])],
-            'request_type' => ['sometimes', Rule::in(['loi', 'concluding_observation', 'other_issue'])],
+            'request_type' => ['sometimes', Rule::in(['loi', 'concluding_observation', 'other_issue', 'upr'])],
             'issue_id' => ['sometimes', 'nullable', 'integer', 'exists:issues,id'],
             'other_issue_text' => ['sometimes', 'nullable', 'string', 'max:200000'],
-            'upr' => ['sometimes', 'nullable', 'string', 'max:64'],
-            'upr_indicator' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'upr' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'upr_indicator' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'upr_selection' => ['sometimes', 'nullable'],
             'region_id' => ['sometimes', 'nullable', 'exists:regions,id'],
             'region_ids' => ['sometimes', 'array'],
             'region_ids.*' => ['integer', 'exists:regions,id'],
@@ -281,16 +378,11 @@ class HrRequestController extends Controller
             'status.in' => 'Status must be draft or active.',
         ]);
 
-        if (($data['reporting_framework'] ?? $model->reporting_framework) === 'upr') {
-            throw ValidationException::withMessages([
-                'reporting_framework' => [
-                    'Universal Periodic Review Reporting cannot be used to complete a request yet. Select Treaty Body Reporting or Other Issues.',
-                ],
-            ]);
-        }
-
         if (($data['reporting_framework'] ?? '') === 'other_issue') {
             $data['request_type'] = 'other_issue';
+        }
+        if (($data['reporting_framework'] ?? $model->reporting_framework) === 'upr') {
+            $data['request_type'] = 'upr';
         }
         $requestType = (string) (
             $data['request_type']
@@ -332,6 +424,23 @@ class HrRequestController extends Controller
                 $data['convention_id'] = $conventionIds[0] ?? null;
                 $data['conv'] = $this->conventionCodeForId($data['convention_id']);
             }
+        } elseif ($requestType === 'upr') {
+            $uprSelection = $this->normalizeUprSelection(
+                $data['upr_selection'] ?? $request->input('upr_selection') ?? $model->upr_selection
+            );
+            $this->assertValidUprSelection($uprSelection);
+            $labels = $this->uprSelectionLabels($uprSelection);
+            $data['request_type'] = 'upr';
+            $data['reporting_framework'] = 'upr';
+            $data['upr'] = $labels['upr'];
+            $data['upr_indicator'] = $labels['upr_indicator'];
+            $data['upr_selection'] = $uprSelection;
+            $data['issue_id'] = null;
+            $data['other_issue_text'] = null;
+            $data['convention_id'] = null;
+            $data['convention_ids'] = [];
+            $data['conv'] = $labels['upr'];
+            $data['indicator_responses'] = [];
         } elseif ($requestType !== '') {
             $data['request_type'] = $requestType;
             $data['other_issue_text'] = null;
@@ -355,6 +464,7 @@ class HrRequestController extends Controller
 
             if (
                 ($data['request_type'] ?? $model->request_type) !== 'other_issue'
+                && ($data['request_type'] ?? $model->request_type) !== 'upr'
                 && (
                     array_key_exists('convention_id', $data)
                     || array_key_exists('issue_id', $data)
@@ -390,10 +500,14 @@ class HrRequestController extends Controller
                 'reporting_framework',
                 'upr',
                 'upr_indicator',
+                'upr_selection',
                 'status',
                 'details',
                 'region_id',
             ])->all();
+            if (! Schema::hasColumn('hr_requests', 'upr_selection')) {
+                unset($scalar['upr_selection']);
+            }
             if ($scalar !== []) {
                 $model->fill($scalar);
             }
@@ -613,6 +727,8 @@ class HrRequestController extends Controller
     {
         $isOtherIssueFramework = ($request->input('reporting_framework') === 'other_issue')
             || ($request->input('request_type') === 'other_issue');
+        $isUprFramework = ($request->input('reporting_framework') === 'upr')
+            || ($request->input('request_type') === 'upr');
 
         $rules = [
             'title' => ['required', 'string', 'max:500'],
@@ -623,18 +739,19 @@ class HrRequestController extends Controller
                 'other_issue',
             ])],
             'convention_id' => [
-                Rule::requiredIf(! $isOtherIssueFramework),
+                Rule::requiredIf(! $isOtherIssueFramework && ! $isUprFramework),
                 'nullable',
                 'integer',
                 'exists:conventions,id',
             ],
             'convention_ids' => ['nullable', 'array'],
             'convention_ids.*' => ['integer', 'exists:conventions,id'],
-            'request_type' => ['nullable', Rule::in(['loi', 'concluding_observation', 'other_issue'])],
+            'request_type' => ['nullable', Rule::in(['loi', 'concluding_observation', 'other_issue', 'upr'])],
             'issue_id' => ['nullable', 'integer', 'exists:issues,id'],
             'other_issue_text' => ['nullable', 'string', 'max:200000'],
-            'upr' => ['nullable', 'string', 'max:64'],
-            'upr_indicator' => ['nullable', 'string', 'max:64'],
+            'upr' => ['nullable', 'string', 'max:255'],
+            'upr_indicator' => ['nullable', 'string', 'max:255'],
+            'upr_selection' => ['nullable'],
             'date' => ['required', 'date'],
             'status' => ['required', Rule::in(['draft', 'active'])],
             'details' => ['nullable', 'string'],
@@ -655,16 +772,11 @@ class HrRequestController extends Controller
             'status.required' => 'Status is required.',
         ]);
 
-        if (($data['reporting_framework'] ?? '') === 'upr') {
-            throw ValidationException::withMessages([
-                'reporting_framework' => [
-                    'Universal Periodic Review Reporting cannot be used to complete a request yet. Select Treaty Body Reporting or Other Issues.',
-                ],
-            ]);
-        }
-
         if (($data['reporting_framework'] ?? '') === 'other_issue') {
             $data['request_type'] = 'other_issue';
+        }
+        if (($data['reporting_framework'] ?? '') === 'upr') {
+            $data['request_type'] = 'upr';
         }
 
         $requestType = (string) ($data['request_type'] ?? '');
@@ -676,12 +788,31 @@ class HrRequestController extends Controller
         }
         if ($requestType === '') {
             throw ValidationException::withMessages([
-                'request_type' => ['Select List of Issues, Concluding Observation, or Other Issues.'],
+                'request_type' => ['Select List of Issues, Concluding Observation, Other Issues, or UPR.'],
             ]);
         }
         $issue = null;
         $indicatorPayload = [];
-        if ($requestType === 'other_issue') {
+        $uprSelection = null;
+        if ($requestType === 'upr') {
+            $uprSelection = $this->normalizeUprSelection($request->input('upr_selection'));
+            $this->assertValidUprSelection($uprSelection);
+            $labels = $this->uprSelectionLabels($uprSelection);
+            $data['upr'] = $labels['upr'];
+            $data['upr_indicator'] = $labels['upr_indicator'];
+            $data['upr_selection'] = $uprSelection;
+            $data['issue_id'] = null;
+            $data['other_issue_text'] = null;
+            $data['convention_id'] = null;
+            $data['convention_ids'] = [];
+            $data['conv'] = $labels['upr'];
+            $data['reporting_framework'] = 'upr';
+            if ($request->filled('indicator_responses')) {
+                throw ValidationException::withMessages([
+                    'indicator_responses' => ['UPR requests use UPR indicators from the selection, not treaty-body indicator responses.'],
+                ]);
+            }
+        } elseif ($requestType === 'other_issue') {
             if (! HrimsAccess::isFederalStaff($request->user())) {
                 return response()->json([
                     'message' => 'Only federal administrators may create Other Issues requests.',
@@ -766,22 +897,27 @@ class HrRequestController extends Controller
                 ? (Convention::query()->whereKey($conventionId)->value('code') ?? '')
                 : '';
 
-            $row = HrRequest::query()->create([
+            $createAttrs = [
                 'id' => $id,
                 'title' => $data['title'],
-                'conv' => $code,
+                'conv' => $data['conv'] ?? $code,
                 'convention_id' => $conventionId,
                 'issue_id' => $data['issue_id'] ?? null,
                 'request_type' => $data['request_type'],
                 'other_issue_text' => $data['other_issue_text'] ?? null,
                 'reporting_framework' => $data['reporting_framework'],
-                'upr' => null,
-                'upr_indicator' => null,
+                'upr' => $data['upr'] ?? null,
+                'upr_indicator' => $data['upr_indicator'] ?? null,
                 'region_id' => $data['region_ids'][0] ?? null,
                 'due_date' => $data['date'],
                 'status' => $data['status'],
                 'details' => $data['details'] ?? null,
-            ]);
+            ];
+            if (Schema::hasColumn('hr_requests', 'upr_selection')) {
+                $createAttrs['upr_selection'] = $data['upr_selection'] ?? null;
+            }
+
+            $row = HrRequest::query()->create($createAttrs);
 
             $row->regions()->sync($data['region_ids']);
             $this->syncHrRequestConventions($row, $data['convention_ids'] ?? []);
@@ -1345,6 +1481,104 @@ class HrRequestController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * @return array{cycle_id: int, type_id: int, category_id: int, recommendation_ids: list<int>, indicator_ids: list<int>}
+     */
+    private function normalizeUprSelection(mixed $raw): array
+    {
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : [];
+        }
+        if (! is_array($raw)) {
+            $raw = [];
+        }
+
+        $recommendationIds = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($raw['recommendation_ids'] ?? [])),
+            static fn (int $id): bool => $id > 0,
+        )));
+        $indicatorIds = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($raw['indicator_ids'] ?? [])),
+            static fn (int $id): bool => $id > 0,
+        )));
+
+        return [
+            'cycle_id' => (int) ($raw['cycle_id'] ?? 0),
+            'type_id' => (int) ($raw['type_id'] ?? 0),
+            'category_id' => (int) ($raw['category_id'] ?? 0),
+            'recommendation_ids' => $recommendationIds,
+            'indicator_ids' => $indicatorIds,
+        ];
+    }
+
+    /**
+     * @param  array{cycle_id: int, type_id: int, category_id: int, recommendation_ids: list<int>, indicator_ids: list<int>}  $selection
+     */
+    private function assertValidUprSelection(array $selection): void
+    {
+        if ($selection['cycle_id'] <= 0) {
+            throw ValidationException::withMessages(['upr_selection' => ['Select a UPR cycle.']]);
+        }
+        if ($selection['type_id'] <= 0) {
+            throw ValidationException::withMessages(['upr_selection' => ['Select a UPR type.']]);
+        }
+        if ($selection['category_id'] <= 0) {
+            throw ValidationException::withMessages(['upr_selection' => ['Select a thematic area.']]);
+        }
+        if ($selection['indicator_ids'] === []) {
+            throw ValidationException::withMessages(['upr_selection' => ['Select at least one UPR indicator.']]);
+        }
+
+        $category = UprCategory::query()
+            ->whereKey($selection['category_id'])
+            ->where('is_active', true)
+            ->first();
+        if (! $category
+            || (int) $category->upr_cycle_id !== $selection['cycle_id']
+            || (int) $category->upr_type_id !== $selection['type_id']) {
+            throw ValidationException::withMessages([
+                'upr_selection' => ['Thematic area must match the selected cycle and type.'],
+            ]);
+        }
+
+        $allowedIndicatorIds = UprEntry::query()
+            ->where('is_active', true)
+            ->where('upr_cycle_id', $selection['cycle_id'])
+            ->where('upr_type_id', $selection['type_id'])
+            ->where('upr_category_id', $selection['category_id'])
+            ->with(['indicators' => fn ($q) => $q->where('is_active', true)])
+            ->get()
+            ->flatMap(fn (UprEntry $e) => $e->indicators->pluck('id'))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        foreach ($selection['indicator_ids'] as $indicatorId) {
+            if (! in_array($indicatorId, $allowedIndicatorIds, true)) {
+                throw ValidationException::withMessages([
+                    'upr_selection' => ['One or more selected indicators are not valid for this thematic area.'],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  array{cycle_id: int, type_id: int, category_id: int, recommendation_ids: list<int>, indicator_ids: list<int>}  $selection
+     * @return array{upr: string, upr_indicator: string}
+     */
+    private function uprSelectionLabels(array $selection): array
+    {
+        $cycleName = (string) (UprCycle::query()->whereKey($selection['cycle_id'])->value('name') ?? '');
+        $typeName = (string) (UprType::query()->whereKey($selection['type_id'])->value('name') ?? '');
+        $categoryName = (string) (UprCategory::query()->whereKey($selection['category_id'])->value('name') ?? '');
+
+        return [
+            'upr' => $cycleName !== '' ? $cycleName : 'UPR',
+            'upr_indicator' => trim($typeName.' · '.$categoryName, ' ·'),
+        ];
     }
 }
 

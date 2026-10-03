@@ -47,8 +47,9 @@ export async function createUser(input: UserCreateInput): Promise<AuthUser> {
 
 export async function deleteUser(id: number): Promise<void> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/users/${id}`, {
-    method: 'DELETE',
+  // POST: FortiGate blocks HTTP DELETE on live (Attack ID 20000001).
+  const res = await fetch(`/api/v1/users/${id}/delete`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
   })

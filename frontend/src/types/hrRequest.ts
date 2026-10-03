@@ -4,7 +4,7 @@ export type { HrReportingFramework }
 
 /** Publication lifecycle for an HR request (not department/regional workflow). */
 export type HrRequestStatus = 'draft' | 'active'
-export type HrRequestType = 'loi' | 'concluding_observation' | 'other_issue'
+export type HrRequestType = 'loi' | 'concluding_observation' | 'other_issue' | 'upr'
 
 /** Map legacy API values after deploy before migration runs, or old cached rows. */
 export function coerceHrRequestStatus(raw: string | undefined | null): HrRequestStatus {
@@ -106,10 +106,18 @@ export interface HrRequestRow {
   recommendation_id?: string | null
   sdg?: string | null
   sdg_indicator?: string | null
-  /** UPR reporting cycle when reporting_framework is `upr` (e.g. cycle_1). */
+  /** UPR cycle label when reporting_framework is `upr`. */
   upr?: string | null
-  /** UPR recommendation when reporting_framework is `upr` (e.g. recommendation_1). */
+  /** UPR type · thematic area label when reporting_framework is `upr`. */
   upr_indicator?: string | null
+  /** Structured UPR selection (cycle / type / category / recommendations / indicators). */
+  upr_selection?: {
+    cycle_id: number
+    type_id: number
+    category_id: number
+    recommendation_ids: number[]
+    indicator_ids: number[]
+  } | null
   issue_cards?: unknown
   region?: { id: number; name: string; slug: string } | null
   region_name?: string | null

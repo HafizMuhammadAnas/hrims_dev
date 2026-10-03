@@ -74,6 +74,20 @@ export async function fetchHrRequestFormFederalDepartments(): Promise<FederalDep
   return json.data
 }
 
+export async function fetchHrRequestFormUprCatalog(): Promise<
+  import('../lib/hrRequestUprForm').HrRequestUprCatalog
+> {
+  const res = await fetch('/api/v1/hr-request-form/upr-catalog', {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  await throwIfNotOk(res)
+  const json = (await res.json()) as {
+    data: import('../lib/hrRequestUprForm').HrRequestUprCatalog
+  }
+  return json.data
+}
+
 export async function fetchHrRequests(): Promise<HrRequestRow[]> {
   const res = await fetch('/api/v1/hr-requests', {
     credentials: 'include',
@@ -124,6 +138,7 @@ export type HrRequestCreateFromIssueFormInput = {
   other_issue_text?: string | null
   upr?: string | null
   upr_indicator?: string | null
+  upr_selection?: import('../lib/hrRequestUprForm').HrRequestUprSelection | null
   date: string
   status: HrRequestRow['status']
   details?: string | null
@@ -151,6 +166,7 @@ export async function createHrRequestFromIssueForm(
   if (input.other_issue_text?.trim()) fd.append('other_issue_text', input.other_issue_text.trim())
   if (input.upr?.trim()) fd.append('upr', input.upr.trim())
   if (input.upr_indicator?.trim()) fd.append('upr_indicator', input.upr_indicator.trim())
+  if (input.upr_selection) fd.append('upr_selection', JSON.stringify(input.upr_selection))
   fd.append('date', input.date)
   fd.append('status', input.status)
   if (input.details != null && input.details !== '') {
@@ -296,6 +312,7 @@ export async function updateHrRequestFromIssueForm(
   else fd.append('upr', '')
   if (input.upr_indicator?.trim()) fd.append('upr_indicator', input.upr_indicator.trim())
   else fd.append('upr_indicator', '')
+  if (input.upr_selection) fd.append('upr_selection', JSON.stringify(input.upr_selection))
   fd.append('date', input.date)
   fd.append('status', input.status)
   if (input.details != null && input.details !== '') {
@@ -328,8 +345,9 @@ export async function updateHrRequestFromIssueForm(
 
 export async function deleteHrRequest(id: string): Promise<void> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/hr-requests/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
+  // POST: FortiGate blocks HTTP DELETE on live (Attack ID 20000001).
+  const res = await fetch(`/api/v1/hr-requests/${encodeURIComponent(id)}/delete`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
   })
@@ -338,10 +356,11 @@ export async function deleteHrRequest(id: string): Promise<void> {
 
 export async function deleteHrRequestAttachment(hrRequestId: string, attachmentId: number): Promise<void> {
   await ensureCsrfCookie()
+  // POST: FortiGate blocks HTTP DELETE on live (Attack ID 20000001).
   const res = await fetch(
-    `/api/v1/hr-requests/${encodeURIComponent(hrRequestId)}/attachments/${encodeURIComponent(String(attachmentId))}`,
+    `/api/v1/hr-requests/${encodeURIComponent(hrRequestId)}/attachments/${encodeURIComponent(String(attachmentId))}/delete`,
     {
-      method: 'DELETE',
+      method: 'POST',
       credentials: 'include',
       headers: apiJsonHeaders(),
     },

@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   deleteHrRequest,
+  fetchHrRequestFormConventions,
+  fetchHrRequestFormUprCatalog,
   fetchHrRequests,
   updateHrRequest,
+  type KnowledgeConventionRow,
 } from '../api/hrRequests'
 import { fetchRegions } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
@@ -24,7 +27,15 @@ import { derivePaginatedRows, useClientTableState } from '../hooks/useClientTabl
 import { HR_REQUEST_EXPORT_COLUMNS } from '../lib/tableExportColumns'
 import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
 import { pickActivityTimestamp, sortRowsLatestFirst } from '../lib/tableRowSort'
+import {
+  buildConventionFilterOptions,
+  buildCycleFilterOptions,
+  conventionOrCycleLabel,
+  rowMatchesConventionCycleFilters,
+  type ConventionCycleKindFilter,
+} from '../lib/hrRequestConventionCycleFilter'
 import { hrRequestListStats, hrRequestStatusPresentation } from '../lib/hrRequestListMetrics'
+import type { HrRequestUprCycle } from '../lib/hrRequestUprForm'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
 import {
   CLARIFICATION_STATUS_LABELS,
@@ -74,9 +85,12 @@ export function FederalRequestManagementPage() {
   const [regions, setRegions] = useState<Awaited<ReturnType<typeof fetchRegions>>>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [conventions, setConventions] = useState<KnowledgeConventionRow[]>([])
+  const [uprCycles, setUprCycles] = useState<HrRequestUprCycle[]>([])
 
   const table = useClientTableState({ pageSize: 10 })
-  const { search, setSearch, filters, setFilter, resetFilters, page, setPage, pageSize } = table
+  const { search, setSearch, filters, setFilter, setFilters, resetFilters, page, setPage, pageSize } =
+    table
 
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<HrRequestRow | null>(null)
@@ -137,26 +151,62 @@ export function FederalRequestManagementPage() {
     setShowCreateForm(view === 'new' && canManage)
   }, [view, canManage])
 
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all([
+      fetchHrRequestFormConventions().catch(() => [] as KnowledgeConventionRow[]),
+      fetchHrRequestFormUprCatalog().catch(() => null),
+    ]).then(([convRows, uprCatalog]) => {
+      if (cancelled) return
+      setConventions(convRows)
+      setUprCycles(uprCatalog?.cycles ?? [])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const statusFilter = filters.status ?? ''
+  const conventionCycleKind = (filters.convention_cycle_kind ?? '') as ConventionCycleKindFilter
+  const conventionCycleValue = filters.convention_cycle ?? ''
+
+  const conventionFilterOptions = useMemo(
+    () => buildConventionFilterOptions(conventions, rows),
+    [conventions, rows],
+  )
+  const cycleFilterOptions = useMemo(
+    () => buildCycleFilterOptions(uprCycles, rows),
+    [uprCycles, rows],
+  )
+  const secondaryFilterOptions =
+    conventionCycleKind === 'convention'
+      ? conventionFilterOptions
+      : conventionCycleKind === 'cycle'
+        ? cycleFilterOptions
+        : []
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filtered = rows.filter((r) => {
       if (statusFilter && r.status !== statusFilter) return false
+      if (!rowMatchesConventionCycleFilters(r, conventionCycleKind, conventionCycleValue)) {
+        return false
+      }
       if (!q) return true
       const regionBlob =
         (r.regions?.length ? r.regions.map((x) => x.name).join(' ') : r.region_name) ?? ''
+      const convCycle = conventionOrCycleLabel(r)
       return (
         r.id.toLowerCase().includes(q) ||
         r.title.toLowerCase().includes(q) ||
-        r.conv.toLowerCase().includes(q) ||
+        convCycle.toLowerCase().includes(q) ||
         regionBlob.toLowerCase().includes(q)
       )
     })
     return sortRowsLatestFirst(filtered, (r) =>
       pickActivityTimestamp(r.updated_at, r.created_at, r.date, r.id),
     )
-  }, [rows, search, statusFilter])
+  }, [rows, search, statusFilter, conventionCycleKind, conventionCycleValue])
 
   const { pageRows } = useMemo(
     () => derivePaginatedRows(filteredRows, table.page, table.pageSize),
@@ -243,11 +293,47 @@ export function FederalRequestManagementPage() {
       <TableToolbar className="hr-requests-toolbar">
         <input
           type="search"
-          placeholder="Search ID, title, convention, region…"
+          placeholder="Search ID, title, convention/cycle, region…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search requests"
         />
+        <select
+          value={conventionCycleKind}
+          onChange={(e) => {
+            const next = e.target.value as ConventionCycleKindFilter
+            setFilters((prev) => ({
+              ...prev,
+              convention_cycle_kind: next,
+              convention_cycle: '',
+            }))
+          }}
+          aria-label="Filter by convention or cycle type"
+        >
+          <option value="">Convention / Cycle</option>
+          <option value="convention">Convention</option>
+          <option value="cycle">Cycle</option>
+        </select>
+        {conventionCycleKind ? (
+          <select
+            value={conventionCycleValue}
+            onChange={(e) => setFilter('convention_cycle', e.target.value)}
+            aria-label={
+              conventionCycleKind === 'convention'
+                ? 'Filter by convention name'
+                : 'Filter by UPR cycle name'
+            }
+          >
+            <option value="">
+              {conventionCycleKind === 'convention' ? 'All conventions' : 'All cycles'}
+            </option>
+            {secondaryFilterOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <select
           value={statusFilter}
           onChange={(e) => setFilter('status', e.target.value)}
@@ -284,7 +370,7 @@ export function FederalRequestManagementPage() {
                 <tr>
                   <th>ID</th>
                   <th>Title</th>
-                  <th>Convention</th>
+                  <th>Convention/Cycle</th>
                   <th>Region(s)</th>
                   <th>Due</th>
                   <th>Status</th>
@@ -298,7 +384,7 @@ export function FederalRequestManagementPage() {
                   <tr key={r.id}>
                     <td>{r.id}</td>
                     <td>{r.title}</td>
-                    <td>{r.conv}</td>
+                    <td>{conventionOrCycleLabel(r)}</td>
                     <td>
                       {r.regions?.length
                         ? r.regions.map((x) => x.name).join(', ')

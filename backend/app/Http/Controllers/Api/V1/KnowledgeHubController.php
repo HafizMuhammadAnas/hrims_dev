@@ -331,9 +331,13 @@ class KnowledgeHubController extends Controller
                 'name' => $row->cycle->name,
             ] : null,
             'introduction' => $row->introduction,
-            'repositories' => KnowledgeUprEntry::normalizeRepositories($row->repositories),
+            'repositories' => KnowledgeUprEntry::filterExistingRepositories(
+                KnowledgeUprEntry::normalizeRepositories($row->repositories),
+            ),
             'repository_labels' => KnowledgeUprEntry::REPOSITORY_LABELS,
-            'analysis_files' => KnowledgeUprEntry::normalizeAnalysisFiles($row->analysis_files),
+            'analysis_files' => KnowledgeUprEntry::filterExistingAnalysisFiles(
+                KnowledgeUprEntry::normalizeAnalysisFiles($row->analysis_files),
+            ),
             'sort_order' => (int) ($row->sort_order ?? 0),
         ];
     }

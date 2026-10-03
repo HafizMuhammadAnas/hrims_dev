@@ -6,6 +6,7 @@ import {
   fetchHrRequestFormFederalDepartments,
   fetchHrRequestFormIssues,
   fetchHrRequestFormConventions,
+  fetchHrRequestFormUprCatalog,
   updateHrRequest,
   updateHrRequestFromIssueForm,
   type FederalDepartmentOption,
@@ -38,14 +39,22 @@ import {
 } from '../lib/issueEntryKind'
 import {
   HR_REPORTING_FRAMEWORK_OPTIONS,
-  UPR_COMPLETION_BLOCKED_MESSAGE,
-  UPR_RECOMMENDATION_OPTIONS,
-  UPR_REPORTING_CYCLE_OPTIONS,
   inferReportingFramework,
   isTreatyBodyReportingFramework,
+  isUprReportingFramework,
   reportingFrameworkLabel,
   type HrReportingFramework,
 } from '../lib/hrRequestReportingFramework'
+import {
+  emptyUprCatalog,
+  filterUprCategories,
+  filterUprIndicators,
+  filterUprRecommendations,
+  parseUprSelection,
+  sortUprTypesForRadios,
+  uprTypeLabel,
+  type HrRequestUprCatalog,
+} from '../lib/hrRequestUprForm'
 import {
   LABEL_EDIT_HR_REQUEST,
   LABEL_NEW_REQUEST,
@@ -137,10 +146,14 @@ type IssueFormState = {
   issue_id: number | ''
   request_type: HrRequestType
   other_issue_text: string
-  /** UPR reporting cycle (`cycle_1` … `cycle_5`), stored as `upr`. */
-  upr_reporting_cycle: string
-  /** UPR recommendation (`recommendation_1` …), stored as `upr_indicator`. */
-  upr_recommendation: string
+  /** UPR Management cycle id. */
+  upr_cycle_id: number | ''
+  /** UPR Management type id (Accepted / Noted / Others…). */
+  upr_type_id: number | ''
+  /** UPR thematic area (category) id. */
+  upr_category_id: number | ''
+  /** Selected UPR indicator ids under the thematic area. */
+  upr_indicator_ids: number[]
   region_ids: number[]
   department_ids: number[]
   date: string
@@ -164,8 +177,10 @@ function emptyIssueForm(lockedRegionId: number | null): IssueFormState {
     issue_id: '',
     request_type: 'loi',
     other_issue_text: '',
-    upr_reporting_cycle: '',
-    upr_recommendation: '',
+    upr_cycle_id: '',
+    upr_type_id: '',
+    upr_category_id: '',
+    upr_indicator_ids: [],
     region_ids,
     department_ids: [],
     date: todayIso(),
@@ -231,11 +246,15 @@ function issueFormFromDetail(row: HrRequestRow, lockedRegionId: number | null): 
     convention_ids: conventionIds,
     issue_id: row.issue_id ?? '',
     request_type:
-      row.request_type ??
-      (row.issue?.entry_kind === 'recommendation' ? 'concluding_observation' : 'loi'),
+      reportingFramework === 'upr'
+        ? 'upr'
+        : (row.request_type ??
+          (row.issue?.entry_kind === 'recommendation' ? 'concluding_observation' : 'loi')),
     other_issue_text: row.other_issue_text ?? '',
-    upr_reporting_cycle: row.upr ?? '',
-    upr_recommendation: row.upr_indicator ?? '',
+    upr_cycle_id: parseUprSelection(row.upr_selection)?.cycle_id ?? '',
+    upr_type_id: parseUprSelection(row.upr_selection)?.type_id ?? '',
+    upr_category_id: parseUprSelection(row.upr_selection)?.category_id ?? '',
+    upr_indicator_ids: parseUprSelection(row.upr_selection)?.indicator_ids ?? [],
     region_ids,
     department_ids: row.departments?.map((d) => d.id) ?? [],
     date: row.date,
@@ -396,14 +415,18 @@ export function HrRequestModal({
   const usesIssueFlow =
     mode === 'create' ||
     Boolean(
-      detail?.convention_id &&
-        (detail?.issue_id || detail?.request_type === 'other_issue'),
+      detail?.reporting_framework === 'upr' ||
+        detail?.request_type === 'upr' ||
+        (detail?.convention_id &&
+          (detail?.issue_id || detail?.request_type === 'other_issue')),
     )
 
   const [conventions, setConventions] = useState<KnowledgeConventionRow[]>([])
   const [issues, setIssues] = useState<HrRequestIssueDetail[]>([])
   const [collectionYears, setCollectionYears] = useState<HrRequestFormCollectionYear[]>([])
   const [federalDepts, setFederalDepts] = useState<FederalDepartmentOption[]>([])
+  const [uprCatalog, setUprCatalog] = useState<HrRequestUprCatalog>(emptyUprCatalog)
+  const [uprCatalogLoading, setUprCatalogLoading] = useState(false)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [issuesLoading, setIssuesLoading] = useState(false)
 
@@ -506,24 +529,27 @@ export function HrRequestModal({
       return
     }
     if (!detailLoading && detail) {
+      const isUprDetail =
+        detail.reporting_framework === 'upr' || detail.request_type === 'upr'
       if (
-        detail.convention_id &&
-        (detail.issue_id || detail.request_type === 'other_issue')
+        isUprDetail ||
+        (detail.convention_id &&
+          (detail.issue_id || detail.request_type === 'other_issue'))
       ) {
         setLegacyForm(null)
         setIssueForm(issueFormFromDetail(detail, lockedRegionId))
         setEntryKindFilters(
-          detail.request_type === 'other_issue'
+          isUprDetail || detail.request_type === 'other_issue'
             ? { issue: false, recommendation: false }
             : entryKindFiltersForIssue(detail.issue),
         )
-        if (detail.issue) {
+        if (detail.issue && !isUprDetail) {
           setIssues([detail.issue])
         } else {
           setIssues([])
         }
         const cid = detail.convention?.id ?? detail.convention_id
-        if (typeof cid === 'number') {
+        if (!isUprDetail && typeof cid === 'number') {
           const hasEmbeddedIssue = Boolean(detail.issue)
           const skipIssuesFetch = mode === 'view' && hasEmbeddedIssue
           if (!skipIssuesFetch) {
@@ -583,6 +609,35 @@ export function HrRequestModal({
       cancelled = true
     }
   }, [mode, detail?.id, detail?.convention_id])
+
+  useEffect(() => {
+    if (!issueForm || !isUprReportingFramework(issueForm.reporting_framework)) {
+      setUprCatalogLoading(false)
+      return
+    }
+    if (uprCatalog.cycles.length > 0) {
+      setUprCatalogLoading(false)
+      return
+    }
+    let cancelled = false
+    setUprCatalogLoading(true)
+    void fetchHrRequestFormUprCatalog()
+      .then((data) => {
+        if (!cancelled) setUprCatalog(data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUprCatalog(emptyUprCatalog())
+          setFormBanner('Could not load UPR catalog from UPR Management.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setUprCatalogLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [issueForm?.reporting_framework, uprCatalog.cycles.length])
 
   useEffect(() => {
     if (readOnly || !issueForm) {
@@ -700,6 +755,74 @@ export function HrRequestModal({
     )
   }, [issueForm, issues, detail?.issue])
 
+  const uprTypesForRadios = useMemo(
+    () => sortUprTypesForRadios(uprCatalog.types),
+    [uprCatalog.types],
+  )
+  const uprCategoriesForSelect = useMemo(
+    () =>
+      filterUprCategories(
+        uprCatalog,
+        issueForm?.upr_cycle_id ?? '',
+        issueForm?.upr_type_id ?? '',
+      ),
+    [uprCatalog, issueForm?.upr_cycle_id, issueForm?.upr_type_id],
+  )
+  const uprRecommendationsForArea = useMemo(
+    () =>
+      filterUprRecommendations(
+        uprCatalog,
+        issueForm?.upr_cycle_id ?? '',
+        issueForm?.upr_category_id ?? '',
+      ),
+    [uprCatalog, issueForm?.upr_cycle_id, issueForm?.upr_category_id],
+  )
+  const uprIndicatorsForArea = useMemo(
+    () =>
+      filterUprIndicators(
+        uprCatalog,
+        issueForm?.upr_cycle_id ?? '',
+        issueForm?.upr_type_id ?? '',
+        issueForm?.upr_category_id ?? '',
+      ),
+    [uprCatalog, issueForm?.upr_cycle_id, issueForm?.upr_type_id, issueForm?.upr_category_id],
+  )
+
+  /** Drop thematic area / indicators that no longer match cycle + type (after catalog loads). */
+  useEffect(() => {
+    if (!issueForm || !isUprReportingFramework(issueForm.reporting_framework)) return
+    if (uprCatalog.cycles.length === 0) return
+    const categoryOk =
+      issueForm.upr_category_id === '' ||
+      uprCategoriesForSelect.some((c) => c.id === issueForm.upr_category_id)
+    const allowedInd = new Set(uprIndicatorsForArea.map((i) => i.id))
+    const nextIndIds = issueForm.upr_indicator_ids.filter((id) => allowedInd.has(id))
+    const indChanged =
+      nextIndIds.length !== issueForm.upr_indicator_ids.length ||
+      nextIndIds.some((id, i) => id !== issueForm.upr_indicator_ids[i])
+    if (categoryOk && !indChanged) return
+    setIssueForm((f) => {
+      if (!f) return f
+      const stillOk =
+        f.upr_category_id === '' ||
+        uprCategoriesForSelect.some((c) => c.id === f.upr_category_id)
+      return {
+        ...f,
+        upr_category_id: stillOk ? f.upr_category_id : '',
+        upr_indicator_ids: stillOk
+          ? f.upr_indicator_ids.filter((id) => allowedInd.has(id))
+          : [],
+      }
+    })
+  }, [
+    uprCatalog.cycles.length,
+    issueForm?.reporting_framework,
+    issueForm?.upr_category_id,
+    issueForm?.upr_indicator_ids,
+    uprCategoriesForSelect,
+    uprIndicatorsForArea,
+  ])
+
   const selectedIctDepartmentsText = useMemo(() => {
     if (!issueForm || federalDepts.length === 0) {
       return ictOnlySelected ? 'Select ICT departments (required)' : 'Select ICT departments'
@@ -800,12 +923,11 @@ export function HrRequestModal({
     if (!framework) {
       fe.reporting_framework = 'Select a reporting type.'
     } else if (framework === 'upr') {
-      fe.reporting_framework = UPR_COMPLETION_BLOCKED_MESSAGE
-      if (!issueForm.upr_reporting_cycle) {
-        fe.upr_reporting_cycle = 'Reporting cycle is required.'
-      }
-      if (!issueForm.upr_recommendation) {
-        fe.upr_recommendation = 'UPR recommendation is required.'
+      if (issueForm.upr_cycle_id === '') fe.upr_cycle_id = 'Select a UPR cycle.'
+      if (issueForm.upr_type_id === '') fe.upr_type_id = 'Select a UPR type.'
+      if (issueForm.upr_category_id === '') fe.upr_category_id = 'Select a thematic area.'
+      if (issueForm.upr_indicator_ids.length === 0) {
+        fe.upr_indicator_ids = 'Select at least one UPR indicator.'
       }
     } else if (treatyBody || otherIssue) {
       if (treatyBody && issueForm.convention_id === '') {
@@ -850,12 +972,12 @@ export function HrRequestModal({
         }
       }
     }
-    if (framework !== 'upr' && issueForm.region_ids.length === 0) {
+    if (issueForm.region_ids.length === 0) {
       fe.region_ids = 'Select at least one region.'
     }
     const ictOnly =
       issueForm.region_ids.length > 0 && issueForm.region_ids.every((id) => ictRegionIdSet.has(id))
-    if (framework !== 'upr' && ictOnly && issueForm.department_ids.length === 0) {
+    if (ictOnly && issueForm.department_ids.length === 0) {
       fe.department_ids =
         'Select at least one national-line department when the request is directed only to ICT.'
     }
@@ -890,37 +1012,55 @@ export function HrRequestModal({
     setFieldErrors({})
     if (!runIssueValidation()) return
     const framework = issueForm.reporting_framework
-    if (!framework || framework === 'upr') return
+    if (!framework) return
     const otherIssue = framework === 'other_issue' || issueForm.request_type === 'other_issue'
-    if (!otherIssue && !selectedIssue) return
+    const uprFlow = framework === 'upr'
+    if (!otherIssue && !uprFlow && !selectedIssue) return
     const ictInPayload = issueForm.region_ids.some((id) => ictRegionIdSet.has(id))
+    const uprSelection =
+      uprFlow &&
+      issueForm.upr_cycle_id !== '' &&
+      issueForm.upr_type_id !== '' &&
+      issueForm.upr_category_id !== ''
+        ? {
+            cycle_id: issueForm.upr_cycle_id as number,
+            type_id: issueForm.upr_type_id as number,
+            category_id: issueForm.upr_category_id as number,
+            recommendation_ids: uprRecommendationsForArea.map((r) => r.id),
+            indicator_ids: [...issueForm.upr_indicator_ids],
+          }
+        : null
     setSaving(true)
     try {
       if (mode === 'create') {
-        if (!otherIssue && issueForm.convention_id === '') return
-        if (!otherIssue && issueForm.issue_id === '') return
-        const conventionIds = otherIssue
-          ? issueForm.convention_ids
-          : issueForm.convention_id === ''
-            ? []
-            : [issueForm.convention_id as number]
+        if (!otherIssue && !uprFlow && issueForm.convention_id === '') return
+        if (!otherIssue && !uprFlow && issueForm.issue_id === '') return
+        if (uprFlow && !uprSelection) return
+        const conventionIds = uprFlow
+          ? []
+          : otherIssue
+            ? issueForm.convention_ids
+            : issueForm.convention_id === ''
+              ? []
+              : [issueForm.convention_id as number]
         await createHrRequestFromIssueForm({
           title: issueForm.title.trim(),
           reporting_framework: framework,
           convention_id: conventionIds[0] ?? null,
           convention_ids: conventionIds,
-          request_type: otherIssue ? 'other_issue' : issueForm.request_type,
-          issue_id: otherIssue ? null : (issueForm.issue_id as number),
+          request_type: uprFlow ? 'upr' : otherIssue ? 'other_issue' : issueForm.request_type,
+          issue_id: otherIssue || uprFlow ? null : (issueForm.issue_id as number),
           other_issue_text: otherIssue ? issueForm.other_issue_text.trim() : null,
           upr: null,
           upr_indicator: null,
+          upr_selection: uprSelection,
           date: issueForm.date,
           status,
           details: issueForm.details.trim() || null,
           region_ids: issueForm.region_ids,
           department_ids: ictInPayload ? issueForm.department_ids : [],
           indicator_responses:
-            !otherIssue && selectedIssue
+            !otherIssue && !uprFlow && selectedIssue
               ? buildIndicatorPayload(
                   selectedIssue,
                   issueForm.indicatorValues,
@@ -931,28 +1071,32 @@ export function HrRequestModal({
           attachments: issueForm.attachmentFiles,
         })
       } else if (mode === 'edit' && detail) {
-        const conventionIds = otherIssue
-          ? issueForm.convention_ids
-          : issueForm.convention_id === ''
-            ? []
-            : [issueForm.convention_id as number]
+        if (uprFlow && !uprSelection) return
+        const conventionIds = uprFlow
+          ? []
+          : otherIssue
+            ? issueForm.convention_ids
+            : issueForm.convention_id === ''
+              ? []
+              : [issueForm.convention_id as number]
         await updateHrRequestFromIssueForm(detail.id, {
           title: issueForm.title.trim(),
           reporting_framework: framework,
           convention_id: conventionIds[0] ?? null,
           convention_ids: conventionIds,
-          request_type: otherIssue ? 'other_issue' : issueForm.request_type,
-          issue_id: otherIssue ? null : (issueForm.issue_id as number),
+          request_type: uprFlow ? 'upr' : otherIssue ? 'other_issue' : issueForm.request_type,
+          issue_id: otherIssue || uprFlow ? null : (issueForm.issue_id as number),
           other_issue_text: otherIssue ? issueForm.other_issue_text.trim() : null,
           upr: null,
           upr_indicator: null,
+          upr_selection: uprSelection,
           region_ids: issueForm.region_ids,
           department_ids: ictInPayload ? issueForm.department_ids : [],
           date: issueForm.date,
           status,
           details: issueForm.details.trim() || null,
           indicator_responses:
-            !otherIssue && selectedIssue
+            !otherIssue && !uprFlow && selectedIssue
               ? buildIndicatorPayload(
                   selectedIssue,
                   issueForm.indicatorValues,
@@ -1132,7 +1276,9 @@ export function HrRequestModal({
               {(catalogLoading || issuesLoading) && (
                 <p className="muted">Loading reference data…</p>
               )}
-              {selectedIssue || issueForm.request_type === 'other_issue' ? (
+              {selectedIssue ||
+              issueForm.request_type === 'other_issue' ||
+              issueForm.reporting_framework === 'upr' ? (
                 <HrRequestViewTemplate
                   className={useWorkflowHero ? 'hr-request-view-template--external-hero' : undefined}
                   requestId={detail?.id ?? requestIdHint}
@@ -1142,7 +1288,13 @@ export function HrRequestModal({
                   regionNames={viewTemplateRegionNames}
                   ictDepartmentNames={viewTemplateIctDepartmentNames}
                   assignedDepartmentNames={viewTemplateAssignedDepartmentNames}
-                  conventionLabel={conventionDisplayLabel}
+                  conventionLabel={
+                    issueForm.reporting_framework === 'upr'
+                      ? detail?.upr?.trim() ||
+                        uprCatalog.cycles.find((c) => c.id === issueForm.upr_cycle_id)?.name ||
+                        '—'
+                      : conventionDisplayLabel
+                  }
                   requestType={issueForm.request_type}
                   reportingFramework={
                     issueForm.reporting_framework ||
@@ -1150,33 +1302,78 @@ export function HrRequestModal({
                     null
                   }
                   otherIssueText={issueForm.other_issue_text}
-                  issueTitle={selectedIssue ? issueEntryPrimaryText(selectedIssue) : 'Other Issues'}
+                  issueTitle={
+                    issueForm.reporting_framework === 'upr'
+                      ? detail?.upr_indicator?.trim() ||
+                        [
+                          uprTypeLabel(
+                            uprCatalog.types.find((t) => t.id === issueForm.upr_type_id)?.name ??
+                              '',
+                          ),
+                          uprCatalog.categories.find((c) => c.id === issueForm.upr_category_id)
+                            ?.name,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') ||
+                        'UPR'
+                      : selectedIssue
+                        ? issueEntryPrimaryText(selectedIssue)
+                        : 'Other Issues'
+                  }
                   issueEntryKind={
                     selectedIssue?.entry_kind === 'recommendation' ? 'recommendation' : 'issue'
                   }
-                  categoryName={selectedIssue?.category?.name ?? '—'}
-                  issueDescription={selectedIssue?.description ?? null}
+                  categoryName={
+                    issueForm.reporting_framework === 'upr'
+                      ? uprCatalog.categories.find((c) => c.id === issueForm.upr_category_id)
+                          ?.name ??
+                        detail?.upr_indicator ??
+                        '—'
+                      : (selectedIssue?.category?.name ?? '—')
+                  }
+                  issueDescription={
+                    issueForm.reporting_framework === 'upr'
+                      ? uprRecommendationsForArea.map((r) => r.name).join('\n') || null
+                      : (selectedIssue?.description ?? null)
+                  }
                   description={issueForm.details}
                   regionalInstructionsOnly={departmentPortalRegionalNotes !== undefined}
                   regionalInstructionsText={
                     departmentPortalRegionalNotes !== undefined ? departmentPortalRegionalNotes : null
                   }
-                  articles={selectedIssue?.articles ?? []}
-                  indicators={selectedIssue ? indicatorsForMappingUi.map((ind) => {
-                    const resp = detail?.indicator_responses?.find(
-                      (r) => r.issue_indicator_id === ind.id,
-                    )
-                    return {
-                      id: ind.id,
-                      indicator_text: ind.indicator_text,
-                      disaggregation: ind.disaggregation,
-                      hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
-                      hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
-                      collectionDisaggregation: indicatorCollectionDisaggregationFromApi(ind),
-                      quantitative_value: resp?.quantitative_value,
-                      qualitative_text: resp?.qualitative_text,
-                    }
-                  }) : []}
+                  articles={
+                    issueForm.reporting_framework === 'upr' ? [] : (selectedIssue?.articles ?? [])
+                  }
+                  indicators={
+                    issueForm.reporting_framework === 'upr'
+                      ? uprIndicatorsForArea
+                          .filter((ind) => issueForm.upr_indicator_ids.includes(ind.id))
+                          .map((ind) => ({
+                            id: ind.id,
+                            indicator_text: ind.indicator_text,
+                            disaggregation: null,
+                            hasQuantitative: ind.has_quantitative,
+                            hasQualitative: ind.has_qualitative,
+                          }))
+                      : selectedIssue
+                        ? indicatorsForMappingUi.map((ind) => {
+                            const resp = detail?.indicator_responses?.find(
+                              (r) => r.issue_indicator_id === ind.id,
+                            )
+                            return {
+                              id: ind.id,
+                              indicator_text: ind.indicator_text,
+                              disaggregation: ind.disaggregation,
+                              hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
+                              hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
+                              collectionDisaggregation:
+                                indicatorCollectionDisaggregationFromApi(ind),
+                              quantitative_value: resp?.quantitative_value,
+                              qualitative_text: resp?.qualitative_text,
+                            }
+                          })
+                        : []
+                  }
                   attachments={detail?.attachments}
                 />
               ) : (
@@ -1257,17 +1454,21 @@ export function HrRequestModal({
                       return {
                         ...f,
                         reporting_framework: next,
-                        request_type: isOther
-                          ? 'other_issue'
-                          : f.request_type === 'other_issue'
-                            ? 'loi'
-                            : f.request_type,
+                        request_type: isUpr
+                          ? 'upr'
+                          : isOther
+                            ? 'other_issue'
+                            : f.request_type === 'other_issue' || f.request_type === 'upr'
+                              ? 'loi'
+                              : f.request_type,
                         convention_id: nextIds[0] ?? '',
                         convention_ids: nextIds,
                         issue_id: '',
                         other_issue_text: isOther ? f.other_issue_text : '',
-                        upr_reporting_cycle: isUpr ? f.upr_reporting_cycle : '',
-                        upr_recommendation: isUpr ? f.upr_recommendation : '',
+                        upr_cycle_id: isUpr ? f.upr_cycle_id : '',
+                        upr_type_id: isUpr ? f.upr_type_id : '',
+                        upr_category_id: isUpr ? f.upr_category_id : '',
+                        upr_indicator_ids: isUpr ? f.upr_indicator_ids : [],
                         selectedIndicatorIds: [],
                         indicatorValues: {},
                         indicatorYearIds: {},
@@ -1297,61 +1498,259 @@ export function HrRequestModal({
 
               {issueForm.reporting_framework === 'upr' ? (
                 <>
-                  <FormField label="Reporting Cycle" htmlFor="hr-upr-cycle">
+                  {uprCatalogLoading ? (
+                    <p className="muted">Loading UPR catalog…</p>
+                  ) : null}
+                  <FormField label="UPR cycle" htmlFor="hr-upr-cycle">
                     <select
                       id="hr-upr-cycle"
-                      value={issueForm.upr_reporting_cycle}
-                      onChange={(e) =>
+                      value={issueForm.upr_cycle_id === '' ? '' : String(issueForm.upr_cycle_id)}
+                      onChange={(e) => {
+                        const v = e.target.value === '' ? '' : Number(e.target.value)
                         setIssueForm((f) =>
-                          f ? { ...f, upr_reporting_cycle: e.target.value } : f,
+                          f
+                            ? {
+                                ...f,
+                                upr_cycle_id: v === '' ? '' : v,
+                                upr_category_id: '',
+                                upr_indicator_ids: [],
+                              }
+                            : f,
                         )
-                      }
-                      disabled={readOnly}
-                      aria-invalid={Boolean(fieldErrors.upr_reporting_cycle)}
+                      }}
+                      disabled={readOnly || uprCatalogLoading}
+                      aria-invalid={Boolean(fieldErrors.upr_cycle_id)}
                       aria-describedby={
-                        fieldErrors.upr_reporting_cycle ? 'hr-upr-cycle-err' : undefined
+                        fieldErrors.upr_cycle_id ? 'hr-upr-cycle-err' : undefined
                       }
                     >
-                      <option value="">Select reporting cycle</option>
-                      {UPR_REPORTING_CYCLE_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
+                      <option value="">Select UPR cycle</option>
+                      {uprCatalog.cycles.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError id="hr-upr-cycle-err" message={fieldErrors.upr_cycle_id} />
+                  </FormField>
+
+                  <FormField label="UPR type">
+                    <div
+                      className="checkbox-grid"
+                      role="radiogroup"
+                      aria-label="UPR type"
+                      aria-invalid={Boolean(fieldErrors.upr_type_id)}
+                      aria-describedby={
+                        fieldErrors.upr_type_id ? 'hr-upr-type-err' : undefined
+                      }
+                    >
+                      {uprTypesForRadios.length === 0 ? (
+                        <p className="muted" style={{ margin: 0 }}>
+                          {uprCatalogLoading
+                            ? 'Loading types…'
+                            : 'No UPR types available. Configure them in UPR Management.'}
+                        </p>
+                      ) : (
+                        uprTypesForRadios.map((t) => (
+                          <label key={t.id} className="checkbox-label">
+                            <input
+                              type="radio"
+                              name="hr-upr-type"
+                              checked={issueForm.upr_type_id === t.id}
+                              disabled={readOnly}
+                              onChange={() =>
+                                setIssueForm((f) =>
+                                  f
+                                    ? {
+                                        ...f,
+                                        upr_type_id: t.id,
+                                        upr_category_id: '',
+                                        upr_indicator_ids: [],
+                                      }
+                                    : f,
+                                )
+                              }
+                            />
+                            {uprTypeLabel(t.name)}
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    <FieldError id="hr-upr-type-err" message={fieldErrors.upr_type_id} />
+                  </FormField>
+
+                  <FormField label="Thematic area" htmlFor="hr-upr-category">
+                    <select
+                      id="hr-upr-category"
+                      value={
+                        issueForm.upr_category_id === ''
+                          ? ''
+                          : String(issueForm.upr_category_id)
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value === '' ? '' : Number(e.target.value)
+                        setIssueForm((f) =>
+                          f
+                            ? {
+                                ...f,
+                                upr_category_id: v === '' ? '' : v,
+                                upr_indicator_ids: [],
+                              }
+                            : f,
+                        )
+                      }}
+                      disabled={
+                        readOnly ||
+                        issueForm.upr_cycle_id === '' ||
+                        issueForm.upr_type_id === '' ||
+                        uprCatalogLoading
+                      }
+                      aria-invalid={Boolean(fieldErrors.upr_category_id)}
+                      aria-describedby={
+                        fieldErrors.upr_category_id ? 'hr-upr-category-err' : undefined
+                      }
+                    >
+                      <option value="">
+                        {issueForm.upr_cycle_id === '' || issueForm.upr_type_id === ''
+                          ? 'Select cycle and type first'
+                          : 'Select thematic area'}
+                      </option>
+                      {uprCategoriesForSelect.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
                         </option>
                       ))}
                     </select>
                     <FieldError
-                      id="hr-upr-cycle-err"
-                      message={fieldErrors.upr_reporting_cycle}
+                      id="hr-upr-category-err"
+                      message={fieldErrors.upr_category_id}
                     />
                   </FormField>
 
-                  <FormField label="List of UPR Recommendations" htmlFor="hr-upr-rec">
-                    <select
-                      id="hr-upr-rec"
-                      value={issueForm.upr_recommendation}
-                      onChange={(e) =>
-                        setIssueForm((f) =>
-                          f ? { ...f, upr_recommendation: e.target.value } : f,
-                        )
-                      }
-                      disabled={readOnly}
-                      aria-invalid={Boolean(fieldErrors.upr_recommendation)}
-                      aria-describedby={
-                        fieldErrors.upr_recommendation ? 'hr-upr-rec-err' : undefined
-                      }
-                    >
-                      <option value="">Select UPR recommendation</option>
-                      {UPR_RECOMMENDATION_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                    <FieldError
-                      id="hr-upr-rec-err"
-                      message={fieldErrors.upr_recommendation}
-                    />
-                  </FormField>
+                  {issueForm.upr_category_id !== '' ? (
+                    <FormField label="List of UPR recommendations">
+                      {uprRecommendationsForArea.length === 0 ? (
+                        <p className="muted" style={{ margin: 0 }}>
+                          No recommendations linked to this thematic area.
+                        </p>
+                      ) : (
+                        <ul
+                          className="mapping-indicators"
+                          style={{ listStyle: 'disc', paddingLeft: '1.25rem', margin: 0 }}
+                        >
+                          {uprRecommendationsForArea.map((r) => (
+                            <li key={r.id} style={{ marginBottom: 6 }}>
+                              {r.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </FormField>
+                  ) : null}
+
+                  {issueForm.upr_category_id !== '' ? (
+                    <FormField label="UPR indicators">
+                      <FieldError
+                        id="hr-upr-ind-err"
+                        message={fieldErrors.upr_indicator_ids}
+                      />
+                      {!readOnly && uprIndicatorsForArea.length > 0 ? (
+                        <div className="mapping-indicators-toolbar">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            compact
+                            onClick={() =>
+                              setIssueForm((f) =>
+                                f
+                                  ? {
+                                      ...f,
+                                      upr_indicator_ids: uprIndicatorsForArea
+                                        .map((i) => i.id)
+                                        .sort((a, b) => a - b),
+                                    }
+                                  : f,
+                              )
+                            }
+                          >
+                            Select all
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            compact
+                            onClick={() =>
+                              setIssueForm((f) =>
+                                f ? { ...f, upr_indicator_ids: [] } : f,
+                              )
+                            }
+                          >
+                            Deselect all
+                          </Button>
+                        </div>
+                      ) : null}
+                      {uprIndicatorsForArea.length === 0 ? (
+                        <p className="muted" style={{ margin: 0 }}>
+                          No indicators linked to this thematic area.
+                        </p>
+                      ) : (
+                        <ul
+                          className="mapping-indicators"
+                          style={{ listStyle: 'none', paddingLeft: 0 }}
+                        >
+                          {uprIndicatorsForArea.map((ind) => {
+                            const checked = issueForm.upr_indicator_ids.includes(ind.id)
+                            const typeHint = [
+                              ind.has_quantitative ? 'Quantitative' : null,
+                              ind.has_qualitative ? 'Qualitative' : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')
+                            return (
+                              <li key={ind.id} style={{ marginBottom: 10 }}>
+                                <label
+                                  className="checkbox-label"
+                                  style={{ alignItems: 'flex-start' }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={readOnly}
+                                    onChange={(e) => {
+                                      const on = e.target.checked
+                                      setIssueForm((f) => {
+                                        if (!f) return f
+                                        const set = new Set(f.upr_indicator_ids)
+                                        if (on) set.add(ind.id)
+                                        else set.delete(ind.id)
+                                        return {
+                                          ...f,
+                                          upr_indicator_ids: [...set].sort((a, b) => a - b),
+                                        }
+                                      })
+                                    }}
+                                  />
+                                  <span>
+                                    <span style={{ fontWeight: 600 }}>
+                                      {ind.indicator_text}
+                                    </span>
+                                    {typeHint ? (
+                                      <span
+                                        className="muted small"
+                                        style={{ marginLeft: 8 }}
+                                      >
+                                        ({typeHint})
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </label>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </FormField>
+                  ) : null}
                 </>
               ) : null}
 
@@ -2193,7 +2592,7 @@ export function HrRequestModal({
                   variant="secondary"
                   compact
                   type="button"
-                  disabled={saving || issueForm.reporting_framework === 'upr'}
+                  disabled={saving}
                   onClick={() => void handleSaveDraft()}
                 >
                   {saving ? 'Saving…' : 'Save as Draft'}
@@ -2204,12 +2603,7 @@ export function HrRequestModal({
                   variant="primary"
                   compact
                   type="submit"
-                  disabled={saving || issueForm.reporting_framework === 'upr'}
-                  title={
-                    issueForm.reporting_framework === 'upr'
-                      ? UPR_COMPLETION_BLOCKED_MESSAGE
-                      : undefined
-                  }
+                  disabled={saving}
                 >
                   {saving ? 'Submitting…' : 'Submit'}
                 </Button>

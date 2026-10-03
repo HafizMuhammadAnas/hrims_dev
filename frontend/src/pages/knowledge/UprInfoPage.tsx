@@ -49,7 +49,7 @@ function UprDetail({ data, onBack }: { data: KnowledgeUprEntry; onBack: () => vo
     <KnowledgeHubPage>
       <KnowledgeHubDetailHeader
         title={data.display_title}
-        subtitle={`${data.type?.name || data.display_title} — ${cycleLabel}`}
+        subtitle={cycleLabel === data.display_title ? 'Universal Periodic Review' : `UPR — ${cycleLabel}`}
         icon="📋"
         fallback="📋"
         onBack={onBack}
@@ -199,11 +199,7 @@ export function UprInfoPage() {
                 icon="📋"
                 fallback="📋"
                 title={item.display_title}
-                description={
-                  item.cycle?.name
-                    ? `${item.type?.name || item.display_title} · ${item.cycle.name}`
-                    : item.type?.name || item.display_title
-                }
+                description={item.cycle?.name ? `UPR cycle · ${item.cycle.name}` : 'Universal Periodic Review'}
                 onClick={() => setSelected(item)}
               />
             ))}

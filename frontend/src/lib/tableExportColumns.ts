@@ -23,7 +23,14 @@ function hrRequestRegionsLabel(row: HrRequestRow): string {
 export const HR_REQUEST_EXPORT_COLUMNS: TableExportColumn<HrRequestRow>[] = [
   { header: 'ID', value: (row) => row.id },
   { header: 'Title', value: (row) => row.title },
-  { header: 'Convention', value: (row) => row.conv },
+  {
+    header: 'Convention/Cycle',
+    value: (row) => {
+      const conv = (row.conv ?? '').trim()
+      if (conv) return conv
+      return (row.upr ?? '').trim() || '—'
+    },
+  },
   { header: 'Region(s)', value: hrRequestRegionsLabel },
   { header: 'Due', value: (row) => formatAppDate(row.date) },
   {
@@ -37,7 +44,14 @@ export type ReceivedRequestExportRow = HrRequestRow & { _status: ReceivedRequest
 export const RECEIVED_REQUEST_EXPORT_COLUMNS: TableExportColumn<ReceivedRequestExportRow>[] = [
   { header: 'Request ID', value: (row) => row.id },
   { header: 'Title', value: (row) => row.title },
-  { header: 'Convention', value: (row) => row.conv },
+  {
+    header: 'Convention/Cycle',
+    value: (row) => {
+      const conv = (row.conv ?? '').trim()
+      if (conv) return conv
+      return (row.upr ?? '').trim() || '—'
+    },
+  },
   { header: 'Date', value: (row) => formatAppDate(row.date) },
   {
     header: 'Status',

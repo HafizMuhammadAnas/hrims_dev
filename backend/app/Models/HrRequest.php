@@ -32,6 +32,7 @@ class HrRequest extends Model
         'sdg_indicator',
         'upr',
         'upr_indicator',
+        'upr_selection',
         'issue_cards',
         'convention_id',
         'issue_id',
@@ -45,6 +46,7 @@ class HrRequest extends Model
         return [
             'due_date' => 'date',
             'issue_cards' => 'array',
+            'upr_selection' => 'array',
         ];
     }
 

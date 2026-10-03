@@ -130,6 +130,9 @@ class KnowledgeUprEntryController extends Controller
         $data = $request->validate([
             'path' => ['nullable', 'string', 'max:500'],
             'token' => ['nullable', 'string', 'max:1000'],
+            'knowledge_upr_entry_id' => ['nullable', 'integer', 'exists:knowledge_upr_entries,id'],
+            'document_id' => ['nullable', 'string', 'max:100'],
+            'href' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $path = null;
@@ -150,6 +153,18 @@ class KnowledgeUprEntryController extends Controller
             Storage::disk('public')->delete($path);
         }
 
+        // Keep Knowledge Hub in sync: drop the document from the saved entry JSON.
+        if (! empty($data['knowledge_upr_entry_id'])) {
+            $entry = KnowledgeUprEntry::query()->find((int) $data['knowledge_upr_entry_id']);
+            if ($entry) {
+                $entry->removeAttachedDocument(
+                    path: $path,
+                    documentId: isset($data['document_id']) ? (string) $data['document_id'] : null,
+                    href: isset($data['href']) ? (string) $data['href'] : null,
+                );
+            }
+        }
+
         return response()->json(['message' => 'Deleted']);
     }
 
@@ -158,10 +173,8 @@ class KnowledgeUprEntryController extends Controller
      */
     private function validatePayload(Request $request, bool $partial): array
     {
-        $req = $partial ? 'sometimes' : 'required';
-
         $data = $request->validate([
-            'upr_type_id' => [$req, 'integer', 'exists:upr_types,id'],
+            'upr_type_id' => ['sometimes', 'nullable', 'integer', 'exists:upr_types,id'],
             'kind' => ['sometimes', 'nullable', 'string', 'max:64'],
             'title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'upr_cycle_id' => [$partial ? 'sometimes' : 'required', 'nullable', 'integer', 'exists:upr_cycles,id'],
@@ -172,7 +185,15 @@ class KnowledgeUprEntryController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
-        if (array_key_exists('upr_type_id', $data)) {
+        // Knowledge Hub entries are cycle-based; type is optional/legacy.
+        if (! $partial && ! array_key_exists('upr_type_id', $data)) {
+            $data['upr_type_id'] = null;
+        }
+        if (! $partial && empty($data['kind'])) {
+            $data['kind'] = 'upr';
+        }
+
+        if (array_key_exists('upr_type_id', $data) && $data['upr_type_id'] !== null) {
             $typeName = DB::table('upr_types')->where('id', (int) $data['upr_type_id'])->value('name');
             if (is_string($typeName) && $typeName !== '') {
                 $data['kind'] = strtolower($typeName);

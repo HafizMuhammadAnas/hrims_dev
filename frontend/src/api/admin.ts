@@ -259,8 +259,15 @@ async function adminGet<T>(path: string): Promise<T> {
 
 async function adminSend(method: string, path: string, body?: unknown): Promise<Response> {
   await ensureCsrfCookie()
-  return fetch(`/api/v1/admin${path}`, {
-    method,
+  // FortiGate blocks HTTP DELETE (same class as PATCH — Attack ID 20000001).
+  let verb = method
+  let urlPath = path
+  if (method === 'DELETE') {
+    verb = 'POST'
+    urlPath = `${path.replace(/\/$/, '')}/delete`
+  }
+  return fetch(`/api/v1/admin${urlPath}`, {
+    method: verb,
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -863,7 +870,7 @@ export type AdminKnowledgeUprEntry = {
 }
 
 export type AdminKnowledgeUprEntryPayload = {
-  upr_type_id: number
+  upr_type_id?: number | null
   kind?: string | null
   title?: string | null
   upr_cycle_id: number | null
@@ -931,10 +938,14 @@ export async function adminUploadKnowledgeUprFiles(
   return ((await res.json()) as { data: AdminKnowledgeUprDocument[] }).data
 }
 
-export async function adminDeleteKnowledgeUprFile(doc: {
-  path?: string
-  href?: string
-}): Promise<void> {
+export async function adminDeleteKnowledgeUprFile(
+  doc: {
+    id?: string
+    path?: string
+    href?: string
+  },
+  entryId?: number | null,
+): Promise<void> {
   const path = doc.path?.trim()
   let token: string | undefined
   if (!path && doc.href) {
@@ -944,11 +955,17 @@ export async function adminDeleteKnowledgeUprFile(doc: {
   }
   if (!path && !token) return
   await ensureCsrfCookie()
+  const payload: Record<string, string | number> = path ? { path } : { token: token as string }
+  if (entryId != null && Number.isFinite(entryId)) {
+    payload.knowledge_upr_entry_id = entryId
+  }
+  if (doc.id?.trim()) payload.document_id = doc.id.trim()
+  if (doc.href?.trim()) payload.href = doc.href.trim()
   const res = await fetch('/api/v1/admin/knowledge-upr-entries/files/delete', {
     method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
-    body: JSON.stringify(path ? { path } : { token }),
+    body: JSON.stringify(payload),
   })
   await throwIfNotOk(res)
 }

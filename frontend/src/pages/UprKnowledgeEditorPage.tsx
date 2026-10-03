@@ -4,14 +4,10 @@ import {
   adminCreateKnowledgeUprEntry,
   adminDeleteKnowledgeUprFile,
   adminFetchKnowledgeUprEntry,
-  adminFetchUprCategories,
   adminFetchUprCycles,
-  adminFetchUprTypes,
   adminUpdateKnowledgeUprEntry,
   adminUploadKnowledgeUprFiles,
-  type AdminUprCategory,
   type AdminUprCycle,
-  type AdminUprType,
 } from '../api/admin'
 import { isApiError } from '../api/apiError'
 import { useAuth } from '../auth/AuthContext'
@@ -40,7 +36,6 @@ import { SUPER_ADMIN_UPR_RECOMMENDATIONS } from '../lib/superAdminRoutes'
 type EditorTab = 'overview' | 'repositories' | 'analysis'
 
 type FormState = {
-  upr_type_id: string
   upr_cycle_id: string
   introduction: string
   repositories: Record<KnowledgeUprRepositoryKey, KnowledgeUprDocument | null>
@@ -49,7 +44,6 @@ type FormState = {
 }
 
 const EMPTY_FORM: FormState = {
-  upr_type_id: '',
   upr_cycle_id: '',
   introduction: '',
   repositories: emptyKnowledgeUprRepositories(),
@@ -70,9 +64,7 @@ export function UprKnowledgeEditorPage() {
 
   const [tab, setTab] = useState<EditorTab>('overview')
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
-  const [types, setTypes] = useState<AdminUprType[]>([])
   const [cycles, setCycles] = useState<AdminUprCycle[]>([])
-  const [categories, setCategories] = useState<AdminUprCategory[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
@@ -80,16 +72,12 @@ export function UprKnowledgeEditorPage() {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
-    void Promise.all([adminFetchUprTypes(), adminFetchUprCycles(), adminFetchUprCategories()])
-      .then(([typeRows, cycleRows, categoryRows]) => {
-        setTypes(typeRows.filter((t) => t.is_active !== false))
+    void adminFetchUprCycles()
+      .then((cycleRows) => {
         setCycles(cycleRows.filter((c) => c.is_active !== false))
-        setCategories(categoryRows.filter((c) => c.is_active !== false))
       })
       .catch(() => {
-        setTypes([])
         setCycles([])
-        setCategories([])
       })
   }, [])
 
@@ -111,7 +99,6 @@ export function UprKnowledgeEditorPage() {
       .then((row) => {
         if (cancelled) return
         setForm({
-          upr_type_id: row.upr_type_id != null ? String(row.upr_type_id) : '',
           upr_cycle_id: row.upr_cycle_id != null ? String(row.upr_cycle_id) : '',
           introduction: row.introduction ?? '',
           repositories: normalizeKnowledgeUprRepositories(row.repositories),
@@ -138,29 +125,10 @@ export function UprKnowledgeEditorPage() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const selectedTypeName =
-    types.find((t) => String(t.id) === form.upr_type_id)?.name?.trim() || 'UPR'
-
-  const linkedCycles = useMemo(() => {
-    if (!form.upr_type_id) return []
-    const linkedCycleIds = new Set(
-      categories
-        .filter(
-          (c) =>
-            String(c.upr_type_id ?? '') === form.upr_type_id && c.upr_cycle_id != null,
-        )
-        .map((c) => c.upr_cycle_id as number),
-    )
-    const linked = cycles.filter((c) => linkedCycleIds.has(c.id))
-    // Keep currently saved cycle visible while editing even if mapping changed.
-    if (form.upr_cycle_id) {
-      const current = cycles.find((c) => String(c.id) === form.upr_cycle_id)
-      if (current && !linked.some((c) => c.id === current.id)) {
-        return [...linked, current]
-      }
-    }
-    return linked
-  }, [categories, cycles, form.upr_type_id, form.upr_cycle_id])
+  const selectedCycleName = useMemo(
+    () => cycles.find((c) => String(c.id) === form.upr_cycle_id)?.name?.trim() || 'UPR',
+    [cycles, form.upr_cycle_id],
+  )
 
   async function uploadRepository(key: KnowledgeUprRepositoryKey, fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return
@@ -195,11 +163,20 @@ export function UprKnowledgeEditorPage() {
     if (!doc) return
     setError(null)
     try {
-      await adminDeleteKnowledgeUprFile(doc)
+      await adminDeleteKnowledgeUprFile(doc, numericId)
     } catch {
       // still clear from form
     }
-    patch('repositories', { ...form.repositories, [key]: null })
+    const nextRepos = { ...form.repositories, [key]: null }
+    patch('repositories', nextRepos)
+    // Persist immediately for existing entries so Knowledge Hub does not keep a dead link.
+    if (numericId != null) {
+      try {
+        await adminUpdateKnowledgeUprEntry(numericId, { repositories: nextRepos })
+      } catch (e: unknown) {
+        setError(isApiError(e) ? e.message : 'File removed, but saving the entry failed')
+      }
+    }
   }
 
   async function uploadAnalysis(fileList: FileList | null) {
@@ -235,22 +212,25 @@ export function UprKnowledgeEditorPage() {
   async function removeAnalysis(doc: KnowledgeUprDocument) {
     setError(null)
     try {
-      await adminDeleteKnowledgeUprFile(doc)
+      await adminDeleteKnowledgeUprFile(doc, numericId)
     } catch {
       // still clear
     }
-    patch(
-      'analysis_files',
-      form.analysis_files.filter((f) => f.id !== doc.id),
+    const nextFiles = form.analysis_files.filter(
+      (f) => f.id !== doc.id && f.path !== doc.path && f.href !== doc.href,
     )
+    patch('analysis_files', nextFiles)
+    // Persist immediately for existing entries so Knowledge Hub does not keep a dead link.
+    if (numericId != null) {
+      try {
+        await adminUpdateKnowledgeUprEntry(numericId, { analysis_files: nextFiles })
+      } catch (e: unknown) {
+        setError(isApiError(e) ? e.message : 'File removed, but saving the entry failed')
+      }
+    }
   }
 
   async function save() {
-    if (!form.upr_type_id) {
-      setError('Select a UPR type.')
-      setTab('overview')
-      return
-    }
     if (!form.upr_cycle_id) {
       setError('Select a UPR cycle.')
       setTab('overview')
@@ -260,7 +240,6 @@ export function UprKnowledgeEditorPage() {
     setError(null)
     try {
       const payload = {
-        upr_type_id: Number(form.upr_type_id),
         title: null,
         upr_cycle_id: Number(form.upr_cycle_id),
         introduction: form.introduction.trim() || null,
@@ -289,7 +268,7 @@ export function UprKnowledgeEditorPage() {
 
   return (
     <PageSection
-      title={isEdit ? `Edit UPR — ${selectedTypeName}` : 'Create UPR for Knowledge Hub'}
+      title={isEdit ? `Edit UPR — ${selectedCycleName}` : 'Create UPR for Knowledge Hub'}
       leading={
         <WorkflowPageBack
           placement="header"
@@ -326,37 +305,14 @@ export function UprKnowledgeEditorPage() {
           <TableCard padded>
             {tab === 'overview' ? (
               <FormGrid>
-                <FormControl label="UPR Type">
-                  <select
-                    value={form.upr_type_id}
-                    onChange={(e) => {
-                      const nextType = e.target.value
-                      setForm((prev) => ({
-                        ...prev,
-                        upr_type_id: nextType,
-                        upr_cycle_id: '',
-                      }))
-                    }}
-                    disabled={saving}
-                  >
-                    <option value="">Select UPR type</option>
-                    {types.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </FormControl>
                 <FormControl label="Cycle">
                   <select
                     value={form.upr_cycle_id}
                     onChange={(e) => patch('upr_cycle_id', e.target.value)}
-                    disabled={saving || !form.upr_type_id}
+                    disabled={saving}
                   >
-                    <option value="">
-                      {form.upr_type_id ? 'Select cycle' : 'Select UPR type first'}
-                    </option>
-                    {linkedCycles.map((c) => (
+                    <option value="">Select cycle</option>
+                    {cycles.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>

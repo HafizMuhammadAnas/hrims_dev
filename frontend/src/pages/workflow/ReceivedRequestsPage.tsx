@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LABEL_DELETE_REQUEST, LABEL_RECEIVED_REQUESTS } from '../../lib/uiLabels'
-import { deleteHrRequest, fetchHrRequests } from '../../api/hrRequests'
+import {
+  deleteHrRequest,
+  fetchHrRequestFormConventions,
+  fetchHrRequestFormUprCatalog,
+  fetchHrRequests,
+  type KnowledgeConventionRow,
+} from '../../api/hrRequests'
 import { fetchClarifications, type HrRequestClarificationRow } from '../../api/clarifications'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../../api/lists'
 import { useAuth } from '../../auth/AuthContext'
@@ -27,6 +33,14 @@ import {
   type ReceivedRequestWorkflowStatus,
 } from '../../lib/receivedRequestWorkflow'
 import { isRegionalAdmin } from '../../lib/roles'
+import {
+  buildConventionFilterOptions,
+  buildCycleFilterOptions,
+  conventionOrCycleLabel,
+  rowMatchesConventionCycleFilters,
+  type ConventionCycleKindFilter,
+} from '../../lib/hrRequestConventionCycleFilter'
+import type { HrRequestUprCycle } from '../../lib/hrRequestUprForm'
 import { hrRequestEditPath } from '../../lib/workflowNavigation'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../../types/hrRequest'
 
@@ -59,8 +73,11 @@ export function ReceivedRequestsPage({
   const [deleteTarget, setDeleteTarget] = useState<HrRequestRow | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [conventions, setConventions] = useState<KnowledgeConventionRow[]>([])
+  const [uprCycles, setUprCycles] = useState<HrRequestUprCycle[]>([])
   const table = useClientTableState({ pageSize: 10 })
-  const { search, setSearch, filters, setFilter, resetFilters, page, setPage, pageSize } = table
+  const { search, setSearch, filters, setFilter, setFilters, resetFilters, page, setPage, pageSize } =
+    table
 
   const load = useCallback(async () => {
     const [reqs, deptTasks, resp, clarRows] = await Promise.all([
@@ -88,6 +105,21 @@ export function ReceivedRequestsPage({
       cancelled = true
     }
   }, [load])
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all([
+      fetchHrRequestFormConventions().catch(() => [] as KnowledgeConventionRow[]),
+      fetchHrRequestFormUprCatalog().catch(() => null),
+    ]).then(([convRows, uprCatalog]) => {
+      if (cancelled) return
+      setConventions(convRows)
+      setUprCycles(uprCatalog?.cycles ?? [])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const mapped = useMemo(() => {
     const scopedRows = enableRequestCrud
@@ -169,22 +201,44 @@ export function ReceivedRequestsPage({
   }
 
   const statusFilter = filters.status ?? ''
+  const conventionCycleKind = (filters.convention_cycle_kind ?? '') as ConventionCycleKindFilter
+  const conventionCycleValue = filters.convention_cycle ?? ''
+
+  const conventionFilterOptions = useMemo(
+    () => buildConventionFilterOptions(conventions, mapped),
+    [conventions, mapped],
+  )
+  const cycleFilterOptions = useMemo(
+    () => buildCycleFilterOptions(uprCycles, mapped),
+    [uprCycles, mapped],
+  )
+  const secondaryFilterOptions =
+    conventionCycleKind === 'convention'
+      ? conventionFilterOptions
+      : conventionCycleKind === 'cycle'
+        ? cycleFilterOptions
+        : []
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filtered = mapped.filter((r) => {
       if (statusFilter && r._status !== statusFilter) return false
+      if (!rowMatchesConventionCycleFilters(r, conventionCycleKind, conventionCycleValue)) {
+        return false
+      }
       if (!q) return true
+      const convCycle = conventionOrCycleLabel(r)
       return (
         r.id.toLowerCase().includes(q) ||
         r.title.toLowerCase().includes(q) ||
-        r.conv.toLowerCase().includes(q) ||
+        convCycle.toLowerCase().includes(q) ||
         r.date.toLowerCase().includes(q)
       )
     })
     return sortRowsLatestFirst(filtered, (r) =>
       pickActivityTimestamp(r.updated_at, r.created_at, r.date, r.id),
     )
-  }, [mapped, search, statusFilter])
+  }, [mapped, search, statusFilter, conventionCycleKind, conventionCycleValue])
   const { pageRows } = useMemo(
     () => derivePaginatedRows(filteredRows, page, pageSize),
     [filteredRows, page, pageSize],
@@ -201,11 +255,47 @@ export function ReceivedRequestsPage({
       <TableToolbar className="active-requests-toolbar">
         <input
           type="search"
-          placeholder="Search ID, title, convention, date..."
+          placeholder="Search ID, title, convention/cycle, date..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search active requests"
         />
+        <select
+          value={conventionCycleKind}
+          onChange={(e) => {
+            const next = e.target.value as ConventionCycleKindFilter
+            setFilters((prev) => ({
+              ...prev,
+              convention_cycle_kind: next,
+              convention_cycle: '',
+            }))
+          }}
+          aria-label="Filter by convention or cycle type"
+        >
+          <option value="">Convention / Cycle</option>
+          <option value="convention">Convention</option>
+          <option value="cycle">Cycle</option>
+        </select>
+        {conventionCycleKind ? (
+          <select
+            value={conventionCycleValue}
+            onChange={(e) => setFilter('convention_cycle', e.target.value)}
+            aria-label={
+              conventionCycleKind === 'convention'
+                ? 'Filter by convention name'
+                : 'Filter by UPR cycle name'
+            }
+          >
+            <option value="">
+              {conventionCycleKind === 'convention' ? 'All conventions' : 'All cycles'}
+            </option>
+            {secondaryFilterOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <select value={statusFilter} onChange={(e) => setFilter('status', e.target.value)} aria-label="Filter by status">
           <option value="">All statuses</option>
           {RECEIVED_REQUEST_STATUS_FILTER_OPTIONS.map((opt) => (
@@ -237,7 +327,7 @@ export function ReceivedRequestsPage({
             <tr>
               <th>Request ID</th>
               <th>Title</th>
-              <th>Convention</th>
+              <th>Convention/Cycle</th>
               <th>Date</th>
               <th>Status</th>
               <th>Actions</th>
@@ -250,7 +340,7 @@ export function ReceivedRequestsPage({
               <tr key={r.id}>
                 <td>{r.id}</td>
                 <td>{r.title}</td>
-                <td>{r.conv}</td>
+                <td>{conventionOrCycleLabel(r)}</td>
                 <td>{formatAppDate(r.date)}</td>
                 <td>
                   <StatusBadge tone={status.tone}>{status.label}</StatusBadge>

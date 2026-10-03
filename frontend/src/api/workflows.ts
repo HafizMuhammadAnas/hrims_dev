@@ -69,8 +69,9 @@ export async function updateDepartment(
 
 export async function deleteDepartment(id: number): Promise<void> {
   await ensureCsrfCookie()
-  const res = await fetch(`/api/v1/departments/${id}`, {
-    method: 'DELETE',
+  // POST: FortiGate blocks HTTP DELETE on live (Attack ID 20000001).
+  const res = await fetch(`/api/v1/departments/${id}/delete`, {
+    method: 'POST',
     credentials: 'include',
     headers: apiJsonHeaders(),
   })

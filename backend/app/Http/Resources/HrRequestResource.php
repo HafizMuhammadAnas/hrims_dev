@@ -48,6 +48,7 @@ class HrRequestResource extends JsonResource
             'sdg_indicator' => $this->sdg_indicator,
             'upr' => $this->upr,
             'upr_indicator' => $this->upr_indicator,
+            'upr_selection' => $this->upr_selection,
             'issue_cards' => $this->issue_cards,
             'region_id' => $this->region_id,
             'region' => $this->whenLoaded('region', fn () => [

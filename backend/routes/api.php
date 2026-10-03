@@ -63,9 +63,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/collection-years', [CollectionYearController::class, 'index'])->name('api.v1.collection-years.index');
         Route::get('/departments', [DepartmentController::class, 'index'])->name('api.v1.departments.index');
         Route::post('/departments', [DepartmentController::class, 'store'])->name('api.v1.departments.store');
-        // POST aliases: FortiGate at hrims.mohr.gov.pk blocks HTTP PATCH (Attack ID 20000001).
+        // POST aliases: FortiGate at hrims.mohr.gov.pk blocks HTTP PATCH/DELETE (Attack ID 20000001).
         Route::post('/departments/{department}/update', [DepartmentController::class, 'update'])->name('api.v1.departments.update');
         Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('api.v1.departments.update.patch');
+        Route::post('/departments/{department}/delete', [DepartmentController::class, 'destroy'])->name('api.v1.departments.destroy.post');
         Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('api.v1.departments.destroy');
 
         Route::get('/knowledge/conventions', [KnowledgeHubController::class, 'conventions'])->name('api.v1.knowledge.conventions.index');
@@ -88,6 +89,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/users', [UserController::class, 'store'])->name('api.v1.users.store');
         Route::post('/users/{user}/update', [UserController::class, 'update'])->name('api.v1.users.update');
         Route::patch('/users/{user}', [UserController::class, 'update'])->name('api.v1.users.update.patch');
+        Route::post('/users/{user}/delete', [UserController::class, 'destroy'])->name('api.v1.users.destroy.post');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('api.v1.users.destroy');
         Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('api.v1.dashboard.summary');
 
@@ -127,14 +129,18 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/hr-request-form/conventions', [HrRequestController::class, 'formConventions'])->name('api.v1.hr-request-form.conventions');
         Route::get('/hr-request-form/issues', [HrRequestController::class, 'formIssues'])->name('api.v1.hr-request-form.issues');
         Route::get('/hr-request-form/federal-departments', [HrRequestController::class, 'formFederalDepartments'])->name('api.v1.hr-request-form.federal-departments');
+        Route::get('/hr-request-form/upr-catalog', [HrRequestController::class, 'formUprCatalog'])->name('api.v1.hr-request-form.upr-catalog');
 
         Route::get('/hr-requests/{hrRequest}/attachments/{attachment}/file', [HrRequestController::class, 'downloadHrRequestAttachment'])
             ->name('api.v1.hr-requests.attachments.file');
+        Route::post('/hr-requests/{hrRequest}/attachments/{attachment}/delete', [HrRequestController::class, 'destroyAttachment'])
+            ->name('api.v1.hr-requests.attachments.destroy.post');
         Route::delete('/hr-requests/{hrRequest}/attachments/{attachment}', [HrRequestController::class, 'destroyAttachment'])
             ->name('api.v1.hr-requests.attachments.destroy');
 
-        // POST update alias: FortiGate blocks HTTP PATCH on live.
+        // POST aliases: FortiGate blocks HTTP PATCH/DELETE on live.
         Route::post('/hr-requests/{hrRequest}/update', [HrRequestController::class, 'update'])->name('api.v1.hr-requests.update.post');
+        Route::post('/hr-requests/{hrRequest}/delete', [HrRequestController::class, 'destroy'])->name('api.v1.hr-requests.destroy.post');
 
         Route::apiResource('hr-requests', HrRequestController::class)->parameters([
             'hr-requests' => 'hrRequest',
@@ -159,18 +165,21 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/regions', [AdminRegionController::class, 'store'])->name('api.v1.admin.regions.store');
             Route::post('/regions/{region}/update', [AdminRegionController::class, 'update'])->name('api.v1.admin.regions.update');
             Route::patch('/regions/{region}', [AdminRegionController::class, 'update'])->name('api.v1.admin.regions.update.patch');
+            Route::post('/regions/{region}/delete', [AdminRegionController::class, 'destroy'])->name('api.v1.admin.regions.destroy.post');
             Route::delete('/regions/{region}', [AdminRegionController::class, 'destroy'])->name('api.v1.admin.regions.destroy');
 
             Route::get('/districts', [AdminDistrictController::class, 'index'])->name('api.v1.admin.districts.index');
             Route::post('/districts', [AdminDistrictController::class, 'store'])->name('api.v1.admin.districts.store');
             Route::post('/districts/{district}/update', [AdminDistrictController::class, 'update'])->name('api.v1.admin.districts.update');
             Route::patch('/districts/{district}', [AdminDistrictController::class, 'update'])->name('api.v1.admin.districts.update.patch');
+            Route::post('/districts/{district}/delete', [AdminDistrictController::class, 'destroy'])->name('api.v1.admin.districts.destroy.post');
             Route::delete('/districts/{district}', [AdminDistrictController::class, 'destroy'])->name('api.v1.admin.districts.destroy');
 
             Route::get('/catalog/departments', [AdminDepartmentController::class, 'index'])->name('api.v1.admin.catalog.departments.index');
             Route::post('/catalog/departments', [AdminDepartmentController::class, 'store'])->name('api.v1.admin.catalog.departments.store');
             Route::post('/catalog/departments/{department}/update', [AdminDepartmentController::class, 'update'])->name('api.v1.admin.catalog.departments.update');
             Route::patch('/catalog/departments/{department}', [AdminDepartmentController::class, 'update'])->name('api.v1.admin.catalog.departments.update.patch');
+            Route::post('/catalog/departments/{department}/delete', [AdminDepartmentController::class, 'destroy'])->name('api.v1.admin.catalog.departments.destroy.post');
             Route::delete('/catalog/departments/{department}', [AdminDepartmentController::class, 'destroy'])->name('api.v1.admin.catalog.departments.destroy');
 
             Route::get('/conventions', [AdminConventionController::class, 'index'])->name('api.v1.admin.conventions.index');
@@ -179,48 +188,56 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/conventions/repository-files/delete', [AdminConventionController::class, 'deleteRepositoryFile'])->name('api.v1.admin.conventions.repository-files.delete');
             Route::post('/conventions/{convention}/update', [AdminConventionController::class, 'update'])->name('api.v1.admin.conventions.update');
             Route::patch('/conventions/{convention}', [AdminConventionController::class, 'update'])->name('api.v1.admin.conventions.update.patch');
+            Route::post('/conventions/{convention}/delete', [AdminConventionController::class, 'destroy'])->name('api.v1.admin.conventions.destroy.post');
             Route::delete('/conventions/{convention}', [AdminConventionController::class, 'destroy'])->name('api.v1.admin.conventions.destroy');
 
             Route::get('/conventions/{convention}/components', [AdminConventionComponentController::class, 'index'])->name('api.v1.admin.convention-components.index');
             Route::post('/conventions/{convention}/components', [AdminConventionComponentController::class, 'store'])->name('api.v1.admin.convention-components.store');
             Route::post('/convention-components/{convention_component}/update', [AdminConventionComponentController::class, 'update'])->name('api.v1.admin.convention-components.update');
             Route::patch('/convention-components/{convention_component}', [AdminConventionComponentController::class, 'update'])->name('api.v1.admin.convention-components.update.patch');
+            Route::post('/convention-components/{convention_component}/delete', [AdminConventionComponentController::class, 'destroy'])->name('api.v1.admin.convention-components.destroy.post');
             Route::delete('/convention-components/{convention_component}', [AdminConventionComponentController::class, 'destroy'])->name('api.v1.admin.convention-components.destroy');
 
             Route::get('/sdg-nodes', [AdminSdgNodeController::class, 'index'])->name('api.v1.admin.sdg-nodes.index');
             Route::post('/sdg-nodes', [AdminSdgNodeController::class, 'store'])->name('api.v1.admin.sdg-nodes.store');
             Route::post('/sdg-nodes/{sdg_node}/update', [AdminSdgNodeController::class, 'update'])->name('api.v1.admin.sdg-nodes.update');
             Route::patch('/sdg-nodes/{sdg_node}', [AdminSdgNodeController::class, 'update'])->name('api.v1.admin.sdg-nodes.update.patch');
+            Route::post('/sdg-nodes/{sdg_node}/delete', [AdminSdgNodeController::class, 'destroy'])->name('api.v1.admin.sdg-nodes.destroy.post');
             Route::delete('/sdg-nodes/{sdg_node}', [AdminSdgNodeController::class, 'destroy'])->name('api.v1.admin.sdg-nodes.destroy');
 
             Route::get('/upr-recommendations', [AdminUprRecommendationController::class, 'index'])->name('api.v1.admin.upr.index');
             Route::post('/upr-recommendations', [AdminUprRecommendationController::class, 'store'])->name('api.v1.admin.upr.store');
             Route::post('/upr-recommendations/{upr_recommendation}/update', [AdminUprRecommendationController::class, 'update'])->name('api.v1.admin.upr.update');
             Route::patch('/upr-recommendations/{upr_recommendation}', [AdminUprRecommendationController::class, 'update'])->name('api.v1.admin.upr.update.patch');
+            Route::post('/upr-recommendations/{upr_recommendation}/delete', [AdminUprRecommendationController::class, 'destroy'])->name('api.v1.admin.upr.destroy.post');
             Route::delete('/upr-recommendations/{upr_recommendation}', [AdminUprRecommendationController::class, 'destroy'])->name('api.v1.admin.upr.destroy');
 
             Route::get('/upr-types', [AdminUprTypeController::class, 'index'])->name('api.v1.admin.upr-types.index');
             Route::post('/upr-types', [AdminUprTypeController::class, 'store'])->name('api.v1.admin.upr-types.store');
             Route::post('/upr-types/{upr_type}/update', [AdminUprTypeController::class, 'update'])->name('api.v1.admin.upr-types.update');
             Route::patch('/upr-types/{upr_type}', [AdminUprTypeController::class, 'update'])->name('api.v1.admin.upr-types.update.patch');
+            Route::post('/upr-types/{upr_type}/delete', [AdminUprTypeController::class, 'destroy'])->name('api.v1.admin.upr-types.destroy.post');
             Route::delete('/upr-types/{upr_type}', [AdminUprTypeController::class, 'destroy'])->name('api.v1.admin.upr-types.destroy');
 
             Route::get('/upr-cycles', [AdminUprCycleController::class, 'index'])->name('api.v1.admin.upr-cycles.index');
             Route::post('/upr-cycles', [AdminUprCycleController::class, 'store'])->name('api.v1.admin.upr-cycles.store');
             Route::post('/upr-cycles/{upr_cycle}/update', [AdminUprCycleController::class, 'update'])->name('api.v1.admin.upr-cycles.update');
             Route::patch('/upr-cycles/{upr_cycle}', [AdminUprCycleController::class, 'update'])->name('api.v1.admin.upr-cycles.update.patch');
+            Route::post('/upr-cycles/{upr_cycle}/delete', [AdminUprCycleController::class, 'destroy'])->name('api.v1.admin.upr-cycles.destroy.post');
             Route::delete('/upr-cycles/{upr_cycle}', [AdminUprCycleController::class, 'destroy'])->name('api.v1.admin.upr-cycles.destroy');
 
             Route::get('/upr-categories', [AdminUprCategoryController::class, 'index'])->name('api.v1.admin.upr-categories.index');
             Route::post('/upr-categories', [AdminUprCategoryController::class, 'store'])->name('api.v1.admin.upr-categories.store');
             Route::post('/upr-categories/{upr_category}/update', [AdminUprCategoryController::class, 'update'])->name('api.v1.admin.upr-categories.update');
             Route::patch('/upr-categories/{upr_category}', [AdminUprCategoryController::class, 'update'])->name('api.v1.admin.upr-categories.update.patch');
+            Route::post('/upr-categories/{upr_category}/delete', [AdminUprCategoryController::class, 'destroy'])->name('api.v1.admin.upr-categories.destroy.post');
             Route::delete('/upr-categories/{upr_category}', [AdminUprCategoryController::class, 'destroy'])->name('api.v1.admin.upr-categories.destroy');
 
             Route::get('/upr-recommendation-entries', [AdminUprRecommendationEntryController::class, 'index'])->name('api.v1.admin.upr-recommendation-entries.index');
             Route::post('/upr-recommendation-entries', [AdminUprRecommendationEntryController::class, 'store'])->name('api.v1.admin.upr-recommendation-entries.store');
             Route::post('/upr-recommendation-entries/{upr_recommendation_entry}/update', [AdminUprRecommendationEntryController::class, 'update'])->name('api.v1.admin.upr-recommendation-entries.update');
             Route::patch('/upr-recommendation-entries/{upr_recommendation_entry}', [AdminUprRecommendationEntryController::class, 'update'])->name('api.v1.admin.upr-recommendation-entries.update.patch');
+            Route::post('/upr-recommendation-entries/{upr_recommendation_entry}/delete', [AdminUprRecommendationEntryController::class, 'destroy'])->name('api.v1.admin.upr-recommendation-entries.destroy.post');
             Route::delete('/upr-recommendation-entries/{upr_recommendation_entry}', [AdminUprRecommendationEntryController::class, 'destroy'])->name('api.v1.admin.upr-recommendation-entries.destroy');
 
             Route::get('/upr-entries', [AdminUprEntryController::class, 'index'])->name('api.v1.admin.upr-entries.index');
@@ -228,6 +245,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/upr-entries/{upr_entry}', [AdminUprEntryController::class, 'show'])->name('api.v1.admin.upr-entries.show');
             Route::post('/upr-entries/{upr_entry}/update', [AdminUprEntryController::class, 'update'])->name('api.v1.admin.upr-entries.update');
             Route::patch('/upr-entries/{upr_entry}', [AdminUprEntryController::class, 'update'])->name('api.v1.admin.upr-entries.update.patch');
+            Route::post('/upr-entries/{upr_entry}/delete', [AdminUprEntryController::class, 'destroy'])->name('api.v1.admin.upr-entries.destroy.post');
             Route::delete('/upr-entries/{upr_entry}', [AdminUprEntryController::class, 'destroy'])->name('api.v1.admin.upr-entries.destroy');
 
             Route::get('/knowledge-upr-entries', [AdminKnowledgeUprEntryController::class, 'index'])->name('api.v1.admin.knowledge-upr-entries.index');
@@ -235,6 +253,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/knowledge-upr-entries/{knowledge_upr_entry}', [AdminKnowledgeUprEntryController::class, 'show'])->name('api.v1.admin.knowledge-upr-entries.show');
             Route::post('/knowledge-upr-entries/{knowledge_upr_entry}/update', [AdminKnowledgeUprEntryController::class, 'update'])->name('api.v1.admin.knowledge-upr-entries.update');
             Route::patch('/knowledge-upr-entries/{knowledge_upr_entry}', [AdminKnowledgeUprEntryController::class, 'update'])->name('api.v1.admin.knowledge-upr-entries.update.patch');
+            Route::post('/knowledge-upr-entries/{knowledge_upr_entry}/delete', [AdminKnowledgeUprEntryController::class, 'destroy'])->name('api.v1.admin.knowledge-upr-entries.destroy.post');
             Route::delete('/knowledge-upr-entries/{knowledge_upr_entry}', [AdminKnowledgeUprEntryController::class, 'destroy'])->name('api.v1.admin.knowledge-upr-entries.destroy');
             Route::post('/knowledge-upr-entries/files', [AdminKnowledgeUprEntryController::class, 'uploadFiles'])->name('api.v1.admin.knowledge-upr-entries.files.upload');
             Route::post('/knowledge-upr-entries/files/delete', [AdminKnowledgeUprEntryController::class, 'deleteFile'])->name('api.v1.admin.knowledge-upr-entries.files.delete');
@@ -243,36 +262,42 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/knowledge-cards', [AdminKnowledgeCardController::class, 'store'])->name('api.v1.admin.knowledge-cards.store');
             Route::post('/knowledge-cards/{knowledge_card}/update', [AdminKnowledgeCardController::class, 'update'])->name('api.v1.admin.knowledge-cards.update');
             Route::patch('/knowledge-cards/{knowledge_card}', [AdminKnowledgeCardController::class, 'update'])->name('api.v1.admin.knowledge-cards.update.patch');
+            Route::post('/knowledge-cards/{knowledge_card}/delete', [AdminKnowledgeCardController::class, 'destroy'])->name('api.v1.admin.knowledge-cards.destroy.post');
             Route::delete('/knowledge-cards/{knowledge_card}', [AdminKnowledgeCardController::class, 'destroy'])->name('api.v1.admin.knowledge-cards.destroy');
 
             Route::get('/issue-categories', [AdminIssueCategoryController::class, 'index'])->name('api.v1.admin.issue-categories.index');
             Route::post('/issue-categories', [AdminIssueCategoryController::class, 'store'])->name('api.v1.admin.issue-categories.store');
             Route::post('/issue-categories/{issue_category}/update', [AdminIssueCategoryController::class, 'update'])->name('api.v1.admin.issue-categories.update');
             Route::patch('/issue-categories/{issue_category}', [AdminIssueCategoryController::class, 'update'])->name('api.v1.admin.issue-categories.update.patch');
+            Route::post('/issue-categories/{issue_category}/delete', [AdminIssueCategoryController::class, 'destroy'])->name('api.v1.admin.issue-categories.destroy.post');
             Route::delete('/issue-categories/{issue_category}', [AdminIssueCategoryController::class, 'destroy'])->name('api.v1.admin.issue-categories.destroy');
 
             Route::get('/articles', [AdminArticleController::class, 'index'])->name('api.v1.admin.articles.index');
             Route::post('/articles', [AdminArticleController::class, 'store'])->name('api.v1.admin.articles.store');
             Route::post('/articles/{article}/update', [AdminArticleController::class, 'update'])->name('api.v1.admin.articles.update');
             Route::patch('/articles/{article}', [AdminArticleController::class, 'update'])->name('api.v1.admin.articles.update.patch');
+            Route::post('/articles/{article}/delete', [AdminArticleController::class, 'destroy'])->name('api.v1.admin.articles.destroy.post');
             Route::delete('/articles/{article}', [AdminArticleController::class, 'destroy'])->name('api.v1.admin.articles.destroy');
 
             Route::get('/collection-years', [AdminCollectionYearController::class, 'index'])->name('api.v1.admin.collection-years.index');
             Route::post('/collection-years', [AdminCollectionYearController::class, 'store'])->name('api.v1.admin.collection-years.store');
             Route::post('/collection-years/{collection_year}/update', [AdminCollectionYearController::class, 'update'])->name('api.v1.admin.collection-years.update');
             Route::patch('/collection-years/{collection_year}', [AdminCollectionYearController::class, 'update'])->name('api.v1.admin.collection-years.update.patch');
+            Route::post('/collection-years/{collection_year}/delete', [AdminCollectionYearController::class, 'destroy'])->name('api.v1.admin.collection-years.destroy.post');
             Route::delete('/collection-years/{collection_year}', [AdminCollectionYearController::class, 'destroy'])->name('api.v1.admin.collection-years.destroy');
 
             Route::get('/collection-genders', [AdminCollectionGenderController::class, 'index'])->name('api.v1.admin.collection-genders.index');
             Route::post('/collection-genders', [AdminCollectionGenderController::class, 'store'])->name('api.v1.admin.collection-genders.store');
             Route::post('/collection-genders/{collection_gender}/update', [AdminCollectionGenderController::class, 'update'])->name('api.v1.admin.collection-genders.update');
             Route::patch('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'update'])->name('api.v1.admin.collection-genders.update.patch');
+            Route::post('/collection-genders/{collection_gender}/delete', [AdminCollectionGenderController::class, 'destroy'])->name('api.v1.admin.collection-genders.destroy.post');
             Route::delete('/collection-genders/{collection_gender}', [AdminCollectionGenderController::class, 'destroy'])->name('api.v1.admin.collection-genders.destroy');
 
             Route::get('/collection-religions', [AdminCollectionReligionController::class, 'index'])->name('api.v1.admin.collection-religions.index');
             Route::post('/collection-religions', [AdminCollectionReligionController::class, 'store'])->name('api.v1.admin.collection-religions.store');
             Route::post('/collection-religions/{collection_religion}/update', [AdminCollectionReligionController::class, 'update'])->name('api.v1.admin.collection-religions.update');
             Route::patch('/collection-religions/{collection_religion}', [AdminCollectionReligionController::class, 'update'])->name('api.v1.admin.collection-religions.update.patch');
+            Route::post('/collection-religions/{collection_religion}/delete', [AdminCollectionReligionController::class, 'destroy'])->name('api.v1.admin.collection-religions.destroy.post');
             Route::delete('/collection-religions/{collection_religion}', [AdminCollectionReligionController::class, 'destroy'])->name('api.v1.admin.collection-religions.destroy');
 
             Route::get('/issues', [AdminIssueController::class, 'index'])->name('api.v1.admin.issues.index');
@@ -285,6 +310,7 @@ Route::prefix('v1')->group(function (): void {
             Route::patch('/issues/{issue}/indicators/reorder', [AdminIssueController::class, 'reorderIndicators'])->name('api.v1.admin.issues.indicators.reorder.patch');
             Route::post('/issues/{issue}/indicators/{indicator}/active', [AdminIssueController::class, 'setIndicatorActive'])->name('api.v1.admin.issues.indicators.active');
             Route::patch('/issues/{issue}/indicators/{indicator}/active', [AdminIssueController::class, 'setIndicatorActive'])->name('api.v1.admin.issues.indicators.active.patch');
+            Route::post('/issues/{issue}/delete', [AdminIssueController::class, 'destroy'])->name('api.v1.admin.issues.destroy.post');
             Route::delete('/issues/{issue}', [AdminIssueController::class, 'destroy'])->name('api.v1.admin.issues.destroy');
 
             Route::get('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'index'])->name('api.v1.admin.governance.default-charts.index');
