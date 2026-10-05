@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Mail\DataCollectionRequestMail;
+use App\Mail\SystemNotificationMail;
 use App\Models\DepartmentTask;
 use App\Models\HrRequest;
 use App\Models\HrRequestClarification;
@@ -9,6 +11,9 @@ use App\Models\Notification;
 use App\Models\RegionalResponse;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class NotificationService
 {
@@ -494,10 +499,12 @@ class NotificationService
         callable $routeForUser,
         array $meta = [],
     ): void {
-        $rows = $users
+        $targets = $users
             ->filter(fn (User $user) => $actor === null || (int) $user->id !== (int) $actor->id)
             ->unique('id')
-            ->values()
+            ->values();
+
+        $rows = $targets
             ->map(function (User $user) use ($eventKey, $title, $message, $entityType, $entityId, $routeForUser, $meta): array {
                 $encoded = json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
                 if ($encoded === false) {
@@ -519,9 +526,80 @@ class NotificationService
             })
             ->all();
 
-        if ($rows !== []) {
-            Notification::query()->insert($rows);
+        if ($rows === []) {
+            return;
         }
+
+        Notification::query()->insert($rows);
+        $this->queueEmailsForTargets($targets, $eventKey, $title, $message, $entityType, $entityId, $routeForUser);
+    }
+
+    /**
+     * @param  Collection<int, User>  $targets
+     * @param  callable(User): (?string)  $routeForUser
+     */
+    private function queueEmailsForTargets(
+        Collection $targets,
+        string $eventKey,
+        string $title,
+        string $message,
+        ?string $entityType,
+        ?string $entityId,
+        callable $routeForUser,
+    ): void {
+        $hrRequest = null;
+        if ($eventKey === 'hr_request.created' && $entityType === 'hr_request' && $entityId !== null && $entityId !== '') {
+            $hrRequest = HrRequest::query()->find($entityId);
+        }
+
+        foreach ($targets as $user) {
+            $email = trim((string) ($user->email ?? ''));
+            if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            $actionUrl = $this->absoluteFrontendUrl($routeForUser($user));
+
+            try {
+                if ($hrRequest !== null) {
+                    $user->loadMissing('department');
+                    Mail::to($email)->queue(new DataCollectionRequestMail(
+                        $user,
+                        $hrRequest,
+                        $actionUrl ?? $this->absoluteFrontendUrl('/') ?? (string) config('app.url'),
+                    ));
+                } else {
+                    Mail::to($email)->queue(new SystemNotificationMail(
+                        $user,
+                        $title,
+                        $message,
+                        $actionUrl,
+                    ));
+                }
+            } catch (Throwable $e) {
+                Log::warning('Failed to queue notification email', [
+                    'user_id' => $user->id,
+                    'event_key' => $eventKey,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    private function absoluteFrontendUrl(?string $route): ?string
+    {
+        if ($route === null || trim($route) === '') {
+            return null;
+        }
+
+        $route = trim($route);
+        if (str_starts_with($route, 'http://') || str_starts_with($route, 'https://')) {
+            return $route;
+        }
+
+        $base = rtrim((string) (config('app.frontend_url') ?: config('app.url')), '/');
+
+        return $base.'/'.ltrim($route, '/');
     }
 
     /**
