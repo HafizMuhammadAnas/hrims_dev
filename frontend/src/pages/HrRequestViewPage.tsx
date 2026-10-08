@@ -956,17 +956,25 @@ export function HrRequestViewPage() {
       )
       return
     }
+    // Hold live nodes before draft save/reload can remount or clear the form.
+    const requestEl = deptRequestPanelRef.current
+    const responseEl = deptResponseFormRef.current
+    if (!responseEl) {
+      setSubmitResponseError('Response form is not available. Open the Response tab and try again.')
+      return
+    }
     const scrollX = window.scrollX
     const scrollY = window.scrollY
     setSavingDraftPdf(true)
     setSubmitResponseError(null)
     try {
-      await persistDepartmentResponse(true)
       await downloadDeptTaskRequestResponsePdf({
-        requestEl: deptRequestPanelRef.current,
-        responseEl: deptResponseFormRef.current,
+        requestEl,
+        responseEl,
         filename: `${activeTask.req_id}_${activeTask.id}_draft.pdf`,
         headerTitle: `HRIMS draft — ${activeTask.req_id} / ${activeTask.id}`,
+        // Clone runs synchronously before this; reload cannot drop response from the PDF.
+        afterSnapshot: () => persistDepartmentResponse(true),
       })
     } catch (e: unknown) {
       setSubmitResponseError(e instanceof Error ? e.message : 'Could not save draft / download PDF')

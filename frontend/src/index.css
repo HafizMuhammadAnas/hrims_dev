@@ -1536,6 +1536,63 @@ button.compiled-record-modal-tab {
   gap: 12px;
 }
 
+/* Department task draft PDF (Request + Response combined capture). */
+.dept-task-draft-pdf-capture {
+  width: 794px !important;
+  max-width: 794px !important;
+  margin: 0 auto !important;
+  background: #ffffff !important;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.dept-task-draft-pdf-capture .iwd-card,
+.dept-task-draft-pdf-capture .iwd-year-panel,
+.dept-task-draft-pdf-capture .iwd-totals,
+.dept-task-draft-pdf-capture .iwd-dimension,
+.dept-task-draft-pdf-capture .dept-response-form-section,
+.dept-task-draft-pdf-capture .dept-indicator-response-card,
+.dept-task-draft-pdf-capture .hr-request-view-template__card,
+.dept-task-draft-pdf-capture .pdf-export-section {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.dept-task-draft-pdf-capture .dept-data-matrix-wrap,
+.dept-task-draft-pdf-capture .table-card-scroll,
+.dept-task-draft-pdf-capture .iwd-year-panel {
+  overflow: visible !important;
+  max-width: 100% !important;
+}
+
+.dept-task-draft-pdf-capture .dept-data-matrix,
+.dept-task-draft-pdf-capture .iwd-sheet {
+  width: 100% !important;
+  min-width: 0 !important;
+  font-size: 11px;
+}
+
+.dept-task-draft-pdf-capture .btn:not([role='switch']):not(.matrix-row-toggle),
+.dept-task-draft-pdf-capture input[type='file'],
+.dept-task-draft-pdf-capture .pending-file-attachment-row {
+  display: none !important;
+}
+
+.dept-task-draft-pdf-capture details {
+  display: block !important;
+}
+
+.dept-task-draft-pdf-capture .dept-response-form-section__body {
+  display: block !important;
+  overflow: visible !important;
+}
+
+.dept-task-draft-pdf-capture .pdf-section-break {
+  break-before: page;
+  page-break-before: always;
+}
+
 /* Regional compilation: department row — checkbox vs open submission */
 .compilation-dept-status-row {
   display: flex;
