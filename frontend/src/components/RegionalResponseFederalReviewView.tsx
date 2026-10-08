@@ -159,7 +159,7 @@ export function RegionalResponseFederalReviewView({
     try {
       await downloadElementAsPdf(el, exportFilenameBase(), {
         captureClass: 'regional-response-export-capture',
-        marginMm: 10,
+        marginMm: 6,
         headerTitle: exportFilenameBase(),
       })
     } catch (e: unknown) {
@@ -256,26 +256,30 @@ export function RegionalResponseFederalReviewView({
             ) : null}
 
             <div ref={exportRef} className="regional-response-detail-modal__export-body">
-              <h2 className="card-section-heading">Department submissions</h2>
-              <DepartmentSubmissionsForRequest
-                tasksForDetail={tasksForViewing}
-                reqId={viewingRow.req_id}
-                issueIndicators={hrDetail?.issue?.indicators}
-                filterByRegionId={viewingRow.region_id ?? undefined}
-                omitHeading
-                showCardMeta
-                hideStatusBadge
-              />
+              <div className="regional-response-export__block">
+                <h2 className="card-section-heading">Department submissions</h2>
+                <DepartmentSubmissionsForRequest
+                  tasksForDetail={tasksForViewing}
+                  reqId={viewingRow.req_id}
+                  issueIndicators={hrDetail?.issue?.indicators}
+                  filterByRegionId={viewingRow.region_id ?? undefined}
+                  omitHeading
+                  showCardMeta
+                  hideStatusBadge
+                />
+              </div>
 
-              <h2 className="card-section-heading">Summary</h2>
-              <div className="hr-request-view-template__prose-box">
-                {viewingRow.content?.trim() ? (
-                  <p className="hr-request-view-template__prose regional-response-detail-modal__summary">
-                    {viewingRow.content.trim()}
-                  </p>
-                ) : (
-                  <p className="muted regional-response-detail-modal__summary-empty">—</p>
-                )}
+              <div className="regional-response-export__block">
+                <h2 className="card-section-heading">Summary</h2>
+                <div className="hr-request-view-template__prose-box">
+                  {viewingRow.content?.trim() ? (
+                    <p className="hr-request-view-template__prose regional-response-detail-modal__summary">
+                      {viewingRow.content.trim()}
+                    </p>
+                  ) : (
+                    <p className="muted regional-response-detail-modal__summary-empty">—</p>
+                  )}
+                </div>
               </div>
             </div>
 

@@ -1484,13 +1484,12 @@ button.compiled-record-modal-tab {
 }
 
 .ministry-compiled-pdf-capture .ministry-compiled-region-card {
-  break-inside: avoid;
-  page-break-inside: avoid;
+  /* Allow tall region cards to split across pages; avoid large empty gaps. */
   box-shadow: none;
   margin-bottom: 16px;
+  overflow: visible !important;
 }
 
-.ministry-compiled-pdf-capture .iwd-card,
 .ministry-compiled-pdf-capture .iwd-year-panel,
 .ministry-compiled-pdf-capture .iwd-totals,
 .ministry-compiled-pdf-capture .iwd-dimension,
@@ -1498,6 +1497,10 @@ button.compiled-record-modal-tab {
 .ministry-compiled-pdf-capture .dept-indicator-response-card {
   break-inside: avoid;
   page-break-inside: avoid;
+}
+
+.ministry-compiled-pdf-capture .iwd-card {
+  overflow: visible !important;
 }
 
 .ministry-compiled-pdf-capture .ministry-compiled-draft-alert {
@@ -1591,6 +1594,36 @@ button.compiled-record-modal-tab {
 .dept-task-draft-pdf-capture .pdf-section-break {
   break-before: page;
   page-break-before: always;
+}
+
+/* Regional response federal review PDF export */
+.regional-response-export-capture {
+  width: 794px !important;
+  max-width: 794px !important;
+  margin: 0 auto !important;
+  background: #ffffff !important;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  overflow: visible !important;
+}
+
+.regional-response-export-capture .card-section-heading,
+.regional-response-export-capture .dept-indicator-response-card,
+.regional-response-export-capture .hr-request-view-template__prose-box {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.regional-response-export-capture .dept-data-matrix-wrap,
+.regional-response-export-capture .table-card-scroll {
+  overflow: visible !important;
+  max-width: 100% !important;
+}
+
+.regional-response-export-capture .btn,
+.regional-response-export-capture .compiled-record-pdf-toolbar {
+  display: none !important;
 }
 
 /* Regional compilation: department row — checkbox vs open submission */
@@ -8046,8 +8079,8 @@ textarea.response-revision-changed,
 }
 
 .report-generator-pdf-capture .reporting-dashboard__row {
-  break-inside: avoid;
-  page-break-inside: avoid;
+  /* Rows may be tall — allow split; keep individual chart panels together. */
+  overflow: visible !important;
 }
 
 .report-generator__chart-panel--grid {
@@ -8102,17 +8135,72 @@ textarea.response-revision-changed,
 }
 
 .report-generator-pdf-capture {
+  width: 794px !important;
+  max-width: 794px !important;
+  margin: 0 auto !important;
   background: #fff;
   padding: 8px;
+  box-sizing: border-box;
+  overflow: visible !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.report-generator-pdf-capture .reporting-dashboard__toolbar-actions,
+.report-generator-pdf-capture .btn {
+  display: none !important;
+}
+
+.report-generator-pdf-capture .reporting-dashboard__toolbar {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Stack dashboard panels for readable A4 pages (avoid crushed 3-column charts). */
+.report-generator-pdf-capture .reporting-dashboard__row--top,
+.report-generator-pdf-capture .reporting-dashboard__row--bottom {
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+  overflow: visible !important;
+}
+
+.report-generator-pdf-capture .reporting-dashboard__summary-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.report-generator-pdf-capture .reporting-dashboard__panel {
+  min-height: 0 !important;
+  overflow: visible !important;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
 }
 
 .report-generator-pdf-capture .report-generator__charts-grid {
-  break-inside: avoid;
+  overflow: visible !important;
 }
 
 .report-generator-pdf-capture .report-generator__chart-panel {
   break-inside: avoid;
   page-break-inside: avoid;
+  overflow: visible !important;
+}
+
+.report-generator-pdf-capture .recharts-responsive-container,
+.report-generator-pdf-capture .recharts-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.report-generator-pdf-capture img {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 .report-generator-pdf-capture .table-card-scroll {

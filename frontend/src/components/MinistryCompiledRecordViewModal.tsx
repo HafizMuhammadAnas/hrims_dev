@@ -187,7 +187,7 @@ export function MinistryCompiledRecordViewModal({
       const base = [record.req_id, record.title?.trim() || record.id].filter(Boolean).join(' — ')
       await downloadElementAsPdf(el, base, {
         captureClass: 'ministry-compiled-pdf-capture',
-        marginMm: 10,
+        marginMm: 6,
         headerTitle: base,
       })
     } catch (e: unknown) {

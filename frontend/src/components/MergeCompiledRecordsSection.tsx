@@ -93,7 +93,7 @@ export function MergeCompiledRecordsSection({ records }: Props) {
     try {
       await downloadElementAsPdf(el, exportBaseName(), {
         captureClass: 'ministry-compiled-pdf-capture',
-        marginMm: 10,
+        marginMm: 6,
         headerTitle: exportBaseName(),
       })
       setExportNotice({

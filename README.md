@@ -15,9 +15,12 @@ Create database and grant access, then set `website/backend/.env`:
 
 ```powershell
 cd website/backend
+php artisan storage:link
 php artisan migrate:fresh --seed
 php artisan serve --host=127.0.0.1 --port=8000
 ```
+
+`storage:link` is required so uploaded files under `/storage/...` (department response attachments, verification PDFs, etc.) are publicly reachable. Without it, View links return 403.
 
 After pulling new backend changes, run `migrate` or `migrate:fresh --seed` again so domain tables (`hr_requests`, `federal_groups`, `regional_responses`, etc.) exist and demo data loads from `HrimsDataSeeder`.
 
@@ -31,7 +34,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. The Vite dev server proxies `/api` and `/sanctum` to `http://127.0.0.1:8000`, so session cookies work without manual CORS setup.
+Open `http://localhost:5173`. The Vite dev server proxies `/api`, `/sanctum`, and `/storage` to `http://127.0.0.1:8000`, so session cookies and public uploads work without manual CORS setup.
 
 ### Composer on PATH
 

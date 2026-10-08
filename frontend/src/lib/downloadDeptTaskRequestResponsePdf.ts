@@ -185,6 +185,7 @@ export async function downloadDeptTaskRequestResponsePdf(options: {
       pdf = await downloadElementAsPdf(host, filename, {
         headerTitle,
         captureClass: 'dept-task-draft-pdf-capture',
+        marginMm: 6,
         pdf,
         save: false,
         // Header/footer only once the full Request + Response document is assembled.

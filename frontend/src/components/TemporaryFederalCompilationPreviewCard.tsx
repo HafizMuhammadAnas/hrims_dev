@@ -260,7 +260,7 @@ export function TemporaryFederalCompilationPreviewCard({
       const base = [previewRecord.req_id, previewRecord.title].filter(Boolean).join(' — ')
       await downloadElementAsPdf(el, base, {
         captureClass: 'ministry-compiled-pdf-capture',
-        marginMm: 10,
+        marginMm: 6,
         headerTitle: base,
       })
       setExportNotice({

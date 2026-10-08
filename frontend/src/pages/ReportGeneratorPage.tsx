@@ -55,7 +55,7 @@ import {
   type ReportingDashboardSummaryCards,
 } from '../lib/reportGeneratorData'
 import { reportDashboardChartColor, reportTop10BarColor } from '../lib/reportChartTheme'
-import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
+import { downloadReportingDashboardPdf } from '../lib/downloadReportingDashboardPdf'
 import { LABEL_REPORTING_DASHBOARD } from '../lib/uiLabels'
 import { isFederalStaff, isRegionalAdmin, isSuperAdmin } from '../lib/roles'
 import { ReportingIndicatorCompiledFocus } from '../components/ReportingIndicatorCompiledFocus'
@@ -480,10 +480,12 @@ export function ReportGeneratorPage() {
   async function handleExportPdf() {
     if (!dashboardResult || !exportRef.current) return
     setPdfLoading(true)
+    setLoadError(null)
     try {
-      await downloadElementAsPdf(exportRef.current, 'reporting-dashboard', {
-        captureClass: 'report-generator-pdf-capture',
-        marginMm: 10,
+      // Dedicated capture: freezes Recharts SVGs so ResponsiveContainer resize does not blank the PDF.
+      await downloadReportingDashboardPdf({
+        sourceEl: exportRef.current,
+        filename: 'reporting-dashboard',
         headerTitle: 'Reporting dashboard',
       })
     } catch (e: unknown) {

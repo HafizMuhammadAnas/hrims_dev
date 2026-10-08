@@ -74,6 +74,12 @@ const BREAK_SELECTORS = [
   '.ministry-compiled-dept-response-item',
   '.merge-compiled-records-section__record',
   '.hr-request-view-template__section',
+  '.hr-request-view-template__card',
+  '.report-generator__chart-panel',
+  '.reporting-rank-row',
+  '.reporting-dashboard__card',
+  '.regional-response-export__block',
+  '.dept-task-response-modal__panel',
   '.form-row',
   'article',
   'table',
@@ -103,6 +109,10 @@ const KEEP_WITH_NEXT_SELECTORS = [
   '.iwd-dimension__head',
   '.hr-request-view-template__section-label',
   '.hr-request-view-template__field-label',
+  '.report-generator__table-head',
+  '.workflow-modal-hero__title',
+  '.dashboard-panel-title',
+  '.card-section-heading',
 ].join(',')
 
 type CssBreak = { y: number; kind: 'edge' | 'keep-with-next-end' }

@@ -1349,22 +1349,39 @@ export function HrRequestViewPage() {
                           <strong>{taskReviewFeedbackLabel}:</strong> {activeTask.regional_review_comments}
                         </p>
                       ) : null}
-                      {activeTask.verification_file_url?.trim() ? (
-                        <p className="muted small" style={{ margin: '0 0 12px' }}>
-                          <strong>Final verified file:</strong>{' '}
-                          <a href={activeTask.verification_file_url} target="_blank" rel="noreferrer">
-                            View uploaded PDF
-                          </a>
-                          {activeTask.physical_validation_done ? ' · Validation done' : ''}
-                        </p>
-                      ) : null}
-                      <DepartmentResponseDisplay
-                        responseData={activeTask.response_data}
-                        attachmentUrl={activeTask.attachment_url}
-                        onlyIndicatorIds={deptResponseDisplayScopeIds}
-                        issueIndicators={detail?.issue?.indicators}
-                        locationRegionIds={[activeTask.region_id]}
-                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <DepartmentResponseDisplay
+                          responseData={activeTask.response_data}
+                          attachmentUrl={activeTask.attachment_url}
+                          onlyIndicatorIds={deptResponseDisplayScopeIds}
+                          issueIndicators={detail?.issue?.indicators}
+                          locationRegionIds={[activeTask.region_id]}
+                        />
+                        {activeTask.verification_file_url?.trim() ? (
+                          <DeptResponseFormSection title="Upload final file" defaultOpen={false}>
+                            <div className="form-row">
+                              <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
+                                Saved final file
+                              </span>
+                              <span className="hr-request-attachments-list__actions">
+                                <a
+                                  href={activeTask.verification_file_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn btn-secondary btn-compact"
+                                >
+                                  View
+                                </a>
+                              </span>
+                            </div>
+                            {activeTask.physical_validation_done ? (
+                              <p className="muted small" style={{ margin: '12px 0 0' }}>
+                                Validation done
+                              </p>
+                            ) : null}
+                          </DeptResponseFormSection>
+                        ) : null}
+                      </div>
                       {showMonitorReviewActions ? (
                         <div style={{ marginTop: 20 }}>
                           <div className="form-row">
@@ -2177,13 +2194,39 @@ export function HrRequestViewPage() {
             <label className="muted small" style={{ display: 'block', marginBottom: 6 }}>
               Response
             </label>
-            <DepartmentResponseDisplay
-              responseData={activeTask.response_data}
-              attachmentUrl={activeTask.attachment_url}
-              onlyIndicatorIds={deptResponseDisplayScopeIds}
-              issueIndicators={detail?.issue?.indicators}
-              locationRegionIds={[activeTask.region_id]}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <DepartmentResponseDisplay
+                responseData={activeTask.response_data}
+                attachmentUrl={activeTask.attachment_url}
+                onlyIndicatorIds={deptResponseDisplayScopeIds}
+                issueIndicators={detail?.issue?.indicators}
+                locationRegionIds={[activeTask.region_id]}
+              />
+              {activeTask.verification_file_url?.trim() ? (
+                <DeptResponseFormSection title="Upload final file" defaultOpen={false}>
+                  <div className="form-row">
+                    <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
+                      Saved final file
+                    </span>
+                    <span className="hr-request-attachments-list__actions">
+                      <a
+                        href={activeTask.verification_file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary btn-compact"
+                      >
+                        View
+                      </a>
+                    </span>
+                  </div>
+                  {activeTask.physical_validation_done ? (
+                    <p className="muted small" style={{ margin: '12px 0 0' }}>
+                      Validation done
+                    </p>
+                  ) : null}
+                </DeptResponseFormSection>
+              ) : null}
+            </div>
           </div>
         )}
 
