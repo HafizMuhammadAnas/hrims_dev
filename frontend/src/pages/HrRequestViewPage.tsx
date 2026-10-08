@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchHrRequest } from '../api/hrRequests'
 import {
@@ -19,7 +19,6 @@ import {
   fetchDepartments,
   submitDepartmentTaskResponse,
   updateDepartmentTaskReview,
-  updateDepartmentTaskValidation,
   type DepartmentRow,
 } from '../api/workflows'
 import { useAuth } from '../auth/AuthContext'
@@ -113,17 +112,15 @@ import {
   canDepartmentSubmitResponse,
   canRequestDepartmentTaskModification,
   canShowDepartmentTaskReviewActions,
-  canValidateDepartmentResponse,
   departmentTaskWorkflowBucket,
   hasDepartmentResponse,
-  isPendingDepartmentValidation,
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
+import { downloadDeptTaskRequestResponsePdf } from '../lib/downloadDeptTaskRequestResponsePdf'
 import { loiMetadataLoadErrorPageMessage } from '../lib/issueEntryKind'
 import {
   isDepartmentStaff,
   isDepartmentAdmin,
-  isDepartmentValidator,
   isFederalStaff,
   isRegionalAdmin,
   isViewer,
@@ -203,7 +200,6 @@ export function HrRequestViewPage() {
     (isDepartmentStaff(user) || isViewer(user)) && user?.department != null
   const deptOperator =
     (isDepartmentAdmin(user) || isViewer(user)) && user?.department != null
-  const deptValidator = isDepartmentValidator(user) && user?.department != null
 
   const [regions, setRegions] = useState<RegionRow[]>([])
   const [districts, setDistricts] = useState<DistrictRow[]>([])
@@ -239,11 +235,17 @@ export function HrRequestViewPage() {
   const [indicatorDrafts, setIndicatorDrafts] = useState<Record<number, DeptIndicatorDraft>>({})
   const [deptChallenges, setDeptChallenges] = useState('')
   const [submittingResponse, setSubmittingResponse] = useState(false)
+  const [savingDraftPdf, setSavingDraftPdf] = useState(false)
   const [submitResponseError, setSubmitResponseError] = useState<string | null>(null)
   const [deptPortalTab, setDeptPortalTab] = useState<'response' | 'request' | 'changes'>('response')
+  const [verificationFile, setVerificationFile] = useState<File | null>(null)
+  const [verificationFileClear, setVerificationFileClear] = useState(false)
+  const [physicalValidationDone, setPhysicalValidationDone] = useState(false)
   const [reviewComments, setReviewComments] = useState('')
   const [reviewFeedback, setReviewFeedback] = useState<WorkflowActionFeedback | null>(null)
   const [savingReview, setSavingReview] = useState(false)
+  const deptRequestPanelRef = useRef<HTMLDivElement | null>(null)
+  const deptResponseFormRef = useRef<HTMLDivElement | null>(null)
 
   function bumpDeptFileInput(key: string) {
     setDeptFileInputRev((r) => ({ ...r, [key]: (r[key] ?? 0) + 1 }))
@@ -519,7 +521,10 @@ export function HrRequestViewPage() {
     setIndicatorDrafts({})
     setDeptChallenges('')
     setResponseText(activeTask.response_data?.trim() ? activeTask.response_data : '')
-  }, [activeTask?.id, activeTask?.response_data, activeTask?.attachment_url, activeTask?.assigned_indicator_ids, detail])
+    setVerificationFile(null)
+    setVerificationFileClear(false)
+    setPhysicalValidationDone(Boolean(activeTask.physical_validation_done))
+  }, [activeTask?.id, activeTask?.response_data, activeTask?.attachment_url, activeTask?.assigned_indicator_ids, activeTask?.physical_validation_done, activeTask?.verification_file_url, detail])
 
   const deptParsedTaskResponse = useMemo(() => {
     if (!activeTask) return null
@@ -664,20 +669,25 @@ export function HrRequestViewPage() {
     }
   }
 
-  async function submitResponse() {
+  function buildDepartmentSubmitOptions(asDraft: boolean) {
+    return {
+      asDraft,
+      verificationFile: verificationFile ?? undefined,
+      removeVerificationFile: verificationFileClear && !verificationFile,
+      physicalValidationDone,
+    }
+  }
+
+  async function persistDepartmentResponse(asDraft: boolean): Promise<void> {
     if (!activeTask) return
-    setSubmittingResponse(true)
-    setSubmitResponseError(null)
-    try {
-      if (deptIndicatorsForForm.length > 0) {
-        if (!indicatorFormReady) {
-          const overrunMsg = formatDeptYearTotalOverrunMessage(deptYearTotalOverruns)
-          setSubmitResponseError(
-            overrunMsg ||
-              'Year totals cannot be less than the sum of breakdown values. Reduce breakdown values so Unaccounted is not negative, then submit.',
-          )
-          return
-        }
+    if (deptIndicatorsForForm.length > 0) {
+      if (!indicatorFormReady) {
+        const overrunMsg = formatDeptYearTotalOverrunMessage(deptYearTotalOverruns)
+        throw new Error(
+          overrunMsg ||
+            'Year totals cannot be less than the sum of breakdown values. Reduce breakdown values so Unaccounted is not negative, then submit.',
+        )
+      }
         const by_indicator: Record<
           string,
           {
@@ -887,33 +897,87 @@ export function HrRequestViewPage() {
           }
           by_indicator[String(ind.id)] = entry
         }
-        await submitDepartmentTaskResponse(activeTask.id, {
-          mode: 'indicators',
-          indicator_bundles: JSON.stringify({
-            by_indicator,
-            challenges: deptChallenges.trim(),
-          }),
-          quantFiles,
-          qualFiles,
-          stripQuantIndicatorIds,
-          stripQualIndicatorIds,
-        })
+        await submitDepartmentTaskResponse(
+          activeTask.id,
+          {
+            mode: 'indicators',
+            indicator_bundles: JSON.stringify({
+              by_indicator,
+              challenges: deptChallenges.trim(),
+            }),
+            quantFiles,
+            qualFiles,
+            stripQuantIndicatorIds,
+            stripQualIndicatorIds,
+          },
+          buildDepartmentSubmitOptions(asDraft),
+        )
       } else {
         const trimmed = responseText.trim()
-        await submitDepartmentTaskResponse(activeTask.id, {
-          mode: 'legacy',
-          response_data: trimmed,
-          attachment: responseFile ?? undefined,
-          removeAttachment: legacyAttachmentClear && !responseFile,
-        })
+        await submitDepartmentTaskResponse(
+          activeTask.id,
+          {
+            mode: 'legacy',
+            response_data: trimmed,
+            attachment: responseFile ?? undefined,
+            removeAttachment: legacyAttachmentClear && !responseFile,
+          },
+          buildDepartmentSubmitOptions(asDraft),
+        )
       }
       await reloadTasksAndDepartments()
+  }
+
+  async function submitResponse() {
+    if (!activeTask) return
+    if (!physicalValidationDone) {
+      setSubmitResponseError('Check “Validation done” before submitting.')
+      return
+    }
+    setSubmittingResponse(true)
+    setSubmitResponseError(null)
+    try {
+      await persistDepartmentResponse(false)
+      setVerificationFile(null)
+      setVerificationFileClear(false)
     } catch (e: unknown) {
       setSubmitResponseError(e instanceof Error ? e.message : 'Submission failed')
     } finally {
       setSubmittingResponse(false)
     }
   }
+
+  async function saveDraftAndDownloadPdf() {
+    if (!activeTask) return
+    if (deptIndicatorsForForm.length > 0 ? !indicatorFormReady : !deptLegacySubmitReady) {
+      setSubmitResponseError(
+        formatDeptYearTotalOverrunMessage(deptYearTotalOverruns) ||
+          'Complete the response before saving draft and downloading PDF.',
+      )
+      return
+    }
+    const scrollX = window.scrollX
+    const scrollY = window.scrollY
+    setSavingDraftPdf(true)
+    setSubmitResponseError(null)
+    try {
+      await persistDepartmentResponse(true)
+      await downloadDeptTaskRequestResponsePdf({
+        requestEl: deptRequestPanelRef.current,
+        responseEl: deptResponseFormRef.current,
+        filename: `${activeTask.req_id}_${activeTask.id}_draft.pdf`,
+        headerTitle: `HRIMS draft — ${activeTask.req_id} / ${activeTask.id}`,
+      })
+    } catch (e: unknown) {
+      setSubmitResponseError(e instanceof Error ? e.message : 'Could not save draft / download PDF')
+    } finally {
+      setSavingDraftPdf(false)
+      window.scrollTo(scrollX, scrollY)
+    }
+  }
+
+  const showQuantitativeSection = deptIndicatorsForForm.some((ind) => ind.has_quantitative)
+  const showQualitativeSection = deptIndicatorsForForm.some((ind) => ind.has_qualitative)
 
   const backLabel = pageBackLabel(from)
   const fromDepartmentTasks = from.includes('department-tasks')
@@ -1011,10 +1075,6 @@ export function HrRequestViewPage() {
       hasDepartmentResponse(activeTask) &&
       monitorReviewBucket === 'revision',
   )
-  const showDeptValidationActions = Boolean(
-    deptValidator && activeTask && canValidateDepartmentResponse(activeTask),
-  )
-
   async function submitMonitorReview(status: 'accepted' | 'needs-modification') {
     if (!activeTask) return
     setSavingReview(true)
@@ -1030,27 +1090,6 @@ export function HrRequestViewPage() {
       setReviewFeedback({
         kind: 'error',
         message: e instanceof Error ? e.message : 'Could not save review',
-      })
-    } finally {
-      setSavingReview(false)
-    }
-  }
-
-  async function submitDepartmentValidation(status: 'accepted' | 'needs-modification') {
-    if (!activeTask) return
-    setSavingReview(true)
-    setReviewFeedback(null)
-    try {
-      await updateDepartmentTaskValidation(activeTask.id, {
-        department_validation_status: status,
-        department_validation_comments: reviewComments.trim() || null,
-      })
-      setReviewComments('')
-      await reloadTasksAndDepartments()
-    } catch (e: unknown) {
-      setReviewFeedback({
-        kind: 'error',
-        message: e instanceof Error ? e.message : 'Could not save validation',
       })
     } finally {
       setSavingReview(false)
@@ -1302,19 +1341,14 @@ export function HrRequestViewPage() {
                           <strong>{taskReviewFeedbackLabel}:</strong> {activeTask.regional_review_comments}
                         </p>
                       ) : null}
-                      {activeTask.department_validation_comments?.trim() &&
-                      activeTask.department_validation_status === 'needs-modification' ? (
+                      {activeTask.verification_file_url?.trim() ? (
                         <p className="muted small" style={{ margin: '0 0 12px' }}>
-                          <strong>Validator feedback:</strong> {activeTask.department_validation_comments}
+                          <strong>Final verified file:</strong>{' '}
+                          <a href={activeTask.verification_file_url} target="_blank" rel="noreferrer">
+                            View uploaded PDF
+                          </a>
+                          {activeTask.physical_validation_done ? ' · Validation done' : ''}
                         </p>
-                      ) : null}
-                      {isPendingDepartmentValidation(activeTask) && !deptValidator ? (
-                        <Alert variant="info" title="Awaiting departmental validation" className="hr-request-dept-portal-tabs__review-outcome">
-                          <p style={{ margin: 0 }}>
-                            Your response was submitted and is waiting for the departmental validator to approve it
-                            before regional/federal review.
-                          </p>
-                        </Alert>
                       ) : null}
                       <DepartmentResponseDisplay
                         responseData={activeTask.response_data}
@@ -1323,51 +1357,6 @@ export function HrRequestViewPage() {
                         issueIndicators={detail?.issue?.indicators}
                         locationRegionIds={[activeTask.region_id]}
                       />
-                      {showDeptValidationActions ? (
-                        <div style={{ marginTop: 20 }}>
-                          <div className="form-row">
-                            <label htmlFor="dept-validation-comments">
-                              Notes to data entry operator (optional)
-                            </label>
-                            <textarea
-                              id="dept-validation-comments"
-                              rows={4}
-                              value={reviewComments}
-                              onChange={(e) => {
-                                setReviewComments(e.target.value)
-                                if (reviewFeedback) setReviewFeedback(null)
-                              }}
-                              style={{ width: '100%', boxSizing: 'border-box' }}
-                            />
-                          </div>
-                          <WorkflowActionFootback
-                            feedback={reviewFeedback}
-                            onDismiss={() => setReviewFeedback(null)}
-                            className="workflow-action-footback workflow-monitor-review-actions"
-                            style={{ marginTop: 12 }}
-                          >
-                            <Button
-                              variant="primary"
-                              compact
-                              disabled={savingReview}
-                              onClick={() => {
-                                setReviewFeedback(null)
-                                void submitDepartmentValidation('accepted')
-                              }}
-                            >
-                              {savingReview ? 'Saving…' : 'Validate & forward'}
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              compact
-                              disabled={savingReview}
-                              onClick={() => void submitDepartmentValidation('needs-modification')}
-                            >
-                              Return for correction
-                            </Button>
-                          </WorkflowActionFootback>
-                        </div>
-                      ) : null}
                       {showMonitorReviewActions ? (
                         <div style={{ marginTop: 20 }}>
                           <div className="form-row">
@@ -1437,26 +1426,28 @@ export function HrRequestViewPage() {
                 </div>
               ) : null}
 
-              {deptPortalTab === 'request' ? (
-                <div className="dept-task-response-modal__panel hr-request-dept-portal-tabs__panel">
-                  {detailLoading ? <p className="muted">Loading request…</p> : null}
-                  {detailError && !detailLoading ? (
-                    <Alert variant="error" title="Could not load request">
-                      {detailError}
-                    </Alert>
-                  ) : null}
-                  {!detailLoading && !detailError && deptRequestTemplateProps ? (
-                    <div className="hr-request-view-template-modal dept-task-response-modal__request-template">
-                      <HrRequestViewTemplate {...deptRequestTemplateProps} />
-                    </div>
-                  ) : null}
-                  {!detailLoading && !detailError && detail && !deptRequestTemplateProps ? (
-                    <Alert variant="warning" title="Request preview unavailable">
-                      <span>{loiMetadataLoadErrorPageMessage()}</span>
-                    </Alert>
-                  ) : null}
-                </div>
-              ) : null}
+              <div
+                ref={deptRequestPanelRef}
+                className="dept-task-response-modal__panel hr-request-dept-portal-tabs__panel"
+                hidden={deptPortalTab !== 'request'}
+              >
+                {detailLoading ? <p className="muted">Loading request…</p> : null}
+                {detailError && !detailLoading ? (
+                  <Alert variant="error" title="Could not load request">
+                    {detailError}
+                  </Alert>
+                ) : null}
+                {!detailLoading && !detailError && deptRequestTemplateProps ? (
+                  <div className="hr-request-view-template-modal dept-task-response-modal__request-template">
+                    <HrRequestViewTemplate {...deptRequestTemplateProps} />
+                  </div>
+                ) : null}
+                {!detailLoading && !detailError && detail && !deptRequestTemplateProps ? (
+                  <Alert variant="warning" title="Request preview unavailable">
+                    <span>{loiMetadataLoadErrorPageMessage()}</span>
+                  </Alert>
+                ) : null}
+              </div>
 
               {deptPortalTab === 'changes' ? (
                 <div className="dept-task-response-modal__panel hr-request-view-panel hr-request-dept-portal-tabs__panel">
@@ -1567,8 +1558,10 @@ export function HrRequestViewPage() {
           </div>
         )}
 
-        {showDeptResponseForm && activeTask && (!taskTabbedPageView || deptPortalTab === 'response') && (
+        {showDeptResponseForm && activeTask && (
           <div
+            ref={deptResponseFormRef}
+            hidden={Boolean(taskTabbedPageView && deptPortalTab !== 'response')}
             className={
               taskTabbedPageView
                 ? 'hr-request-view-panel hr-request-dept-portal-tabs__form-attach'
@@ -1609,6 +1602,7 @@ export function HrRequestViewPage() {
             ) : null}
             {deptIndicatorsForForm.length > 0 ? (
               <>
+                {showQuantitativeSection ? (
                 <DeptResponseFormSection title="Quantitative data">
                 {deptFormUsesIndicatorMatrix(deptIndicatorsForForm) ? (
                   <DepartmentIndicatorDisaggregationMatrices
@@ -1839,8 +1833,9 @@ export function HrRequestViewPage() {
                   })}
                 </div>
                 </DeptResponseFormSection>
+                ) : null}
 
-                {deptIndicatorsForForm.some((ind) => ind.has_qualitative) ? (
+                {showQualitativeSection ? (
                   <DeptResponseFormSection title="Qualitative data">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       {deptIndicatorsForForm.map((ind) => {
@@ -1896,6 +1891,81 @@ export function HrRequestViewPage() {
                       style={{ width: '100%', boxSizing: 'border-box' }}
                     />
                   </div>
+                </DeptResponseFormSection>
+
+                <DeptResponseFormSection title="Upload final file" defaultOpen={false}>
+                  <p className="muted small" style={{ marginTop: 0 }}>
+                    After you save draft and download the PDF, complete physical verification, then
+                    upload that signed/verified file here before submitting.
+                  </p>
+                  {activeTask.verification_file_url?.trim() && !verificationFileClear ? (
+                    <div className="form-row">
+                      <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
+                        Saved final file
+                      </span>
+                      <span className="hr-request-attachments-list__actions">
+                        <a
+                          href={activeTask.verification_file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-secondary btn-compact"
+                        >
+                          View
+                        </a>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          compact
+                          onClick={() => {
+                            setVerificationFileClear(true)
+                            setVerificationFile(null)
+                            setPhysicalValidationDone(false)
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="form-row">
+                    <label htmlFor="dept-verification-file">
+                      Upload final verified file (PDF) — optional
+                    </label>
+                    <input
+                      id="dept-verification-file"
+                      key={`verification-${deptFileInputRev.verification ?? 0}`}
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null
+                        e.target.value = ''
+                        setVerificationFile(f)
+                        setVerificationFileClear(false)
+                      }}
+                    />
+                  </div>
+                  {verificationFile ? (
+                    <PendingFileAttachmentRow
+                      file={verificationFile}
+                      listStyle={{ marginTop: 8 }}
+                      onRemove={() => {
+                        bumpDeptFileInput('verification')
+                        setVerificationFile(null)
+                      }}
+                    />
+                  ) : null}
+                  <label
+                    className="form-row"
+                    style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 12 }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={physicalValidationDone}
+                      onChange={(e) => setPhysicalValidationDone(e.target.checked)}
+                      style={{ marginTop: 3 }}
+                    />
+                    <span>Validation done</span>
+                  </label>
                 </DeptResponseFormSection>
               </>
             ) : (
@@ -1964,6 +2034,81 @@ export function HrRequestViewPage() {
                     }}
                   />
                 ) : null}
+
+                <DeptResponseFormSection title="Upload final file" defaultOpen={false}>
+                  <p className="muted small" style={{ marginTop: 0 }}>
+                    After you save draft and download the PDF, complete physical verification, then
+                    upload that signed/verified file here before submitting.
+                  </p>
+                  {activeTask.verification_file_url?.trim() && !verificationFileClear ? (
+                    <div className="form-row">
+                      <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
+                        Saved final file
+                      </span>
+                      <span className="hr-request-attachments-list__actions">
+                        <a
+                          href={activeTask.verification_file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-secondary btn-compact"
+                        >
+                          View
+                        </a>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          compact
+                          onClick={() => {
+                            setVerificationFileClear(true)
+                            setVerificationFile(null)
+                            setPhysicalValidationDone(false)
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="form-row">
+                    <label htmlFor="dept-verification-file-legacy">
+                      Upload final verified file (PDF) — optional
+                    </label>
+                    <input
+                      id="dept-verification-file-legacy"
+                      key={`verification-legacy-${deptFileInputRev.verification ?? 0}`}
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null
+                        e.target.value = ''
+                        setVerificationFile(f)
+                        setVerificationFileClear(false)
+                      }}
+                    />
+                  </div>
+                  {verificationFile ? (
+                    <PendingFileAttachmentRow
+                      file={verificationFile}
+                      listStyle={{ marginTop: 8 }}
+                      onRemove={() => {
+                        bumpDeptFileInput('verification')
+                        setVerificationFile(null)
+                      }}
+                    />
+                  ) : null}
+                  <label
+                    className="form-row"
+                    style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 12 }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={physicalValidationDone}
+                      onChange={(e) => setPhysicalValidationDone(e.target.checked)}
+                      style={{ marginTop: 3 }}
+                    />
+                    <span>Validation done</span>
+                  </label>
+                </DeptResponseFormSection>
               </>
             )}
             {submitResponseError && <p className="login-error">{submitResponseError}</p>}
@@ -1973,12 +2118,26 @@ export function HrRequestViewPage() {
                 Unaccounted is not negative, then submit.
               </p>
             ) : null}
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              <Button
+                variant="secondary"
+                compact
+                disabled={
+                  submittingResponse ||
+                  savingDraftPdf ||
+                  (deptIndicatorsForForm.length > 0 ? !indicatorFormReady : !deptLegacySubmitReady)
+                }
+                onClick={() => void saveDraftAndDownloadPdf()}
+              >
+                {savingDraftPdf ? 'Generating PDF…' : 'Save draft and download'}
+              </Button>
               <Button
                 variant="primary"
                 compact
                 disabled={
                   submittingResponse ||
+                  savingDraftPdf ||
+                  !physicalValidationDone ||
                   (deptIndicatorsForForm.length > 0 ? !indicatorFormReady : !deptLegacySubmitReady)
                 }
                 onClick={() => void submitResponse()}

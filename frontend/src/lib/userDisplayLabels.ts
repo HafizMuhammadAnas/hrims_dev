@@ -1,7 +1,6 @@
 import type { AuthUser } from '../types/auth'
 import {
   isDepartmentAdmin,
-  isDepartmentValidator,
   isFederalAdmin,
   isFederalSubAdmin,
   isRegionalAdmin,
@@ -31,9 +30,7 @@ export function formatRoleSlugLabel(slug: string | null | undefined): string {
     case 'super_admin':
       return 'Super administrator'
     case 'department_admin':
-      return 'Departmental data entry operator'
-    case 'department_validator':
-      return 'Departmental validator'
+      return 'Departmental administrator'
     case 'viewer':
       return 'Viewer'
     default:
@@ -78,7 +75,6 @@ export function accountPortalSubtitle(user: AuthUser): string {
     const regionName = user.region?.name?.trim()
     return regionName ? `${regionName} Admin` : 'Admin portal'
   }
-  if (isDepartmentValidator(user)) return user.department?.name ?? 'Department validation'
   if (isDepartmentAdmin(user)) return user.department?.name ?? 'Department workspace'
   if (isViewer(user)) return user.department?.name ?? user.region?.name ?? 'Read-only access'
 

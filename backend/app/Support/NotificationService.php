@@ -56,12 +56,10 @@ class NotificationService
             ];
         }
 
-        if ($user->hasRole('department_admin') || $user->hasRole('department_validator') || $user->hasRole('viewer')) {
+        if ($user->hasRole('department_admin') || $user->hasRole('viewer')) {
             return [
                 'department_task.assigned',
                 'department_task.needs_modification',
-                'department_task.pending_validation',
-                'department_task.validation_returned',
                 'hr_request.created',
                 'hr_request.updated',
             ];
@@ -219,61 +217,6 @@ class NotificationService
     }
 
     /**
-     * Operator submitted → departmental validators (same department).
-     */
-    public function notifyDepartmentTaskPendingValidation(DepartmentTask $task, User $actor, bool $isResubmit = false): void
-    {
-        $task->loadMissing(['hrRequest:id,title']);
-        $requestTitle = $task->hrRequest?->title ?: 'Request';
-        $requestId = (string) $task->hr_request_id;
-
-        $this->notifyUsersWithRoutes(
-            $this->usersForDepartmentValidatorsOnly($task),
-            $actor,
-            'department_task.pending_validation',
-            $isResubmit ? 'Department response ready for re-validation' : 'Department response awaiting validation',
-            sprintf('%s · %s', $requestTitle, $requestId),
-            'department_task',
-            $task->id,
-            fn (User $user) => $this->routeForDepartmentTask($user, $task),
-            [
-                'status' => $task->status,
-                'hr_request_id' => $task->hr_request_id,
-                'title' => $requestTitle,
-                'is_resubmit' => $isResubmit,
-            ],
-        );
-    }
-
-    /**
-     * Validator returned response to operator for correction.
-     */
-    public function notifyDepartmentTaskValidationReturned(DepartmentTask $task, User $actor): void
-    {
-        $task->loadMissing(['hrRequest:id,title']);
-        $requestTitle = $task->hrRequest?->title ?: 'Request';
-        $requestId = (string) $task->hr_request_id;
-
-        $this->notifyUsersWithRoutes(
-            $this->usersForDepartmentOperatorsOnly($task),
-            $actor,
-            'department_task.validation_returned',
-            'Departmental revision requested',
-            sprintf('%s · %s', $requestTitle, $requestId),
-            'department_task',
-            $task->id,
-            fn (User $user) => $this->routeForDepartmentTask($user, $task),
-            [
-                'status' => $task->status,
-                'department_validation_status' => $task->department_validation_status,
-                'hr_request_id' => $task->hr_request_id,
-                'title' => $requestTitle,
-                'revision_source' => 'department_validator',
-            ],
-        );
-    }
-
-    /**
      * Department response submitted / resubmitted → regional (or federal for ICT tasks).
      */
     public function notifyDepartmentTaskSubmitted(DepartmentTask $task, User $actor, bool $isResubmit = false): void
@@ -411,11 +354,6 @@ class NotificationService
             }
 
             return 'Regional revision requested';
-        }
-
-        if ($eventKey === 'department_task.validation_returned'
-            && in_array($title, ['Revision requested', 'Validation returned for correction', 'Departmental revision requested'], true)) {
-            return 'Departmental revision requested';
         }
 
         if ($title === 'Regional response submitted') {
@@ -648,7 +586,7 @@ class NotificationService
                     $method = $regionIds !== [] ? 'orWhere' : 'where';
                     $query->{$method}(function ($inner) use ($departmentIds): void {
                         $inner
-                            ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'department_validator', 'viewer']))
+                            ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
                             ->whereIn('department_id', $departmentIds);
                     });
                 }
@@ -692,7 +630,7 @@ class NotificationService
             ->where(function ($query) use ($task, $isIct): void {
                 $query->where(function ($inner) use ($task): void {
                     $inner
-                        ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'department_validator', 'viewer']))
+                        ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
                         ->where('department_id', $task->department_id);
                 });
 
@@ -744,30 +682,6 @@ class NotificationService
     {
         return User::query()
             ->with(['roles', 'department.regions'])
-            ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'department_validator', 'viewer']))
-            ->where('department_id', $task->department_id)
-            ->get();
-    }
-
-    /**
-     * @return Collection<int, User>
-     */
-    private function usersForDepartmentValidatorsOnly(DepartmentTask $task): Collection
-    {
-        return User::query()
-            ->with(['roles', 'department.regions'])
-            ->whereHas('roles', fn ($r) => $r->where('slug', 'department_validator'))
-            ->where('department_id', $task->department_id)
-            ->get();
-    }
-
-    /**
-     * @return Collection<int, User>
-     */
-    private function usersForDepartmentOperatorsOnly(DepartmentTask $task): Collection
-    {
-        return User::query()
-            ->with(['roles', 'department.regions'])
             ->whereHas('roles', fn ($r) => $r->whereIn('slug', ['department_admin', 'viewer']))
             ->where('department_id', $task->department_id)
             ->get();
@@ -804,7 +718,6 @@ class NotificationService
 
                 if (
                     in_array('department_admin', $subjectRoleSlugs, true)
-                    || in_array('department_validator', $subjectRoleSlugs, true)
                     || in_array('viewer', $subjectRoleSlugs, true)
                 ) {
                     if ($subject->department?->coversRegionSlug('ict')) {
@@ -827,7 +740,7 @@ class NotificationService
     {
         $user->loadMissing('roles');
         $slugs = $user->roles->pluck('slug')->all();
-        foreach (['super_admin', 'federal_admin', 'federal_sub_admin', 'regional_admin', 'department_validator', 'department_admin', 'viewer'] as $slug) {
+        foreach (['super_admin', 'federal_admin', 'federal_sub_admin', 'regional_admin', 'department_admin', 'viewer'] as $slug) {
             if (in_array($slug, $slugs, true)) {
                 return $slug;
             }
@@ -844,7 +757,7 @@ class NotificationService
             return '/requests/'.rawurlencode($requestId).'?from='.rawurlencode('/region-received');
         }
 
-        if ($role === 'department_admin' || $role === 'department_validator' || $role === 'viewer') {
+        if ($role === 'department_admin' || $role === 'viewer') {
             $from = $user->department?->coversRegionSlug('ict')
                 ? '/federal-department-requests'
                 : '/department-tasks';
@@ -874,7 +787,7 @@ class NotificationService
 
         if ($role === 'regional_admin') {
             $from = '/region-monitoring';
-        } elseif ($role === 'department_admin' || $role === 'department_validator' || $role === 'viewer') {
+        } elseif ($role === 'department_admin' || $role === 'viewer') {
             $from = $user->department?->coversRegionSlug('ict')
                 ? '/federal-department-requests'
                 : '/department-tasks';

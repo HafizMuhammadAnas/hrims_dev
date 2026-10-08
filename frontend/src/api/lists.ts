@@ -69,6 +69,8 @@ export type DepartmentTaskRow = {
   submission_date?: string | null
   response_data?: string | null
   attachment_url?: string | null
+  verification_file_url?: string | null
+  physical_validation_done?: boolean
 }
 
 export async function fetchDepartmentTasks(options?: {

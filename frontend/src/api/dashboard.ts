@@ -50,7 +50,7 @@ export interface DashboardSummary {
   clarifications_pending_federal?: number
   department_tasks_total?: number
   department_tasks_by_status?: Record<string, number>
-  /** Pending / Pending Validation / Validator Revision / Under Review / Regional Revision / Accepted */
+  /** Pending / Under Review / Regional Revision / Accepted (legacy validation keys kept at 0) */
   department_tasks_by_workflow?: {
     in_process: number
     pending_validation?: number

@@ -29,18 +29,14 @@ export function isRegionalAdmin(user: AuthUser | null): boolean {
   return hasRole(user, 'regional_admin')
 }
 
-/** Departmental data entry operator (legacy slug department_admin). */
+/** Departmental administrator (slug department_admin). */
 export function isDepartmentAdmin(user: AuthUser | null): boolean {
   return hasRole(user, 'department_admin')
 }
 
-export function isDepartmentValidator(user: AuthUser | null): boolean {
-  return hasRole(user, 'department_validator')
-}
-
-/** Operator or validator (department workspace). */
+/** Department workspace (admin). */
 export function isDepartmentStaff(user: AuthUser | null): boolean {
-  return isDepartmentAdmin(user) || isDepartmentValidator(user)
+  return isDepartmentAdmin(user)
 }
 
 export function isViewer(user: AuthUser | null): boolean {

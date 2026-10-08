@@ -117,7 +117,7 @@ class DashboardController extends Controller
             $data['department_tasks_by_workflow'] = $this->departmentTasksByWorkflow(clone $tq, true);
         }
 
-        if ($user->hasRole('department_admin') || $user->hasRole('department_validator') || $user->hasRole('viewer')) {
+        if ($user->hasRole('department_admin') || $user->hasRole('viewer')) {
             if ($user->department_id) {
                 $tq = DepartmentTask::query()->where('department_id', $user->department_id);
                 $data['department_tasks_total'] = (clone $tq)->count();
@@ -132,35 +132,12 @@ class DashboardController extends Controller
 
                 $openForAction = DepartmentTask::query()
                     ->where('department_id', $user->department_id)
-                    ->where(function ($q) use ($user): void {
-                        if ($user->hasRole('department_validator')) {
-                            $q->where(function ($inner): void {
-                                $inner->where('status', 'submitted')
-                                    ->whereNull('department_validation_status')
-                                    ->where(function ($r): void {
-                                        $r->whereNull('regional_review_status')
-                                            ->orWhere('regional_review_status', '!=', 'needs-modification');
-                                    });
-                            })->orWhere(function ($inner): void {
-                                $inner->where('status', 'assigned')
-                                    ->orWhere(function ($q2): void {
-                                        $q2->where('status', 'submitted')
-                                            ->where(function ($q3): void {
-                                                $q3->where('regional_review_status', 'needs-modification')
-                                                    ->orWhere('department_validation_status', 'needs-modification');
-                                            });
-                                    });
+                    ->where(function ($q): void {
+                        $q->where('status', 'assigned')
+                            ->orWhere(function ($q2): void {
+                                $q2->where('status', 'submitted')
+                                    ->where('regional_review_status', 'needs-modification');
                             });
-                        } else {
-                            $q->where('status', 'assigned')
-                                ->orWhere(function ($q2): void {
-                                    $q2->where('status', 'submitted')
-                                        ->where(function ($q3): void {
-                                            $q3->where('regional_review_status', 'needs-modification')
-                                                ->orWhere('department_validation_status', 'needs-modification');
-                                        });
-                                });
-                        }
                     })
                     ->orderByDesc('assigned_date')
                     ->limit(5)
@@ -168,14 +145,7 @@ class DashboardController extends Controller
                     ->get();
 
                 $data['urgent_department_tasks'] = $openForAction->map(function (DepartmentTask $t) {
-                    if ($t->status === 'submitted' && $t->department_validation_status === null
-                        && $t->regional_review_status !== 'needs-modification') {
-                        $status = 'pending-validation';
-                    } elseif ($t->department_validation_status === 'needs-modification') {
-                        $status = 'needs-revision';
-                    } else {
-                        $status = $t->regional_review_status === 'needs-modification' ? 'needs-revision' : 'pending';
-                    }
+                    $status = $t->regional_review_status === 'needs-modification' ? 'needs-revision' : 'pending';
 
                     return [
                         'task_id' => $t->id,
@@ -205,30 +175,17 @@ class DashboardController extends Controller
      */
     private function departmentTasksByWorkflow(Builder $taskQuery, bool $forUpstreamReviewer = false): array
     {
-        $rows = (clone $taskQuery)->get(['status', 'regional_review_status', 'department_validation_status', 'submission_date']);
+        $rows = (clone $taskQuery)->get(['status', 'regional_review_status', 'submission_date']);
         $out = $this->emptyDepartmentWorkflowCounts();
 
         foreach ($rows as $row) {
             $status = (string) $row->getAttribute('status');
             $review = $row->getAttribute('regional_review_status');
-            $validation = $row->getAttribute('department_validation_status');
             $submissionDate = $row->getAttribute('submission_date');
             $hasResponse = $submissionDate !== null || $status === 'submitted';
 
-            // Regional/federal: unvalidated / validator-revision submissions still count as pending.
-            if ($forUpstreamReviewer && $hasResponse && $validation !== 'accepted'
-                && $review !== 'accepted' && $review !== 'needs-modification') {
-                $out['in_process']++;
-                continue;
-            }
-
             if (! $hasResponse) {
                 $out['in_process']++;
-                continue;
-            }
-
-            if ($validation === 'needs-modification') {
-                $out['validator_revision']++;
                 continue;
             }
 
@@ -239,12 +196,6 @@ class DashboardController extends Controller
 
             if ($review === 'accepted') {
                 $out['accepted']++;
-                continue;
-            }
-
-            // Under Review only after validator accepted.
-            if ($validation !== 'accepted') {
-                $out['pending_validation']++;
                 continue;
             }
 
@@ -390,7 +341,7 @@ class DashboardController extends Controller
             return $query->where('region_id', $user->region_id);
         }
 
-        if (($user->hasRole('department_admin') || $user->hasRole('department_validator') || $user->hasRole('viewer')) && $user->department_id) {
+        if (($user->hasRole('department_admin') || $user->hasRole('viewer')) && $user->department_id) {
             $ids = HrimsAccess::hrRequestIdsForDepartmentUser($user);
             if ($ids === []) {
                 $query->whereRaw('1 = 0');

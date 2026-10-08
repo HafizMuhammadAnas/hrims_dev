@@ -26,17 +26,11 @@ final class HrimsAccess
         return $user->hasRole('federal_admin') || $user->hasRole('federal_sub_admin');
     }
 
-    /** Department operator, validator, or legacy viewer with a department. */
+    /** Department administrator or legacy viewer with a department. */
     public static function isDepartmentUser(User $user): bool
     {
         return $user->hasRole('department_admin')
-            || $user->hasRole('department_validator')
             || $user->hasRole('viewer');
-    }
-
-    public static function isDepartmentValidator(User $user): bool
-    {
-        return $user->hasRole('department_validator');
     }
 
     public static function seesAllRegions(User $user): bool

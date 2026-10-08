@@ -15,13 +15,20 @@ class RbacSeeder extends Seeder
             ['slug' => 'federal_admin', 'name' => 'Federal administrator', 'description' => 'National scope'],
             ['slug' => 'federal_sub_admin', 'name' => 'Federal sub user', 'description' => 'Federal scope without user or department management'],
             ['slug' => 'regional_admin', 'name' => 'Regional administrator', 'description' => 'Regional focal person'],
-            ['slug' => 'department_admin', 'name' => 'Departmental data entry operator', 'description' => 'Department data entry and submission'],
-            ['slug' => 'department_validator', 'name' => 'Departmental validator', 'description' => 'Department internal validation before regional/federal review'],
+            ['slug' => 'department_admin', 'name' => 'Departmental administrator', 'description' => 'Department data entry and submission'],
             ['slug' => 'viewer', 'name' => 'Viewer', 'description' => 'Read-only'],
         ];
 
         foreach ($roles as $row) {
             RbacRole::query()->updateOrCreate(['slug' => $row['slug']], $row);
+        }
+
+        // Drop legacy validator role if a prior seed created it.
+        $legacyValidator = RbacRole::query()->where('slug', 'department_validator')->first();
+        if ($legacyValidator) {
+            $legacyValidator->permissions()->detach();
+            $legacyValidator->users()->detach();
+            $legacyValidator->delete();
         }
 
         $permissions = [
@@ -41,7 +48,6 @@ class RbacSeeder extends Seeder
             'federal_sub_admin' => ['dashboard.view', 'requests.manage'],
             'regional_admin' => ['dashboard.view', 'users.manage', 'requests.manage'],
             'department_admin' => ['dashboard.view', 'requests.manage'],
-            'department_validator' => ['dashboard.view', 'requests.manage'],
             'viewer' => ['dashboard.view'],
         ];
 

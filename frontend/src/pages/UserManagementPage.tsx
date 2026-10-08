@@ -40,7 +40,6 @@ type RoleSlug =
   | 'federal_admin'
   | 'regional_admin'
   | 'department_admin'
-  | 'department_validator'
   | 'federal_sub_admin'
   | 'viewer'
 
@@ -174,7 +173,7 @@ export function UserManagementPage() {
           username: form.username,
           email,
           password,
-          role_slug: form.role_slug as 'department_admin' | 'department_validator' | 'viewer',
+          role_slug: form.role_slug as 'department_admin' | 'viewer',
           department_id: Number(form.department_id),
         })
       }
@@ -560,10 +559,7 @@ export function UserManagementPage() {
                   {superUser && <option value="federal_admin">Federal admin</option>}
                   {superUser && <option value="regional_admin">Regional admin</option>}
                   {!superUser && (
-                    <option value="department_admin">Departmental data entry operator</option>
-                  )}
-                  {!superUser && (
-                    <option value="department_validator">Departmental validator</option>
+                    <option value="department_admin">Departmental administrator</option>
                   )}
                   {!superUser && federalPortal && (
                     <option value="federal_sub_admin">Federal sub user</option>

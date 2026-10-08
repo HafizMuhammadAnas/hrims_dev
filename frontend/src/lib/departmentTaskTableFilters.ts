@@ -12,8 +12,6 @@ export function workflowBucketFilterOptions(opts?: {
   return [
     { value: '', label: 'All statuses' },
     { value: 'in_process', label: 'Pending' },
-    { value: 'pending_validation', label: 'Pending Validation' },
-    { value: 'validator_revision', label: 'Validator Revision' },
     { value: 'responded', label: 'Under Review' },
     { value: 'revision', label: revisionLabel },
     { value: 'accepted', label: 'Accepted' },
@@ -22,12 +20,9 @@ export function workflowBucketFilterOptions(opts?: {
 
 export const WORKFLOW_BUCKET_FILTER_OPTIONS = workflowBucketFilterOptions()
 
-/** Filters shown on regional/federal monitoring (internal validation stages hidden). */
 export function upstreamWorkflowBucketFilterOptions(scope: 'regional' | 'federal-ict') {
   const revisionLabel = scope === 'federal-ict' ? 'Federal Revision' : 'Regional Revision'
-  return workflowBucketFilterOptions({ upstreamRevisionLabel: revisionLabel }).filter(
-    (opt) => opt.value !== 'pending_validation' && opt.value !== 'validator_revision',
-  )
+  return workflowBucketFilterOptions({ upstreamRevisionLabel: revisionLabel })
 }
 
 /** @deprecated Prefer upstreamWorkflowBucketFilterOptions(scope) */

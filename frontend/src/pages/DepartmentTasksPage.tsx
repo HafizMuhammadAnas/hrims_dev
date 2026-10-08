@@ -74,8 +74,6 @@ export function DepartmentTasksPage() {
           items={[
             { label: LABEL_TOTAL_TASKS, value: filtered.length },
             { label: 'Pending', value: workflowCounts.in_process },
-            { label: 'Pending Validation', value: workflowCounts.pending_validation },
-            { label: 'Validator Revision', value: workflowCounts.validator_revision },
             { label: 'Under Review', value: workflowCounts.responded },
             { label: revisionLabel, value: workflowCounts.revision },
             { label: 'Accepted', value: workflowCounts.accepted },

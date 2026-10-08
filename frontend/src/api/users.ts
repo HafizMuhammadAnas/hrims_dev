@@ -15,7 +15,6 @@ export type UserCreateInput = {
     | 'federal_admin'
     | 'regional_admin'
     | 'department_admin'
-    | 'department_validator'
     | 'federal_sub_admin'
     | 'viewer'
   region_id?: number | null

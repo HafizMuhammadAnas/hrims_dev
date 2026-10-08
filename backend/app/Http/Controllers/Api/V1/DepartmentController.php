@@ -36,7 +36,7 @@ class DepartmentController extends Controller
                 return response()->json(['message' => 'Forbidden'], 403);
             }
             $query->whereHas('regions', fn ($q) => $q->where('slug', $slug));
-        } elseif ($user->hasRole('department_admin') || $user->hasRole('department_validator') || $user->hasRole('viewer')) {
+        } elseif ($user->hasRole('department_admin') || $user->hasRole('viewer')) {
             if ($user->department_id === null) {
                 return response()->json(['data' => []]);
             }

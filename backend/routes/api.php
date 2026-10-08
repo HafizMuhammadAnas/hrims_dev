@@ -120,7 +120,6 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/department-tasks', [DepartmentTaskController::class, 'index'])->name('api.v1.department-tasks.index');
         Route::post('/department-tasks', [DepartmentTaskController::class, 'store'])->name('api.v1.department-tasks.store');
         Route::post('/department-tasks/{departmentTask}/submit-response', [DepartmentTaskController::class, 'submitResponse'])->name('api.v1.department-tasks.submit-response');
-        Route::post('/department-tasks/{departmentTask}/department-validation', [DepartmentTaskController::class, 'updateDepartmentValidation'])->name('api.v1.department-tasks.department-validation');
         Route::get('/department-tasks/{departmentTask}/revisions', [DepartmentTaskController::class, 'revisions'])->name('api.v1.department-tasks.revisions');
         Route::post('/department-tasks/{departmentTask}/review', [DepartmentTaskController::class, 'updateReview'])->name('api.v1.department-tasks.update-review');
         Route::patch('/department-tasks/{departmentTask}', [DepartmentTaskController::class, 'updateReview'])->name('api.v1.department-tasks.update-review.patch');

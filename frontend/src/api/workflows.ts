@@ -97,12 +97,34 @@ export type SubmitDepartmentTaskBody =
       stripQualIndicatorIds?: number[]
     }
 
+export type DepartmentTaskSubmitOptions = {
+  asDraft?: boolean
+  verificationFile?: File | null
+  removeVerificationFile?: boolean
+  physicalValidationDone?: boolean
+}
+
 export async function submitDepartmentTaskResponse(
   taskId: string,
   body: SubmitDepartmentTaskBody,
+  options?: DepartmentTaskSubmitOptions,
 ): Promise<DepartmentTaskRow> {
   await ensureCsrfCookie()
   const form = new FormData()
+  if (options?.asDraft) {
+    form.append('as_draft', '1')
+  }
+  if (options?.physicalValidationDone) {
+    form.append('physical_validation_done', '1')
+  } else if (options?.physicalValidationDone === false) {
+    form.append('physical_validation_done', '0')
+  }
+  if (options?.verificationFile) {
+    form.append('verification_file', options.verificationFile)
+  }
+  if (options?.removeVerificationFile) {
+    form.append('remove_verification_file', '1')
+  }
   if (body.mode === 'legacy') {
     form.append('response_data', body.response_data)
     if (body.attachment) {
@@ -200,37 +222,6 @@ export async function updateDepartmentTaskReview(
     headers: apiJsonHeaders(),
     body: JSON.stringify(payload),
   })
-  await throwIfNotOk(res)
-  const json = (await res.json()) as { data: DepartmentTaskRow }
-  return json.data
-}
-
-export async function updateDepartmentTaskValidation(
-  taskId: string,
-  body: {
-    department_validation_status: 'accepted' | 'needs-modification'
-    department_validation_comments?: string | null
-  },
-): Promise<DepartmentTaskRow> {
-  await ensureCsrfCookie()
-  const payload: {
-    department_validation_status: 'accepted' | 'needs-modification'
-    department_validation_comments?: string
-  } = {
-    department_validation_status: body.department_validation_status,
-  }
-  const comments = body.department_validation_comments?.trim()
-  if (comments) payload.department_validation_comments = comments
-
-  const res = await fetch(
-    `/api/v1/department-tasks/${encodeURIComponent(taskId)}/department-validation`,
-    {
-      method: 'POST',
-      credentials: 'include',
-      headers: apiJsonHeaders(),
-      body: JSON.stringify(payload),
-    },
-  )
   await throwIfNotOk(res)
   const json = (await res.json()) as { data: DepartmentTaskRow }
   return json.data

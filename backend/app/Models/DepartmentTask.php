@@ -29,6 +29,8 @@ class DepartmentTask extends Model
         'submission_date',
         'response_data',
         'attachment_url',
+        'verification_file_url',
+        'physical_validation_done',
         'category_id',
         'subcategory_id',
         'indicator_id',
@@ -41,6 +43,7 @@ class DepartmentTask extends Model
             'due_date' => 'date',
             'submission_date' => 'date',
             'assigned_indicator_ids' => 'array',
+            'physical_validation_done' => 'boolean',
         ];
     }
 

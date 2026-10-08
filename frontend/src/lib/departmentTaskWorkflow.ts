@@ -2,7 +2,7 @@ import type { DepartmentTaskRow } from '../api/lists'
 import { isIctLineTask } from './ictRegion'
 import type { StatusBadgeTone } from './statusBadgeTone'
 
-/** Upstream (region or federal ICT) sent the task back after validation. */
+/** Upstream (region or federal ICT) sent the task back after review. */
 export function upstreamRevisionLabel(t: DepartmentTaskRow): string {
   return isIctLineTask(t) ? 'Federal Revision' : 'Regional Revision'
 }
@@ -15,28 +15,11 @@ export function hasDepartmentResponse(t: DepartmentTaskRow): boolean {
   return Boolean(t.submission_date) || t.status === 'submitted'
 }
 
-/** Task is open for the department user to submit or resubmit after validation/regional revision. */
+/** Task is open for the department user to submit or resubmit after regional/federal revision. */
 export function canDepartmentSubmitResponse(t: DepartmentTaskRow): boolean {
   if (t.status === 'assigned') return true
   if (t.status !== 'submitted') return false
-  return (
-    t.regional_review_status === 'needs-modification' ||
-    t.department_validation_status === 'needs-modification'
-  )
-}
-
-/** Submitted and waiting for departmental validator (not yet accepted). */
-export function isPendingDepartmentValidation(t: DepartmentTaskRow): boolean {
-  return (
-    hasDepartmentResponse(t) &&
-    t.department_validation_status !== 'accepted' &&
-    t.department_validation_status !== 'needs-modification' &&
-    t.regional_review_status !== 'needs-modification'
-  )
-}
-
-export function canValidateDepartmentResponse(t: DepartmentTaskRow): boolean {
-  return isPendingDepartmentValidation(t)
+  return t.regional_review_status === 'needs-modification'
 }
 
 /** Mutually exclusive buckets for a distributed department task. */
@@ -50,11 +33,8 @@ export type DepartmentTaskWorkflowBucket =
 
 export function departmentTaskWorkflowBucket(t: DepartmentTaskRow): DepartmentTaskWorkflowBucket {
   if (!hasDepartmentResponse(t)) return 'in_process'
-  if (t.department_validation_status === 'needs-modification') return 'validator_revision'
   if (t.regional_review_status === 'needs-modification') return 'revision'
   if (t.regional_review_status === 'accepted') return 'accepted'
-  // Under Review only after validator has accepted and forwarded upstream.
-  if (t.department_validation_status !== 'accepted') return 'pending_validation'
   return 'responded'
 }
 
@@ -81,20 +61,14 @@ export function workflowPresentation(t: DepartmentTaskRow): {
 } {
   const b = departmentTaskWorkflowBucket(t)
   if (b === 'in_process') return { label: 'Pending', tone: 'pending' }
-  if (b === 'pending_validation') return { label: 'Pending Validation', tone: 'warning' }
-  if (b === 'validator_revision') return { label: 'Validator Revision', tone: 'warning' }
   if (b === 'revision') return { label: upstreamRevisionLabel(t), tone: 'warning' }
   if (b === 'accepted') return { label: 'Accepted', tone: 'success' }
   return { label: 'Under Review', tone: 'in-progress' }
 }
 
-/** Regional/federal can accept only after department validation and while Under Review. */
+/** Regional/federal can accept while Under Review. */
 export function canAcceptDepartmentTaskReview(t: DepartmentTaskRow): boolean {
-  return (
-    hasDepartmentResponse(t) &&
-    t.department_validation_status === 'accepted' &&
-    departmentTaskWorkflowBucket(t) === 'responded'
-  )
+  return hasDepartmentResponse(t) && departmentTaskWorkflowBucket(t) === 'responded'
 }
 
 /**
@@ -103,7 +77,6 @@ export function canAcceptDepartmentTaskReview(t: DepartmentTaskRow): boolean {
  */
 export function canRequestDepartmentTaskModification(t: DepartmentTaskRow): boolean {
   if (!hasDepartmentResponse(t)) return false
-  if (t.department_validation_status !== 'accepted') return false
   const b = departmentTaskWorkflowBucket(t)
   return b === 'responded' || b === 'accepted'
 }

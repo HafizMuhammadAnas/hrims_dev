@@ -39,7 +39,6 @@ import { upstreamRevisionLabelForScope } from '../lib/departmentTaskWorkflow'
 import { isIctDepartmentPortalUser } from '../lib/ictRegion'
 import {
   isDepartmentStaff,
-  isDepartmentValidator,
   isFederalStaff,
   isRegionalAdmin,
   isSuperAdmin,
@@ -225,8 +224,6 @@ export function DashboardPage() {
   const taskAssigned = count(taskBy, 'assigned')
   const taskSubmitted = count(taskBy, 'submitted')
   const workflowPending = taskWorkflow?.in_process ?? 0
-  const workflowPendingValidation = taskWorkflow?.pending_validation ?? 0
-  const workflowValidatorRevision = taskWorkflow?.validator_revision ?? 0
   const workflowReview = taskWorkflow?.responded ?? 0
   const workflowRevision = taskWorkflow?.revision ?? 0
   const workflowAccepted = taskWorkflow?.accepted ?? 0
@@ -274,9 +271,6 @@ export function DashboardPage() {
       return `${user.region?.name ?? 'Province'} overview — manage requests and responses for your province`
     }
     if (variant === 'department' || variant === 'viewer') {
-      if (isDepartmentValidator(user)) {
-        return `Department validation — ${user.department?.name ?? 'your department'}`
-      }
       return `Department workspace — ${user.department?.name ?? user.region?.name ?? 'your assignments'}`
     }
     return 'HRIMS dashboard'
@@ -398,13 +392,10 @@ export function DashboardPage() {
                   </div>
                   <div className="dashboard-card-title">{LABEL_NEEDS_ATTENTION}</div>
                   <div className="dashboard-card-value">
-                    {workflowValidatorRevision + workflowRevision}
+                    {workflowRevision}
                   </div>
                   <div className="dashboard-card-subtitle">
                     {[
-                      workflowValidatorRevision > 0
-                        ? `${workflowValidatorRevision} validator revision${workflowValidatorRevision === 1 ? '' : 's'}`
-                        : null,
                       workflowRevision > 0
                         ? `${workflowRevision} ${deptUpstreamRevisionLabel.toLowerCase()}${workflowRevision === 1 ? '' : 's'}`
                         : null,
@@ -851,8 +842,6 @@ export function DashboardPage() {
                 className="dashboard-status-stats"
                 items={[
                   { label: 'Pending', value: workflowPending, accent: '#ffb300' },
-                  { label: 'Pending Validation', value: workflowPendingValidation, accent: '#ff9800' },
-                  { label: 'Validator Revision', value: workflowValidatorRevision, accent: '#fb8c00' },
                   { label: 'Under Review', value: workflowReview, accent: '#00bcd4' },
                   { label: deptUpstreamRevisionLabel, value: workflowRevision, accent: '#f44336' },
                   { label: 'Accepted', value: workflowAccepted, accent: '#4caf50' },
