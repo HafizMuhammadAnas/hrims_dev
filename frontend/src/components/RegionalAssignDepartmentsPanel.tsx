@@ -2,6 +2,12 @@ import type { DepartmentRow } from '../api/workflows'
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import { Button } from './ui/Button'
 
+export type ExistingDepartmentAssignment = {
+  departmentName: string
+  /** Human-readable indicator labels already assigned to this department. */
+  indicatorLabels: string[]
+}
+
 type Props = {
   regionName: string
   /** Parent HR request due date (YYYY-MM-DD); department due must be on or before this. */
@@ -23,6 +29,10 @@ type Props = {
   onBack?: () => void
   onAssign: () => void
   showBackLink?: boolean
+  /** When true, copy reflects adding departments after an initial distribution. */
+  redistribute?: boolean
+  /** Existing distribution to show (already-assigned departments are excluded from `departments`). */
+  existingAssignments?: ExistingDepartmentAssignment[]
 }
 
 function indicatorSummary(selectedIds: number[]): string {
@@ -67,6 +77,8 @@ export function RegionalAssignDepartmentsPanel({
   onBack,
   onAssign,
   showBackLink = true,
+  redistribute = false,
+  existingAssignments = [],
 }: Props) {
   const byDepartment = assignedDepartmentIndicatorMap(departmentIndicators)
   const noIndicatorMode = indicators.length === 0
@@ -86,19 +98,55 @@ export function RegionalAssignDepartmentsPanel({
 
   return (
     <section className="hr-request-view-template__card hr-request-regional-workflow-section">
-      {showBackLink && onBack ? (
+      {showBackLink && onBack && !redistribute ? (
         <Button variant="link" compact type="button" onClick={onBack}>
           ← Choose a different path
         </Button>
       ) : null}
-      <h4 className="dashboard-panel-title" style={{ marginTop: showBackLink ? 0 : undefined, marginBottom: 12 }}>
-        Assign to departments ({regionName})
+      <h4 className="dashboard-panel-title" style={{ marginTop: showBackLink && !redistribute ? 0 : undefined, marginBottom: 12 }}>
+        {redistribute
+          ? `Redistribute to departments (${regionName})`
+          : `Assign to departments (${regionName})`}
       </h4>
       <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-        {noIndicatorMode
-          ? 'Select the departments that should provide a written response and attachment.'
-          : 'Open a department to select the indicators they should respond to. Leave a department empty to skip it.'}
+        {redistribute
+          ? 'Already distributed departments are listed below for reference and excluded from new assignment. For each new department, select any indicators freely.'
+          : noIndicatorMode
+            ? 'Select the departments that should provide a written response and attachment.'
+            : 'Open a department to select the indicators they should respond to. Leave a department empty to skip it.'}
       </p>
+
+      {redistribute && existingAssignments.length > 0 ? (
+        <div className="regional-assign-existing" style={{ marginBottom: 16 }}>
+          <h5 className="dashboard-panel-title" style={{ margin: '0 0 8px', fontSize: '0.95rem' }}>
+            Already distributed
+          </h5>
+          <ul className="regional-assign-existing__list">
+            {existingAssignments.map((row) => (
+              <li key={row.departmentName} className="regional-assign-existing__item">
+                <strong className="regional-assign-existing__dept">{row.departmentName}</strong>
+                {row.indicatorLabels.length > 0 ? (
+                  <ul className="regional-assign-existing__indicators">
+                    {row.indicatorLabels.map((label, index) => (
+                      <li key={`${row.departmentName}-${index}`}>{label}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted small" style={{ margin: '4px 0 0' }}>
+                    Full request scope (no specific indicators recorded)
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {redistribute ? (
+        <h5 className="dashboard-panel-title" style={{ margin: '0 0 10px', fontSize: '0.95rem' }}>
+          Assign additional departments
+        </h5>
+      ) : null}
 
       <div className="form-row" style={{ marginBottom: 14 }}>
         <label htmlFor="reg-assign-due-date">
@@ -120,8 +168,9 @@ export function RegionalAssignDepartmentsPanel({
 
       {departments.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
-          No departments are mapped to your region. Add departments under <strong>Manage departments</strong> before
-          assigning tasks.
+          {redistribute
+            ? 'All region departments are already assigned. Add departments under Manage departments if you need to redistribute further.'
+            : 'No departments are mapped to your region. Add departments under Manage departments before assigning tasks.'}
         </p>
       ) : noIndicatorMode ? (
         <div className="regional-assign-dept-list">
@@ -203,8 +252,10 @@ export function RegionalAssignDepartmentsPanel({
           {assigning
             ? 'Assigning…'
             : mappedDeptCount > 0
-              ? `Assign ${mappedDeptCount} department${mappedDeptCount === 1 ? '' : 's'}`
-              : 'Assign selected departments'}
+              ? `${redistribute ? 'Redistribute to' : 'Assign'} ${mappedDeptCount} department${mappedDeptCount === 1 ? '' : 's'}`
+              : redistribute
+                ? 'Redistribute to selected departments'
+                : 'Assign selected departments'}
         </Button>
       </div>
     </section>

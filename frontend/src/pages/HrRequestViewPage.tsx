@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Download } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchHrRequest } from '../api/hrRequests'
 import {
@@ -117,6 +118,7 @@ import {
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
 import { downloadDeptTaskRequestResponsePdf } from '../lib/downloadDeptTaskRequestResponsePdf'
+import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { loiMetadataLoadErrorPageMessage } from '../lib/issueEntryKind'
 import {
   isDepartmentStaff,
@@ -246,6 +248,9 @@ export function HrRequestViewPage() {
   const [savingReview, setSavingReview] = useState(false)
   const deptRequestPanelRef = useRef<HTMLDivElement | null>(null)
   const deptResponseFormRef = useRef<HTMLDivElement | null>(null)
+  const receivedRequestTemplateRef = useRef<HTMLDivElement | null>(null)
+  const [receivedRequestPdfLoading, setReceivedRequestPdfLoading] = useState(false)
+  const [receivedRequestPdfError, setReceivedRequestPdfError] = useState<string | null>(null)
 
   function bumpDeptFileInput(key: string) {
     setDeptFileInputRev((r) => ({ ...r, [key]: (r[key] ?? 0) + 1 }))
@@ -356,6 +361,60 @@ export function HrRequestViewPage() {
     () => (detail ? tasks.filter((t) => t.req_id === detail.id) : []),
     [detail, tasks],
   )
+
+  const hasRegionalCompilation = regionalResponses.length > 0
+
+  /**
+   * Tasks expose `department_id` as department code (e.g. SEC-POLICE), not the numeric DB id.
+   * Match by code, numeric id fallback, or display name so already-assigned depts are excluded.
+   */
+  const unassignedRegionDepartments = useMemo(() => {
+    const assignedKeys = new Set<string>()
+    for (const t of tasksForRequest) {
+      const code = String(t.department_id ?? '')
+        .trim()
+        .toLowerCase()
+      if (code) assignedKeys.add(`code:${code}`)
+      const name = t.department_name?.trim().toLowerCase()
+      if (name) assignedKeys.add(`name:${name}`)
+    }
+    return regionDepartments.filter((d) => {
+      const code = (d.code ?? '').trim().toLowerCase()
+      if (code && assignedKeys.has(`code:${code}`)) return false
+      if (assignedKeys.has(`code:${String(d.id)}`)) return false
+      const name = d.name.trim().toLowerCase()
+      if (name && assignedKeys.has(`name:${name}`)) return false
+      return true
+    })
+  }, [regionDepartments, tasksForRequest])
+
+  const existingDepartmentAssignments = useMemo(() => {
+    const indicatorById = new Map(
+      (detail?.issue?.indicators ?? []).map((ind) => [ind.id, ind.indicator_text] as const),
+    )
+    const ordinalById = indicatorOrdinalsForRequest(detail)
+    return [...tasksForRequest]
+      .sort((a, b) => {
+        const an = (a.department_name ?? a.department_id).toLowerCase()
+        const bn = (b.department_name ?? b.department_id).toLowerCase()
+        return an.localeCompare(bn)
+      })
+      .map((t) => {
+        const departmentName = t.department_name?.trim() || String(t.department_id)
+        const ids = t.assigned_indicator_ids ?? []
+        const indicatorLabels = ids
+          .slice()
+          .sort((a, b) => (ordinalById[a] ?? a) - (ordinalById[b] ?? b))
+          .map((id) => {
+            const text = indicatorById.get(id)?.trim() || `Indicator #${id}`
+            const ord = ordinalById[id]
+            return ord ? `#${ord} ${text}` : text
+          })
+        return { departmentName, indicatorLabels }
+      })
+  }, [tasksForRequest, detail])
+
+  const isRegionalRedistribute = tasksForRequest.length > 0 && !hasRegionalCompilation
 
   const activeTask = useMemo(() => {
     if (!detail || !taskIdFromUrl) return null
@@ -554,8 +613,19 @@ export function HrRequestViewPage() {
 
   const deptLegacySubmitReady = Boolean(activeTask)
 
-  const canRegionalProceed =
-    Boolean(regionalUser && detail && tasksForRequest.length === 0 && regionDepartments.length > 0)
+  /** First-time assign / clarification path (no department tasks yet). */
+  const canRegionalProceed = Boolean(
+    regionalUser &&
+      detail &&
+      tasksForRequest.length === 0 &&
+      regionDepartments.length > 0 &&
+      !hasRegionalCompilation,
+  )
+
+  /** Add more departments until a regional compilation exists for this request. */
+  const canRegionalRedistribute = Boolean(
+    regionalUser && detail && isRegionalRedistribute && unassignedRegionDepartments.length > 0,
+  )
 
   const clarificationBlocksAssign = activeClarification?.status === 'pending_federal'
 
@@ -567,9 +637,9 @@ export function HrRequestViewPage() {
     regionalPathChoice === null
 
   const showRegionalAssign =
-    canRegionalProceed &&
     !clarificationBlocksAssign &&
-    (fromRegionReceived ? regionalPathChoice === 'assign' : true)
+    ((canRegionalProceed && (fromRegionReceived ? regionalPathChoice === 'assign' : true)) ||
+      canRegionalRedistribute)
 
   const showRegionalClarificationForm =
     fromRegionReceived &&
@@ -984,6 +1054,27 @@ export function HrRequestViewPage() {
     }
   }
 
+  async function downloadReceivedRequestPdf() {
+    const el = receivedRequestTemplateRef.current
+    if (!el || !detail) return
+    const filenameBase = [detail.id, detail.title?.trim() || 'received-request']
+      .filter(Boolean)
+      .join(' — ')
+    setReceivedRequestPdfLoading(true)
+    setReceivedRequestPdfError(null)
+    try {
+      await downloadElementAsPdf(el, filenameBase, {
+        captureClass: 'regional-response-export-capture',
+        marginMm: 6,
+        headerTitle: filenameBase,
+      })
+    } catch (e: unknown) {
+      setReceivedRequestPdfError(e instanceof Error ? e.message : 'Could not generate PDF.')
+    } finally {
+      setReceivedRequestPdfLoading(false)
+    }
+  }
+
   const showQuantitativeSection = deptIndicatorsForForm.some((ind) => ind.has_quantitative)
   const showQualitativeSection = deptIndicatorsForForm.some((ind) => ind.has_qualitative)
 
@@ -1232,6 +1323,22 @@ export function HrRequestViewPage() {
           </section>
         )}
 
+        {fromRegionReceived && hasRegionalCompilation ? (
+          <p className="muted" style={{ margin: '8px 0 0' }}>
+            This request has been compiled for your region. Department redistribution is closed.
+          </p>
+        ) : null}
+
+        {fromRegionReceived &&
+        isRegionalRedistribute &&
+        unassignedRegionDepartments.length === 0 &&
+        regionDepartments.length > 0 ? (
+          <p className="muted" style={{ margin: '8px 0 0' }}>
+            All region departments are already assigned. Redistribution stays open until the response is
+            compiled — add departments under <strong>Manage departments</strong> if needed.
+          </p>
+        ) : null}
+
         {showRegionalAssign && (
           <RegionalAssignDepartmentsPanel
             regionName={user?.region?.name ?? 'your region'}
@@ -1239,7 +1346,7 @@ export function HrRequestViewPage() {
             dueDate={assignDueDate}
             onChangeDueDate={setAssignDueDate}
             indicators={requestIndicatorsForAssign}
-            departments={regionDepartments}
+            departments={isRegionalRedistribute ? unassignedRegionDepartments : regionDepartments}
             departmentIndicators={assignDepartmentIndicators}
             onChangeDepartmentIndicators={setAssignDepartmentIndicators}
             selectedDepartmentIds={assignOtherDepartmentIds}
@@ -1253,7 +1360,11 @@ export function HrRequestViewPage() {
               setAssignError(null)
             }}
             onAssign={() => void assignSelectedDepartments()}
-            showBackLink
+            showBackLink={!isRegionalRedistribute}
+            redistribute={isRegionalRedistribute}
+            existingAssignments={
+              isRegionalRedistribute ? existingDepartmentAssignments : undefined
+            }
           />
         )}
 
@@ -1298,6 +1409,11 @@ export function HrRequestViewPage() {
               </StatusBadge>
               <span className="workflow-modal-hero__chip">Task {activeTask.id}</span>
               <span className="workflow-modal-hero__chip">{activeTask.req_id}</span>
+              {activeTask.due_date?.trim() ? (
+                <span className="workflow-modal-hero__chip">
+                  Due {formatAppDate(activeTask.due_date)}
+                </span>
+              ) : null}
             </WorkflowModalHero>
             <nav
               className="compiled-record-modal-tabs dept-task-response-modal__tabs"
@@ -1510,6 +1626,7 @@ export function HrRequestViewPage() {
             }
             departmentPortalAssignedDepartmentNames={departmentPortalAssignedNames}
             pageViewBelowTemplate={regionalWorkflowBelowTemplate}
+            pageViewTemplateRef={fromRegionReceived ? receivedRequestTemplateRef : undefined}
             pageViewActions={
               embeddedRequestPage ? undefined : (
                 <Button variant="secondary" compact type="button" onClick={() => navigate(from)}>
@@ -2247,7 +2364,7 @@ export function HrRequestViewPage() {
             dueDate={assignDueDate}
             onChangeDueDate={setAssignDueDate}
             indicators={requestIndicatorsForAssign}
-            departments={regionDepartments}
+            departments={isRegionalRedistribute ? unassignedRegionDepartments : regionDepartments}
             departmentIndicators={assignDepartmentIndicators}
             onChangeDepartmentIndicators={setAssignDepartmentIndicators}
             selectedDepartmentIds={assignOtherDepartmentIds}
@@ -2258,6 +2375,10 @@ export function HrRequestViewPage() {
             error={assignError}
             onAssign={() => void assignSelectedDepartments()}
             showBackLink={false}
+            redistribute={isRegionalRedistribute}
+            existingAssignments={
+              isRegionalRedistribute ? existingDepartmentAssignments : undefined
+            }
           />
         )}
 
@@ -2280,6 +2401,23 @@ export function HrRequestViewPage() {
                 {LABEL_OPEN_SUBMISSION_HISTORY}
               </Button>
             )}
+            {fromRegionReceived && detail && !detailLoading ? (
+              <>
+                <Button
+                  variant="secondary"
+                  compact
+                  type="button"
+                  disabled={receivedRequestPdfLoading}
+                  onClick={() => void downloadReceivedRequestPdf()}
+                >
+                  <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
+                  {receivedRequestPdfLoading ? 'Generating PDF…' : 'Download PDF'}
+                </Button>
+                {receivedRequestPdfError ? (
+                  <span className="login-error small">{receivedRequestPdfError}</span>
+                ) : null}
+              </>
+            ) : null}
             <Button variant="secondary" compact type="button" onClick={() => navigate(from)}>
               {backLabel}
             </Button>

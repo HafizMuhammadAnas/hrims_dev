@@ -10,7 +10,7 @@ import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestFo
 import { regionalResponseFederalReviewPath } from '../lib/workflowNavigation'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import type { HrRequestRow } from '../types/hrRequest'
-import { DepartmentSubmissionsForRequest } from './DepartmentSubmissionsForRequest'
+import { ClubbedRegionDepartmentResponses } from './ClubbedRegionDepartmentResponses'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
 import { RegionalFederalReviewFeedback } from './RegionalFederalReviewFeedback'
 import { RegionalCompilationChangesTab } from './RegionalCompilationChangesTab'
@@ -257,15 +257,14 @@ export function RegionalResponseFederalReviewView({
 
             <div ref={exportRef} className="regional-response-detail-modal__export-body">
               <div className="regional-response-export__block">
-                <h2 className="card-section-heading">Department submissions</h2>
-                <DepartmentSubmissionsForRequest
-                  tasksForDetail={tasksForViewing}
-                  reqId={viewingRow.req_id}
+                <ClubbedRegionDepartmentResponses
+                  tasks={tasksForViewing}
                   issueIndicators={hrDetail?.issue?.indicators}
                   filterByRegionId={viewingRow.region_id ?? undefined}
-                  omitHeading
-                  showCardMeta
-                  hideStatusBadge
+                  filterByRegionName={
+                    viewingRow.region_id == null ? viewingRow.region_name : undefined
+                  }
+                  regionLabel={viewingRow.region_name}
                 />
               </div>
 

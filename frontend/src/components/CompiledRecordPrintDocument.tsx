@@ -13,7 +13,7 @@ import {
 import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
 import type { HrRequestRow } from '../types/hrRequest'
-import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
+import { ClubbedRegionDepartmentResponses } from './ClubbedRegionDepartmentResponses'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
 import { Alert } from './ui/Alert'
 import { StatusBadge } from './ui/StatusBadge'
@@ -181,18 +181,13 @@ export function CompiledRecordPrintDocument({ record, onReadyChange }: Props) {
                   {tasks.length === 0 ? (
                     <p className="muted small ministry-compiled-region-card__empty">—</p>
                   ) : (
-                    <div className="ministry-compiled-region-card__responses">
-                      {tasks.map((t) => (
-                        <div key={t.id} className="ministry-compiled-dept-response-item">
-                          <DepartmentResponseDisplay
-                            responseData={t.response_data}
-                            attachmentUrl={t.attachment_url}
-                            issueIndicators={hrDetail?.issue?.indicators}
-                            locationRegionIds={[t.region_id]}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                    <ClubbedRegionDepartmentResponses
+                      tasks={tasks}
+                      issueIndicators={hrDetail?.issue?.indicators}
+                      filterByRegionName={regionName}
+                      regionLabel={regionName}
+                      showHeading={false}
+                    />
                   )}
                 </article>
               ))}

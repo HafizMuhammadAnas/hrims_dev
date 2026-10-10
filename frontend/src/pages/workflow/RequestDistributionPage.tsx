@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchHrRequests } from '../../api/hrRequests'
 import { coerceHrRequestStatus } from '../../types/hrRequest'
-import { fetchDepartmentTasks, type DepartmentTaskRow } from '../../api/lists'
+import {
+  fetchDepartmentTasks,
+  fetchRegionalResponses,
+  type DepartmentTaskRow,
+} from '../../api/lists'
 import { createDepartmentTask, fetchDepartments, type DepartmentRow } from '../../api/workflows'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
@@ -22,6 +26,7 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
   const [requests, setRequests] = useState<Awaited<ReturnType<typeof fetchHrRequests>>>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [departments, setDepartments] = useState<DepartmentRow[]>([])
+  const [compiledReqIds, setCompiledReqIds] = useState<Set<string>>(() => new Set())
   const [selectedReq, setSelectedReq] = useState<string>('')
   const [selectedDeptIds, setSelectedDeptIds] = useState<number[]>([])
   const [dueDate, setDueDate] = useState('')
@@ -29,25 +34,33 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
   const [saving, setSaving] = useState(false)
 
   async function load() {
-    const [reqs, taskRows, deptRows] = await Promise.all([
+    const [reqs, taskRows, deptRows, regionalRows] = await Promise.all([
       fetchHrRequests(),
       fetchDepartmentTasks(),
       fetchDepartments(),
+      fetchRegionalResponses(),
     ])
     setRequests(reqs)
     setTasks(taskRows)
     setDepartments(deptRows)
+    setCompiledReqIds(new Set(regionalRows.map((r) => r.req_id)))
   }
 
   useEffect(() => {
     void load().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
   }, [])
 
+  /** Active requests that are not yet compiled — may already have some department assignments. */
   const openRequests = useMemo(() => {
     return requests.filter(
-      (r) => coerceHrRequestStatus(r.status) === 'active' && !tasks.some((t) => t.req_id === r.id),
+      (r) => coerceHrRequestStatus(r.status) === 'active' && !compiledReqIds.has(r.id),
     )
-  }, [requests, tasks])
+  }, [requests, compiledReqIds])
+
+  const undistributedCount = useMemo(
+    () => openRequests.filter((r) => !tasks.some((t) => t.req_id === r.id)).length,
+    [openRequests, tasks],
+  )
 
   useEffect(() => {
     if (!preselectReqId) return
@@ -62,12 +75,42 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
   const selectedRequestLabel = selectedRequest?.title ?? ''
   const requestDueDate = selectedRequest?.date?.trim() || ''
 
+  const tasksForSelected = useMemo(
+    () => (selectedReq ? tasks.filter((t) => t.req_id === selectedReq) : []),
+    [tasks, selectedReq],
+  )
+
+  /** Task `department_id` is usually the department code, not the numeric DB id. */
+  const availableDepartments = useMemo(() => {
+    const assignedKeys = new Set<string>()
+    for (const t of tasksForSelected) {
+      const code = String(t.department_id ?? '')
+        .trim()
+        .toLowerCase()
+      if (code) assignedKeys.add(`code:${code}`)
+      const name = t.department_name?.trim().toLowerCase()
+      if (name) assignedKeys.add(`name:${name}`)
+    }
+    return departments.filter((d) => {
+      const code = (d.code ?? '').trim().toLowerCase()
+      if (code && assignedKeys.has(`code:${code}`)) return false
+      if (assignedKeys.has(`code:${String(d.id)}`)) return false
+      const name = d.name.trim().toLowerCase()
+      if (name && assignedKeys.has(`name:${name}`)) return false
+      return true
+    })
+  }, [departments, tasksForSelected])
+
+  const isRedistribute = Boolean(selectedReq && tasksForSelected.length > 0)
+
   useEffect(() => {
     if (!selectedReq) {
       setDueDate('')
+      setSelectedDeptIds([])
       return
     }
     setDueDate(requestDueDate)
+    setSelectedDeptIds([])
   }, [selectedReq, requestDueDate])
 
   const preselectUnavailable = useMemo(() => {
@@ -120,27 +163,33 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
   }
 
   return (
-    <PageSection
-      title={title}
-    >
+    <PageSection title={title}>
       {error && <p className="login-error">{error}</p>}
       {preselectUnavailable && (
         <p className="muted" style={{ marginTop: 12 }}>
-          Request <strong>{preselectReqId}</strong> is not in the undistributed list (it may already be assigned).
+          Request <strong>{preselectReqId}</strong> is not available for distribution
+          {compiledReqIds.has(preselectReqId ?? '')
+            ? ' (it has already been compiled).'
+            : '.'}{' '}
           Choose another request below.
         </p>
       )}
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[
-            { label: 'Undistributed requests', value: openRequests.length },
-            { label: 'Available departments', value: departments.length },
+            { label: 'Open for distribution', value: openRequests.length },
+            { label: 'Not yet assigned', value: undistributedCount },
+            { label: 'Available departments', value: availableDepartments.length },
             { label: 'Selected assignees', value: selectedDeptIds.length },
           ]}
         />
       </div>
 
       <TableCard padded>
+        <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
+          You can assign or redistribute departments until a regional compilation is submitted for the
+          request.
+        </p>
         <label className="muted">Select request</label>
         <select
           style={{ width: '100%', marginTop: 6, marginBottom: 14 }}
@@ -148,11 +197,15 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
           onChange={(e) => setSelectedReq(e.target.value)}
         >
           <option value="">-- choose --</option>
-          {openRequests.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.id} — {r.title}
-            </option>
-          ))}
+          {openRequests.map((r) => {
+            const assigned = tasks.some((t) => t.req_id === r.id)
+            return (
+              <option key={r.id} value={r.id}>
+                {r.id} — {r.title}
+                {assigned ? ' (redistribute)' : ''}
+              </option>
+            )
+          })}
         </select>
         {selectedReq && (
           <p className="muted" style={{ margin: '0 0 10px' }}>
@@ -161,6 +214,13 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
               <>
                 {' '}
                 (request due: <strong>{requestDueDate}</strong>)
+              </>
+            ) : null}
+            {isRedistribute ? (
+              <>
+                {' '}
+                — <strong>{tasksForSelected.length}</strong> department
+                {tasksForSelected.length === 1 ? '' : 's'} already assigned
               </>
             ) : null}
           </p>
@@ -184,30 +244,48 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
           </div>
         )}
 
-        <label className="muted">Assign departments</label>
-        <div className="checkbox-grid" style={{ marginTop: 8 }}>
-          {departments.map((d) => (
-            <label key={d.id} className="checkbox-card">
-              <input
-                type="checkbox"
-                checked={selectedDeptIds.includes(d.id)}
-                onChange={(e) =>
-                  setSelectedDeptIds((prev) =>
-                    e.target.checked ? [...prev, d.id] : prev.filter((x) => x !== d.id),
-                  )
-                }
-              />
-              <span className="checkbox-card-label">
-                {d.code ? `${d.code} — ` : ''}
-                {d.name}
-              </span>
-            </label>
-          ))}
-        </div>
+        <label className="muted">
+          {isRedistribute ? 'Assign additional departments' : 'Assign departments'}
+        </label>
+        {selectedReq && availableDepartments.length === 0 ? (
+          <p className="muted" style={{ margin: '8px 0 0' }}>
+            All region departments are already assigned to this request. Redistribution stays open until
+            the response is compiled — add departments under <strong>Manage departments</strong> if needed.
+          </p>
+        ) : (
+          <div className="checkbox-grid" style={{ marginTop: 8 }}>
+            {availableDepartments.map((d) => (
+              <label key={d.id} className="checkbox-card">
+                <input
+                  type="checkbox"
+                  checked={selectedDeptIds.includes(d.id)}
+                  onChange={(e) =>
+                    setSelectedDeptIds((prev) =>
+                      e.target.checked ? [...prev, d.id] : prev.filter((x) => x !== d.id),
+                    )
+                  }
+                />
+                <span className="checkbox-card-label">
+                  {d.code ? `${d.code} — ` : ''}
+                  {d.name}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
 
         <div style={{ marginTop: 14 }}>
-          <Button variant="primary" compact disabled={saving} onClick={() => void assign()}>
-            {saving ? 'Assigning...' : 'Assign selected departments'}
+          <Button
+            variant="primary"
+            compact
+            disabled={saving || availableDepartments.length === 0}
+            onClick={() => void assign()}
+          >
+            {saving
+              ? 'Assigning...'
+              : isRedistribute
+                ? 'Redistribute to selected departments'
+                : 'Assign selected departments'}
           </Button>
         </div>
       </TableCard>

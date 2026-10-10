@@ -478,13 +478,15 @@ export function ReportGeneratorPage() {
   }
 
   async function handleExportPdf() {
-    if (!dashboardResult || !exportRef.current) return
-    setPdfLoading(true)
+    const sourceEl = exportRef.current
+    if (!dashboardResult || !sourceEl) return
     setLoadError(null)
+    // Keep dashboard visible (under the loader) so chart pixels can be captured first.
+    setPdfLoading(true)
     try {
-      // Dedicated capture: freezes Recharts SVGs so ResponsiveContainer resize does not blank the PDF.
+      await waitForPaint()
       await downloadReportingDashboardPdf({
-        sourceEl: exportRef.current,
+        sourceEl,
         filename: 'reporting-dashboard',
         headerTitle: 'Reporting dashboard',
       })
@@ -493,6 +495,12 @@ export function ReportGeneratorPage() {
     } finally {
       setPdfLoading(false)
     }
+  }
+
+  function waitForPaint(): Promise<void> {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
   }
 
   return (
@@ -660,67 +668,82 @@ export function ReportGeneratorPage() {
           </div>
 
           {dashboardResult ? (
-            <div ref={exportRef} className="report-generator__results report-generator__results--full reporting-dashboard">
-              <div className="reporting-dashboard__toolbar">
-                <ReportingFilterSummary parts={dashboardResult.filterSummaryParts} />
-                <div className="reporting-dashboard__toolbar-actions">
-                  <Button variant="primary" compact onClick={() => void handleExportPdf()} disabled={pdfLoading}>
-                    <FileText size={16} aria-hidden />
-                    {pdfLoading ? 'Saving PDF…' : 'Save to PDF'}
-                  </Button>
+            <div className="report-generator__results-shell">
+              {pdfLoading ? (
+                <div className="report-generator__pdf-loader" role="status" aria-live="polite">
+                  <div className="report-generator__pdf-loader-spinner" aria-hidden />
+                  <p className="report-generator__pdf-loader-text">Generating PDF…</p>
                 </div>
+              ) : null}
+              <div
+                ref={exportRef}
+                className={
+                  'report-generator__results report-generator__results--full reporting-dashboard' +
+                  (pdfLoading ? ' report-generator__results--pdf-capturing' : '')
+                }
+                aria-hidden={pdfLoading || undefined}
+              >
+                <div className="reporting-dashboard__toolbar">
+                  <ReportingFilterSummary parts={dashboardResult.filterSummaryParts} />
+                  <div className="reporting-dashboard__toolbar-actions">
+                    <Button variant="primary" compact onClick={() => void handleExportPdf()} disabled={pdfLoading}>
+                      <FileText size={16} aria-hidden />
+                      Save to PDF
+                    </Button>
+                  </div>
+                </div>
+
+                {dashboardResult.indicatorFocusMode ? (
+                  <ReportingIndicatorCompiledFocus
+                    indicatorId={Number(dashboardResult.focusedIndicatorId)}
+                    indicatorLabel={dashboardResult.focusedIndicatorLabel}
+                    records={dashboardResult.indicatorFocusCompiled}
+                    filterYearId={dashboardResult.focusedYearId}
+                    filterYearLabel={dashboardResult.focusedYearLabel}
+                  />
+                ) : (
+                  <>
+                    <ReportingSummaryCards cards={dashboardResult.summaryCards} />
+
+                    <div className="reporting-dashboard__row reporting-dashboard__row--top">
+                      <div className="report-generator__chart-panel reporting-dashboard__panel">
+                        <h4 className="chart-caption">Records Status</h4>
+                        <MultiColorBarChart
+                          data={dashboardResult.recordStatusBar}
+                          emptyMessage="No records for the current filters."
+                        />
+                      </div>
+                      <div className="report-generator__chart-panel reporting-dashboard__panel">
+                        <h4 className="chart-caption">{issueEntryTitleColumnLabel()}</h4>
+                        <DonutChartPanel data={dashboardResult.entryKindPie} title={issueEntryTitleColumnLabel()} />
+                      </div>
+                      <div className="report-generator__chart-panel reporting-dashboard__panel">
+                        <h4 className="chart-caption">Records by region</h4>
+                        <MultiColorBarChart
+                          data={dashboardResult.regionBar}
+                          emptyMessage="No regional compiled records for the current filters."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="reporting-dashboard__row reporting-dashboard__row--bottom">
+                      <div className="report-generator__chart-panel reporting-dashboard__panel reporting-dashboard__panel--rank">
+                        <ReportingRankPanel
+                          title="Categories — top 10"
+                          rows={dashboardResult.topCategories}
+                        />
+                      </div>
+                      <div className="report-generator__chart-panel reporting-dashboard__panel reporting-dashboard__panel--rank">
+                        <ReportingRankPanel
+                          title="Indicators — top 10"
+                          rows={dashboardResult.topIndicators}
+                          reverseColors
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-
-              {dashboardResult.indicatorFocusMode ? (
-                <ReportingIndicatorCompiledFocus
-                  indicatorId={Number(dashboardResult.focusedIndicatorId)}
-                  indicatorLabel={dashboardResult.focusedIndicatorLabel}
-                  records={dashboardResult.indicatorFocusCompiled}
-                  filterYearId={dashboardResult.focusedYearId}
-                  filterYearLabel={dashboardResult.focusedYearLabel}
-                />
-              ) : (
-                <>
-                  <ReportingSummaryCards cards={dashboardResult.summaryCards} />
-
-                  <div className="reporting-dashboard__row reporting-dashboard__row--top">
-                    <div className="report-generator__chart-panel reporting-dashboard__panel">
-                      <h4 className="chart-caption">Records Status</h4>
-                      <MultiColorBarChart
-                        data={dashboardResult.recordStatusBar}
-                        emptyMessage="No records for the current filters."
-                      />
-                    </div>
-                    <div className="report-generator__chart-panel reporting-dashboard__panel">
-                      <h4 className="chart-caption">{issueEntryTitleColumnLabel()}</h4>
-                      <DonutChartPanel data={dashboardResult.entryKindPie} title={issueEntryTitleColumnLabel()} />
-                    </div>
-                    <div className="report-generator__chart-panel reporting-dashboard__panel">
-                      <h4 className="chart-caption">Records by region</h4>
-                      <MultiColorBarChart
-                        data={dashboardResult.regionBar}
-                        emptyMessage="No regional compiled records for the current filters."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="reporting-dashboard__row reporting-dashboard__row--bottom">
-                    <div className="report-generator__chart-panel reporting-dashboard__panel reporting-dashboard__panel--rank">
-                      <ReportingRankPanel
-                        title="Categories — top 10"
-                        rows={dashboardResult.topCategories}
-                      />
-                    </div>
-                    <div className="report-generator__chart-panel reporting-dashboard__panel reporting-dashboard__panel--rank">
-                      <ReportingRankPanel
-                        title="Indicators — top 10"
-                        rows={dashboardResult.topIndicators}
-                        reverseColors
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
           ) : (
             <div className="report-generator__empty">

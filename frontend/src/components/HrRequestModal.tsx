@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { isApiError } from '../api/apiError'
 import {
   createHrRequestFromIssueForm,
@@ -367,6 +375,8 @@ export type HrRequestModalProps = {
   pageViewActions?: ReactNode
   /** Page layout: hide modal header (request ID already in template hero). */
   hidePageHeader?: boolean
+  /** Ref to the request template root for PDF export (page view). */
+  pageViewTemplateRef?: RefObject<HTMLDivElement | null>
 }
 
 export function HrRequestModal({
@@ -387,6 +397,7 @@ export function HrRequestModal({
   pageViewBelowTemplate,
   pageViewActions,
   hidePageHeader = false,
+  pageViewTemplateRef,
 }: HrRequestModalProps) {
   const { user: authUser } = useAuth()
   const portalDeptViewer = Boolean(
@@ -1279,105 +1290,107 @@ export function HrRequestModal({
               {selectedIssue ||
               issueForm.request_type === 'other_issue' ||
               issueForm.reporting_framework === 'upr' ? (
-                <HrRequestViewTemplate
-                  className={useWorkflowHero ? 'hr-request-view-template--external-hero' : undefined}
-                  requestId={detail?.id ?? requestIdHint}
-                  title={issueForm.title}
-                  status={issueForm.status}
-                  dueDate={issueForm.date}
-                  regionNames={viewTemplateRegionNames}
-                  ictDepartmentNames={viewTemplateIctDepartmentNames}
-                  assignedDepartmentNames={viewTemplateAssignedDepartmentNames}
-                  conventionLabel={
-                    issueForm.reporting_framework === 'upr'
-                      ? detail?.upr?.trim() ||
-                        uprCatalog.cycles.find((c) => c.id === issueForm.upr_cycle_id)?.name ||
-                        '—'
-                      : conventionDisplayLabel
-                  }
-                  requestType={issueForm.request_type}
-                  reportingFramework={
-                    issueForm.reporting_framework ||
-                    (detail ? inferReportingFramework(detail) : '') ||
-                    null
-                  }
-                  otherIssueText={issueForm.other_issue_text}
-                  issueTitle={
-                    issueForm.reporting_framework === 'upr'
-                      ? detail?.upr_indicator?.trim() ||
-                        [
-                          uprTypeLabel(
-                            uprCatalog.types.find((t) => t.id === issueForm.upr_type_id)?.name ??
-                              '',
-                          ),
-                          uprCatalog.categories.find((c) => c.id === issueForm.upr_category_id)
-                            ?.name,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ') ||
-                        'UPR'
-                      : selectedIssue
-                        ? issueEntryPrimaryText(selectedIssue)
-                        : 'Other Issues'
-                  }
-                  issueEntryKind={
-                    selectedIssue?.entry_kind === 'recommendation' ? 'recommendation' : 'issue'
-                  }
-                  categoryName={
-                    issueForm.reporting_framework === 'upr'
-                      ? uprCatalog.categories.find((c) => c.id === issueForm.upr_category_id)
-                          ?.name ??
-                        detail?.upr_indicator ??
-                        '—'
-                      : (selectedIssue?.category?.name ?? '—')
-                  }
-                  issueDescription={
-                    issueForm.reporting_framework === 'upr'
-                      ? uprRecommendationsForArea.map((r) => r.name).join('\n') || null
-                      : (selectedIssue?.description ?? null)
-                  }
-                  description={issueForm.details}
-                  regionalInstructionsOnly={departmentPortalRegionalNotes !== undefined}
-                  regionalInstructionsText={
-                    departmentPortalRegionalNotes !== undefined ? departmentPortalRegionalNotes : null
-                  }
-                  articles={
-                    issueForm.reporting_framework === 'upr' ? [] : (selectedIssue?.articles ?? [])
-                  }
-                  indicators={
-                    issueForm.reporting_framework === 'upr'
-                      ? uprIndicatorsForArea
-                          .filter((ind) => issueForm.upr_indicator_ids.includes(ind.id))
-                          .map((ind) => ({
-                            id: ind.id,
-                            indicator_text: ind.indicator_text,
-                            disaggregation: null,
-                            hasQuantitative: ind.has_quantitative,
-                            hasQualitative: ind.has_qualitative,
-                            quantitative_value: null,
-                            qualitative_text: null,
-                          }))
-                      : selectedIssue
-                        ? indicatorsForMappingUi.map((ind) => {
-                            const resp = detail?.indicator_responses?.find(
-                              (r) => r.issue_indicator_id === ind.id,
-                            )
-                            return {
+                <div ref={pageViewTemplateRef}>
+                  <HrRequestViewTemplate
+                    className={useWorkflowHero ? 'hr-request-view-template--external-hero' : undefined}
+                    requestId={detail?.id ?? requestIdHint}
+                    title={issueForm.title}
+                    status={issueForm.status}
+                    dueDate={issueForm.date}
+                    regionNames={viewTemplateRegionNames}
+                    ictDepartmentNames={viewTemplateIctDepartmentNames}
+                    assignedDepartmentNames={viewTemplateAssignedDepartmentNames}
+                    conventionLabel={
+                      issueForm.reporting_framework === 'upr'
+                        ? detail?.upr?.trim() ||
+                          uprCatalog.cycles.find((c) => c.id === issueForm.upr_cycle_id)?.name ||
+                          '—'
+                        : conventionDisplayLabel
+                    }
+                    requestType={issueForm.request_type}
+                    reportingFramework={
+                      issueForm.reporting_framework ||
+                      (detail ? inferReportingFramework(detail) : '') ||
+                      null
+                    }
+                    otherIssueText={issueForm.other_issue_text}
+                    issueTitle={
+                      issueForm.reporting_framework === 'upr'
+                        ? detail?.upr_indicator?.trim() ||
+                          [
+                            uprTypeLabel(
+                              uprCatalog.types.find((t) => t.id === issueForm.upr_type_id)?.name ??
+                                '',
+                            ),
+                            uprCatalog.categories.find((c) => c.id === issueForm.upr_category_id)
+                              ?.name,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ') ||
+                          'UPR'
+                        : selectedIssue
+                          ? issueEntryPrimaryText(selectedIssue)
+                          : 'Other Issues'
+                    }
+                    issueEntryKind={
+                      selectedIssue?.entry_kind === 'recommendation' ? 'recommendation' : 'issue'
+                    }
+                    categoryName={
+                      issueForm.reporting_framework === 'upr'
+                        ? uprCatalog.categories.find((c) => c.id === issueForm.upr_category_id)
+                            ?.name ??
+                          detail?.upr_indicator ??
+                          '—'
+                        : (selectedIssue?.category?.name ?? '—')
+                    }
+                    issueDescription={
+                      issueForm.reporting_framework === 'upr'
+                        ? uprRecommendationsForArea.map((r) => r.name).join('\n') || null
+                        : (selectedIssue?.description ?? null)
+                    }
+                    description={issueForm.details}
+                    regionalInstructionsOnly={departmentPortalRegionalNotes !== undefined}
+                    regionalInstructionsText={
+                      departmentPortalRegionalNotes !== undefined ? departmentPortalRegionalNotes : null
+                    }
+                    articles={
+                      issueForm.reporting_framework === 'upr' ? [] : (selectedIssue?.articles ?? [])
+                    }
+                    indicators={
+                      issueForm.reporting_framework === 'upr'
+                        ? uprIndicatorsForArea
+                            .filter((ind) => issueForm.upr_indicator_ids.includes(ind.id))
+                            .map((ind) => ({
                               id: ind.id,
                               indicator_text: ind.indicator_text,
-                              disaggregation: ind.disaggregation,
-                              hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
-                              hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
-                              collectionDisaggregation:
-                                indicatorCollectionDisaggregationFromApi(ind),
-                              quantitative_value: resp?.quantitative_value,
-                              qualitative_text: resp?.qualitative_text,
-                            }
-                          })
-                        : []
-                  }
-                  attachments={detail?.attachments}
-                />
+                              disaggregation: null,
+                              hasQuantitative: ind.has_quantitative,
+                              hasQualitative: ind.has_qualitative,
+                              quantitative_value: null,
+                              qualitative_text: null,
+                            }))
+                        : selectedIssue
+                          ? indicatorsForMappingUi.map((ind) => {
+                              const resp = detail?.indicator_responses?.find(
+                                (r) => r.issue_indicator_id === ind.id,
+                              )
+                              return {
+                                id: ind.id,
+                                indicator_text: ind.indicator_text,
+                                disaggregation: ind.disaggregation,
+                                hasQuantitative: indicatorAllowsQuantitative(ind, selectedIssue),
+                                hasQualitative: indicatorAllowsQualitative(ind, selectedIssue),
+                                collectionDisaggregation:
+                                  indicatorCollectionDisaggregationFromApi(ind),
+                                quantitative_value: resp?.quantitative_value,
+                                qualitative_text: resp?.qualitative_text,
+                              }
+                            })
+                          : []
+                    }
+                    attachments={detail?.attachments}
+                  />
+                </div>
               ) : (
                 <Alert variant="error" title={loiMissingDataAlertTitle()}>
                   <span>{loiMetadataLoadErrorMessage()}</span>

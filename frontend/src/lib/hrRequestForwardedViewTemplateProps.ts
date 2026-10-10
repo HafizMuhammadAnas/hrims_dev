@@ -130,7 +130,9 @@ export function buildDepartmentForwardedViewTemplateProps(
     requestId: detail.id,
     title: detail.title,
     status: detail.status,
-    dueDate: detail.date,
+    // Department portal: show the department-task due date set by the region (or federal ICT assigner),
+    // not the parent request due date used on regional/federal request views.
+    dueDate: task.due_date?.trim() || detail.date,
     regionNames: ictTask ? [] : regionNamesForDepartmentForwardedView(detail, task),
     showMetaAssigneeRow: false,
     ictDepartmentNames: null,

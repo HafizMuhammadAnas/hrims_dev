@@ -10,6 +10,7 @@ use App\Models\District;
 use App\Models\HrRequest;
 use App\Models\HrRequestClarification;
 use App\Models\Region;
+use App\Models\RegionalResponse;
 use App\Models\IssueIndicator;
 use App\Models\IssueIndicatorYear;
 use App\Support\HrimsAccess;
@@ -193,6 +194,17 @@ class DepartmentTaskController extends Controller
         if ($hrRequest->status !== 'active') {
             return response()->json([
                 'message' => 'This request is still a draft. Set status to Active in Request management before assigning departments.',
+            ], 422);
+        }
+
+        // Redistribution is allowed until the region has compiled a response for this request.
+        $compiledForRegion = RegionalResponse::query()
+            ->where('hr_request_id', $hrRequest->id)
+            ->where('region_id', $taskRegionId)
+            ->exists();
+        if ($compiledForRegion) {
+            return response()->json([
+                'message' => 'This request has already been compiled for your region. New department assignments are closed.',
             ], 422);
         }
 

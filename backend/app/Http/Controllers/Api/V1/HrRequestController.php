@@ -18,6 +18,7 @@ use App\Models\UprCycle;
 use App\Models\UprEntry;
 use App\Models\UprRecommendationEntry;
 use App\Models\UprType;
+use App\Models\User;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -717,7 +718,17 @@ class HrRequestController extends Controller
 
         $row = $row->load(['region', 'regions', 'convention', 'issue', 'departments']);
         if ($row->status === 'active') {
-            app(NotificationService::class)->notifyHrRequestCreated($row, $request->user());
+            $actorId = (int) $request->user()->id;
+            $hrRequestId = $row->id;
+            $this->deferAfterResponse(function () use ($hrRequestId, $actorId) {
+                $this->runDeferredHrRequestNotifications(
+                    $hrRequestId,
+                    $actorId,
+                    createdTaskIds: [],
+                    previousStatus: null,
+                    createdEvent: true,
+                );
+            });
         }
 
         return new HrRequestResource($row);
@@ -962,10 +973,26 @@ class HrRequestController extends Controller
         });
 
         if ($row->status === 'active') {
+            $createdTaskIds = [];
             if ($departmentIds !== []) {
-                $this->autoCreateDepartmentTasks($row->fresh(['regions']), $departmentIds, $request);
+                $createdTaskIds = $this->autoCreateDepartmentTasks(
+                    $row->fresh(['regions']),
+                    $departmentIds,
+                    $request,
+                    notify: false,
+                );
             }
-            app(NotificationService::class)->notifyHrRequestCreated($row, $request->user());
+            $actorId = (int) $request->user()->id;
+            $hrRequestId = $row->id;
+            $this->deferAfterResponse(function () use ($hrRequestId, $actorId, $createdTaskIds) {
+                $this->runDeferredHrRequestNotifications(
+                    $hrRequestId,
+                    $actorId,
+                    $createdTaskIds,
+                    previousStatus: null,
+                    createdEvent: true,
+                );
+            });
         }
 
         return new HrRequestResource($row);
@@ -981,6 +1008,7 @@ class HrRequestController extends Controller
         array $updateData,
     ): void {
         $publishedNow = $previousStatus === 'draft' && $model->status === 'active';
+        $createdTaskIds = [];
 
         if ($publishedNow) {
             $deptIds = $model->departments()->pluck('id')->map(fn ($id) => (int) $id)->all();
@@ -988,9 +1016,24 @@ class HrRequestController extends Controller
                 $deptIds = array_values(array_unique(array_map('intval', $updateData['department_ids'])));
             }
             if ($deptIds !== []) {
-                $this->autoCreateDepartmentTasks($model->load(['regions']), $deptIds, $request);
+                $createdTaskIds = $this->autoCreateDepartmentTasks(
+                    $model->load(['regions']),
+                    $deptIds,
+                    $request,
+                    notify: false,
+                );
             }
-            app(NotificationService::class)->notifyHrRequestUpdated($model, $request->user(), $previousStatus);
+            $actorId = (int) $request->user()->id;
+            $hrRequestId = $model->id;
+            $this->deferAfterResponse(function () use ($hrRequestId, $actorId, $createdTaskIds, $previousStatus) {
+                $this->runDeferredHrRequestNotifications(
+                    $hrRequestId,
+                    $actorId,
+                    $createdTaskIds,
+                    previousStatus: $previousStatus,
+                    createdEvent: false,
+                );
+            });
 
             return;
         }
@@ -998,11 +1041,81 @@ class HrRequestController extends Controller
         if ($model->status === 'active' && array_key_exists('department_ids', $updateData)) {
             $deptIds = array_values(array_unique(array_map('intval', $updateData['department_ids'])));
             if ($deptIds !== []) {
-                $this->autoCreateDepartmentTasks($model->load(['regions']), $deptIds, $request);
+                $createdTaskIds = $this->autoCreateDepartmentTasks(
+                    $model->load(['regions']),
+                    $deptIds,
+                    $request,
+                    notify: false,
+                );
             }
         }
 
-        app(NotificationService::class)->notifyHrRequestUpdated($model, $request->user(), $previousStatus);
+        $actorId = (int) $request->user()->id;
+        $hrRequestId = $model->id;
+        $this->deferAfterResponse(function () use ($hrRequestId, $actorId, $createdTaskIds, $previousStatus) {
+            $this->runDeferredHrRequestNotifications(
+                $hrRequestId,
+                $actorId,
+                $createdTaskIds,
+                previousStatus: $previousStatus,
+                createdEvent: false,
+            );
+        });
+    }
+
+    /**
+     * Run notification/email side-effects after the HTTP response is sent.
+     * Prevents QUEUE_CONNECTION=sync + SMTP from blocking form submit on production.
+     *
+     * @param  list<string>  $createdTaskIds
+     */
+    private function deferAfterResponse(callable $callback): void
+    {
+        dispatch(function () use ($callback) {
+            try {
+                $callback();
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        })->afterResponse();
+    }
+
+    /**
+     * @param  list<string>  $createdTaskIds
+     */
+    private function runDeferredHrRequestNotifications(
+        string $hrRequestId,
+        int $actorId,
+        array $createdTaskIds,
+        ?string $previousStatus,
+        bool $createdEvent,
+    ): void {
+        $hr = HrRequest::query()->find($hrRequestId);
+        $actor = User::query()->find($actorId);
+        if (! $hr || ! $actor) {
+            return;
+        }
+
+        foreach ($createdTaskIds as $taskId) {
+            try {
+                $task = DepartmentTask::query()->with(['region', 'department'])->find($taskId);
+                if ($task) {
+                    app(NotificationService::class)->notifyDepartmentTaskAssigned($task, $actor);
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        try {
+            if ($createdEvent) {
+                app(NotificationService::class)->notifyHrRequestCreated($hr, $actor);
+            } else {
+                app(NotificationService::class)->notifyHrRequestUpdated($hr, $actor, $previousStatus);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -1314,21 +1427,27 @@ class HrRequestController extends Controller
      * requests still create ICT-line tasks when ICT is not the first saved region.
      *
      * @param  array<int>  $departmentIds
+     * @return list<string> Newly created department task IDs (for deferred notifications)
      */
-    private function autoCreateDepartmentTasks(HrRequest $hrRequest, array $departmentIds, Request $request): void
-    {
+    private function autoCreateDepartmentTasks(
+        HrRequest $hrRequest,
+        array $departmentIds,
+        Request $request,
+        bool $notify = true,
+    ): array {
         if ($departmentIds === []) {
-            return;
+            return [];
         }
 
         $hrRequest->loadMissing('regions');
         $requestRegionIds = $hrRequest->regions->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         if ($requestRegionIds === []) {
-            return;
+            return [];
         }
 
         $ictRegionId = $hrRequest->regions->first(fn (Region $r) => in_array($r->slug, ['ict', 'federal'], true))?->id;
         $ictRegionId = $ictRegionId !== null ? (int) $ictRegionId : null;
+        $createdTaskIds = [];
 
         foreach ($departmentIds as $deptId) {
             $department = Department::query()->with('regions')->find((int) $deptId);
@@ -1384,14 +1503,19 @@ class HrRequestController extends Controller
                 }
             }
             $task = DepartmentTask::query()->create($createPayload);
+            $createdTaskIds[] = $task->id;
 
-            try {
-                $task->load(['region', 'department']);
-                app(NotificationService::class)->notifyDepartmentTaskAssigned($task, $request->user());
-            } catch (\Throwable $e) {
-                report($e);
+            if ($notify) {
+                try {
+                    $task->load(['region', 'department']);
+                    app(NotificationService::class)->notifyDepartmentTaskAssigned($task, $request->user());
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
         }
+
+        return $createdTaskIds;
     }
 
     /**

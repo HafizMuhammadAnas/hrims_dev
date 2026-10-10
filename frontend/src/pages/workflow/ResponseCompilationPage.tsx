@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { fetchHrRequest, fetchHrRequests } from '../../api/hrRequests'
-import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow } from '../../api/lists'
+import {
+  fetchDepartmentTasks,
+  fetchRegionalResponses,
+  type DepartmentTaskRow,
+  type RegionalResponseRow,
+} from '../../api/lists'
 import { fetchRegions } from '../../api/regions'
 import { createRegionalResponse } from '../../api/workflows'
 import { hrRequestViewPath } from '../../lib/workflowNavigation'
@@ -12,6 +17,7 @@ import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TableCard } from '../../components/ui/TableCard'
 import { DepartmentSubmissionsForRequest } from '../../components/DepartmentSubmissionsForRequest'
+import { MergeRegionalCompilationsSection } from '../../components/MergeRegionalCompilationsSection'
 import {
   countDepartmentTasksByWorkflow,
   hasDepartmentResponse,
@@ -44,6 +50,7 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
   const [ictRegionId, setIctRegionId] = useState<number | null>(null)
   const [compiledReqIds, setCompiledReqIds] = useState<Set<string>>(() => new Set())
+  const [regionalCompilations, setRegionalCompilations] = useState<RegionalResponseRow[]>([])
   const [selectedReqId, setSelectedReqId] = useState('')
   const [content, setContent] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -69,10 +76,13 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
           setCompiledReqIds(
             new Set(regionalRows.filter((r) => isIctRegionalResponseRow(r)).map((r) => r.req_id)),
           )
+          setRegionalCompilations([])
         } else if (isRegionalAdmin(user) && user?.region != null) {
           setCompiledReqIds(new Set(regionalRows.map((r) => r.req_id)))
+          setRegionalCompilations(regionalRows)
         } else {
           setCompiledReqIds(new Set())
+          setRegionalCompilations([])
         }
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load'))
@@ -267,6 +277,11 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
         <CompilationSubmitButton saving={saving} onSubmit={() => void submit()} />
       </TableCard>
 
+      {!ictScope ? (
+        <div style={{ marginTop: 20 }}>
+          <MergeRegionalCompilationsSection records={regionalCompilations} />
+        </div>
+      ) : null}
     </PageSection>
   )
 }

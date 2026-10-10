@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { fetchHrRequest } from '../api/hrRequests'
 import type { DepartmentTaskRow, RegionalResponseRow } from '../api/lists'
@@ -32,6 +32,9 @@ type ViewProps = {
   footerExtra?: ReactNode
   /** Extra content under Responses tab (e.g. push revision to departments). */
   belowResponses?: ReactNode
+  /** Kept mounted for Request + Response PDF export. */
+  requestPanelRef?: RefObject<HTMLDivElement | null>
+  responsePanelRef?: RefObject<HTMLDivElement | null>
 }
 
 export function RegionalResponsePreviewView({
@@ -41,6 +44,8 @@ export function RegionalResponsePreviewView({
   onClose,
   footerExtra,
   belowResponses,
+  requestPanelRef,
+  responsePanelRef,
 }: ViewProps) {
   const [tab, setTab] = useState<PreviewTab>('responses')
   const [hrDetail, setHrDetail] = useState<HrRequestRow | null>(null)
@@ -121,49 +126,54 @@ export function RegionalResponsePreviewView({
       </nav>
 
       <div className="modal-form regional-response-detail-modal__form dept-task-response-modal__body regional-response-detail-modal__form--flat">
-        {tab === 'responses' ? (
-          <>
-            <h2 className="card-section-heading">Responses</h2>
-            <DepartmentSubmissionsForRequest
-              tasksForDetail={tasksForDetail}
-              reqId={row.req_id}
-              issueIndicators={hrDetail?.issue?.indicators}
-              filterByRegionName={row.region_name ?? undefined}
-              omitHeading
-              hideStatusBadge
-            />
-            <h2 className="card-section-heading">Summary</h2>
-            <div className="hr-request-view-template__prose-box">
-              {row.content?.trim() ? (
-                <p className="hr-request-view-template__prose regional-response-detail-modal__summary">
-                  {row.content.trim()}
-                </p>
-              ) : (
-                <p className="muted regional-response-detail-modal__summary-empty">—</p>
-              )}
-            </div>
-            {belowResponses}
-          </>
-        ) : null}
-
-        {tab === 'request' ? (
-          <>
-            {hrLoading ? <p className="muted">Loading request…</p> : null}
-            {hrError ? (
-              <Alert variant="warning" title="Could not load the HR request">
-                <p style={{ margin: 0 }}>{hrError}</p>
-              </Alert>
-            ) : null}
-            {!hrLoading && !hrError && federalTemplateProps ? (
-              <HrRequestViewTemplate {...federalTemplateProps} />
-            ) : null}
-            {!hrLoading && !hrError && hrDetail && !federalTemplateProps ? (
-              <p className="muted small" style={{ margin: 0 }}>
-                {loiLegacyFormatMessage()}
+        {/* Keep Request + Responses mounted so PDF can snapshot both (same as dept task export). */}
+        <div
+          ref={responsePanelRef}
+          className="dept-task-response-modal__panel"
+          hidden={tab !== 'responses'}
+        >
+          <h2 className="card-section-heading">Responses</h2>
+          <DepartmentSubmissionsForRequest
+            tasksForDetail={tasksForDetail}
+            reqId={row.req_id}
+            issueIndicators={hrDetail?.issue?.indicators}
+            filterByRegionName={row.region_name ?? undefined}
+            omitHeading
+            hideStatusBadge
+          />
+          <h2 className="card-section-heading">Summary</h2>
+          <div className="hr-request-view-template__prose-box">
+            {row.content?.trim() ? (
+              <p className="hr-request-view-template__prose regional-response-detail-modal__summary">
+                {row.content.trim()}
               </p>
-            ) : null}
-          </>
-        ) : null}
+            ) : (
+              <p className="muted regional-response-detail-modal__summary-empty">—</p>
+            )}
+          </div>
+        </div>
+        {tab === 'responses' ? belowResponses : null}
+
+        <div
+          ref={requestPanelRef}
+          className="dept-task-response-modal__panel"
+          hidden={tab !== 'request'}
+        >
+          {hrLoading ? <p className="muted">Loading request…</p> : null}
+          {hrError ? (
+            <Alert variant="warning" title="Could not load the HR request">
+              <p style={{ margin: 0 }}>{hrError}</p>
+            </Alert>
+          ) : null}
+          {!hrLoading && !hrError && federalTemplateProps ? (
+            <HrRequestViewTemplate {...federalTemplateProps} />
+          ) : null}
+          {!hrLoading && !hrError && hrDetail && !federalTemplateProps ? (
+            <p className="muted small" style={{ margin: 0 }}>
+              {loiLegacyFormatMessage()}
+            </p>
+          ) : null}
+        </div>
 
         {tab === 'changes' ? (
           <RegionalCompilationChangesTab

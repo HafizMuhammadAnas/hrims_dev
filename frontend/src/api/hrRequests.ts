@@ -12,6 +12,27 @@ function withCoercedStatus(row: HrRequestRow): HrRequestRow {
   return { ...row, status: coerceHrRequestStatus(row.status) }
 }
 
+/**
+ * Prefer a parsed body, but if the gateway truncates JSON after a successful save,
+ * still resolve so the UI can leave the "Submitting…" state.
+ */
+async function parseHrRequestResponse(res: Response): Promise<HrRequestRow> {
+  try {
+    const json = (await res.json()) as { data?: HrRequestRow }
+    if (json?.data) return withCoercedStatus(json.data)
+  } catch {
+    /* empty / non-JSON body */
+  }
+  return withCoercedStatus({
+    id: '',
+    title: '',
+    conv: '',
+    region_id: null,
+    date: '',
+    status: 'active',
+  } as HrRequestRow)
+}
+
 export type KnowledgeConventionRow = {
   id: number
   code: string
@@ -192,8 +213,7 @@ export async function createHrRequestFromIssueForm(
     body: fd,
   })
   await throwIfNotOk(res)
-  const json = (await res.json()) as { data: HrRequestRow }
-  return withCoercedStatus(json.data)
+  return parseHrRequestResponse(res)
 }
 
 /** @deprecated Legacy JSON create (tests / old clients). Prefer `createHrRequestFromIssueForm`. */
@@ -339,8 +359,7 @@ export async function updateHrRequestFromIssueForm(
     body: fd,
   })
   await throwIfNotOk(res)
-  const json = (await res.json()) as { data: HrRequestRow }
-  return withCoercedStatus(json.data)
+  return parseHrRequestResponse(res)
 }
 
 export async function deleteHrRequest(id: string): Promise<void> {

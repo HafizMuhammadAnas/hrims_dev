@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Download } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchHrRequest } from '../api/hrRequests'
 import { fetchDepartmentTasks, fetchRegionalResponses, type DepartmentTaskRow, type RegionalResponseRow } from '../api/lists'
@@ -15,6 +16,7 @@ import { Button } from '../components/ui/Button'
 import { ModalActions } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
 import { WorkflowModalHero } from '../components/ui/WorkflowModalHero'
+import { downloadDeptTaskRequestResponsePdf } from '../lib/downloadDeptTaskRequestResponsePdf'
 import { isRegionalAdmin } from '../lib/roles'
 import { regionalCompilationViewPath, workflowBackLabel } from '../lib/workflowNavigation'
 
@@ -43,6 +45,10 @@ export function RegionalCompilationViewPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [hrDetail, setHrDetail] = useState<HrRequestRow | null>(null)
+  const requestPanelRef = useRef<HTMLDivElement | null>(null)
+  const responsePanelRef = useRef<HTMLDivElement | null>(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
   const backTo = from.startsWith('/') ? from : `/${from}`
 
@@ -155,6 +161,40 @@ export function RegionalCompilationViewPage() {
       </Button>
     ) : null
 
+  async function downloadCompilationPdf() {
+    if (!row) return
+    const requestEl = requestPanelRef.current
+    const responseEl = responsePanelRef.current
+    if (!requestEl || !responseEl) {
+      setPdfError('Request and response content is not ready yet. Try again in a moment.')
+      return
+    }
+    if (!requestEl.querySelector('.hr-request-view-template')) {
+      setPdfError('Request is still loading. Try again in a moment.')
+      return
+    }
+    const filenameBase = [row.req_id, row.region_name?.trim() || 'region', row.id]
+      .filter(Boolean)
+      .join('_')
+    const headerTitle = [row.req_id, row.region_name?.trim() || 'Regional compilation', row.title?.trim()]
+      .filter(Boolean)
+      .join(' — ')
+    setPdfLoading(true)
+    setPdfError(null)
+    try {
+      await downloadDeptTaskRequestResponsePdf({
+        requestEl,
+        responseEl,
+        filename: `${filenameBase}.pdf`,
+        headerTitle,
+      })
+    } catch (e: unknown) {
+      setPdfError(e instanceof Error ? e.message : 'Could not generate PDF.')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
   return (
     <PageSection title={editing ? 'Edit Compilation' : 'Regional Compilation'}>
       <div className="hr-request-view-stack hr-request-view-stack--request-page">
@@ -170,6 +210,8 @@ export function RegionalCompilationViewPage() {
               tasksForDetail={tasksForDetail}
               embedded
               footerExtra={footerExtra}
+              requestPanelRef={requestPanelRef}
+              responsePanelRef={responsePanelRef}
               belowResponses={
                 regional && row.review_status === 'needs-modification' ? (
                   <RegionalDepartmentRevisionFollowUp
@@ -268,7 +310,31 @@ export function RegionalCompilationViewPage() {
             </div>
           </div>
         ) : null}
-        <WorkflowPageBack to={backTo} label={workflowBackLabel(backTo)} />
+        {!editing && row && !loading && !error ? (
+          <div className="hr-request-view-footback hr-request-view-footback--actions">
+            <Button
+              variant="secondary"
+              compact
+              type="button"
+              disabled={pdfLoading}
+              onClick={() => void downloadCompilationPdf()}
+            >
+              <Download size={16} strokeWidth={2} aria-hidden style={{ marginRight: 6 }} />
+              {pdfLoading ? 'Generating PDF…' : 'Download PDF'}
+            </Button>
+            {pdfError ? <span className="login-error small">{pdfError}</span> : null}
+            <Button
+              variant="secondary"
+              compact
+              type="button"
+              onClick={() => navigate(backTo)}
+            >
+              {workflowBackLabel(backTo)}
+            </Button>
+          </div>
+        ) : (
+          <WorkflowPageBack to={backTo} label={workflowBackLabel(backTo)} />
+        )}
       </div>
     </PageSection>
   )

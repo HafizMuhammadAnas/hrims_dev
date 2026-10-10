@@ -174,7 +174,10 @@ export function ReceivedRequestsPage({
 
   /** Primary link in the row menu — must match the navigate target in the click handler. */
   function actionLabel(status: RowStatus): string {
-    if (regionalMode) return 'View HR request'
+    if (regionalMode) {
+      if (status === 'Distributed' || status === 'In Process') return 'View / redistribute'
+      return 'View HR request'
+    }
     if (status === 'Response Delivered') return 'View response history'
     if (status === 'pending' && distributionPath !== monitoringPath) return 'Distribute to departments'
     if (status === 'pending') return 'Open department workspace'

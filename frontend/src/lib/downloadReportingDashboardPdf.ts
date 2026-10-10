@@ -1,3 +1,4 @@
+import html2canvas from 'html2canvas'
 import { downloadElementAsPdf } from './downloadElementAsPdf'
 
 function waitFrames(count = 2): Promise<void> {
@@ -30,57 +31,81 @@ function waitForImages(root: HTMLElement): Promise<void> {
 }
 
 /**
- * Replace live Recharts SVGs with raster-friendly <img> copies so html2canvas
- * does not depend on ResponsiveContainer reflow inside the capture clone.
+ * Paint each live Recharts container to a PNG while it is still on-screen.
+ * SVG serialization drops CSS fills — html2canvas of the live widget keeps bars/pies.
  */
-async function replaceSvgsWithImages(liveRoot: HTMLElement, cloneRoot: HTMLElement): Promise<void> {
-  const liveSvgs = [...liveRoot.querySelectorAll('svg')]
-  const cloneSvgs = [...cloneRoot.querySelectorAll('svg')]
-  const count = Math.min(liveSvgs.length, cloneSvgs.length)
+async function rasterizeLiveCharts(liveRoot: HTMLElement): Promise<
+  Array<{ png: string; width: number; height: number }>
+> {
+  const containers = [
+    ...liveRoot.querySelectorAll<HTMLElement>('.recharts-responsive-container'),
+  ]
+  const out: Array<{ png: string; width: number; height: number }> = []
 
-  for (let i = 0; i < count; i++) {
-    const liveSvg = liveSvgs[i]
-    const cloneSvg = cloneSvgs[i]
-    if (!(liveSvg instanceof SVGElement) || !(cloneSvg instanceof SVGElement)) continue
+  for (const el of containers) {
+    const rect = el.getBoundingClientRect()
+    const width = Math.max(1, Math.round(rect.width || el.offsetWidth || 400))
+    const height = Math.max(1, Math.round(rect.height || el.offsetHeight || 260))
+    if (width < 8 || height < 8) continue
 
-    const rect = liveSvg.getBoundingClientRect()
-    const width = Math.max(1, Math.round(rect.width || liveSvg.clientWidth || 400))
-    const height = Math.max(1, Math.round(rect.height || liveSvg.clientHeight || 260))
+    // Capture the live painted widget (CSS fills included). Do not force x/y —
+    // the node may sit mid-page; html2canvas resolves its box itself.
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      logging: false,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+    })
 
-    // Ensure width/height exist on the serialized SVG for correct raster sizing.
-    const svgClone = liveSvg.cloneNode(true) as SVGElement
-    svgClone.setAttribute('width', String(width))
-    svgClone.setAttribute('height', String(height))
-    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-    if (!svgClone.getAttribute('viewBox') && width > 0 && height > 0) {
-      svgClone.setAttribute('viewBox', `0 0 ${width} ${height}`)
-    }
-
-    const xml = new XMLSerializer().serializeToString(svgClone)
-    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`
-
-    const img = document.createElement('img')
-    img.alt = ''
-    img.width = width
-    img.height = height
-    img.style.cssText = `display:block;width:100%;max-width:100%;height:auto;aspect-ratio:${width}/${height};`
-    img.src = url
-
-    const parent = cloneSvg.parentElement
-    if (parent) {
-      // ResponsiveContainer wrappers often have a fixed height; keep that box filled.
-      parent.style.width = '100%'
-      parent.style.minHeight = `${height}px`
-    }
-    cloneSvg.replaceWith(img)
+    out.push({
+      png: canvas.toDataURL('image/png'),
+      width,
+      height,
+    })
   }
 
-  await waitForImages(cloneRoot)
+  return out
+}
+
+function insertChartImages(
+  cloneRoot: HTMLElement,
+  charts: Array<{ png: string; width: number; height: number }>,
+): void {
+  const containers = [
+    ...cloneRoot.querySelectorAll<HTMLElement>('.recharts-responsive-container'),
+  ]
+  const count = Math.min(containers.length, charts.length)
+
+  for (let i = 0; i < count; i++) {
+    const container = containers[i]
+    const chart = charts[i]
+    if (!container || !chart) continue
+
+    const img = document.createElement('img')
+    img.alt = 'Chart'
+    img.setAttribute('data-recharts-capture', '1')
+    img.width = chart.width
+    img.height = chart.height
+    img.style.cssText = [
+      'display:block',
+      'width:100%',
+      'max-width:100%',
+      'height:auto',
+      `aspect-ratio:${chart.width} / ${chart.height}`,
+      'margin:0 auto',
+      'background:#ffffff',
+    ].join(';')
+    img.src = chart.png
+
+    // Replace the whole responsive container (SVG + legend wrapper bits inside).
+    container.replaceWith(img)
+  }
 }
 
 /**
  * Export the reporting dashboard to PDF.
- * Uses an off-DOM capture host so live Recharts widgets are not resized mid-capture.
+ * Capture host stays off-screen — callers show their own in-page loader.
  */
 export async function downloadReportingDashboardPdf(options: {
   sourceEl: HTMLElement
@@ -96,37 +121,22 @@ export async function downloadReportingDashboardPdf(options: {
   const scrollX = window.scrollX
   const scrollY = window.scrollY
 
-  const overlay = document.createElement('div')
-  overlay.setAttribute('data-report-pdf-overlay', '1')
-  overlay.style.cssText = [
-    'position:fixed',
-    'inset:0',
-    'z-index:2147483000',
-    'background:rgba(15,23,42,0.45)',
-    'display:flex',
-    'align-items:center',
-    'justify-content:center',
-    'pointer-events:all',
-  ].join(';')
-  const overlayLabel = document.createElement('div')
-  overlayLabel.textContent = 'Generating PDF…'
-  overlayLabel.style.cssText =
-    'background:#ffffff;color:#173d69;padding:14px 22px;border-radius:10px;font:600 15px Arial,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,0.18);'
-  overlay.appendChild(overlayLabel)
+  // Rasterize charts from the live, painted dashboard BEFORE cloning / off-screen work.
+  await waitFrames(2)
+  const chartImages = await rasterizeLiveCharts(sourceEl)
 
   const host = document.createElement('div')
   host.setAttribute('data-report-pdf-host', '1')
   host.className = 'report-generator-pdf-capture report-generator-pdf-capture--host'
   host.style.cssText = [
-    'position:absolute',
+    'position:fixed',
+    'left:-10000px',
     'top:0',
-    'left:0',
     'width:794px',
-    'max-width:100%',
     'background:#ffffff',
     'color:#111111',
     'padding:16px',
-    'z-index:2147482990',
+    'z-index:-1',
     'overflow:visible',
     'box-sizing:border-box',
     'pointer-events:none',
@@ -139,15 +149,15 @@ export async function downloadReportingDashboardPdf(options: {
     if (node instanceof HTMLElement) node.style.display = 'none'
   })
 
+  insertChartImages(clone, chartImages)
+
   host.appendChild(clone)
   document.body.appendChild(host)
-  document.body.appendChild(overlay)
 
   try {
+    await waitForImages(host)
     await waitFrames(2)
-    await replaceSvgsWithImages(sourceEl, clone)
-    await waitFrames(2)
-    await new Promise<void>((resolve) => setTimeout(resolve, 60))
+    await new Promise<void>((resolve) => setTimeout(resolve, 40))
 
     if (host.scrollHeight < 40) {
       throw new Error('Reporting dashboard capture was empty. Apply filters, then try again.')
@@ -160,7 +170,6 @@ export async function downloadReportingDashboardPdf(options: {
       save: true,
     })
   } finally {
-    overlay.remove()
     host.remove()
     window.scrollTo(scrollX, scrollY)
   }
