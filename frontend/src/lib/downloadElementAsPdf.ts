@@ -115,8 +115,6 @@ const KEEP_WITH_NEXT_SELECTORS = [
   '.card-section-heading',
 ].join(',')
 
-type CssBreak = { y: number; kind: 'edge' | 'keep-with-next-end' }
-
 function collectCssBreaks(root: HTMLElement): {
   breakYs: number[]
   /** Ranges [top, bottom] that must stay on the same page when possible (heading + following block). */
