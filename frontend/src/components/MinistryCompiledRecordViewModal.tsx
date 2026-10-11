@@ -18,9 +18,10 @@ import { loadDepartmentTasksForRegion } from '../lib/compiledRecordDepartmentTas
 import { loiLegacyFormatMessage } from '../lib/issueEntryKind'
 import type { StatusBadgeTone } from '../lib/statusBadgeTone'
 import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
-import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
+import { ClubbedRegionDepartmentResponses } from './ClubbedRegionDepartmentResponses'
 import { HrRequestViewTemplate } from './HrRequestViewTemplate'
-import { Alert } from './ui/Alert'
+import { ActionNoticeAlert, Alert, type ActionNotice } from './ui/Alert'
+import { actionFlashSuccess } from '../lib/actionFlashNotice'
 import { Button } from './ui/Button'
 import { ModalActions } from './ui/ModalChrome'
 import { StatusBadge } from './ui/StatusBadge'
@@ -71,6 +72,7 @@ export function MinistryCompiledRecordViewModal({
   const [responsesLoading, setResponsesLoading] = useState(false)
   const [responsesError, setResponsesError] = useState<string | null>(null)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null)
   const [finalizing, setFinalizing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
@@ -171,6 +173,12 @@ export function MinistryCompiledRecordViewModal({
     try {
       const updated = await updateCompiledRecord(record.id, { status: 'submitted' })
       onRecordUpdated(updated)
+      setActionNotice(
+        actionFlashSuccess(
+          'Compilation submitted',
+          `${record.req_id || record.id} was submitted successfully.`,
+        ),
+      )
     } catch (e: unknown) {
       setFinalizeError(isApiError(e) ? e.message : 'Could not submit this record.')
     } finally {
@@ -255,6 +263,7 @@ export function MinistryCompiledRecordViewModal({
         </WorkflowModalHero>
 
         <div className="ministry-compiled-modal__body ministry-compiled-single__body">
+          <ActionNoticeAlert notice={actionNotice} onDismiss={() => setActionNotice(null)} />
           {record.status === 'draft' && canFinalize ? (
             <Alert variant="info" title="Draft record" className="ministry-compiled-draft-alert">
               <p style={{ margin: 0 }}>
@@ -323,18 +332,12 @@ export function MinistryCompiledRecordViewModal({
                     {tasks.length === 0 ? (
                       <p className="muted small ministry-compiled-region-card__empty">—</p>
                     ) : (
-                      <div className="ministry-compiled-region-card__responses">
-                        {tasks.map((t) => (
-                          <div key={t.id} className="ministry-compiled-dept-response-item">
-                            <DepartmentResponseDisplay
-                              responseData={t.response_data}
-                              attachmentUrl={t.attachment_url}
-                              issueIndicators={hrDetail?.issue?.indicators}
-                              locationRegionIds={[t.region_id]}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                      <ClubbedRegionDepartmentResponses
+                        tasks={tasks}
+                        issueIndicators={hrDetail?.issue?.indicators}
+                        filterByRegionName={regionName}
+                        regionLabel={regionName}
+                      />
                     )}
                   </article>
                 ))}

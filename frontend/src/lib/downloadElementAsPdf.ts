@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+import { PDF_MATRIX_FIT_CLASS, prepareWideTablesForPdfCapture } from './prepareWideTablesForPdf'
 
 export type DownloadElementAsPdfOptions = {
   /** Page margin in millimetres (default 6 — tight so pages feel continuous). */
@@ -34,7 +35,7 @@ function applyPdfChrome(
   const totalPages = pdf.getNumberOfPages()
   if (totalPages < 1) return
 
-  const shortTitle = (headerTitle ?? '').trim().slice(0, 90)
+  const shortTitle = (headerTitle ?? '').trim().slice(0, 120)
 
   if (shortTitle) {
     pdf.setPage(1)
@@ -337,6 +338,9 @@ export async function downloadElementAsPdf(
     element.classList.add(captureClass)
   }
 
+  // Fit / split wide Religion, PWD, and other matrices so A4 capture does not clip columns.
+  const restoreWideTables = prepareWideTablesForPdfCapture(element)
+
   await new Promise<void>((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
   })
@@ -363,6 +367,7 @@ export async function downloadElementAsPdf(
       onclone: (_doc, clonedNode) => {
         if (!(clonedNode instanceof HTMLElement)) return
         if (captureClass) clonedNode.classList.add(captureClass)
+        clonedNode.classList.add(PDF_MATRIX_FIT_CLASS)
         clonedNode.style.transform = 'none'
         clonedNode.style.opacity = '1'
         clonedNode.style.visibility = 'visible'
@@ -371,6 +376,10 @@ export async function downloadElementAsPdf(
         clonedNode.style.top = 'auto'
         clonedNode.querySelectorAll('details').forEach((d) => {
           d.open = true
+        })
+        // Prefer visible split clones; keep React originals hidden in the clone too.
+        clonedNode.querySelectorAll<HTMLElement>('[data-pdf-matrix-hidden="1"]').forEach((el) => {
+          el.style.display = 'none'
         })
         const sourceControls = element.querySelectorAll('input, textarea, select')
         const cloneControls = clonedNode.querySelectorAll('input, textarea, select')
@@ -408,7 +417,7 @@ export async function downloadElementAsPdf(
     const mmPerCanvasPx = contentWidthMm / canvas.width
     const isFreshPdf = !existingPdf
     const needsLeadingPage = Boolean(existingPdf) && pdf.getNumberOfPages() > 0
-    const shortTitle = (headerTitle ?? filename).trim().slice(0, 90)
+    const shortTitle = (headerTitle ?? filename).trim().slice(0, 120)
 
     const breakYsCanvas = breakYsCss
       .map((y) => y * canvasPerCss - trimTop)
@@ -522,6 +531,7 @@ export async function downloadElementAsPdf(
 
     return pdf
   } finally {
+    restoreWideTables()
     if (captureClass) {
       element.classList.remove(captureClass)
     }

@@ -493,31 +493,44 @@ class NotificationService
         foreach ($targets as $user) {
             $email = trim((string) ($user->email ?? ''));
             if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                Log::warning('Notification email skipped: missing or invalid address', [
+                    'user_id' => $user->id,
+                    'event_key' => $eventKey,
+                    'email' => $email,
+                ]);
                 continue;
             }
 
             $actionUrl = $this->absoluteFrontendUrl($routeForUser($user));
 
             try {
+                // Send immediately (controllers already defer this work afterResponse).
+                // Avoid Mail::queue + ShouldQueue so sync hosting does not depend on a worker.
                 if ($hrRequest !== null) {
                     $user->loadMissing('department');
-                    Mail::to($email)->queue(new DataCollectionRequestMail(
+                    Mail::to($email)->send(new DataCollectionRequestMail(
                         $user,
                         $hrRequest,
                         $actionUrl ?? $this->absoluteFrontendUrl('/') ?? (string) config('app.url'),
                     ));
                 } else {
-                    Mail::to($email)->queue(new SystemNotificationMail(
+                    Mail::to($email)->send(new SystemNotificationMail(
                         $user,
                         $title,
                         $message,
                         $actionUrl,
                     ));
                 }
-            } catch (Throwable $e) {
-                Log::warning('Failed to queue notification email', [
+                Log::info('Notification email sent', [
                     'user_id' => $user->id,
                     'event_key' => $eventKey,
+                    'email' => $email,
+                ]);
+            } catch (Throwable $e) {
+                Log::warning('Failed to send notification email', [
+                    'user_id' => $user->id,
+                    'event_key' => $eventKey,
+                    'email' => $email,
                     'error' => $e->getMessage(),
                 ]);
             }

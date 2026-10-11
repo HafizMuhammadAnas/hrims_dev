@@ -355,7 +355,7 @@ export type HrRequestModalProps = {
   canManage: boolean
   lockedRegionId?: number | null
   onClose: () => void
-  onSaved: () => void
+  onSaved: (result?: { status: HrRequestStatus }) => void
   /** After deleting a saved attachment, parent should refetch `detail` (e.g. `fetchHrRequest` + `setDetail`). */
   onDetailRefresh?: () => void | Promise<void>
   /** Inline full-width layout (no overlay) for `/requests/:id` */
@@ -1118,7 +1118,7 @@ export function HrRequestModal({
           attachments: issueForm.attachmentFiles,
         })
       }
-      onSaved()
+      onSaved({ status })
       onClose()
     } catch (err) {
       if (isApiError(err)) {
@@ -1166,7 +1166,7 @@ export function HrRequestModal({
             details: legacyForm.details.trim() || null,
           })
         }
-        onSaved()
+        onSaved({ status: legacyForm.status })
         onClose()
       } catch (err) {
         if (isApiError(err)) {

@@ -22,6 +22,8 @@ import {
   upstreamWorkflowBucketFilterOptions,
 } from '../../lib/departmentTaskTableFilters'
 import { LABEL_TOTAL_TASKS } from '../../lib/uiLabels'
+import { ActionNoticeAlert } from '../../components/ui/Alert'
+import { useActionFlashNotice } from '../../lib/actionFlashNotice'
 type Props = {
   title: string
 }
@@ -29,6 +31,7 @@ type Props = {
 export function DepartmentMonitoringPage({ title }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { notice: flashNotice, dismiss: dismissFlash } = useActionFlashNotice()
   const federalIctScope = location.pathname.includes('federal-department')
   const upstreamScope = federalIctScope ? 'federal-ict' : 'regional'
   const revisionLabel = upstreamRevisionLabelForScope(upstreamScope)
@@ -75,6 +78,7 @@ export function DepartmentMonitoringPage({ title }: Props) {
   return (
     <PageSection title={title}>
       {error && <p className="login-error">{error}</p>}
+      <ActionNoticeAlert notice={flashNotice} onDismiss={dismissFlash} />
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={[

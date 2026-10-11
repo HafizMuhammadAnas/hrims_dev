@@ -6,7 +6,9 @@ import { useAuth } from '../../auth/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
 import { RowActionsMenu } from '../../components/ui/RowActionsMenu'
+import { ActionNoticeAlert } from '../../components/ui/Alert'
 import { PageSection } from '../../components/ui/PageSection'
+import { useActionFlashNotice } from '../../lib/actionFlashNotice'
 import { PaginationBar } from '../../components/ui/PaginationBar'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -42,6 +44,7 @@ export function SubmissionHistoryPage({ title }: Props) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const { notice: flashNotice, dismiss: dismissFlash } = useActionFlashNotice()
   const regional = isRegionalAdmin(user)
   const deptHistoryUser =
     (isDepartmentStaff(user) || isViewer(user)) && user?.department != null
@@ -139,6 +142,7 @@ export function SubmissionHistoryPage({ title }: Props) {
 
   return (
     <PageSection title={title}>
+      <ActionNoticeAlert notice={flashNotice} onDismiss={dismissFlash} />
       {error && <p className="login-error">{error}</p>}
 
       {deptHistoryUser && (

@@ -7,6 +7,7 @@ import { updateRegionalReview } from '../api/workflows'
 import { downloadElementAsPdf } from '../lib/downloadElementAsPdf'
 import { downloadElementAsWord } from '../lib/downloadElementAsWord'
 import { buildFederalOriginalRequestViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
+import { actionFlashSuccess, withActionFlash } from '../lib/actionFlashNotice'
 import { regionalResponseFederalReviewPath } from '../lib/workflowNavigation'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import type { HrRequestRow } from '../types/hrRequest'
@@ -126,7 +127,19 @@ export function RegionalResponseFederalReviewView({
     try {
       await updateRegionalReview(viewingRow.id, status, comments)
       onReviewSaved?.()
-      navigate(fromPath.startsWith('/') ? fromPath : `/${fromPath}`)
+      const regionLabel = viewingRow.region_name?.trim() || viewingRow.id
+      const notice =
+        status === 'accepted'
+          ? actionFlashSuccess(
+              'Response accepted',
+              `${regionLabel} compilation was accepted.`,
+            )
+          : actionFlashSuccess(
+              'Modification requested',
+              `${regionLabel} was sent back for modification.`,
+            )
+      const dest = fromPath.startsWith('/') ? fromPath : `/${fromPath}`
+      navigate(dest, { state: withActionFlash(notice) })
     } catch (e) {
       setActionFeedback({
         kind: 'error',

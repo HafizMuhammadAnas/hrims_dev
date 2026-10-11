@@ -3,11 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchHrRequests } from '../api/hrRequests'
 import { fetchRegionalResponses, type RegionalResponseRow } from '../api/lists'
 import { CompiledRecordsWorkflowNav, isFromCompiledRecordsPath } from '../components/CompiledRecordsWorkflowNav'
-import { Alert } from '../components/ui/Alert'
+import { ActionNoticeAlert, Alert } from '../components/ui/Alert'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { PageSection } from '../components/ui/PageSection'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
+import { useActionFlashNotice } from '../lib/actionFlashNotice'
 import { LABEL_REGIONAL_RESPONSES } from '../lib/uiLabels'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { SortColumnHeader } from '../components/ui/SortColumnHeader'
@@ -55,6 +56,12 @@ type Props = {
   /** Render table only (inside Request management tabs). */
   embedded?: boolean
   fromPath?: string
+}
+
+/** Mounted only when not embedded so Request Management can own the flash banner. */
+function RegionalResponsesFlashBanner() {
+  const { notice, dismiss } = useActionFlashNotice()
+  return <ActionNoticeAlert notice={notice} onDismiss={dismiss} />
 }
 
 export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp }: Props) {
@@ -222,7 +229,7 @@ export function RegionalResponsesPage({ embedded = false, fromPath: fromPathProp
           {error}
         </Alert>
       )}
-
+      {!embedded ? <RegionalResponsesFlashBanner /> : null}
       <div style={{ marginTop: 16 }}>
         <StatsCards
           items={

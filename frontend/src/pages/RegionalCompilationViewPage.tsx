@@ -16,6 +16,12 @@ import { Button } from '../components/ui/Button'
 import { ModalActions } from '../components/ui/ModalChrome'
 import { PageSection } from '../components/ui/PageSection'
 import { WorkflowModalHero } from '../components/ui/WorkflowModalHero'
+import {
+  actionFlashSuccess,
+  useActionFlashNotice,
+  withActionFlash,
+} from '../lib/actionFlashNotice'
+import { ActionNoticeAlert } from '../components/ui/Alert'
 import { downloadDeptTaskRequestResponsePdf } from '../lib/downloadDeptTaskRequestResponsePdf'
 import { isRegionalAdmin } from '../lib/roles'
 import { regionalCompilationViewPath, workflowBackLabel } from '../lib/workflowNavigation'
@@ -34,6 +40,7 @@ export function RegionalCompilationViewPage() {
   const editMode = searchParams.get('edit') === '1'
   const { user } = useAuth()
   const regional = isRegionalAdmin(user)
+  const { notice: flashNotice, dismiss: dismissFlash } = useActionFlashNotice()
 
   const [rows, setRows] = useState<RegionalResponseRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
@@ -138,7 +145,15 @@ export function RegionalCompilationViewPage() {
       })
       setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
       setEditing(false)
-      navigate(regionalCompilationViewPath(updated.id, backTo), { replace: true })
+      navigate(regionalCompilationViewPath(updated.id, backTo), {
+        replace: true,
+        state: withActionFlash(
+          actionFlashSuccess(
+            'Compilation updated',
+            'Your revised compilation was saved. Resubmit to federal when ready.',
+          ),
+        ),
+      })
       void fetchDepartmentTasks().then(setTasks).catch(() => {})
     } catch (e: unknown) {
       setSaveError(e instanceof Error ? e.message : 'Save failed')
@@ -198,6 +213,7 @@ export function RegionalCompilationViewPage() {
   return (
     <PageSection title={editing ? 'Edit Compilation' : 'Regional Compilation'}>
       <div className="hr-request-view-stack hr-request-view-stack--request-page">
+        <ActionNoticeAlert notice={flashNotice} onDismiss={dismissFlash} />
         {loading ? <p className="muted">Loading...</p> : null}
         {error ? <p className="login-error">{error}</p> : null}
         {!loading && !error && !row ? (

@@ -3,7 +3,7 @@ import type { DepartmentTaskRow } from '../api/lists'
 import { clubbedResponseDataJson, clubDepartmentTaskResponses } from '../lib/clubDepartmentResponses'
 import { hasDepartmentResponse } from '../lib/departmentTaskWorkflow'
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
-import { DepartmentResponseDisplay } from './DepartmentResponseDisplay'
+import { AttachmentViewLink, DepartmentResponseDisplay } from './DepartmentResponseDisplay'
 
 type Props = {
   tasks: DepartmentTaskRow[]
@@ -11,14 +11,12 @@ type Props = {
   filterByRegionId?: number | null
   filterByRegionName?: string | null
   regionLabel?: string | null
-  /** When false, omit the section heading (e.g. parent already titled the region). */
-  showHeading?: boolean
 }
 
 /**
  * Federal view: one clubbed regional response —
- * quantitative cells summed; qualitative merged as separate paragraphs.
- * Does not list department names or per-department cards.
+ * quantitative cells summed; qualitative merged as separate paragraphs;
+ * all uploaded files listed anonymously (no department names).
  */
 export function ClubbedRegionDepartmentResponses({
   tasks,
@@ -26,7 +24,6 @@ export function ClubbedRegionDepartmentResponses({
   filterByRegionId,
   filterByRegionName,
   regionLabel,
-  showHeading = true,
 }: Props) {
   const scopedTasks = useMemo(() => {
     let rows = tasks
@@ -36,7 +33,12 @@ export function ClubbedRegionDepartmentResponses({
       const want = (filterByRegionName ?? '').trim()
       rows = rows.filter((t) => (t.region_name ?? '').trim() === want)
     }
-    return rows.filter((t) => hasDepartmentResponse(t))
+    return rows.filter(
+      (t) =>
+        hasDepartmentResponse(t) ||
+        Boolean(t.attachment_url?.trim()) ||
+        Boolean(t.verification_file_url?.trim()),
+    )
   }, [tasks, filterByRegionId, filterByRegionName])
 
   const clubbed = useMemo(() => clubDepartmentTaskResponses(scopedTasks), [scopedTasks])
@@ -51,43 +53,50 @@ export function ClubbedRegionDepartmentResponses({
     return ids
   }, [filterByRegionId, scopedTasks])
 
-  if (!clubbed) {
-    const label =
-      regionLabel?.trim() ||
-      filterByRegionName?.trim() ||
-      scopedTasks[0]?.region_name?.trim() ||
-      'this region'
-    return (
-      <p className="muted" style={{ margin: '0 0 12px' }}>
-        No clubbed response data is available for <strong>{label}</strong> yet.
-      </p>
-    )
-  }
-
   const label =
     regionLabel?.trim() ||
     filterByRegionName?.trim() ||
     scopedTasks[0]?.region_name?.trim() ||
     'Region'
 
+  if (!clubbed) {
+    return (
+      <p className="muted" style={{ margin: '0 0 12px' }}>
+        No response data is available for <strong>{label}</strong> yet.
+      </p>
+    )
+  }
+
+  const hasPayloadContent =
+    Object.keys(clubbed.payload.by_indicator ?? {}).length > 0 ||
+    Boolean(clubbed.payload.challenges?.trim())
+
   return (
     <section className="clubbed-region-responses">
-      {showHeading ? (
-        <>
-          <h2 className="card-section-heading">Clubbed regional response</h2>
-          <p className="muted small" style={{ marginTop: 0, marginBottom: 12 }}>
-            Combined response for <strong>{label}</strong>: numeric values are summed; qualitative
-            narratives appear as separate paragraphs.
-          </p>
-        </>
+      {hasPayloadContent ? (
+        <div className="dept-submission-card clubbed-region-responses__card">
+          <DepartmentResponseDisplay
+            responseData={clubbedResponseDataJson(clubbed.payload)}
+            issueIndicators={issueIndicators}
+            locationRegionIds={locationRegionIds}
+          />
+        </div>
       ) : null}
-      <div className="dept-submission-card clubbed-region-responses__card">
-        <DepartmentResponseDisplay
-          responseData={clubbedResponseDataJson(clubbed.payload)}
-          issueIndicators={issueIndicators}
-          locationRegionIds={locationRegionIds}
-        />
-      </div>
+      {clubbed.attachmentUrls.length > 0 ? (
+        <div className="clubbed-region-responses__files">
+          <h3 className="clubbed-region-responses__files-title">Supporting documents</h3>
+          <ul className="clubbed-region-responses__files-list">
+            {clubbed.attachmentUrls.map((url, index) => (
+              <li key={`${url}-${index}`}>
+                <AttachmentViewLink url={url} />
+                <span className="muted small" style={{ marginLeft: 8 }}>
+                  Document {index + 1}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   )
 }

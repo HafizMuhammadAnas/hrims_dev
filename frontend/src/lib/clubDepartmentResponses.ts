@@ -1,6 +1,8 @@
 import type { DepartmentTaskRow } from '../api/lists'
 import {
   DEPARTMENT_INDICATOR_FORMAT,
+  collectAttachmentUrlsFromDepartmentTask,
+  dedupeUrls,
   parseDepartmentTaskResponseData,
   type DepartmentIndicatorBundle,
   type DepartmentIndicatorPayload,
@@ -14,6 +16,8 @@ import {
 export type ClubbedDepartmentResponses = {
   payload: DepartmentIndicatorPayload
   contributorCount: number
+  /** Anonymous supporting document URLs (no department names). */
+  attachmentUrls: string[]
 }
 
 function cellValue(cell: DepartmentYearGenderCell | null | undefined): number | null {
@@ -178,11 +182,19 @@ function mergeQualitative(
   }
 }
 
+/** Collect all upload URLs for a task (structured, legacy, final supporting PDF). */
+export function collectAllTaskUploadUrls(task: DepartmentTaskRow): string[] {
+  const urls = collectAttachmentUrlsFromDepartmentTask(task.response_data, task.attachment_url)
+  const verification = task.verification_file_url?.trim()
+  if (verification) urls.push(verification)
+  return dedupeUrls(urls)
+}
+
 /**
  * Club department responses for a region:
  * - quantitative matrix / legacy numbers are summed
  * - qualitative (and comments / challenges) are merged as separate paragraphs
- * - department names are not included in the result
+ * - all uploaded files are listed anonymously (no department names)
  */
 export function clubDepartmentTaskResponses(
   tasks: DepartmentTaskRow[],
@@ -191,15 +203,19 @@ export function clubDepartmentTaskResponses(
   let challenges: string | null = null
   let contributorCount = 0
   const legacyParagraphs: string[] = []
+  const attachmentUrls: string[] = []
 
   for (const task of tasks) {
+    attachmentUrls.push(...collectAllTaskUploadUrls(task))
+
     const parsed = parseDepartmentTaskResponseData(task.response_data, task.attachment_url)
 
     if (parsed.kind === 'legacy') {
       const text = parsed.text?.trim()
-      if (!text) continue
+      const hasFile = Boolean(parsed.attachmentUrl?.trim() || task.verification_file_url?.trim())
+      if (!text && !hasFile) continue
       contributorCount += 1
-      legacyParagraphs.push(text)
+      if (text) legacyParagraphs.push(text)
       continue
     }
 
@@ -211,7 +227,8 @@ export function clubDepartmentTaskResponses(
       const l = bundle.qualitative
       const hasQ = quantitativeHasSummableData(q) || Boolean(q?.comment?.trim())
       const hasL = qualitativeHasText(l)
-      if (!hasQ && !hasL) continue
+      const hasFile = Boolean(q?.attachment_url?.trim() || l?.attachment_url?.trim())
+      if (!hasQ && !hasL && !hasFile) continue
       contributed = true
       const target = ensureIndicatorBundle(byIndicator, indicatorId, bundle.indicator_label)
       if (q && (quantitativeHasSummableData(q) || q.comment?.trim())) {
@@ -236,6 +253,10 @@ export function clubDepartmentTaskResponses(
       }
     }
 
+    if (!contributed && task.verification_file_url?.trim()) {
+      contributed = true
+    }
+
     if (!contributed) continue
     contributorCount += 1
   }
@@ -247,7 +268,11 @@ export function clubDepartmentTaskResponses(
     )
   }
 
-  if (contributorCount === 0 || (Object.keys(byIndicator).length === 0 && !challenges)) {
+  const uniqueAttachments = dedupeUrls(attachmentUrls)
+  const hasContent =
+    Object.keys(byIndicator).length > 0 || Boolean(challenges) || uniqueAttachments.length > 0
+
+  if (contributorCount === 0 && !hasContent) {
     return null
   }
 
@@ -258,6 +283,7 @@ export function clubDepartmentTaskResponses(
       challenges,
     },
     contributorCount,
+    attachmentUrls: uniqueAttachments,
   }
 }
 

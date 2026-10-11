@@ -8,6 +8,7 @@ import { HrRequestModal } from '../components/HrRequestModal'
 import { WorkflowPageBack } from '../components/WorkflowPageBack'
 import { Alert } from '../components/ui/Alert'
 import { PageSection } from '../components/ui/PageSection'
+import { actionFlashSuccess, withActionFlash } from '../lib/actionFlashNotice'
 import { LABEL_EDIT_REQUEST } from '../lib/uiLabels'
 import { workflowBackLabel } from '../lib/workflowNavigation'
 import { hrRequestAllowsEditDelete, type HrRequestRow } from '../types/hrRequest'
@@ -93,9 +94,19 @@ export function HrRequestEditPage() {
         layout="page"
         pageCloseLabel={workflowBackLabel(backTo)}
         onClose={() => navigate(backTo)}
-        onSaved={() => {
+        onSaved={(result) => {
           void reloadDetail()
-          navigate(backTo)
+          const status = result?.status
+          const notice =
+            status === 'draft'
+              ? actionFlashSuccess('Draft saved', 'Your changes to the draft request were saved.')
+              : status === 'active'
+                ? actionFlashSuccess(
+                    'Request activated',
+                    'The request is now active and visible to regions.',
+                  )
+                : actionFlashSuccess('Request updated', 'Your changes were saved.')
+          navigate(backTo, { state: withActionFlash(notice) })
         }}
         onDetailRefresh={reloadDetail}
       />

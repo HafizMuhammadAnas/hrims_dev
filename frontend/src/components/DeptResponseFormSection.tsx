@@ -20,7 +20,12 @@ export function DeptResponseFormSection({
       className={`dept-response-form-section${className ? ` ${className}` : ''}`}
       open={defaultOpen}
     >
-      <summary className="dept-response-form-section__summary">{title}</summary>
+      <summary
+        className="dept-response-form-section__summary"
+        aria-label={title.trim() ? undefined : 'Section'}
+      >
+        {title}
+      </summary>
       <div className="dept-response-form-section__body">{children}</div>
     </details>
   )

@@ -8,7 +8,8 @@ import {
   hasDepartmentResponse,
   workflowPresentation,
 } from '../lib/departmentTaskWorkflow'
-import { Alert } from './ui/Alert'
+import { actionFlashSuccess } from '../lib/actionFlashNotice'
+import { ActionNoticeAlert, Alert, type ActionNotice } from './ui/Alert'
 import { Button } from './ui/Button'
 import { StatusBadge } from './ui/StatusBadge'
 
@@ -53,6 +54,7 @@ export function RegionalDepartmentRevisionFollowUp({
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null)
 
   const reopenable = scoped.filter((t) => canRequestDepartmentTaskModification(t))
   const waitingRevision = scoped.filter((t) => departmentTaskWorkflowBucket(t) === 'revision')
@@ -75,6 +77,12 @@ export function RegionalDepartmentRevisionFollowUp({
         revision_origin: 'federal_follow_up',
       })
       onUpdated?.(updated)
+      setActionNotice(
+        actionFlashSuccess(
+          'Modification requested',
+          `${task.department_name?.trim() || task.department_id} was asked to revise their response.`,
+        ),
+      )
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not request modification.')
     } finally {
@@ -88,6 +96,7 @@ export function RegionalDepartmentRevisionFollowUp({
     setBulkSaving(true)
     setError(null)
     try {
+      const count = reopenable.length
       for (const task of reopenable) {
         const updated = await updateDepartmentTaskReview(task.id, {
           regional_review_status: 'needs-modification',
@@ -96,6 +105,12 @@ export function RegionalDepartmentRevisionFollowUp({
         })
         onUpdated?.(updated)
       }
+      setActionNotice(
+        actionFlashSuccess(
+          'Modification requested',
+          `${count} department${count === 1 ? '' : 's'} asked to revise their response.`,
+        ),
+      )
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not request modification for all departments.')
     } finally {
@@ -121,6 +136,7 @@ export function RegionalDepartmentRevisionFollowUp({
         that need correction. Departments can then update and resubmit; after you re-accept them,
         edit and resubmit the compilation to federal.
       </p>
+      <ActionNoticeAlert notice={actionNotice} onDismiss={() => setActionNotice(null)} />
       {error ? (
         <Alert variant="error" title="Could not update department review" onDismiss={() => setError(null)}>
           {error}

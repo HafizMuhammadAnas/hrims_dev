@@ -10,6 +10,7 @@ import {
 } from '../../api/lists'
 import { fetchRegions } from '../../api/regions'
 import { createRegionalResponse } from '../../api/workflows'
+import { actionFlashSuccess, withActionFlash } from '../../lib/actionFlashNotice'
 import { hrRequestViewPath } from '../../lib/workflowNavigation'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
@@ -182,13 +183,21 @@ export function ResponseCompilationPage({ title, nextPath, scope }: Props) {
     setSaving(true)
     setError(null)
     try {
+      const reqLabel = selectedReq.id
       await createRegionalResponse({
         hr_request_id: selectedReq.id,
         title: `${selectedReq.title} - consolidated response`,
         content: content.trim() || '',
         ...(ictScope && ictRegionId != null ? { region_id: ictRegionId } : {}),
       })
-      navigate(nextPath)
+      navigate(nextPath, {
+        state: withActionFlash(
+          actionFlashSuccess(
+            'Compilation submitted',
+            `The consolidated response for ${reqLabel} was submitted.`,
+          ),
+        ),
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Submit failed')
     } finally {

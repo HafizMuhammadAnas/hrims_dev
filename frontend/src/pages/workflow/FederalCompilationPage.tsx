@@ -23,6 +23,7 @@ import {
 } from '../../lib/regionalSubmissionCoverage'
 import { regionalResponseReviewPresentation } from '../../lib/regionalResponseReviewStatus'
 import { ActionNoticeAlert, Alert, type ActionNotice } from '../../components/ui/Alert'
+import { useActionFlashNotice } from '../../lib/actionFlashNotice'
 import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
 import { LABEL_COMPILATION_CENTER, LABEL_DEPARTMENTAL_RESPONSES, LABEL_REGIONAL_RESPONSES } from '../../lib/uiLabels'
@@ -54,6 +55,7 @@ export function FederalCompilationPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  const { notice: flashNotice, dismiss: dismissFlash } = useActionFlashNotice()
   const [requests, setRequests] = useState<HrRequestRow[]>([])
   const [responses, setResponses] = useState<RegionalResponseRow[]>([])
   const [deptTasks, setDeptTasks] = useState<DepartmentTaskRow[]>([])
@@ -65,6 +67,11 @@ export function FederalCompilationPage() {
   const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null)
   const [saving, setSaving] = useState<'draft' | 'submitted' | null>(null)
   const [compiledRecords, setCompiledRecords] = useState<CompiledRecordRow[]>([])
+  const displayNotice = actionNotice ?? flashNotice
+  const dismissDisplayNotice = () => {
+    setActionNotice(null)
+    dismissFlash()
+  }
 
   useEffect(() => {
     void Promise.all([
@@ -329,7 +336,7 @@ export function FederalCompilationPage() {
         />
       </div>
       <TableCard padded>
-        <ActionNoticeAlert notice={actionNotice} onDismiss={() => setActionNotice(null)} />
+        <ActionNoticeAlert notice={displayNotice} onDismiss={dismissDisplayNotice} />
         <label className="muted">HR request</label>
         {requestsForSelect.length === 0 && reqIdsForPicker.length === 0 ? (
           <p className="muted" style={{ margin: '8px 0 12px' }}>

@@ -81,7 +81,11 @@ import {
 } from '../lib/deptIndicatorYearTotalValidation'
 import { HrRequestModal } from '../components/HrRequestModal'
 import { HrRequestViewTemplate } from '../components/HrRequestViewTemplate'
-import { Alert } from '../components/ui/Alert'
+import { ActionNoticeAlert, Alert, type ActionNotice } from '../components/ui/Alert'
+import {
+  actionFlashSuccess,
+  withActionFlash,
+} from '../lib/actionFlashNotice'
 import { buildDepartmentForwardedViewTemplateProps } from '../lib/hrRequestForwardedViewTemplateProps'
 import {
   inferReportingFramework,
@@ -239,6 +243,7 @@ export function HrRequestViewPage() {
   const [submittingResponse, setSubmittingResponse] = useState(false)
   const [savingDraftPdf, setSavingDraftPdf] = useState(false)
   const [submitResponseError, setSubmitResponseError] = useState<string | null>(null)
+  const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null)
   const [deptPortalTab, setDeptPortalTab] = useState<'response' | 'request' | 'changes'>('response')
   const [verificationFile, setVerificationFile] = useState<File | null>(null)
   const [verificationFileClear, setVerificationFileClear] = useState(false)
@@ -636,10 +641,11 @@ export function HrRequestViewPage() {
     !clarificationBlocksAssign &&
     regionalPathChoice === null
 
+  /** Assign / redistribute only under Request Management (region-received), not other tabs. */
   const showRegionalAssign =
+    fromRegionReceived &&
     !clarificationBlocksAssign &&
-    ((canRegionalProceed && (fromRegionReceived ? regionalPathChoice === 'assign' : true)) ||
-      canRegionalRedistribute)
+    ((canRegionalProceed && regionalPathChoice === 'assign') || canRegionalRedistribute)
 
   const showRegionalClarificationForm =
     fromRegionReceived &&
@@ -658,6 +664,12 @@ export function HrRequestViewPage() {
       setRegionalPathChoice(null)
       setClarMessage('')
       setClarFile(null)
+      setActionNotice(
+        actionFlashSuccess(
+          'Clarification submitted',
+          'Your clarification request was sent to federal.',
+        ),
+      )
     } catch (e: unknown) {
       setClarError(e instanceof Error ? e.message : 'Could not submit clarification')
     } finally {
@@ -722,6 +734,13 @@ export function HrRequestViewPage() {
           })
         }
       }
+      const assignedCount = otherIssue ? assignOtherDepartmentIds.length : byDepartment.size
+      const notice = actionFlashSuccess(
+        isRegionalRedistribute ? 'Departments redistributed' : 'Departments assigned',
+        `${assignedCount} department${assignedCount === 1 ? '' : 's'} ${
+          isRegionalRedistribute ? 'added' : 'assigned'
+        } for ${detail.id}.`,
+      )
       setAssignDepartmentIndicators({})
       setAssignOtherDepartmentIds([])
       setAssignRegionalNotes('')
@@ -730,7 +749,9 @@ export function HrRequestViewPage() {
       await reloadTasksAndDepartments()
       await reloadClarification()
       if (fromRegionReceived) {
-        navigate('/region-monitoring')
+        navigate('/region-monitoring', { state: withActionFlash(notice) })
+      } else {
+        setActionNotice(notice)
       }
     } catch (e: unknown) {
       setAssignError(e instanceof Error ? e.message : 'Assignment failed')
@@ -1001,7 +1022,9 @@ export function HrRequestViewPage() {
   async function submitResponse() {
     if (!activeTask) return
     if (!physicalValidationDone) {
-      setSubmitResponseError('Check “Validation done” before submitting.')
+      setSubmitResponseError(
+        'Confirm that the data has been reviewed and approved by the competent authority before submitting.',
+      )
       return
     }
     setSubmittingResponse(true)
@@ -1010,6 +1033,12 @@ export function HrRequestViewPage() {
       await persistDepartmentResponse(false)
       setVerificationFile(null)
       setVerificationFileClear(false)
+      setActionNotice(
+        actionFlashSuccess(
+          'Response submitted',
+          `Your response for ${activeTask.id} was submitted successfully.`,
+        ),
+      )
     } catch (e: unknown) {
       setSubmitResponseError(e instanceof Error ? e.message : 'Submission failed')
     } finally {
@@ -1038,14 +1067,29 @@ export function HrRequestViewPage() {
     setSavingDraftPdf(true)
     setSubmitResponseError(null)
     try {
+      const departmentName =
+        activeTask.department_name?.trim() || String(activeTask.department_id)
+      const regionName = activeTask.region_name?.trim() || ''
+      const departmentLabel =
+        regionName &&
+        !departmentName.toLowerCase().includes(regionName.toLowerCase())
+          ? `${regionName} — ${departmentName}`
+          : departmentName
       await downloadDeptTaskRequestResponsePdf({
         requestEl,
         responseEl,
-        filename: `${activeTask.req_id}_${activeTask.id}_draft.pdf`,
-        headerTitle: `HRIMS draft — ${activeTask.req_id} / ${activeTask.id}`,
+        filename: `${activeTask.req_id}_${departmentName}_${activeTask.id}_draft.pdf`,
+        headerTitle: `${departmentLabel} — ${activeTask.req_id} / ${activeTask.id}`,
+        departmentLabel,
         // Clone runs synchronously before this; reload cannot drop response from the PDF.
         afterSnapshot: () => persistDepartmentResponse(true),
       })
+      setActionNotice(
+        actionFlashSuccess(
+          'Draft saved',
+          'Your draft was saved and the PDF download started.',
+        ),
+      )
     } catch (e: unknown) {
       setSubmitResponseError(e instanceof Error ? e.message : 'Could not save draft / download PDF')
     } finally {
@@ -1185,6 +1229,17 @@ export function HrRequestViewPage() {
         ...(status === 'needs-modification' ? { revision_origin: 'regional' as const } : {}),
       })
       await reloadTasksAndDepartments()
+      setActionNotice(
+        status === 'accepted'
+          ? actionFlashSuccess(
+              'Response accepted',
+              `${activeTask.department_name?.trim() || activeTask.department_id} was accepted.`,
+            )
+          : actionFlashSuccess(
+              'Modification requested',
+              `${activeTask.department_name?.trim() || activeTask.department_id} was asked to revise their response.`,
+            ),
+      )
     } catch (e: unknown) {
       setReviewFeedback({
         kind: 'error',
@@ -1392,6 +1447,8 @@ export function HrRequestViewPage() {
           <CompiledRecordsWorkflowNav reqId={id} activeTab="request" />
         ) : null}
 
+        <ActionNoticeAlert notice={actionNotice} onDismiss={() => setActionNotice(null)} />
+
         {taskTabbedPageView && activeTask ? (
           <div className="modal-card modal-card-wide hr-request-dept-portal-tabs hr-request-modal--page workflow-tabbed-card">
             <WorkflowModalHero
@@ -1474,10 +1531,10 @@ export function HrRequestViewPage() {
                           locationRegionIds={[activeTask.region_id]}
                         />
                         {activeTask.verification_file_url?.trim() ? (
-                          <DeptResponseFormSection title="Upload final file" defaultOpen={false}>
+                          <DeptResponseFormSection title="" defaultOpen>
                             <div className="form-row">
                               <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
-                                Saved final file
+                                Saved supporting document
                               </span>
                               <span className="hr-request-attachments-list__actions">
                                 <a
@@ -1492,7 +1549,8 @@ export function HrRequestViewPage() {
                             </div>
                             {activeTask.physical_validation_done ? (
                               <p className="muted small" style={{ margin: '12px 0 0' }}>
-                                Validation done
+                                By clicking this box, you confirm that the data being provided has been
+                                reviewed and approved for onward submission by the competent authority.
                               </p>
                             ) : null}
                           </DeptResponseFormSection>
@@ -1620,7 +1678,19 @@ export function HrRequestViewPage() {
             hidePageHeader={embeddedRequestPage}
             pageCloseLabel={backLabel}
             onClose={() => navigate(from)}
-            onSaved={() => navigate(from)}
+            onSaved={(result) => {
+              const status = result?.status
+              const notice =
+                status === 'draft'
+                  ? actionFlashSuccess('Draft saved', 'Your changes to the draft request were saved.')
+                  : status === 'active'
+                    ? actionFlashSuccess(
+                        'Request activated',
+                        'The request is now active and visible to regions.',
+                      )
+                    : actionFlashSuccess('Request updated', 'Your changes were saved.')
+              navigate(from, { state: withActionFlash(notice) })
+            }}
             departmentPortalRegionalNotes={
               deptUser ? (activeTask?.assignment_instructions ?? null) : undefined
             }
@@ -2035,15 +2105,11 @@ export function HrRequestViewPage() {
                   </div>
                 </DeptResponseFormSection>
 
-                <DeptResponseFormSection title="Upload final file" defaultOpen={false}>
-                  <p className="muted small" style={{ marginTop: 0 }}>
-                    After you save draft and download the PDF, complete physical verification, then
-                    upload that signed/verified file here before submitting.
-                  </p>
+                <DeptResponseFormSection title="" defaultOpen>
                   {activeTask.verification_file_url?.trim() && !verificationFileClear ? (
                     <div className="form-row">
                       <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
-                        Saved final file
+                        Saved supporting document
                       </span>
                       <span className="hr-request-attachments-list__actions">
                         <a
@@ -2071,7 +2137,7 @@ export function HrRequestViewPage() {
                   ) : null}
                   <div className="form-row">
                     <label htmlFor="dept-verification-file">
-                      Upload final verified file (PDF) — optional
+                      Please upload any relevant supporting document with your submission.
                     </label>
                     <input
                       id="dept-verification-file"
@@ -2106,7 +2172,10 @@ export function HrRequestViewPage() {
                       onChange={(e) => setPhysicalValidationDone(e.target.checked)}
                       style={{ marginTop: 3 }}
                     />
-                    <span>Validation done</span>
+                    <span>
+                      By clicking this box, you confirm that the data being provided has been reviewed
+                      and approved for onward submission by the competent authority.
+                    </span>
                   </label>
                 </DeptResponseFormSection>
               </>
@@ -2177,15 +2246,11 @@ export function HrRequestViewPage() {
                   />
                 ) : null}
 
-                <DeptResponseFormSection title="Upload final file" defaultOpen={false}>
-                  <p className="muted small" style={{ marginTop: 0 }}>
-                    After you save draft and download the PDF, complete physical verification, then
-                    upload that signed/verified file here before submitting.
-                  </p>
+                <DeptResponseFormSection title="" defaultOpen>
                   {activeTask.verification_file_url?.trim() && !verificationFileClear ? (
                     <div className="form-row">
                       <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
-                        Saved final file
+                        Saved supporting document
                       </span>
                       <span className="hr-request-attachments-list__actions">
                         <a
@@ -2213,7 +2278,7 @@ export function HrRequestViewPage() {
                   ) : null}
                   <div className="form-row">
                     <label htmlFor="dept-verification-file-legacy">
-                      Upload final verified file (PDF) — optional
+                      Please upload any relevant supporting document with your submission.
                     </label>
                     <input
                       id="dept-verification-file-legacy"
@@ -2248,7 +2313,10 @@ export function HrRequestViewPage() {
                       onChange={(e) => setPhysicalValidationDone(e.target.checked)}
                       style={{ marginTop: 3 }}
                     />
-                    <span>Validation done</span>
+                    <span>
+                      By clicking this box, you confirm that the data being provided has been reviewed
+                      and approved for onward submission by the competent authority.
+                    </span>
                   </label>
                 </DeptResponseFormSection>
               </>
@@ -2320,10 +2388,10 @@ export function HrRequestViewPage() {
                 locationRegionIds={[activeTask.region_id]}
               />
               {activeTask.verification_file_url?.trim() ? (
-                <DeptResponseFormSection title="Upload final file" defaultOpen={false}>
+                <DeptResponseFormSection title="" defaultOpen>
                   <div className="form-row">
                     <span className="muted small" style={{ display: 'block', marginBottom: 6 }}>
-                      Saved final file
+                      Saved supporting document
                     </span>
                     <span className="hr-request-attachments-list__actions">
                       <a
@@ -2338,7 +2406,8 @@ export function HrRequestViewPage() {
                   </div>
                   {activeTask.physical_validation_done ? (
                     <p className="muted small" style={{ margin: '12px 0 0' }}>
-                      Validation done
+                      By clicking this box, you confirm that the data being provided has been reviewed
+                      and approved for onward submission by the competent authority.
                     </p>
                   ) : null}
                 </DeptResponseFormSection>
@@ -2354,43 +2423,6 @@ export function HrRequestViewPage() {
           !activeTask && (
             <p className="login-error hr-request-view-footnote">
               That task was not found for this request, or you may not have access.
-            </p>
-          )}
-
-        {showRegionalAssign && !fromRegionReceived && (
-          <RegionalAssignDepartmentsPanel
-            regionName={user?.region?.name ?? 'your region'}
-            requestDueDate={detail?.date?.trim() || null}
-            dueDate={assignDueDate}
-            onChangeDueDate={setAssignDueDate}
-            indicators={requestIndicatorsForAssign}
-            departments={isRegionalRedistribute ? unassignedRegionDepartments : regionDepartments}
-            departmentIndicators={assignDepartmentIndicators}
-            onChangeDepartmentIndicators={setAssignDepartmentIndicators}
-            selectedDepartmentIds={assignOtherDepartmentIds}
-            onChangeSelectedDepartmentIds={setAssignOtherDepartmentIds}
-            notes={assignRegionalNotes}
-            onChangeNotes={setAssignRegionalNotes}
-            assigning={assigning}
-            error={assignError}
-            onAssign={() => void assignSelectedDepartments()}
-            showBackLink={false}
-            redistribute={isRegionalRedistribute}
-            existingAssignments={
-              isRegionalRedistribute ? existingDepartmentAssignments : undefined
-            }
-          />
-        )}
-
-        {regionalUser &&
-          !fromRegionReceived &&
-          detail &&
-          !detailLoading &&
-          tasksForRequest.length === 0 &&
-          regionDepartments.length === 0 && (
-            <p className="muted hr-request-view-footnote">
-              No departments are mapped to your region. Add departments under <strong>Manage departments</strong>{' '}
-              before assigning tasks.
             </p>
           )}
 

@@ -601,7 +601,8 @@ export function TemporaryFederalCompilationPreviewCard({
       </div>
 
       {previewRecord ? (
-        <div className="temporary-federal-compilation-preview__capture-host" aria-hidden>
+        <div className="temporary-federal-compilation-preview__live">
+          <h4 className="temporary-federal-compilation-preview__live-title">Request preview</h4>
           <div ref={printRef} className="temporary-federal-compilation-preview__capture-root">
             <CompiledRecordPrintDocument record={previewRecord} onReadyChange={setDocReady} />
           </div>

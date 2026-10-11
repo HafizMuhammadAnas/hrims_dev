@@ -15,7 +15,9 @@ import { canManageHrRequests } from '../../auth/rbac'
 import { Button } from '../../components/ui/Button'
 import { EmptyStateRow } from '../../components/ui/EmptyStateRow'
 import { ModalActions, ModalHeader } from '../../components/ui/ModalChrome'
+import { ActionNoticeAlert } from '../../components/ui/Alert'
 import { PageSection } from '../../components/ui/PageSection'
+import { useActionFlashNotice } from '../../lib/actionFlashNotice'
 import { PaginationBar } from '../../components/ui/PaginationBar'
 import { RowActionsMenu } from '../../components/ui/RowActionsMenu'
 import { StatsCards } from '../../components/ui/StatsCards'
@@ -63,6 +65,7 @@ export function ReceivedRequestsPage({
 }: Props) {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { notice: flashNotice, dismiss: dismissFlash } = useActionFlashNotice()
   const canManage = canManageHrRequests(user)
   const [rows, setRows] = useState<HrRequestRow[]>([])
   const [tasks, setTasks] = useState<DepartmentTaskRow[]>([])
@@ -252,6 +255,7 @@ export function ReceivedRequestsPage({
       title={title}
     >
       {error && <p className="login-error">{error}</p>}
+      <ActionNoticeAlert notice={flashNotice} onDismiss={dismissFlash} />
       <div style={{ marginTop: 16 }}>
         <StatsCards items={statusCounts.map((s) => ({ label: s.label, value: s.count }))} />
       </div>

@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/Button'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { TableCard } from '../../components/ui/TableCard'
+import { actionFlashSuccess, withActionFlash } from '../../lib/actionFlashNotice'
 import { indicatorsScopedToRequest } from '../../lib/hrRequestIndicatorScope'
 
 type Props = {
@@ -150,11 +151,20 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
           issue_indicator_ids: indicatorIds,
         })
       }
+      const assignedCount = selectedDeptIds.length
+      const reqLabel = selectedReq
       setSelectedReq('')
       setSelectedDeptIds([])
       setDueDate('')
       await load()
-      navigate(nextPath)
+      navigate(nextPath, {
+        state: withActionFlash(
+          actionFlashSuccess(
+            'Departments assigned',
+            `${assignedCount} department${assignedCount === 1 ? '' : 's'} assigned for ${reqLabel}.`,
+          ),
+        ),
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Assignment failed')
     } finally {

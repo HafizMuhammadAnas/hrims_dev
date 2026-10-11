@@ -12,7 +12,12 @@ import { fetchRegions } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
 import { canManageHrRequests, hrRequestLockedRegionId } from '../auth/rbac'
 import { HrRequestModal } from '../components/HrRequestModal'
-import { Alert } from '../components/ui/Alert'
+import { ActionNoticeAlert, Alert, type ActionNotice } from '../components/ui/Alert'
+import {
+  actionFlashSuccess,
+  useActionFlashNotice,
+  withActionFlash,
+} from '../lib/actionFlashNotice'
 import { Button } from '../components/ui/Button'
 import { EmptyStateRow } from '../components/ui/EmptyStateRow'
 import { ModalActions, ModalHeader } from '../components/ui/ModalChrome'
@@ -80,6 +85,13 @@ export function FederalRequestManagementPage() {
   const { user } = useAuth()
   const canManage = canManageHrRequests(user)
   const lockedRegionId = hrRequestLockedRegionId(user)
+  const { notice: flashNotice, dismiss: dismissFlash } = useActionFlashNotice()
+  const [localNotice, setLocalNotice] = useState<ActionNotice | null>(null)
+  const actionNotice = localNotice ?? flashNotice
+  const dismissActionNotice = () => {
+    setLocalNotice(null)
+    dismissFlash()
+  }
 
   const [rows, setRows] = useState<HrRequestRow[]>([])
   const [regions, setRegions] = useState<Awaited<ReturnType<typeof fetchRegions>>>([])
@@ -218,9 +230,13 @@ export function FederalRequestManagementPage() {
     setDeleteError(null)
     setDeleting(true)
     try {
-      await deleteHrRequest(deleteTarget.id)
+      const deletedId = deleteTarget.id
+      await deleteHrRequest(deletedId)
       setDeleteTarget(null)
       await reload()
+      setLocalNotice(
+        actionFlashSuccess('Request deleted', `${deletedId} was removed from Request Management.`),
+      )
     } catch (e: unknown) {
       setDeleteError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
@@ -259,6 +275,7 @@ export function FederalRequestManagementPage() {
           {error}
         </Alert>
       )}
+      <ActionNoticeAlert notice={actionNotice} onDismiss={dismissActionNotice} />
 
       <nav className="issues-admin-tabs compiled-record-modal-tabs" aria-label={`${LABEL_REQUEST_MANAGEMENT} sections`}>
         {REQUESTS_TABS.map((tab) => (
@@ -430,6 +447,12 @@ export function FederalRequestManagementPage() {
                                   try {
                                     await updateHrRequest(r.id, { status: 'active' })
                                     await reload()
+                                    setLocalNotice(
+                                      actionFlashSuccess(
+                                        'Request activated',
+                                        `${r.id} is now active and visible to regions.`,
+                                      ),
+                                    )
                                   } catch (e: unknown) {
                                     setError(
                                       e instanceof Error
@@ -487,9 +510,20 @@ export function FederalRequestManagementPage() {
           lockedRegionId={lockedRegionId}
           layout="page"
           onClose={() => navigate('/requests')}
-          onSaved={() => {
+          onSaved={(result) => {
             void reload()
-            navigate('/requests')
+            const status = result?.status
+            const notice =
+              status === 'draft'
+                ? actionFlashSuccess(
+                    'Draft saved',
+                    'The request draft was saved. You can activate it later from the list.',
+                  )
+                : actionFlashSuccess(
+                    'Request submitted',
+                    'The request was submitted and is available under Requests list.',
+                  )
+            navigate('/requests', { state: withActionFlash(notice) })
           }}
         />
       )}
@@ -503,6 +537,12 @@ export function FederalRequestManagementPage() {
               onResponded={() => {
                 setViewingClarificationId(null)
                 void refreshClarifications()
+                setLocalNotice(
+                  actionFlashSuccess(
+                    'Clarification sent',
+                    'Your reply was sent to the region.',
+                  ),
+                )
               }}
             />
           ) : (

@@ -186,7 +186,6 @@ export function CompiledRecordPrintDocument({ record, onReadyChange }: Props) {
                       issueIndicators={hrDetail?.issue?.indicators}
                       filterByRegionName={regionName}
                       regionLabel={regionName}
-                      showHeading={false}
                     />
                   )}
                 </article>

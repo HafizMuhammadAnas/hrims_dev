@@ -92,10 +92,12 @@ export async function downloadDeptTaskRequestResponsePdf(options: {
   responseEl: HTMLElement | null
   filename: string
   headerTitle: string
+  /** Shown prominently on the first PDF page (e.g. "Punjab — Police"). */
+  departmentLabel?: string | null
   /** Runs after the DOM snapshot is taken and before rasterizing (e.g. save draft). */
   afterSnapshot?: () => Promise<void>
 }): Promise<void> {
-  const { requestEl, responseEl, filename, headerTitle, afterSnapshot } = options
+  const { requestEl, responseEl, filename, headerTitle, departmentLabel, afterSnapshot } = options
   if (!requestEl && !responseEl) {
     throw new Error('Nothing to export. Open the Request and Response tabs, then try again.')
   }
@@ -107,6 +109,25 @@ export async function downloadDeptTaskRequestResponsePdf(options: {
   const sections: HTMLElement[] = []
   if (requestEl) sections.push(buildSection('Request', requestEl))
   sections.push(buildSection('Response', responseEl))
+
+  const deptLabel = departmentLabel?.trim() || ''
+  if (deptLabel && sections[0]) {
+    const banner = document.createElement('div')
+    banner.className = 'pdf-export-department-banner'
+    banner.style.cssText =
+      'margin:0 0 12px;padding:10px 12px;border:1px solid #c5d0e6;border-radius:8px;background:#f0f5fc;font-family:Arial,Helvetica,sans-serif;'
+    const label = document.createElement('div')
+    label.textContent = 'Department'
+    label.style.cssText =
+      'margin:0 0 2px;font-size:11px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;color:#64748b;'
+    const name = document.createElement('div')
+    name.textContent = deptLabel
+    name.style.cssText =
+      'margin:0;font-size:16px;font-weight:700;line-height:1.3;color:#173d69;'
+    banner.appendChild(label)
+    banner.appendChild(name)
+    sections[0].insertBefore(banner, sections[0].firstChild)
+  }
 
   const scrollX = window.scrollX
   const scrollY = window.scrollY
