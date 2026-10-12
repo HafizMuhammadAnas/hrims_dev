@@ -718,17 +718,13 @@ class HrRequestController extends Controller
 
         $row = $row->load(['region', 'regions', 'convention', 'issue', 'departments']);
         if ($row->status === 'active') {
-            $actorId = (int) $request->user()->id;
-            $hrRequestId = $row->id;
-            $this->deferAfterResponse(function () use ($hrRequestId, $actorId) {
-                $this->runDeferredHrRequestNotifications(
-                    $hrRequestId,
-                    $actorId,
-                    createdTaskIds: [],
-                    previousStatus: null,
-                    createdEvent: true,
-                );
-            });
+            $this->dispatchHrRequestNotifications(
+                $row->id,
+                (int) $request->user()->id,
+                createdTaskIds: [],
+                previousStatus: null,
+                createdEvent: true,
+            );
         }
 
         return new HrRequestResource($row);
@@ -982,17 +978,13 @@ class HrRequestController extends Controller
                     notify: false,
                 );
             }
-            $actorId = (int) $request->user()->id;
-            $hrRequestId = $row->id;
-            $this->deferAfterResponse(function () use ($hrRequestId, $actorId, $createdTaskIds) {
-                $this->runDeferredHrRequestNotifications(
-                    $hrRequestId,
-                    $actorId,
-                    $createdTaskIds,
-                    previousStatus: null,
-                    createdEvent: true,
-                );
-            });
+            $this->dispatchHrRequestNotifications(
+                $row->id,
+                (int) $request->user()->id,
+                $createdTaskIds,
+                previousStatus: null,
+                createdEvent: true,
+            );
         }
 
         return new HrRequestResource($row);
@@ -1023,17 +1015,13 @@ class HrRequestController extends Controller
                     notify: false,
                 );
             }
-            $actorId = (int) $request->user()->id;
-            $hrRequestId = $model->id;
-            $this->deferAfterResponse(function () use ($hrRequestId, $actorId, $createdTaskIds, $previousStatus) {
-                $this->runDeferredHrRequestNotifications(
-                    $hrRequestId,
-                    $actorId,
-                    $createdTaskIds,
-                    previousStatus: $previousStatus,
-                    createdEvent: false,
-                );
-            });
+            $this->dispatchHrRequestNotifications(
+                $model->id,
+                (int) $request->user()->id,
+                $createdTaskIds,
+                previousStatus: $previousStatus,
+                createdEvent: false,
+            );
 
             return;
         }
@@ -1050,40 +1038,22 @@ class HrRequestController extends Controller
             }
         }
 
-        $actorId = (int) $request->user()->id;
-        $hrRequestId = $model->id;
-        $this->deferAfterResponse(function () use ($hrRequestId, $actorId, $createdTaskIds, $previousStatus) {
-            $this->runDeferredHrRequestNotifications(
-                $hrRequestId,
-                $actorId,
-                $createdTaskIds,
-                previousStatus: $previousStatus,
-                createdEvent: false,
-            );
-        });
+        $this->dispatchHrRequestNotifications(
+            $model->id,
+            (int) $request->user()->id,
+            $createdTaskIds,
+            previousStatus: $previousStatus,
+            createdEvent: false,
+        );
     }
 
     /**
-     * Run notification/email side-effects after the HTTP response is sent.
-     * Prevents QUEUE_CONNECTION=sync + SMTP from blocking form submit on production.
+     * Schedule request/task notifications. Delivery is deferred inside NotificationService
+     * so SMTP timeouts never block the API response.
      *
      * @param  list<string>  $createdTaskIds
      */
-    private function deferAfterResponse(callable $callback): void
-    {
-        dispatch(function () use ($callback) {
-            try {
-                $callback();
-            } catch (\Throwable $e) {
-                report($e);
-            }
-        })->afterResponse();
-    }
-
-    /**
-     * @param  list<string>  $createdTaskIds
-     */
-    private function runDeferredHrRequestNotifications(
+    private function dispatchHrRequestNotifications(
         string $hrRequestId,
         int $actorId,
         array $createdTaskIds,

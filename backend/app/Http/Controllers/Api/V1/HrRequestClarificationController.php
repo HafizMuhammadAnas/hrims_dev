@@ -185,7 +185,11 @@ class HrRequestClarificationController extends Controller
 
         $row->load(['region', 'attachments', 'requestedBy']);
 
-        app(NotificationService::class)->notifyClarificationRequested($row, $user);
+        try {
+            app(NotificationService::class)->notifyClarificationRequested($row, $user);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['data' => new HrRequestClarificationResource($row)], 201);
     }
@@ -220,7 +224,11 @@ class HrRequestClarificationController extends Controller
 
         $hrRequestClarification->load(['region', 'attachments', 'requestedBy', 'respondedBy', 'hrRequest']);
 
-        app(NotificationService::class)->notifyClarificationAnswered($hrRequestClarification, $user);
+        try {
+            app(NotificationService::class)->notifyClarificationAnswered($hrRequestClarification, $user);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['data' => new HrRequestClarificationResource($hrRequestClarification->fresh(['region', 'attachments', 'requestedBy', 'respondedBy']))]);
     }

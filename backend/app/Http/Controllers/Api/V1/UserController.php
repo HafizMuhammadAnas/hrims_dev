@@ -143,13 +143,17 @@ class UserController extends Controller
         ]);
         $user->roles()->sync([$role->id]);
         $user->load(['roles.permissions', 'region', 'department']);
-        app(NotificationService::class)->notifyUserManaged(
-            $user,
-            $creator,
-            'user.created',
-            'User created',
-            sprintf('%s created user %s.', $creator->name, $user->username)
-        );
+        try {
+            app(NotificationService::class)->notifyUserManaged(
+                $user,
+                $creator,
+                'user.created',
+                'User created',
+                sprintf('%s created user %s.', $creator->name, $user->username)
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['data' => $this->serialize($user)], 201);
     }
@@ -212,15 +216,19 @@ class UserController extends Controller
         $model->fill($data);
         $model->save();
         $model->load(['roles.permissions', 'region', 'department']);
-        app(NotificationService::class)->notifyUserManaged(
-            $model,
-            $creator,
-            ! $model->is_active && $wasActive ? 'user.deactivated' : 'user.updated',
-            ! $model->is_active && $wasActive ? 'User deactivated' : 'User updated',
-            ! $model->is_active && $wasActive
-                ? sprintf('%s deactivated user %s.', $creator->name, $model->username)
-                : sprintf('%s updated user %s.', $creator->name, $model->username)
-        );
+        try {
+            app(NotificationService::class)->notifyUserManaged(
+                $model,
+                $creator,
+                ! $model->is_active && $wasActive ? 'user.deactivated' : 'user.updated',
+                ! $model->is_active && $wasActive ? 'User deactivated' : 'User updated',
+                ! $model->is_active && $wasActive
+                    ? sprintf('%s deactivated user %s.', $creator->name, $model->username)
+                    : sprintf('%s updated user %s.', $creator->name, $model->username)
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['data' => $this->serialize($model)]);
     }
@@ -262,13 +270,17 @@ class UserController extends Controller
         $username = $model->username;
         $model->delete();
 
-        app(NotificationService::class)->notifyUserManaged(
-            $model,
-            $creator,
-            'user.deleted',
-            'User deleted',
-            sprintf('%s deleted user %s.', $creator->name, $username)
-        );
+        try {
+            app(NotificationService::class)->notifyUserManaged(
+                $model,
+                $creator,
+                'user.deleted',
+                'User deleted',
+                sprintf('%s deleted user %s.', $creator->name, $username)
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['message' => 'Deleted']);
     }

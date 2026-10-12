@@ -68,7 +68,11 @@ class RegionalResponseController extends Controller
         ]);
 
         $model->load(['region', 'hrRequest']);
-        app(NotificationService::class)->notifyRegionalResponseCreated($model, $request->user());
+        try {
+            app(NotificationService::class)->notifyRegionalResponseCreated($model, $request->user());
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['data' => $this->serialize($model)], 201);
     }
@@ -103,7 +107,11 @@ class RegionalResponseController extends Controller
         $model->refresh();
         $model->load(['region', 'hrRequest']);
 
-        app(NotificationService::class)->notifyRegionalResponseReviewed($model, $request->user(), $previousStatus);
+        try {
+            app(NotificationService::class)->notifyRegionalResponseReviewed($model, $request->user(), $previousStatus);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()
             ->json(['data' => $this->serialize($model)])
@@ -145,7 +153,11 @@ class RegionalResponseController extends Controller
             $model->save();
 
             $fresh = $model->fresh(['region', 'hrRequest']);
-            app(NotificationService::class)->notifyRegionalResponseCreated($fresh, $request->user(), true);
+            try {
+                app(NotificationService::class)->notifyRegionalResponseCreated($fresh, $request->user(), true);
+            } catch (\Throwable $e) {
+                report($e);
+            }
 
             return response()
                 ->json(['data' => $this->serialize($fresh)])

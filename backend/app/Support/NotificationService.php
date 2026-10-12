@@ -422,6 +422,9 @@ class NotificationService
     }
 
     /**
+     * Schedule in-app + email delivery after the HTTP response is sent.
+     * Form/API submits must never wait on SMTP (blocked ports time out for a long time).
+     *
      * @param  Collection<int, User>  $users
      * @param  callable(User): (?string)  $routeForUser
      * @param  array<string, mixed>  $meta
@@ -442,72 +445,104 @@ class NotificationService
             ->unique('id')
             ->values();
 
-        $rows = $targets
-            ->map(function (User $user) use ($eventKey, $title, $message, $entityType, $entityId, $routeForUser, $meta): array {
-                $encoded = json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-                if ($encoded === false) {
-                    $encoded = '{}';
-                }
-
-                return [
-                    'user_id' => $user->id,
-                    'event_key' => $eventKey,
-                    'title' => $title,
-                    'message' => $message,
-                    'entity_type' => $entityType,
-                    'entity_id' => $entityId,
-                    'route' => $routeForUser($user),
-                    'meta' => $encoded,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            })
-            ->all();
-
-        if ($rows === []) {
+        if ($targets->isEmpty()) {
             return;
         }
 
-        Notification::query()->insert($rows);
-        $this->queueEmailsForTargets($targets, $eventKey, $title, $message, $entityType, $entityId, $routeForUser);
+        $encodedMeta = json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($encodedMeta === false) {
+            $encodedMeta = '{}';
+        }
+
+        $now = now();
+        $rows = [];
+        $emailTargets = [];
+
+        foreach ($targets as $user) {
+            $route = $routeForUser($user);
+            $rows[] = [
+                'user_id' => $user->id,
+                'event_key' => $eventKey,
+                'title' => $title,
+                'message' => $message,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'route' => $route,
+                'meta' => $encodedMeta,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+            $emailTargets[] = [
+                'user_id' => (int) $user->id,
+                'email' => trim((string) ($user->email ?? '')),
+                'action_url' => $this->absoluteFrontendUrl(is_string($route) ? $route : null),
+            ];
+        }
+
+        $this->deferAfterResponse(function () use ($rows, $emailTargets, $eventKey, $title, $message, $entityType, $entityId): void {
+            try {
+                Notification::query()->insert($rows);
+                $this->sendEmailsForTargets($emailTargets, $eventKey, $title, $message, $entityType, $entityId);
+            } catch (Throwable $e) {
+                report($e);
+                Log::warning('Failed to deliver notifications after response', [
+                    'event_key' => $eventKey,
+                    'entity_type' => $entityType,
+                    'entity_id' => $entityId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+    }
+
+    private function deferAfterResponse(callable $callback): void
+    {
+        dispatch(function () use ($callback): void {
+            try {
+                $callback();
+            } catch (Throwable $e) {
+                report($e);
+            }
+        })->afterResponse();
     }
 
     /**
-     * @param  Collection<int, User>  $targets
-     * @param  callable(User): (?string)  $routeForUser
+     * @param  list<array{user_id: int, email: string, action_url: ?string}>  $emailTargets
      */
-    private function queueEmailsForTargets(
-        Collection $targets,
+    private function sendEmailsForTargets(
+        array $emailTargets,
         string $eventKey,
         string $title,
         string $message,
         ?string $entityType,
         ?string $entityId,
-        callable $routeForUser,
     ): void {
         $hrRequest = null;
         if ($eventKey === 'hr_request.created' && $entityType === 'hr_request' && $entityId !== null && $entityId !== '') {
             $hrRequest = HrRequest::query()->find($entityId);
         }
 
-        foreach ($targets as $user) {
-            $email = trim((string) ($user->email ?? ''));
+        foreach ($emailTargets as $target) {
+            $email = $target['email'];
+            $userId = $target['user_id'];
             if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 Log::warning('Notification email skipped: missing or invalid address', [
-                    'user_id' => $user->id,
+                    'user_id' => $userId,
                     'event_key' => $eventKey,
                     'email' => $email,
                 ]);
                 continue;
             }
 
-            $actionUrl = $this->absoluteFrontendUrl($routeForUser($user));
+            $user = User::query()->with('department')->find($userId);
+            if (! $user) {
+                continue;
+            }
+
+            $actionUrl = $target['action_url'];
 
             try {
-                // Send immediately (controllers already defer this work afterResponse).
-                // Avoid Mail::queue + ShouldQueue so sync hosting does not depend on a worker.
                 if ($hrRequest !== null) {
-                    $user->loadMissing('department');
                     Mail::to($email)->send(new DataCollectionRequestMail(
                         $user,
                         $hrRequest,
@@ -522,13 +557,13 @@ class NotificationService
                     ));
                 }
                 Log::info('Notification email sent', [
-                    'user_id' => $user->id,
+                    'user_id' => $userId,
                     'event_key' => $eventKey,
                     'email' => $email,
                 ]);
             } catch (Throwable $e) {
                 Log::warning('Failed to send notification email', [
-                    'user_id' => $user->id,
+                    'user_id' => $userId,
                     'event_key' => $eventKey,
                     'email' => $email,
                     'error' => $e->getMessage(),

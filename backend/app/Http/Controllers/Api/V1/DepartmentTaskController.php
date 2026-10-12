@@ -1224,7 +1224,11 @@ class DepartmentTaskController extends Controller
 
             $fresh = $departmentTask->fresh(['region', 'department']) ?? $departmentTask;
             if ($data['regional_review_status'] === 'needs-modification') {
-                app(NotificationService::class)->notifyDepartmentTaskNeedsModification($fresh, $request->user());
+                try {
+                    app(NotificationService::class)->notifyDepartmentTaskNeedsModification($fresh, $request->user());
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
 
             $redact = HrimsAccess::redactDepartmentTaskPayloadFor($request->user());
@@ -1436,7 +1440,11 @@ class DepartmentTaskController extends Controller
         $actor,
         bool $wasResubmit,
     ): void {
-        app(NotificationService::class)->notifyDepartmentTaskSubmitted($task, $actor, $wasResubmit);
+        try {
+            app(NotificationService::class)->notifyDepartmentTaskSubmitted($task, $actor, $wasResubmit);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**
