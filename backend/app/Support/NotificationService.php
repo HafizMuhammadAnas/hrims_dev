@@ -422,8 +422,8 @@ class NotificationService
     }
 
     /**
-     * Schedule in-app + email delivery after the HTTP response is sent.
-     * Form/API submits must never wait on SMTP (blocked ports time out for a long time).
+     * Persist in-app notifications immediately, then send email after the HTTP response.
+     * SMTP must never block form submit (use MAIL_TIMEOUT + terminating callback, not Bus queue).
      *
      * @param  Collection<int, User>  $users
      * @param  callable(User): (?string)  $routeForUser
@@ -446,6 +446,12 @@ class NotificationService
             ->values();
 
         if ($targets->isEmpty()) {
+            Log::info('Notification skipped: no target users', [
+                'event_key' => $eventKey,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+            ]);
+
             return;
         }
 
@@ -479,31 +485,38 @@ class NotificationService
             ];
         }
 
-        $this->deferAfterResponse(function () use ($rows, $emailTargets, $eventKey, $title, $message, $entityType, $entityId): void {
-            try {
-                Notification::query()->insert($rows);
-                $this->sendEmailsForTargets($emailTargets, $eventKey, $title, $message, $entityType, $entityId);
-            } catch (Throwable $e) {
-                report($e);
-                Log::warning('Failed to deliver notifications after response', [
-                    'event_key' => $eventKey,
-                    'entity_type' => $entityType,
-                    'entity_id' => $entityId,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        try {
+            Notification::query()->insert($rows);
+        } catch (Throwable $e) {
+            report($e);
+            Log::warning('Failed to insert in-app notifications', [
+                'event_key' => $eventKey,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $this->deferEmailAfterResponse(function () use ($emailTargets, $eventKey, $title, $message, $entityType, $entityId): void {
+            $this->sendEmailsForTargets($emailTargets, $eventKey, $title, $message, $entityType, $entityId);
         });
     }
 
-    private function deferAfterResponse(callable $callback): void
+    /**
+     * Run after the response is sent, without Bus/SerializableClosure (more reliable on PHP-FPM).
+     */
+    private function deferEmailAfterResponse(callable $callback): void
     {
-        dispatch(function () use ($callback): void {
+        app()->terminating(function () use ($callback): void {
             try {
                 $callback();
             } catch (Throwable $e) {
                 report($e);
+                Log::warning('Failed during deferred notification email send', [
+                    'error' => $e->getMessage(),
+                ]);
             }
-        })->afterResponse();
+        });
     }
 
     /**
