@@ -70,6 +70,11 @@ export function AppHeader({ onToggleSidebar }: Props) {
           >
             <Menu size={24} />
           </button>
+          <img
+            src="/brand/mohr-blue-logo.png"
+            alt="Ministry of Human Rights"
+            className="header-brand-logo"
+          />
           <div>
             <h1>Human Rights Information Management System</h1>
           </div>

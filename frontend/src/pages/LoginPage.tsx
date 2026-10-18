@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { AuthShell } from '../components/AuthShell'
 import { Alert } from '../components/ui/Alert'
 import { PasswordField } from '../components/ui/PasswordField'
 
@@ -29,40 +30,39 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <h1>HRIMS</h1>
-        <p className="login-sub">Human Rights Information Management System</p>
-        <form onSubmit={onSubmit} className="login-form">
-          <label>
-            Username
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-              required
-            />
-          </label>
-          <PasswordField
-            label="Password"
-            value={password}
-            onChange={setPassword}
-            autoComplete="current-password"
+    <AuthShell cardTitle="Login">
+      <form onSubmit={onSubmit} className="login-form">
+        <label>
+          Username
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            placeholder="Enter your username"
             required
           />
-          {error && (
-            <Alert variant="error" title="Sign-in failed" onDismiss={() => setError(null)}>
-              {error}
-            </Alert>
-          )}
-          <button type="submit" className="btn btn-primary" disabled={submitting || loading}>
-            {submitting ? 'Signing in…' : 'Sign in'}
-          </button>
-          <Link className="btn btn-link login-reset-link" to="/reset-password">
-            Reset password
+        </label>
+        <PasswordField
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
+          required
+        />
+        {error && (
+          <Alert variant="error" title="Sign-in failed" onDismiss={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+        <div className="login-form-actions">
+          <Link className="login-forgot-link" to="/reset-password">
+            Forgot password?
           </Link>
-        </form>
-      </div>
-    </div>
+        </div>
+        <button type="submit" className="btn btn-primary login-submit-btn" disabled={submitting || loading}>
+          {submitting ? 'Signing in…' : 'Sign In'}
+        </button>
+      </form>
+    </AuthShell>
   )
 }
