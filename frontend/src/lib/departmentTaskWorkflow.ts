@@ -72,16 +72,24 @@ export function canAcceptDepartmentTaskReview(t: DepartmentTaskRow): boolean {
 }
 
 /**
- * Regional/federal can request modification while Under Review, or reopen an Accepted
- * response so the department can correct inputs (e.g. after federal revision).
+ * Regional/federal can request modification only while Under Review.
+ * Once Accepted, Accept / Request modification actions are hidden.
  */
 export function canRequestDepartmentTaskModification(t: DepartmentTaskRow): boolean {
+  return hasDepartmentResponse(t) && departmentTaskWorkflowBucket(t) === 'responded'
+}
+
+/**
+ * After federal sends a regional compilation back, region may reopen Accepted
+ * (or still Under Review) department responses for correction.
+ */
+export function canPushDepartmentTaskModificationFollowUp(t: DepartmentTaskRow): boolean {
   if (!hasDepartmentResponse(t)) return false
   const b = departmentTaskWorkflowBucket(t)
   return b === 'responded' || b === 'accepted'
 }
 
-/** Show Accept / Request modification action strip. */
+/** Show Accept / Request modification action strip (Under Review only). */
 export function canShowDepartmentTaskReviewActions(t: DepartmentTaskRow): boolean {
   return canAcceptDepartmentTaskReview(t) || canRequestDepartmentTaskModification(t)
 }

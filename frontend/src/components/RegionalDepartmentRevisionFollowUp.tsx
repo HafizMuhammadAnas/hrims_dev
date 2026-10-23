@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import type { DepartmentTaskRow } from '../api/lists'
 import { updateDepartmentTaskReview } from '../api/workflows'
 import {
-  canRequestDepartmentTaskModification,
+  canPushDepartmentTaskModificationFollowUp,
   departmentTaskWorkflowBucket,
   hasDepartmentResponse,
   workflowPresentation,
@@ -56,7 +56,7 @@ export function RegionalDepartmentRevisionFollowUp({
   const [bulkSaving, setBulkSaving] = useState(false)
   const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null)
 
-  const reopenable = scoped.filter((t) => canRequestDepartmentTaskModification(t))
+  const reopenable = scoped.filter((t) => canPushDepartmentTaskModificationFollowUp(t))
   const waitingRevision = scoped.filter((t) => departmentTaskWorkflowBucket(t) === 'revision')
 
   function commentFor(taskId: string): string {
@@ -158,7 +158,7 @@ export function RegionalDepartmentRevisionFollowUp({
       <div className="regional-dept-revision-followup__list">
         {scoped.map((task) => {
           const wf = workflowPresentation(task)
-          const canPush = canRequestDepartmentTaskModification(task)
+          const canPush = canPushDepartmentTaskModificationFollowUp(task)
           const waiting = departmentTaskWorkflowBucket(task) === 'revision'
           const taskPath = `/requests/${encodeURIComponent(reqId)}?task=${encodeURIComponent(task.id)}&from=${encodeURIComponent('/region-monitoring')}`
           return (

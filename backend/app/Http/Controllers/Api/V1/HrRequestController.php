@@ -365,7 +365,7 @@ class HrRequestController extends Controller
             'region_ids.*' => ['integer', 'exists:regions,id'],
             'department_ids' => ['sometimes', 'array'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
-            'date' => ['sometimes', 'date'],
+            'date' => ['sometimes', 'date', 'after_or_equal:today'],
             'status' => ['sometimes', Rule::in(['draft', 'active'])],
             'details' => ['sometimes', 'nullable', 'string'],
             /** JSON array (multipart) or array (JSON body); decoded in controller. Omit to leave indicators unchanged. */
@@ -376,6 +376,7 @@ class HrRequestController extends Controller
             'title.max' => 'Title may not exceed 500 characters.',
             'region_id.exists' => 'Select a valid region.',
             'date.date' => 'Due date must be a valid date.',
+            'date.after_or_equal' => 'Due date must be today or a future date.',
             'status.in' => 'Status must be draft or active.',
         ]);
 
@@ -657,7 +658,7 @@ class HrRequestController extends Controller
             'title' => ['required', 'string', 'max:500'],
             'conv' => ['required', 'string', 'max:64'],
             'region_id' => ['nullable', 'exists:regions,id'],
-            'date' => ['required', 'date'],
+            'date' => ['required', 'date', 'after_or_equal:today'],
             'status' => ['required', Rule::in(['draft', 'active'])],
             'details' => ['nullable', 'string'],
             'attachment_file_name' => ['nullable', 'string', 'max:255'],
@@ -674,6 +675,7 @@ class HrRequestController extends Controller
             'conv.required' => 'Convention is required.',
             'region_id.exists' => 'Select a valid region.',
             'date.required' => 'Due date is required.',
+            'date.after_or_equal' => 'Due date must be today or a future date.',
             'status.required' => 'Status is required.',
         ]);
 
@@ -759,7 +761,7 @@ class HrRequestController extends Controller
             'upr' => ['nullable', 'string', 'max:255'],
             'upr_indicator' => ['nullable', 'string', 'max:255'],
             'upr_selection' => ['nullable'],
-            'date' => ['required', 'date'],
+            'date' => ['required', 'date', 'after_or_equal:today'],
             'status' => ['required', Rule::in(['draft', 'active'])],
             'details' => ['nullable', 'string'],
             'region_ids' => ['nullable', 'array'],
@@ -776,6 +778,7 @@ class HrRequestController extends Controller
             'reporting_framework.required' => 'Select a reporting type.',
             'convention_id.required' => 'Convention is required.',
             'date.required' => 'Due date is required.',
+            'date.after_or_equal' => 'Due date must be today or a future date.',
             'status.required' => 'Status is required.',
         ]);
 

@@ -67,9 +67,13 @@ export const LABEL_SUBMITTED_RATE = 'Submitted Rate'
 /** @deprecated Prefer LABEL_NEEDS_ATTENTION — department KPI now uses revision status. */
 export const LABEL_LINKED_REQUEST_ATTENTION = 'Needs Attention'
 export const LABEL_ACTIVE_REQUESTS = 'Active Requests'
-export const LABEL_ACCEPTED_RATE = 'Accepted Rate'
+/** Regional dashboard KPI — accepted department responses (count). */
+export const LABEL_ACCEPTED = 'Accepted'
+/** @deprecated Prefer LABEL_ACCEPTED on regional KPI cards. */
+export const LABEL_ACCEPTED_RATE = 'Accepted'
 export const LABEL_NEEDS_ATTENTION = 'Needs Attention'
 export const LABEL_TOTAL_REQUESTS = 'Total Requests'
+export const LABEL_PENDING = 'Pending'
 export const LABEL_PENDING_REQUESTS = 'Pending Requests'
 export const LABEL_COMPILED_REPORTS = 'Compiled Records / Completed Requests'
 export const LABEL_ACTIVE_SHARE = 'Active Share'

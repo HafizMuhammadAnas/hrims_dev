@@ -24,8 +24,6 @@ import { WorkflowModalHero } from './ui/WorkflowModalHero'
 
 type Tab = 'responses' | 'request' | 'changes'
 
-type ReviewStatus = 'pending' | 'accepted' | 'needs-modification'
-
 type Props = {
   viewing: RegionalResponseRow
   allResponses: RegionalResponseRow[]
@@ -51,7 +49,8 @@ export function RegionalResponseFederalReviewView({
   const [hrError, setHrError] = useState<string | null>(null)
   const [reviewComments, setReviewComments] = useState(viewing.comments ?? '')
   const [actionFeedback, setActionFeedback] = useState<WorkflowActionFeedback | null>(null)
-  const [saving, setSaving] = useState(false)
+  /** Which review action is in flight — drives per-button loading labels. */
+  const [savingAction, setSavingAction] = useState<'accept' | 'modification' | null>(null)
   const exportRef = useRef<HTMLDivElement>(null)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [wordLoading, setWordLoading] = useState(false)
@@ -121,8 +120,9 @@ export function RegionalResponseFederalReviewView({
     [hrDetail],
   )
 
-  async function persistReview(status: ReviewStatus, comments: string) {
-    setSaving(true)
+  async function persistReview(status: 'accepted' | 'needs-modification', comments: string) {
+    const action = status === 'accepted' ? 'accept' : 'modification'
+    setSavingAction(action)
     setActionFeedback(null)
     try {
       await updateRegionalReview(viewingRow.id, status, comments)
@@ -146,7 +146,7 @@ export function RegionalResponseFederalReviewView({
         message: e instanceof Error ? e.message : 'Failed to save review',
       })
     } finally {
-      setSaving(false)
+      setSavingAction(null)
     }
   }
 
@@ -349,24 +349,26 @@ export function RegionalResponseFederalReviewView({
                   variant="primary"
                   compact
                   type="button"
-                  disabled={saving}
+                  disabled={savingAction != null}
                   onClick={() => {
                     setActionFeedback(null)
                     void persistReview('accepted', reviewComments)
                   }}
                 >
-                  {saving ? 'Saving…' : 'Accept response'}
+                  {savingAction === 'accept' ? 'Accepting…' : 'Accept response'}
                 </Button>
                 <Button
                   variant="secondary"
                   compact
                   type="button"
-                  disabled={saving}
+                  disabled={savingAction != null}
                   onClick={() => {
                     void persistReview('needs-modification', reviewComments)
                   }}
                 >
-                  {saving ? 'Saving…' : 'Request modification'}
+                  {savingAction === 'modification'
+                    ? 'Requesting modification…'
+                    : 'Request modification'}
                 </Button>
               </WorkflowActionFootback>
             ) : null}

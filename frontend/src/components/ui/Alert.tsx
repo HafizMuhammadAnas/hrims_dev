@@ -50,8 +50,8 @@ export type ActionNotice = {
 }
 
 const AUTO_DISMISS_MS: Partial<Record<AlertVariant, number>> = {
-  success: 4500,
-  info: 5000,
+  success: 10000,
+  info: 10000,
 }
 
 /** Dismissible page/section feedback after a user action. Success/info close on their own. */

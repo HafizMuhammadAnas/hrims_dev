@@ -38,8 +38,8 @@ type NotifyFns = {
 const NotificationsContext = createContext<NotifyFns | null>(null)
 
 const DISMISS_MS: Record<ToastVariant, number> = {
-  success: 4500,
-  info: 5000,
+  success: 10000,
+  info: 10000,
   warning: 6500,
   error: 9000,
 }

@@ -9,10 +9,12 @@ import {
 } from '../../api/lists'
 import { createDepartmentTask, fetchDepartments, type DepartmentRow } from '../../api/workflows'
 import { Button } from '../../components/ui/Button'
+import { DateInput } from '../../components/ui/DateInput'
 import { PageSection } from '../../components/ui/PageSection'
 import { StatsCards } from '../../components/ui/StatsCards'
 import { TableCard } from '../../components/ui/TableCard'
 import { actionFlashSuccess, withActionFlash } from '../../lib/actionFlashNotice'
+import { todayInputDate } from '../../lib/dateFormat'
 import { indicatorsScopedToRequest } from '../../lib/hrRequestIndicatorScope'
 
 type Props = {
@@ -133,6 +135,10 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
       setError('Set a department due date.')
       return
     }
+    if (dueDate.trim() < todayInputDate()) {
+      setError('Department due date must be today or a future date.')
+      return
+    }
     if (requestDueDate && dueDate.trim() > requestDueDate) {
       setError(`Department due date must be on or before the request due date (${requestDueDate}).`)
       return
@@ -242,11 +248,11 @@ export function RequestDistributionPage({ title, nextPath }: Props) {
               Department due date
               {requestDueDate ? ` (on or before ${requestDueDate})` : ''}
             </label>
-            <input
+            <DateInput
               id="dist-due-date"
-              type="date"
               required
               value={dueDate}
+              min={todayInputDate()}
               max={requestDueDate || undefined}
               onChange={(e) => setDueDate(e.target.value)}
               style={{ width: '100%', maxWidth: 280, marginTop: 6 }}

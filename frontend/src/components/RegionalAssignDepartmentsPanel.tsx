@@ -1,6 +1,8 @@
 import type { DepartmentRow } from '../api/workflows'
+import { todayInputDate } from '../lib/dateFormat'
 import type { HrRequestIssueIndicator } from '../types/hrRequest'
 import { Button } from './ui/Button'
+import { DateInput } from './ui/DateInput'
 
 export type ExistingDepartmentAssignment = {
   departmentName: string
@@ -155,11 +157,11 @@ export function RegionalAssignDepartmentsPanel({
             <span className="muted small"> (must be on or before request due date {requestDueDate})</span>
           ) : null}
         </label>
-        <input
+        <DateInput
           id="reg-assign-due-date"
-          type="date"
           required
           value={dueDate}
+          min={todayInputDate()}
           max={requestDueDate ?? undefined}
           onChange={(e) => onChangeDueDate(e.target.value)}
           style={{ width: '100%', maxWidth: 280, boxSizing: 'border-box' }}

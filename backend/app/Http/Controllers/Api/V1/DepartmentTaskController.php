@@ -105,13 +105,14 @@ class DepartmentTaskController extends Controller
         $data = $request->validate([
             'hr_request_id' => ['required', 'string', 'exists:hr_requests,id'],
             'department_id' => ['required', 'integer', 'exists:departments,id'],
-            'due_date' => ['required', 'date'],
+            'due_date' => ['required', 'date', 'after_or_equal:today'],
             'assignment_instructions' => ['nullable', 'string', 'max:20000'],
             'issue_indicator_ids' => ['sometimes', 'array'],
             'issue_indicator_ids.*' => ['integer', 'distinct', 'exists:issue_indicators,id'],
         ], [
             'due_date.required' => 'Set a department due date for this assignment.',
             'due_date.date' => 'Enter a valid due date.',
+            'due_date.after_or_equal' => 'Department due date must be today or a future date.',
         ]);
 
         $hrRequest = HrRequest::query()->with(['regions', 'issue.indicators', 'indicatorResponses'])->find($data['hr_request_id']);

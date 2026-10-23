@@ -24,6 +24,7 @@ import {
 } from '../api/hrRequests'
 import type { RegionRow } from '../api/regions'
 import { useAuth } from '../auth/AuthContext'
+import { todayInputDate } from '../lib/dateFormat'
 import { isDepartmentStaff, isFederalStaff, isViewer } from '../lib/roles'
 import { sortCollectionYearsByLabelValue } from '../lib/collectionYearSort'
 import { HR_REQUEST_STATUSES, HR_REQUEST_STATUS_LABELS } from '../data/hrRequestFormLookups'
@@ -84,6 +85,7 @@ import {
 } from '../lib/hrRequestForwardedViewTemplateProps'
 import { Alert, FieldError } from './ui/Alert'
 import { Button } from './ui/Button'
+import { DateInput } from './ui/DateInput'
 import { FormControl } from './ui/FormControl'
 import { FormField } from './ui/FormField'
 import { SearchableSelect } from './ui/SearchableSelect'
@@ -2446,10 +2448,10 @@ export function HrRequestModal({
 
               <FormRow twoCol={mode !== 'create'}>
                 <FormControl label="Due date" htmlFor="hr-date">
-                  <input
+                  <DateInput
                     id="hr-date"
-                    type="date"
                     value={issueForm.date}
+                    min={readOnly ? undefined : todayInputDate()}
                     onChange={(e) =>
                       setIssueForm((f) => (f ? { ...f, date: e.target.value } : f))
                     }
@@ -2723,10 +2725,10 @@ export function HrRequestModal({
               </FormField>
               <FormRow twoCol>
                 <FormControl label="Due date" htmlFor="hr-leg-date">
-                  <input
+                  <DateInput
                     id="hr-leg-date"
-                    type="date"
                     value={legacyForm.date}
+                    min={readOnly ? undefined : todayInputDate()}
                     onChange={(e) =>
                       setLegacyForm((f) => (f ? { ...f, date: e.target.value } : f))
                     }

@@ -46,6 +46,16 @@ export function formatAppDateTime(value: string | null | undefined, fallback = '
   }).format(d)
 }
 
+/** Today's calendar date as YYYY-MM-DD (Karachi) for `<input type="date" min=…>`. */
+export function todayInputDate(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now)
+}
+
 /** Long “today” line for dashboard welcome (weekday + dd/mm/yyyy, Karachi). */
 export function formatAppTodayLong(now = new Date()): string {
   const weekday = new Intl.DateTimeFormat('en-GB', {

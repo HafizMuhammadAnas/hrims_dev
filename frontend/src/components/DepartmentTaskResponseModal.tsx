@@ -108,8 +108,11 @@ export function DepartmentTaskResponseModal({
   )
   const showAcceptAction = showReviewActions && canAcceptDepartmentTaskReview(task)
   const showModificationAction = showReviewActions && canRequestDepartmentTaskModification(task)
-  const showReviewOutcomeBanner = Boolean(
+  const showRevisionOutcomeBanner = Boolean(
     review && responded && !showReviewActions && bucket === 'revision',
+  )
+  const showAcceptedOutcomeBanner = Boolean(
+    review && responded && !showReviewActions && bucket === 'accepted',
   )
 
   return (
@@ -264,7 +267,7 @@ export function DepartmentTaskResponseModal({
                     ) : null}
                   </ModalActions>
                 </>
-              ) : showReviewOutcomeBanner ? (
+              ) : showRevisionOutcomeBanner ? (
                 <>
                   <Alert variant="warning" title="Resubmission requested">
                     <p style={{ margin: 0 }}>
@@ -273,6 +276,24 @@ export function DepartmentTaskResponseModal({
                     {task.regional_review_comments?.trim() ? (
                       <p style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
                         <strong>Feedback sent to the department:</strong> {task.regional_review_comments}
+                      </p>
+                    ) : null}
+                  </Alert>
+                  <ModalActions>
+                    <Button variant="secondary" compact onClick={onClose}>
+                      Close
+                    </Button>
+                  </ModalActions>
+                </>
+              ) : showAcceptedOutcomeBanner ? (
+                <>
+                  <Alert variant="success" title="Response accepted">
+                    <p style={{ margin: 0 }}>
+                      This department response is accepted. Modification cannot be requested from here.
+                    </p>
+                    {task.regional_review_comments?.trim() ? (
+                      <p style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
+                        <strong>{reviewFeedbackLabel}:</strong> {task.regional_review_comments}
                       </p>
                     ) : null}
                   </Alert>

@@ -6890,6 +6890,10 @@ textarea.response-revision-changed,
   background: var(--grad-blue);
 }
 
+.dashboard-card.amber {
+  background: linear-gradient(135deg, #c9892e 0%, #a86f1f 100%);
+}
+
 .dashboard-card.teal {
   background: var(--grad-teal);
 }

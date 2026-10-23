@@ -63,6 +63,52 @@ export type ParsedDepartmentResponse =
   | { kind: 'legacy'; text: string; attachmentUrl: string | null }
   | { kind: 'structured'; payload: DepartmentIndicatorPayload }
 
+function keyedMatrixHasValue(
+  map: Record<string, Record<string, DepartmentYearGenderCell>> | null | undefined,
+): boolean {
+  if (!map) return false
+  for (const row of Object.values(map)) {
+    for (const cell of Object.values(row ?? {})) {
+      if (cell?.value != null && Number.isFinite(Number(cell.value))) return true
+    }
+  }
+  return false
+}
+
+/** True when a department response includes real data for this indicator. */
+export function indicatorBundleHasUsage(bundle: DepartmentIndicatorBundle | null | undefined): boolean {
+  if (!bundle) return false
+  const q = bundle.quantitative
+  if (q) {
+    if (q.value != null && Number.isFinite(Number(q.value))) return true
+    if (q.comment?.trim()) return true
+    if (q.attachment_url?.trim()) return true
+    if (
+      keyedMatrixHasValue(q.by_year_gender) ||
+      keyedMatrixHasValue(q.by_year_age) ||
+      keyedMatrixHasValue(q.by_year_disability) ||
+      keyedMatrixHasValue(q.by_year_district) ||
+      keyedMatrixHasValue(q.by_year_religion) ||
+      keyedMatrixHasValue(q.by_year_consolidated) ||
+      keyedMatrixHasValue(q.by_year_others) ||
+      keyedMatrixHasValue(q.by_year_region)
+    ) {
+      return true
+    }
+  }
+  const l = bundle.qualitative
+  if (l) {
+    if (l.text?.trim()) return true
+    if (l.attachment_url?.trim()) return true
+    if (l.by_year) {
+      for (const row of Object.values(l.by_year)) {
+        if (row?.text?.trim()) return true
+      }
+    }
+  }
+  return false
+}
+
 export function parseDepartmentTaskResponseData(
   responseData: string | null | undefined,
   attachmentUrl?: string | null,

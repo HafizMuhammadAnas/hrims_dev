@@ -24,7 +24,7 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { fetchCompiledRecords, fetchRegionalResponses } from '../api/lists'
+import { fetchCompiledRecords, fetchDepartmentTasks, fetchRegionalResponses } from '../api/lists'
 import {
   fetchReportArticles,
   fetchReportConventions,
@@ -294,6 +294,9 @@ export function ReportGeneratorPage() {
   const [requests, setRequests] = useState<Awaited<ReturnType<typeof fetchHrRequests>>>([])
   const [responses, setResponses] = useState<Awaited<ReturnType<typeof fetchRegionalResponses>>>([])
   const [compiled, setCompiled] = useState<Awaited<ReturnType<typeof fetchCompiledRecords>>>([])
+  const [departmentTasks, setDepartmentTasks] = useState<
+    Awaited<ReturnType<typeof fetchDepartmentTasks>>
+  >([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const defaultFilters = useMemo(
@@ -316,8 +319,9 @@ export function ReportGeneratorPage() {
       fetchHrRequests(),
       fetchRegionalResponses(),
       fetchCompiledRecords(),
+      fetchDepartmentTasks({ scope: 'all' }),
     ])
-      .then(([reg, conv, cats, arts, links, req, resp, comp]) => {
+      .then(([reg, conv, cats, arts, links, req, resp, comp, tasks]) => {
         setRegions(reg)
         setConventions(conv)
         setCategories(cats)
@@ -326,6 +330,7 @@ export function ReportGeneratorPage() {
         setRequests(req)
         setResponses(resp)
         setCompiled(comp)
+        setDepartmentTasks(tasks)
       })
       .catch((e: unknown) => {
         setLoadError(e instanceof Error ? e.message : 'Failed to load data')
@@ -450,14 +455,21 @@ export function ReportGeneratorPage() {
           collectionYearId: reportFilters.collectionYearId || undefined,
         }),
       ])
-      const result = buildReportingDashboard(requests, responses, compiled, reportFilters, {
-        conventions,
-        categories,
-        regions,
-        articles,
-        indicators: rankingIndicators,
-        issueArticleLinks,
-      })
+      const result = buildReportingDashboard(
+        requests,
+        responses,
+        compiled,
+        reportFilters,
+        {
+          conventions,
+          categories,
+          regions,
+          articles,
+          indicators: rankingIndicators,
+          issueArticleLinks,
+        },
+        departmentTasks,
+      )
       if (!result.indicatorFocusMode) {
         result.summaryCards = {
           ...result.summaryCards,

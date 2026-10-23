@@ -1,7 +1,11 @@
-import type { CompiledRecordRow, RegionalResponseRow } from '../api/lists'
+import type { CompiledRecordRow, DepartmentTaskRow, RegionalResponseRow } from '../api/lists'
 import type { ReportLookupArticle, ReportLookupCategory, ReportLookupConvention, ReportLookupIndicator } from '../api/reports'
 import type { RegionRow } from '../api/regions'
 import { sortCollectionYearsByLabelValue } from './collectionYearSort'
+import {
+  indicatorBundleHasUsage,
+  parseDepartmentTaskResponseData,
+} from './departmentTaskResponseFormat'
 import {
   CONCLUDING_OBSERVATIONS_LABEL,
   LOI_LABEL,
@@ -58,7 +62,7 @@ export type ReportRankRow = {
   shortLabel: string
   label: string
   count: number
-  /** Share of total (displayed as NN%). */
+  /** Share of all usage counts in scope (displayed as NN%), not only the top-N slice. */
   percent: number
   /** Width of progress bar relative to top row (0–100). */
   barPercent: number
@@ -372,14 +376,70 @@ function buildRankRows(
   entries: Array<{ id: string; shortLabel: string; label: string; count: number }>,
   limit = 10,
 ): ReportRankRow[] {
-  const sorted = [...entries].sort((a, b) => b.count - a.count).slice(0, limit)
-  const total = sorted.reduce((sum, row) => sum + row.count, 0)
-  const max = sorted[0]?.count ?? 1
-  return sorted.map((row) => ({
+  const sorted = [...entries].filter((row) => row.count > 0).sort((a, b) => b.count - a.count)
+  const totalAll = sorted.reduce((sum, row) => sum + row.count, 0)
+  const top = sorted.slice(0, limit)
+  const max = top[0]?.count ?? 1
+  return top.map((row) => ({
     ...row,
-    percent: total > 0 ? Math.round((row.count / total) * 100) : 0,
+    percent: totalAll > 0 ? Math.round((row.count / totalAll) * 100) : 0,
     barPercent: max > 0 ? Math.round((row.count / max) * 100) : 0,
   }))
+}
+
+/**
+ * Count each time an indicator appears with real data in a submitted department response.
+ * Percent later = this indicator's usages / sum of all indicator usages in scope.
+ */
+function countIndicatorUsagesFromDepartmentTasks(
+  tasks: DepartmentTaskRow[],
+  requests: HrRequestRow[],
+  f: ReportFilters,
+  issueArticleMap: Map<number, Set<number>>,
+  indicatorIssueMap: Map<number, number>,
+  issueYearMap: Map<number, Set<number>>,
+  catalogIndicators: ReportLookupIndicator[],
+): Array<{ id: string; shortLabel: string; label: string; count: number }> {
+  const reqById = new Map(requests.map((r) => [r.id, r]))
+  const labelById = new Map(catalogIndicators.map((ind) => [String(ind.id), ind.indicator_text]))
+  const usage: Record<string, { id: string; label: string; count: number }> = {}
+
+  for (const task of tasks) {
+    if (f.regionId && String(task.region_id ?? '') !== f.regionId) continue
+    const req = reqById.get(task.req_id)
+    if (!req) continue
+    if (!requestMatchesCatalogFilters(req, f, issueArticleMap, indicatorIssueMap)) continue
+    if (!matchesYear(req, f.collectionYearId, issueYearMap)) continue
+
+    const parsed = parseDepartmentTaskResponseData(task.response_data, task.attachment_url)
+    if (parsed.kind !== 'structured') continue
+
+    for (const [indicatorId, bundle] of Object.entries(parsed.payload.by_indicator ?? {})) {
+      if (!indicatorBundleHasUsage(bundle)) continue
+      const id = String(indicatorId)
+      if (f.indicatorId && id !== f.indicatorId) continue
+      // Ranking catalog is already scoped by convention/category/entry kind/article.
+      if (catalogIndicators.length > 0 && !labelById.has(id)) continue
+
+      if (!usage[id]) {
+        usage[id] = {
+          id,
+          label: labelById.get(id) || bundle.indicator_label?.trim() || `Indicator #${id}`,
+          count: 0,
+        }
+      }
+      usage[id].count += 1
+    }
+  }
+
+  return Object.values(usage)
+    .sort((a, b) => b.count - a.count)
+    .map((row, index) => ({
+      id: row.id,
+      shortLabel: `Ind ${index + 1}`,
+      label: row.label,
+      count: row.count,
+    }))
 }
 
 function filtersForDashboardCharts(f: ReportFilters): ReportFilters {
@@ -510,6 +570,7 @@ export function buildReportingDashboard(
     indicators: ReportLookupIndicator[]
     issueArticleLinks: Array<{ issue_id: number; article_id: number }>
   },
+  departmentTasks: DepartmentTaskRow[] = [],
 ): ReportingDashboardResult {
   const regionsById = new Map(lookups.regions.map((r) => [r.id, r]))
   const issueArticleMap = buildIssueArticleMap(lookups.issueArticleLinks)
@@ -625,30 +686,16 @@ export function buildReportingDashboard(
     })),
   )
 
-  const indicatorCounts: Record<number, { id: string; label: string; count: number }> = {}
-  for (const c of chartCr) {
-    const req = c.req_id ? reqById.get(c.req_id) : undefined
-    if (!req?.issue_id) continue
-    const issueId = Number(req.issue_id)
-    for (const ind of lookups.indicators) {
-      if (ind.issue_id !== issueId) continue
-      if (!indicatorCounts[ind.id]) {
-        indicatorCounts[ind.id] = {
-          id: String(ind.id),
-          label: ind.indicator_text,
-          count: 0,
-        }
-      }
-      indicatorCounts[ind.id].count += 1
-    }
-  }
   const topIndicators = buildRankRows(
-    Object.values(indicatorCounts).map((row, index) => ({
-      id: row.id,
-      shortLabel: `Ind ${index + 1}`,
-      label: row.label,
-      count: row.count,
-    })),
+    countIndicatorUsagesFromDepartmentTasks(
+      departmentTasks,
+      requests,
+      chartFilters,
+      issueArticleMap,
+      indicatorIssueMap,
+      issueYearMap,
+      lookups.indicators,
+    ),
   )
 
   return {

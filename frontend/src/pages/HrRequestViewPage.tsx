@@ -40,7 +40,7 @@ import {
   LABEL_SUBMISSION_HISTORY,
   LABEL_BACK_TO_SUBMISSION_HISTORY,
 } from '../lib/uiLabels'
-import { formatAppDate, formatAppDateTime } from '../lib/dateFormat'
+import { formatAppDate, formatAppDateTime, todayInputDate } from '../lib/dateFormat'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import { DepartmentIndicatorDisaggregationMatrices } from '../components/DepartmentIndicatorDisaggregationMatrices'
 import { DeptResponseFormSection } from '../components/DeptResponseFormSection'
@@ -709,6 +709,11 @@ export function HrRequestViewPage() {
       setAssignError('Set a department due date.')
       return
     }
+    const today = todayInputDate()
+    if (due < today) {
+      setAssignError('Department due date must be today or a future date.')
+      return
+    }
     const requestDue = detail.date?.trim() || ''
     if (requestDue && due > requestDue) {
       setAssignError(`Department due date must be on or before the request due date (${requestDue}).`)
@@ -1216,7 +1221,7 @@ export function HrRequestViewPage() {
     monitorTaskReview &&
       activeTask &&
       hasDepartmentResponse(activeTask) &&
-      monitorReviewBucket === 'revision',
+      (monitorReviewBucket === 'revision' || monitorReviewBucket === 'accepted'),
   )
   async function submitMonitorReview(status: 'accepted' | 'needs-modification') {
     if (!activeTask) return
@@ -1605,7 +1610,7 @@ export function HrRequestViewPage() {
                           </WorkflowActionFootback>
                         </div>
                       ) : null}
-                      {showMonitorReviewOutcome ? (
+                      {showMonitorReviewOutcome && monitorReviewBucket === 'revision' ? (
                         <Alert
                           variant="warning"
                           title="Resubmission requested"
@@ -1614,6 +1619,24 @@ export function HrRequestViewPage() {
                           <p style={{ margin: 0 }}>
                             The department must submit an updated response before further review.
                           </p>
+                        </Alert>
+                      ) : null}
+                      {showMonitorReviewOutcome && monitorReviewBucket === 'accepted' ? (
+                        <Alert
+                          variant="success"
+                          title="Response accepted"
+                          className="hr-request-dept-portal-tabs__review-outcome"
+                        >
+                          <p style={{ margin: 0 }}>
+                            This department response is accepted. Modification cannot be requested
+                            from here.
+                          </p>
+                          {activeTask.regional_review_comments?.trim() ? (
+                            <p style={{ margin: '10px 0 0', whiteSpace: 'pre-wrap' }}>
+                              <strong>{taskReviewFeedbackLabel}:</strong>{' '}
+                              {activeTask.regional_review_comments.trim()}
+                            </p>
+                          ) : null}
                         </Alert>
                       ) : null}
                     </>

@@ -49,7 +49,7 @@ import { formatAppDate, formatAppTodayLong } from '../lib/dateFormat'
 import { regionalResponseReviewPresentation } from '../lib/regionalResponseReviewStatus'
 import { regionalResponseFederalReviewPath } from '../lib/workflowNavigation'
 import {
-  LABEL_ACCEPTED_RATE,
+  LABEL_ACCEPTED,
   LABEL_ACTIVE_REQUESTS,
   LABEL_ACTIVE_SHARE,
   LABEL_COMPILED_REPORTS,
@@ -60,6 +60,7 @@ import {
   LABEL_NEEDS_ATTENTION,
   LABEL_NEW_REQUESTS_SCOPE_6MO,
   LABEL_OPEN_TASKS,
+  LABEL_PENDING,
   LABEL_PENDING_REQUESTS,
   LABEL_PERFORMANCE_OVERVIEW,
   LABEL_REGIONAL_RESPONSE_PIPELINE,
@@ -234,8 +235,6 @@ export function DashboardPage() {
     summary && summary.hr_requests_total > 0
       ? Math.round((active / summary.hr_requests_total) * 100)
       : 0
-  const deptAcceptedRatePct =
-    taskTotal > 0 ? Math.round((workflowAccepted / taskTotal) * 100) : null
   const taskDonePct =
     taskTotal > 0 ? Math.round((taskSubmitted / taskTotal) * 100) : null
 
@@ -414,19 +413,27 @@ export function DashboardPage() {
                   <div className="dashboard-card-icon">
                     <Clock size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">{LABEL_ACTIVE_REQUESTS}</div>
-                  <div className="dashboard-card-value">{active}</div>
-                  <div className="dashboard-card-subtitle">HR requests marked active (circulated)</div>
+                  <div className="dashboard-card-title">{LABEL_TOTAL_REQUESTS}</div>
+                  <div className="dashboard-card-value">{summary.hr_requests_total}</div>
+                  <div className="dashboard-card-subtitle">
+                    {draft} draft · {active} active in your province
+                  </div>
                 </div>
                 <div className="dashboard-card blue">
                   <div className="dashboard-card-icon">
+                    <CheckCircle size={22} strokeWidth={2.2} />
+                  </div>
+                  <div className="dashboard-card-title">{LABEL_ACCEPTED}</div>
+                  <div className="dashboard-card-value">{workflowAccepted}</div>
+                  <div className="dashboard-card-subtitle">Accepted department responses</div>
+                </div>
+                <div className="dashboard-card amber">
+                  <div className="dashboard-card-icon">
                     <TrendingUp size={22} strokeWidth={2.2} />
                   </div>
-                  <div className="dashboard-card-title">{LABEL_ACCEPTED_RATE}</div>
-                  <div className="dashboard-card-value">
-                    {deptAcceptedRatePct !== null ? `${deptAcceptedRatePct}%` : '—'}
-                  </div>
-                  <div className="dashboard-card-subtitle">Accepted department responses / total tasks</div>
+                  <div className="dashboard-card-title">{LABEL_PENDING}</div>
+                  <div className="dashboard-card-value">{workflowPending}</div>
+                  <div className="dashboard-card-subtitle">Department tasks awaiting submission</div>
                 </div>
                 <div className="dashboard-card teal">
                   <div className="dashboard-card-icon">
@@ -689,11 +696,11 @@ export function DashboardPage() {
 
             <div className="table-card table-card-padded">
               {(variant === 'federal' || variant === 'regional') && (
-                <div className="dashboard-due-alerts" role="region" aria-label="Due date notifications">
+                <div className="dashboard-due-alerts" role="region" aria-label="Over due notification">
                   <div className="dashboard-due-alerts__head">
                     <AlertCircle size={18} aria-hidden />
                     <h3 className="dashboard-panel-title" style={{ margin: 0 }}>
-                      Due date notifications
+                      Over due notification
                     </h3>
                   </div>
                   {dueDateAlerts.length > 0 ? (
