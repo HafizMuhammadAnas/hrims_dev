@@ -840,6 +840,14 @@ export async function adminDeleteUprEntry(id: number): Promise<void> {
   await throwIfNotOk(res)
 }
 
+export async function adminDeleteUprEntryIndicator(
+  uprEntryId: number,
+  indicatorId: number,
+): Promise<void> {
+  const res = await adminSend('DELETE', `/upr-entries/${uprEntryId}/indicators/${indicatorId}`)
+  await throwIfNotOk(res)
+}
+
 export type AdminKnowledgeUprDocument = {
   id: string
   title: string

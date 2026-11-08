@@ -246,6 +246,8 @@ Route::prefix('v1')->group(function (): void {
             Route::patch('/upr-entries/{upr_entry}', [AdminUprEntryController::class, 'update'])->name('api.v1.admin.upr-entries.update.patch');
             Route::post('/upr-entries/{upr_entry}/delete', [AdminUprEntryController::class, 'destroy'])->name('api.v1.admin.upr-entries.destroy.post');
             Route::delete('/upr-entries/{upr_entry}', [AdminUprEntryController::class, 'destroy'])->name('api.v1.admin.upr-entries.destroy');
+            Route::post('/upr-entries/{upr_entry}/indicators/{upr_entry_indicator}/delete', [AdminUprEntryController::class, 'destroyIndicator'])->name('api.v1.admin.upr-entries.indicators.destroy.post');
+            Route::delete('/upr-entries/{upr_entry}/indicators/{upr_entry_indicator}', [AdminUprEntryController::class, 'destroyIndicator'])->name('api.v1.admin.upr-entries.indicators.destroy');
 
             Route::get('/knowledge-upr-entries', [AdminKnowledgeUprEntryController::class, 'index'])->name('api.v1.admin.knowledge-upr-entries.index');
             Route::post('/knowledge-upr-entries', [AdminKnowledgeUprEntryController::class, 'store'])->name('api.v1.admin.knowledge-upr-entries.store');

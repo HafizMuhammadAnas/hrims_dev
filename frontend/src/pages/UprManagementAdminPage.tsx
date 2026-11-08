@@ -8,6 +8,7 @@ import {
   adminCreateUprType,
   adminDeleteUprCategory,
   adminDeleteUprCycle,
+  adminDeleteUprEntryIndicator,
   adminDeleteUprRecommendationEntry,
   adminDeleteUprType,
   adminFetchUprCategories,
@@ -39,6 +40,7 @@ import { FormGrid } from '../components/ui/FormGrid'
 import { FormRow } from '../components/ui/FormRow'
 import { PaginationBar } from '../components/ui/PaginationBar'
 import { RowActionsMenu } from '../components/ui/RowActionsMenu'
+import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { SortColumnHeader } from '../components/ui/SortColumnHeader'
 import { StatsCards } from '../components/ui/StatsCards'
 import { TableCard } from '../components/ui/TableCard'
@@ -437,7 +439,15 @@ export function UprManagementAdminPage() {
         </TableCard>
       ) : null}
 
-      {view === 'indicators' ? <UprIndicatorsListSection entries={entries} /> : null}
+      {view === 'indicators' ? (
+        <UprIndicatorsListSection
+          entries={entries}
+          busy={busy}
+          setBusy={setBusy}
+          setError={setError}
+          onRefresh={refreshEntries}
+        />
+      ) : null}
     </div>
   )
 }
@@ -2310,7 +2320,19 @@ function sortUprIndicatorListRows(
   return list
 }
 
-function UprIndicatorsListSection({ entries }: { entries: AdminUprEntry[] }) {
+function UprIndicatorsListSection({
+  entries,
+  busy,
+  setBusy,
+  setError,
+  onRefresh,
+}: {
+  entries: AdminUprEntry[]
+  busy: boolean
+  setBusy: (v: boolean) => void
+  setError: (v: string | null) => void
+  onRefresh: () => Promise<void>
+}) {
   const navigate = useNavigate()
   const allRows = useMemo(() => buildUprIndicatorListRows(entries), [entries])
 
@@ -2599,6 +2621,30 @@ function UprIndicatorsListSection({ entries }: { entries: AdminUprEntry[] }) {
                           onClick={() => navigate(superAdminUprEntryEditPath(row.uprEntryId))}
                         >
                           Edit UPR
+                        </Button>
+                        <Button
+                          variant="link"
+                          compact
+                          dangerLink
+                          disabled={busy}
+                          onClick={() => {
+                            const label = row.indicatorText
+                            if (!window.confirm(`Delete indicator “${label}”?`)) return
+                            void (async () => {
+                              setBusy(true)
+                              setError(null)
+                              try {
+                                await adminDeleteUprEntryIndicator(row.uprEntryId, row.indicatorId)
+                                await onRefresh()
+                              } catch (e: unknown) {
+                                setError(isApiError(e) ? e.message : 'Delete failed')
+                              } finally {
+                                setBusy(false)
+                              }
+                            })()
+                          }}
+                        >
+                          Delete
                         </Button>
                       </ActionMenu>
                     </td>
@@ -2911,43 +2957,35 @@ function UprCreateForm({
       <FormGrid>
         <div className="issues-form-top-grid">
           <FormControl label="Cycle">
-            <select
+            <SearchableSelect
               value={cycleId}
-              onChange={(e) => {
-                setCycleId(e.target.value)
+              onChange={(next) => {
+                setCycleId(next)
                 setCategoryId('')
               }}
               disabled={busy || typeId == null}
-            >
-              <option value="">{typeId != null ? 'Select cycle' : 'Select UPR type first'}</option>
-              {typeCycles.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              placeholder={typeId != null ? 'Select cycle' : 'Select UPR type first'}
+              options={typeCycles.map((c) => ({ value: String(c.id), label: c.name }))}
+              emptyFilterMessage="No matching cycles"
+            />
           </FormControl>
           {/* Recommendations are hidden: all active recommendations for the selected
               cycle + category are attached automatically on save and shown on the view page. */}
           <FormControl label="Category">
-            <select
+            <SearchableSelect
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              onChange={setCategoryId}
               disabled={busy || !cycleId || typeId == null}
-            >
-              <option value="">
-                {!cycleId
+              placeholder={
+                !cycleId
                   ? 'Select cycle first'
                   : typeId == null
                     ? 'Select UPR type first'
-                    : 'Select category'}
-              </option>
-              {cycleCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+                    : 'Select category'
+              }
+              options={cycleCategories.map((c) => ({ value: String(c.id), label: c.name }))}
+              emptyFilterMessage="No matching categories"
+            />
           </FormControl>
         </div>
       </FormGrid>

@@ -1597,15 +1597,15 @@ export function HrRequestModal({
                   </FormField>
 
                   <FormField label="Thematic area" htmlFor="hr-upr-category">
-                    <select
+                    <SearchableSelect
                       id="hr-upr-category"
                       value={
                         issueForm.upr_category_id === ''
                           ? ''
                           : String(issueForm.upr_category_id)
                       }
-                      onChange={(e) => {
-                        const v = e.target.value === '' ? '' : Number(e.target.value)
+                      onChange={(next) => {
+                        const v = next === '' ? '' : Number(next)
                         setIssueForm((f) =>
                           f
                             ? {
@@ -1622,22 +1622,21 @@ export function HrRequestModal({
                         issueForm.upr_type_id === '' ||
                         uprCatalogLoading
                       }
+                      placeholder={
+                        issueForm.upr_cycle_id === '' || issueForm.upr_type_id === ''
+                          ? 'Select cycle and type first'
+                          : 'Select thematic area'
+                      }
+                      options={uprCategoriesForSelect.map((c) => ({
+                        value: String(c.id),
+                        label: c.name,
+                      }))}
+                      emptyFilterMessage="No matching thematic areas"
                       aria-invalid={Boolean(fieldErrors.upr_category_id)}
                       aria-describedby={
                         fieldErrors.upr_category_id ? 'hr-upr-category-err' : undefined
                       }
-                    >
-                      <option value="">
-                        {issueForm.upr_cycle_id === '' || issueForm.upr_type_id === ''
-                          ? 'Select cycle and type first'
-                          : 'Select thematic area'}
-                      </option>
-                      {uprCategoriesForSelect.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                     <FieldError
                       id="hr-upr-category-err"
                       message={fieldErrors.upr_category_id}

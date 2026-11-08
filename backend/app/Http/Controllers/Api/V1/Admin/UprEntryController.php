@@ -234,6 +234,26 @@ class UprEntryController extends Controller
         return response()->json(['message' => 'Deleted']);
     }
 
+    public function destroyIndicator(UprEntry $uprEntry, UprEntryIndicator $uprEntryIndicator): JsonResponse
+    {
+        if ((int) $uprEntryIndicator->upr_entry_id !== (int) $uprEntry->id) {
+            abort(404);
+        }
+
+        DB::transaction(function () use ($uprEntry, $uprEntryIndicator) {
+            $uprEntryIndicator->delete();
+
+            $remaining = $uprEntry->indicators()->get(['has_quantitative', 'has_qualitative']);
+            $uprEntry->fill([
+                'has_quantitative' => $remaining->contains(fn (UprEntryIndicator $ind) => (bool) $ind->has_quantitative),
+                'has_qualitative' => $remaining->contains(fn (UprEntryIndicator $ind) => (bool) $ind->has_qualitative),
+            ]);
+            $uprEntry->save();
+        });
+
+        return response()->json(['message' => 'Deleted']);
+    }
+
     /**
      * @param  list<array<string, mixed>>  $rows
      */

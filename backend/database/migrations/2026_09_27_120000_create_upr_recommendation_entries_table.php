@@ -12,12 +12,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('upr_cycle_id')->constrained('upr_cycles')->cascadeOnDelete();
             $table->foreignId('upr_category_id')->constrained('upr_categories')->cascadeOnDelete();
-            $table->string('name');
+            $table->text('name');
             $table->unsignedInteger('sort_order')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-
-            $table->unique(['upr_category_id', 'name'], 'upr_rec_entries_category_name_unique');
         });
     }
 

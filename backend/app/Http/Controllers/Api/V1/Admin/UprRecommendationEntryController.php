@@ -56,9 +56,9 @@ class UprRecommendationEntryController extends Controller
             'upr_cycle_id' => ['required', 'integer', 'exists:upr_cycles,id'],
             'upr_type_id' => ['required', 'integer', 'exists:upr_types,id'],
             'upr_category_id' => ['required', 'integer', 'exists:upr_categories,id'],
-            'name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'name' => ['sometimes', 'nullable', 'string', 'max:10000'],
             'names' => ['sometimes', 'array', 'min:1'],
-            'names.*' => ['required', 'string', 'max:255'],
+            'names.*' => ['required', 'string', 'max:10000'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
@@ -140,7 +140,7 @@ class UprRecommendationEntryController extends Controller
                 'sometimes',
                 'required',
                 'string',
-                'max:255',
+                'max:10000',
                 Rule::unique('upr_recommendation_entries', 'name')
                     ->where(fn ($q) => $q->where('upr_category_id', $categoryId))
                     ->ignore($uprRecommendationEntry->id),
