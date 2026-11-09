@@ -219,7 +219,10 @@ export async function downloadDeptTaskRequestResponsePdf(options: {
     }
 
     const safeName = filename.replace(/[^\w.-]+/g, '_').replace(/_+/g, '_') || 'hrims-draft'
-    pdf.save(safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`)
+    const outName = safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`
+    pdf.save(outName)
+    const { logFileDownload } = await import('./logFileDownload')
+    logFileDownload(outName, 'pdf', 'dept_task_pdf')
   } finally {
     overlay.remove()
     host.remove()

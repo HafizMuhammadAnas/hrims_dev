@@ -23,6 +23,9 @@ function triggerDownload(blob: Blob, filename: string): void {
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+  void import('./logFileDownload').then(({ logFileDownload }) => {
+    logFileDownload(filename, 'excel', 'matrix_excel')
+  })
 }
 
 function cellXml(value: string, type: 'String' | 'Number' = 'String'): string {

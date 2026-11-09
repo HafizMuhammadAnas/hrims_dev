@@ -10,6 +10,7 @@ export const SUPER_ADMIN_UPR_MANAGEMENT = `${SUPER_ADMIN_PREFIX}/upr-management`
 export const SUPER_ADMIN_REGIONS_DISTRICTS = `${SUPER_ADMIN_PREFIX}/regions-districts`
 export const SUPER_ADMIN_CONVENTIONS = `${SUPER_ADMIN_PREFIX}/conventions`
 export const SUPER_ADMIN_GOVERNANCE_CHARTS = `${SUPER_ADMIN_PREFIX}/governance-charts`
+export const SUPER_ADMIN_ACTIVITY_LOGS = `${SUPER_ADMIN_PREFIX}/activity-logs`
 export const SUPER_ADMIN_INDICATOR_WISE_DATA = `${SUPER_ADMIN_PREFIX}/indicator-wise-data`
 export const SUPER_ADMIN_SDG_NODES = `${SUPER_ADMIN_PREFIX}/sdg-nodes`
 export const SUPER_ADMIN_UPR_RECOMMENDATIONS = `${SUPER_ADMIN_PREFIX}/upr-recommendations`

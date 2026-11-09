@@ -19,6 +19,7 @@ use App\Models\UprEntry;
 use App\Models\UprRecommendationEntry;
 use App\Models\UprType;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -267,6 +268,16 @@ class HrRequestController extends Controller
         if ($attachment->path === null || $attachment->path === '' || ! Storage::disk($attachment->disk)->exists($attachment->path)) {
             return response()->json(['message' => 'File not found'], 404);
         }
+
+        $fileName = (string) ($attachment->original_name ?: basename((string) $attachment->path));
+        ActivityLogService::record(
+            'download',
+            $request->user(),
+            $request,
+            $fileName,
+            ActivityLogService::guessFileType($fileName),
+            'hr_request_attachment',
+        );
 
         return Storage::disk($attachment->disk)->response(
             $attachment->path,

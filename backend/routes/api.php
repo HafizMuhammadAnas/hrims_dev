@@ -20,6 +20,8 @@ use App\Http\Controllers\Api\V1\Admin\UprRecommendationEntryController as AdminU
 use App\Http\Controllers\Api\V1\Admin\UprEntryController as AdminUprEntryController;
 use App\Http\Controllers\Api\V1\Admin\UprTypeController as AdminUprTypeController;
 use App\Http\Controllers\Api\V1\Admin\KnowledgeUprEntryController as AdminKnowledgeUprEntryController;
+use App\Http\Controllers\Api\V1\ActivityLogController;
+use App\Http\Controllers\Api\V1\Admin\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompiledRecordController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -53,6 +55,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
         Route::get('/auth/me', [AuthController::class, 'me'])->name('api.v1.auth.me');
+        Route::post('/activity-logs/download', [ActivityLogController::class, 'storeDownload'])->name('api.v1.activity-logs.download');
         Route::get('/notifications', [NotificationController::class, 'index'])->name('api.v1.notifications.index');
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('api.v1.notifications.read');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('api.v1.notifications.read-all');
@@ -317,6 +320,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'index'])->name('api.v1.admin.governance.default-charts.index');
             Route::post('/governance/default-charts/sync', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'sync'])->name('api.v1.admin.governance.default-charts.sync');
             Route::put('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'sync'])->name('api.v1.admin.governance.default-charts.sync.put');
+
+            Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])->name('api.v1.admin.activity-logs.index');
         });
     });
 });

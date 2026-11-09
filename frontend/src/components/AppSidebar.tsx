@@ -20,6 +20,7 @@ import {
   Scale,
   ScrollText,
   Send,
+  Shield,
   Target,
   UserCog,
   Users,
@@ -47,6 +48,7 @@ import {
   LABEL_REGIONS_AND_DISTRICTS,
   LABEL_DASHBOARDS,
   LABEL_GOVERNANCE_DASHBOARD,
+  LABEL_ACTIVITY_LOGS,
   LABEL_GOVERNANCE_DEFAULT_CHARTS,
   LABEL_REPORTING_DASHBOARD,
   LABEL_REQUEST_MANAGEMENT,
@@ -58,6 +60,7 @@ import {
   LABEL_USER_MANAGEMENT,
 } from '../lib/uiLabels'
 import {
+  SUPER_ADMIN_ACTIVITY_LOGS,
   SUPER_ADMIN_CONVENTIONS,
   SUPER_ADMIN_GOVERNANCE_CHARTS,
   SUPER_ADMIN_ISSUES,
@@ -144,6 +147,7 @@ export function AppSidebar({ open, onClose, autoCloseOnNavigate = false }: Props
               <NavItem to={SUPER_ADMIN_SDG_NODES} icon={Layers} label="SDGs" onPick={onPick} />
               <NavItem to={SUPER_ADMIN_UPR_RECOMMENDATIONS} icon={RefreshCcw} label="UPR for Knowledge Hub" onPick={onPick} />
               <NavItem to={SUPER_ADMIN_GOVERNANCE_CHARTS} icon={BarChart2} label={LABEL_GOVERNANCE_DEFAULT_CHARTS} onPick={onPick} />
+              <NavItem to={SUPER_ADMIN_ACTIVITY_LOGS} icon={Shield} label={LABEL_ACTIVITY_LOGS} onPick={onPick} />
               <NavItem to="/federal-users-mgmt" icon={UserCog} label={LABEL_USER_MANAGEMENT} onPick={onPick} />
             </div>
             <div className="nav-section-title">{LABEL_DASHBOARDS}</div>

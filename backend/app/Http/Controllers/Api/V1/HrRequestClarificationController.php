@@ -8,6 +8,7 @@ use App\Models\HrRequest;
 use App\Models\HrRequestClarification;
 use App\Models\HrRequestClarificationAttachment;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use App\Support\HrimsAccess;
 use App\Support\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -267,6 +268,16 @@ class HrRequestClarificationController extends Controller
         if (! Storage::disk($attachment->disk)->exists($attachment->path)) {
             return response()->json(['message' => 'File missing'], 404);
         }
+
+        $fileName = (string) ($attachment->original_name ?: basename((string) $attachment->path));
+        ActivityLogService::record(
+            'download',
+            $user,
+            $request,
+            $fileName,
+            ActivityLogService::guessFileType($fileName),
+            'clarification_attachment',
+        );
 
         return Storage::disk($attachment->disk)->download($attachment->path, $attachment->original_name);
     }

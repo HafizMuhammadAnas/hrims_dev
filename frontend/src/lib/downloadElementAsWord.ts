@@ -21,6 +21,9 @@ function triggerDownload(blob: Blob, filename: string): void {
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+  void import('./logFileDownload').then(({ logFileDownload }) => {
+    logFileDownload(filename, 'word', 'element_word')
+  })
 }
 
 /** Inline styles so Word does not depend on the app stylesheet. */

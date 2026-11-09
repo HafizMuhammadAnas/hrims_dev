@@ -170,13 +170,37 @@ function ComparisonChart({
     points.every((p) => slots.every((slot) => Number(p[slot.key] ?? 0) === 0))
 
   // Recharts Legend often reverses series; pin A → B → C (Registered → Investigated → Convictions).
-  const legendPayload = slots.map((slot, i) => ({
-    value: slot.label,
-    type: 'square' as const,
-    id: slot.key,
-    color: reportDashboardChartColor(colorIndex + i),
-    dataKey: slot.key,
-  }))
+  // Use custom content — `payload` prop is omitted from Legend typings in this Recharts version.
+  const orderedLegend = (
+    <ul
+      className="recharts-default-legend"
+      style={{ padding: 0, margin: 0, textAlign: 'center' }}
+    >
+      {slots.map((slot, i) => (
+        <li
+          key={slot.key}
+          className="recharts-legend-item"
+          style={{ display: 'inline-block', marginRight: 10 }}
+        >
+          <svg
+            className="recharts-surface"
+            width={14}
+            height={14}
+            viewBox="0 0 32 32"
+            style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 4 }}
+            aria-hidden
+          >
+            <path
+              fill={reportDashboardChartColor(colorIndex + i)}
+              className="recharts-legend-icon"
+              d="M0,4h32v24h-32z"
+            />
+          </svg>
+          <span className="recharts-legend-item-text">{slot.label}</span>
+        </li>
+      ))}
+    </ul>
+  )
 
   return (
     <div className="report-generator__chart-panel reporting-dashboard__panel governance-dashboard__chart-panel">
@@ -199,7 +223,7 @@ function ComparisonChart({
                 <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
-                <Legend payload={legendPayload} />
+                <Legend content={() => orderedLegend} />
                 {slots.map((slot, i) => (
                   <Bar
                     key={slot.key}
@@ -216,7 +240,7 @@ function ComparisonChart({
                 <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
-                <Legend payload={legendPayload} />
+                <Legend content={() => orderedLegend} />
                 {slots.map((slot, i) =>
                   i === 0 ? (
                     <Bar
@@ -246,7 +270,7 @@ function ComparisonChart({
                 <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
-                <Legend payload={legendPayload} />
+                <Legend content={() => orderedLegend} />
                 {slots.map((slot, i) => (
                   <Line
                     key={slot.key}

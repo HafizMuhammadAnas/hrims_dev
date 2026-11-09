@@ -26,6 +26,7 @@ import { RegionalResponsesPage } from './pages/RegionalResponsesPage'
 import { ReportGeneratorPage } from './pages/ReportGeneratorPage'
 import { GovernanceDashboardPage } from './pages/GovernanceDashboardPage'
 import { GovernanceDefaultChartsAdminPage } from './pages/GovernanceDefaultChartsAdminPage'
+import { ActivityLogsAdminPage } from './pages/ActivityLogsAdminPage'
 import { IndicatorWiseDataAdminPage } from './pages/IndicatorWiseDataAdminPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { IssuesMappingsAdminPage } from './pages/IssuesMappingsAdminPage'
@@ -203,6 +204,7 @@ function App() {
               <Route path="catalog-mgmt/regions-districts" element={<RegionsDistrictsAdminPage />} />
               <Route path="catalog-mgmt/regions-districts/:geoView" element={<RegionsDistrictsAdminPage />} />
               <Route path="catalog-mgmt/governance-charts" element={<GovernanceDefaultChartsAdminPage />} />
+              <Route path="catalog-mgmt/activity-logs" element={<ActivityLogsAdminPage />} />
               <Route path="catalog-mgmt/indicator-wise-data" element={<IndicatorWiseDataAdminPage />} />
               <Route path="catalog-mgmt/indicator-wise-data/create" element={<IndicatorWiseDataAdminPage />} />
               <Route path="catalog-mgmt/indicator-wise-data/view/:recordId" element={<IndicatorWiseDataAdminPage />} />

@@ -526,7 +526,10 @@ export async function downloadElementAsPdf(
 
     if (shouldSave) {
       const safeName = filename.replace(/[^\w.-]+/g, '_').replace(/_+/g, '_') || 'compiled-record'
-      pdf.save(safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`)
+      const outName = safeName.endsWith('.pdf') ? safeName : `${safeName}.pdf`
+      pdf.save(outName)
+      const { logFileDownload } = await import('./logFileDownload')
+      logFileDownload(outName, 'pdf', 'element_pdf')
     }
 
     return pdf

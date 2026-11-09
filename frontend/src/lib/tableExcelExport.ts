@@ -61,7 +61,11 @@ export function downloadTableExcel<T>(
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${fileBaseName}-${new Date().toISOString().slice(0, 10)}.xls`
+  const outName = `${fileBaseName}-${new Date().toISOString().slice(0, 10)}.xls`
+  a.download = outName
   a.click()
   URL.revokeObjectURL(url)
+  void import('./logFileDownload').then(({ logFileDownload }) => {
+    logFileDownload(outName, 'excel', 'table_excel')
+  })
 }

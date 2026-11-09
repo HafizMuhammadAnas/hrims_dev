@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Convention;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -178,7 +179,7 @@ class ConventionController extends Controller
     /**
      * Stream a previously uploaded repository file (authenticated users — Knowledge Hub downloads).
      */
-    public function downloadRepositoryFile(string $token): StreamedResponse|JsonResponse
+    public function downloadRepositoryFile(Request $request, string $token): StreamedResponse|JsonResponse
     {
         $path = self::decodeRepositoryFileToken($token);
         if ($path === null || ! Storage::disk('public')->exists($path)) {
@@ -186,6 +187,14 @@ class ConventionController extends Controller
         }
 
         $downloadName = basename($path);
+        ActivityLogService::record(
+            'download',
+            $request->user(),
+            $request,
+            $downloadName,
+            ActivityLogService::guessFileType($downloadName),
+            'repository_file',
+        );
 
         return Storage::disk('public')->response($path, $downloadName, [
             'Content-Disposition' => 'inline; filename="'.$downloadName.'"',

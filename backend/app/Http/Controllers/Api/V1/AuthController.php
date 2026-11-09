@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -40,6 +41,7 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
         $this->storeSessionPasswordHash($request, $user);
+        ActivityLogService::record('login', $user, $request);
 
         return response()->json([
             'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
@@ -48,6 +50,12 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
+        /** @var User|null $user */
+        $user = Auth::user();
+        if ($user) {
+            ActivityLogService::record('logout', $user, $request);
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

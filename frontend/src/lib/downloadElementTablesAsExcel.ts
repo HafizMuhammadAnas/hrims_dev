@@ -54,6 +54,9 @@ function triggerDownload(blob: Blob, filename: string): void {
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+  void import('./logFileDownload').then(({ logFileDownload }) => {
+    logFileDownload(filename, 'excel', 'element_excel')
+  })
 }
 
 function cellText(el: Element | null | undefined): string {
