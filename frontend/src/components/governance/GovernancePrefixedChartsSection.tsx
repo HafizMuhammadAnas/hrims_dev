@@ -21,7 +21,7 @@ import type {
   IndicatorTrendSeries,
 } from '../../lib/governanceDashboardData'
 import {
-  buildComparisonPoints,
+  buildMultiSeriesPoints,
   type ResolvedPrefixedChart,
 } from '../../lib/governancePrefixedCharts'
 import { reportDashboardChartColor } from '../../lib/reportChartTheme'
@@ -152,33 +152,32 @@ function ComparisonChart({
   seriesById,
   colorIndex,
 }: {
-  chart: Extract<ResolvedPrefixedChart, { kind: 'comparison' }>
+  chart: Extract<ResolvedPrefixedChart, { kind: 'comparison' | 'triple' }>
   seriesById: Map<string, IndicatorTrendSeries>
   colorIndex: number
 }) {
-  const a = chart.series[0]
-  const b = chart.series[1]
-  const seriesA = a.indicator ? seriesById.get(String(a.indicator.id)) ?? null : null
-  const seriesB = b.indicator ? seriesById.get(String(b.indicator.id)) ?? null : null
-  const points = buildComparisonPoints(seriesA, seriesB, a.key, b.key)
+  const slots = chart.series
+  const points = buildMultiSeriesPoints(
+    slots.map((slot) => ({
+      key: slot.key,
+      series: slot.indicator ? seriesById.get(String(slot.indicator.id)) ?? null : null,
+    })),
+  )
+  const missingIndicator = slots.some((slot) => !slot.indicator)
   const empty =
-    !a.indicator ||
-    !b.indicator ||
+    missingIndicator ||
     points.length === 0 ||
-    points.every((p) => Number(p[a.key] ?? 0) === 0 && Number(p[b.key] ?? 0) === 0)
-
-  const colorA = reportDashboardChartColor(colorIndex)
-  const colorB = reportDashboardChartColor(colorIndex + 1)
+    points.every((p) => slots.every((slot) => Number(p[slot.key] ?? 0) === 0))
 
   return (
     <div className="report-generator__chart-panel reporting-dashboard__panel governance-dashboard__chart-panel">
       <h4 className="chart-caption" title={chart.title}>
         {chart.title}
         <span className="governance-dashboard__chart-shape-tag">
-          Comparison · {shapeTag(chart.shape)}
+          {chart.kind === 'triple' ? 'Three indicators' : 'Comparison'} · {shapeTag(chart.shape)}
         </span>
       </h4>
-      {!a.indicator || !b.indicator ? (
+      {missingIndicator ? (
         <EmptyTrend message="Selected indicator was not found in the catalog." />
       ) : empty ? (
         <EmptyTrend />
@@ -192,8 +191,15 @@ function ComparisonChart({
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey={a.key} name={a.label} fill={colorA} radius={[4, 4, 0, 0]} />
-                <Bar dataKey={b.key} name={b.label} fill={colorB} radius={[4, 4, 0, 0]} />
+                {slots.map((slot, i) => (
+                  <Bar
+                    key={slot.key}
+                    dataKey={slot.key}
+                    name={slot.label}
+                    fill={reportDashboardChartColor(colorIndex + i)}
+                    radius={[4, 4, 0, 0]}
+                  />
+                ))}
               </BarChart>
             ) : chart.shape === 'composed' ? (
               <ComposedChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
@@ -202,15 +208,28 @@ function ComparisonChart({
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey={a.key} name={a.label} fill={colorA} fillOpacity={0.35} radius={[4, 4, 0, 0]} />
-                <Line
-                  type="monotone"
-                  dataKey={b.key}
-                  name={b.label}
-                  stroke={colorB}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                />
+                {slots.map((slot, i) =>
+                  i === 0 ? (
+                    <Bar
+                      key={slot.key}
+                      dataKey={slot.key}
+                      name={slot.label}
+                      fill={reportDashboardChartColor(colorIndex + i)}
+                      fillOpacity={0.35}
+                      radius={[4, 4, 0, 0]}
+                    />
+                  ) : (
+                    <Line
+                      key={slot.key}
+                      type="monotone"
+                      dataKey={slot.key}
+                      name={slot.label}
+                      stroke={reportDashboardChartColor(colorIndex + i)}
+                      strokeWidth={3}
+                      dot={{ r: 4 }}
+                    />
+                  ),
+                )}
               </ComposedChart>
             ) : (
               <LineChart data={points} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
@@ -219,22 +238,17 @@ function ComparisonChart({
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
                 <Legend />
-                <Line
-                  type="monotone"
-                  dataKey={a.key}
-                  name={a.label}
-                  stroke={colorA}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey={b.key}
-                  name={b.label}
-                  stroke={colorB}
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                />
+                {slots.map((slot, i) => (
+                  <Line
+                    key={slot.key}
+                    type="monotone"
+                    dataKey={slot.key}
+                    name={slot.label}
+                    stroke={reportDashboardChartColor(colorIndex + i)}
+                    strokeWidth={3}
+                    dot={{ r: 4 }}
+                  />
+                ))}
               </LineChart>
             )}
           </ResponsiveContainer>
@@ -416,7 +430,7 @@ export function GovernancePrefixedChartsSection({
             <div key={`prefixed-row-${rowIndex}`} className="governance-dashboard__chart-row">
               {row.map((chart, colIndex) => {
                 const colorIndex = rowIndex * 2 + colIndex
-                if (chart.kind === 'comparison') {
+                if (chart.kind === 'comparison' || chart.kind === 'triple') {
                   return (
                     <ComparisonChart
                       key={chart.key}

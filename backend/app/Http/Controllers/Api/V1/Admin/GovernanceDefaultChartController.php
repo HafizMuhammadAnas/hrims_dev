@@ -14,7 +14,11 @@ class GovernanceDefaultChartController extends Controller
     public function index(): JsonResponse
     {
         $rows = GovernanceDefaultChart::query()
-            ->with(['seriesAIndicator:id,indicator_text', 'seriesBIndicator:id,indicator_text'])
+            ->with([
+                'seriesAIndicator:id,indicator_text',
+                'seriesBIndicator:id,indicator_text',
+                'seriesCIndicator:id,indicator_text',
+            ])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
@@ -29,7 +33,7 @@ class GovernanceDefaultChartController extends Controller
     {
         $data = $request->validate([
             'charts' => ['required', 'array', 'max:40'],
-            'charts.*.kind' => ['required', 'string', Rule::in(['trend', 'comparison', 'dimension_totals'])],
+            'charts.*.kind' => ['required', 'string', Rule::in(['trend', 'comparison', 'triple', 'dimension_totals'])],
             'charts.*.title' => ['required', 'string', 'max:500'],
             'charts.*.shape' => ['required', 'string', Rule::in(['line', 'bar', 'area', 'step', 'pie', 'composed'])],
             'charts.*.series_a_key' => ['nullable', 'string', 'max:64'],
@@ -38,17 +42,27 @@ class GovernanceDefaultChartController extends Controller
             'charts.*.series_b_key' => ['nullable', 'string', 'max:64'],
             'charts.*.series_b_label' => ['nullable', 'string', 'max:255'],
             'charts.*.series_b_indicator_id' => ['nullable', 'integer', 'exists:issue_indicators,id'],
+            'charts.*.series_c_key' => ['nullable', 'string', 'max:64'],
+            'charts.*.series_c_label' => ['nullable', 'string', 'max:255'],
+            'charts.*.series_c_indicator_id' => ['nullable', 'integer', 'exists:issue_indicators,id'],
             'charts.*.is_active' => ['sometimes', 'boolean'],
         ]);
 
         foreach ($data['charts'] as $i => $chart) {
-            if (($chart['kind'] ?? '') === 'comparison') {
+            $kind = $chart['kind'] ?? '';
+            if ($kind === 'comparison' || $kind === 'triple') {
                 if (empty($chart['series_b_label'])) {
                     return response()->json([
                         'message' => 'Comparison charts require a second series label.',
                         'errors' => ["charts.$i.series_b_label" => ['Required for comparison charts.']],
                     ], 422);
                 }
+            }
+            if ($kind === 'triple' && empty($chart['series_c_label'])) {
+                return response()->json([
+                    'message' => 'Three-indicator charts require a third series label.',
+                    'errors' => ["charts.$i.series_c_label" => ['Required for three-indicator charts.']],
+                ], 422);
             }
         }
 
@@ -57,7 +71,8 @@ class GovernanceDefaultChartController extends Controller
 
             foreach (array_values($data['charts']) as $index => $chart) {
                 $kind = $chart['kind'];
-                $isComparison = $kind === 'comparison';
+                $isComparison = $kind === 'comparison' || $kind === 'triple';
+                $isTriple = $kind === 'triple';
                 GovernanceDefaultChart::query()->create([
                     'sort_order' => $index,
                     'kind' => $kind,
@@ -69,13 +84,20 @@ class GovernanceDefaultChartController extends Controller
                     'series_b_key' => $isComparison ? ($chart['series_b_key'] ?? 'series_b') : null,
                     'series_b_label' => $isComparison ? ($chart['series_b_label'] ?? null) : null,
                     'series_b_indicator_id' => $isComparison ? ($chart['series_b_indicator_id'] ?? null) : null,
+                    'series_c_key' => $isTriple ? ($chart['series_c_key'] ?? 'series_c') : null,
+                    'series_c_label' => $isTriple ? ($chart['series_c_label'] ?? null) : null,
+                    'series_c_indicator_id' => $isTriple ? ($chart['series_c_indicator_id'] ?? null) : null,
                     'is_active' => array_key_exists('is_active', $chart) ? (bool) $chart['is_active'] : true,
                 ]);
             }
         });
 
         $rows = GovernanceDefaultChart::query()
-            ->with(['seriesAIndicator:id,indicator_text', 'seriesBIndicator:id,indicator_text'])
+            ->with([
+                'seriesAIndicator:id,indicator_text',
+                'seriesBIndicator:id,indicator_text',
+                'seriesCIndicator:id,indicator_text',
+            ])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
@@ -104,6 +126,10 @@ class GovernanceDefaultChartController extends Controller
             'series_b_label' => $row->series_b_label,
             'series_b_indicator_id' => $row->series_b_indicator_id,
             'series_b_indicator_text' => $row->seriesBIndicator?->indicator_text,
+            'series_c_key' => $row->series_c_key,
+            'series_c_label' => $row->series_c_label,
+            'series_c_indicator_id' => $row->series_c_indicator_id,
+            'series_c_indicator_text' => $row->seriesCIndicator?->indicator_text,
             'is_active' => (bool) $row->is_active,
         ];
     }

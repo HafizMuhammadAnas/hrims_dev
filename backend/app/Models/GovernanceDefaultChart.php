@@ -18,6 +18,9 @@ class GovernanceDefaultChart extends Model
         'series_b_key',
         'series_b_label',
         'series_b_indicator_id',
+        'series_c_key',
+        'series_c_label',
+        'series_c_indicator_id',
         'is_active',
     ];
 
@@ -25,6 +28,7 @@ class GovernanceDefaultChart extends Model
         'sort_order' => 'integer',
         'series_a_indicator_id' => 'integer',
         'series_b_indicator_id' => 'integer',
+        'series_c_indicator_id' => 'integer',
         'is_active' => 'boolean',
     ];
 
@@ -36,5 +40,10 @@ class GovernanceDefaultChart extends Model
     public function seriesBIndicator(): BelongsTo
     {
         return $this->belongsTo(IssueIndicator::class, 'series_b_indicator_id');
+    }
+
+    public function seriesCIndicator(): BelongsTo
+    {
+        return $this->belongsTo(IssueIndicator::class, 'series_c_indicator_id');
     }
 }

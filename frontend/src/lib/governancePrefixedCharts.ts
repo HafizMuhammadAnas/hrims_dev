@@ -229,6 +229,13 @@ export type ResolvedPrefixedChart =
     }
   | {
       key: string
+      kind: 'triple'
+      title: string
+      shape: 'line' | 'bar' | 'composed'
+      series: [ResolvedPrefixedSeries, ResolvedPrefixedSeries, ResolvedPrefixedSeries]
+    }
+  | {
+      key: string
       kind: 'trend'
       title: string
       shape: GovernanceTrendChartShapeId
@@ -268,31 +275,27 @@ export type PrefixedComparisonPoint = {
   [seriesKey: string]: string | number
 }
 
-export function buildComparisonPoints(
-  primary: IndicatorTrendSeries | null,
-  secondary: IndicatorTrendSeries | null,
-  primaryKey: string,
-  secondaryKey: string,
+export function buildMultiSeriesPoints(
+  slots: Array<{ series: IndicatorTrendSeries | null; key: string }>,
 ): PrefixedComparisonPoint[] {
   const byYear = new Map<string, PrefixedComparisonPoint>()
+  const keys = slots.map((s) => s.key)
 
-  const ingest = (series: IndicatorTrendSeries | null, key: string) => {
-    if (!series) return
-    for (const p of series.points) {
-      const existing = byYear.get(p.yearId) ?? {
-        yearId: p.yearId,
-        year: p.year,
-        [primaryKey]: 0,
-        [secondaryKey]: 0,
-      }
+  const blankRow = (yearId: string, year: string): PrefixedComparisonPoint => {
+    const row: PrefixedComparisonPoint = { yearId, year }
+    for (const key of keys) row[key] = 0
+    return row
+  }
+
+  for (const slot of slots) {
+    if (!slot.series) continue
+    for (const p of slot.series.points) {
+      const existing = byYear.get(p.yearId) ?? blankRow(p.yearId, p.year)
       existing.year = p.year || existing.year
-      existing[key] = p.total
+      existing[slot.key] = p.total
       byYear.set(p.yearId, existing)
     }
   }
-
-  ingest(primary, primaryKey)
-  ingest(secondary, secondaryKey)
 
   return [...byYear.values()].sort((a, b) => {
     const na = Number(a.year)
@@ -300,6 +303,18 @@ export function buildComparisonPoints(
     if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb
     return String(a.year).localeCompare(String(b.year), undefined, { numeric: true })
   })
+}
+
+export function buildComparisonPoints(
+  primary: IndicatorTrendSeries | null,
+  secondary: IndicatorTrendSeries | null,
+  primaryKey: string,
+  secondaryKey: string,
+): PrefixedComparisonPoint[] {
+  return buildMultiSeriesPoints([
+    { series: primary, key: primaryKey },
+    { series: secondary, key: secondaryKey },
+  ])
 }
 
 /** All indicator ids resolved for prefixed (mode 2) charts. */
@@ -315,7 +330,7 @@ export function prefixedIndicatorIds(resolved: ResolvedPrefixedChart[]): string[
 
 export type SavedGovernanceChartConfig = {
   id: number
-  kind: 'trend' | 'comparison' | 'dimension_totals'
+  kind: 'trend' | 'comparison' | 'triple' | 'dimension_totals'
   title: string
   shape: string
   series_a_key: string
@@ -324,6 +339,9 @@ export type SavedGovernanceChartConfig = {
   series_b_key: string | null
   series_b_label: string | null
   series_b_indicator_id: number | null
+  series_c_key?: string | null
+  series_c_label?: string | null
+  series_c_indicator_id?: number | null
 }
 
 function indicatorById(
@@ -374,6 +392,37 @@ export function resolveChartsFromSavedConfig(
             label: cfg.series_b_label || 'Series B',
             includes: [],
             indicator: b,
+          },
+        ],
+      }
+    }
+
+    if (cfg.kind === 'triple') {
+      const b = indicatorById(indicators, cfg.series_b_indicator_id)
+      const c = indicatorById(indicators, cfg.series_c_indicator_id ?? null)
+      return {
+        key: `saved-${cfg.id}`,
+        kind: 'triple' as const,
+        title: cfg.title,
+        shape: asComparisonShape(cfg.shape),
+        series: [
+          {
+            key: cfg.series_a_key || 'series_a',
+            label: cfg.series_a_label || 'Series A',
+            includes: [],
+            indicator: a,
+          },
+          {
+            key: cfg.series_b_key || 'series_b',
+            label: cfg.series_b_label || 'Series B',
+            includes: [],
+            indicator: b,
+          },
+          {
+            key: cfg.series_c_key || 'series_c',
+            label: cfg.series_c_label || 'Series C',
+            includes: [],
+            indicator: c,
           },
         ],
       }

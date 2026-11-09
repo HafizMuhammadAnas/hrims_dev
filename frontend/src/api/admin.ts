@@ -1269,7 +1269,7 @@ export async function adminDeleteIssue(id: number): Promise<void> {
 export type AdminGovernanceDefaultChart = {
   id: number
   sort_order: number
-  kind: 'trend' | 'comparison' | 'dimension_totals'
+  kind: 'trend' | 'comparison' | 'triple' | 'dimension_totals'
   title: string
   shape: 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
   series_a_key: string
@@ -1280,11 +1280,15 @@ export type AdminGovernanceDefaultChart = {
   series_b_label: string | null
   series_b_indicator_id: number | null
   series_b_indicator_text: string | null
+  series_c_key: string | null
+  series_c_label: string | null
+  series_c_indicator_id: number | null
+  series_c_indicator_text: string | null
   is_active: boolean
 }
 
 export type AdminGovernanceDefaultChartPayload = {
-  kind: 'trend' | 'comparison' | 'dimension_totals'
+  kind: 'trend' | 'comparison' | 'triple' | 'dimension_totals'
   title: string
   shape: 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
   series_a_key?: string | null
@@ -1293,6 +1297,9 @@ export type AdminGovernanceDefaultChartPayload = {
   series_b_key?: string | null
   series_b_label?: string | null
   series_b_indicator_id?: number | null
+  series_c_key?: string | null
+  series_c_label?: string | null
+  series_c_indicator_id?: number | null
   is_active?: boolean
 }
 

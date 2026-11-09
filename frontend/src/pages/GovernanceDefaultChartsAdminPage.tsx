@@ -25,7 +25,7 @@ import { SearchableSelect, type SearchableSelectOption } from '../components/ui/
 import { isSuperAdmin } from '../lib/roles'
 import { LABEL_GOVERNANCE_DASHBOARD, LABEL_GOVERNANCE_DEFAULT_CHARTS } from '../lib/uiLabels'
 
-type ChartKind = 'trend' | 'comparison' | 'dimension_totals'
+type ChartKind = 'trend' | 'comparison' | 'triple' | 'dimension_totals'
 type ChartShape = 'line' | 'bar' | 'area' | 'step' | 'pie' | 'composed'
 
 type ChartDraft = {
@@ -41,7 +41,15 @@ type ChartDraft = {
   /** UI-only filter for series B indicator picker. */
   series_b_category_id: string
   series_b_indicator_id: string
+  series_c_label: string
+  /** UI-only filter for series C indicator picker. */
+  series_c_category_id: string
+  series_c_indicator_id: string
   is_active: boolean
+}
+
+function isMultiIndicatorKind(kind: ChartKind): boolean {
+  return kind === 'comparison' || kind === 'triple'
 }
 
 const TREND_SHAPES: { value: ChartShape; label: string }[] = [
@@ -82,7 +90,41 @@ function emptyDraft(): ChartDraft {
     series_b_label: '',
     series_b_category_id: '',
     series_b_indicator_id: '',
+    series_c_label: '',
+    series_c_category_id: '',
+    series_c_indicator_id: '',
     is_active: true,
+  }
+}
+
+function draftFromSaved(c: {
+  id: number
+  kind: ChartKind
+  title: string
+  shape: ChartShape
+  series_a_label: string
+  series_a_indicator_id: number | null
+  series_b_label: string | null
+  series_b_indicator_id: number | null
+  series_c_label?: string | null
+  series_c_indicator_id?: number | null
+  is_active: boolean
+}): ChartDraft {
+  return {
+    clientKey: `cfg-${c.id}`,
+    kind: c.kind,
+    title: c.title,
+    shape: c.shape,
+    series_a_label: c.series_a_label,
+    series_a_category_id: '',
+    series_a_indicator_id: c.series_a_indicator_id != null ? String(c.series_a_indicator_id) : '',
+    series_b_label: c.series_b_label ?? '',
+    series_b_category_id: '',
+    series_b_indicator_id: c.series_b_indicator_id != null ? String(c.series_b_indicator_id) : '',
+    series_c_label: c.series_c_label ?? '',
+    series_c_category_id: '',
+    series_c_indicator_id: c.series_c_indicator_id != null ? String(c.series_c_indicator_id) : '',
+    is_active: c.is_active,
   }
 }
 
@@ -110,26 +152,31 @@ function slugKey(label: string, fallback: string): string {
 
 function toPayload(drafts: ChartDraft[]): AdminGovernanceDefaultChartPayload[] {
   return drafts.map((d) => {
-    const isComparison = d.kind === 'comparison'
+    const multi = isMultiIndicatorKind(d.kind)
     const base: AdminGovernanceDefaultChartPayload = {
       kind: d.kind,
       title: d.title.trim(),
       shape: d.shape,
-      series_a_key: isComparison
+      series_a_key: multi
         ? slugKey(d.series_a_label, 'series_a')
         : d.kind === 'dimension_totals'
           ? 'dimensions'
           : 'total',
       series_a_label:
         d.series_a_label.trim() ||
-        (d.kind === 'dimension_totals' ? 'Dimension totals' : isComparison ? 'Series A' : 'Total'),
+        (d.kind === 'dimension_totals' ? 'Dimension totals' : multi ? 'Series A' : 'Total'),
       series_a_indicator_id: d.series_a_indicator_id ? Number(d.series_a_indicator_id) : null,
       is_active: d.is_active,
     }
-    if (isComparison) {
+    if (multi) {
       base.series_b_key = slugKey(d.series_b_label, 'series_b')
       base.series_b_label = d.series_b_label.trim() || 'Series B'
       base.series_b_indicator_id = d.series_b_indicator_id ? Number(d.series_b_indicator_id) : null
+      if (d.kind === 'triple') {
+        base.series_c_key = slugKey(d.series_c_label, 'series_c')
+        base.series_c_label = d.series_c_label.trim() || 'Series C'
+        base.series_c_indicator_id = d.series_c_indicator_id ? Number(d.series_c_indicator_id) : null
+      }
       if (base.shape !== 'line' && base.shape !== 'bar' && base.shape !== 'composed') {
         base.shape = 'line'
       }
@@ -175,23 +222,7 @@ export function GovernanceDefaultChartsAdminPage() {
       ])
       setIndicators(inds)
       setCategories(cats)
-      setDrafts(
-        charts.map((c) => ({
-          clientKey: `cfg-${c.id}`,
-          kind: c.kind,
-          title: c.title,
-          shape: c.shape,
-          series_a_label: c.series_a_label,
-          series_a_category_id: '',
-          series_a_indicator_id:
-            c.series_a_indicator_id != null ? String(c.series_a_indicator_id) : '',
-          series_b_label: c.series_b_label ?? '',
-          series_b_category_id: '',
-          series_b_indicator_id:
-            c.series_b_indicator_id != null ? String(c.series_b_indicator_id) : '',
-          is_active: c.is_active,
-        })),
-      )
+      setDrafts(charts.map((c) => draftFromSaved(c)))
     } catch (e: unknown) {
       setError(isApiError(e) ? e.message : e instanceof Error ? e.message : 'Load failed')
     } finally {
@@ -219,6 +250,7 @@ export function GovernanceDefaultChartsAdminPage() {
     for (const d of drafts) {
       if (d.series_a_category_id) needed.add(d.series_a_category_id)
       if (d.series_b_category_id) needed.add(d.series_b_category_id)
+      if (d.series_c_category_id) needed.add(d.series_c_category_id)
     }
     for (const id of needed) {
       void ensureCategoryIndicators(id)
@@ -238,12 +270,15 @@ export function GovernanceDefaultChartsAdminPage() {
     return categoryId || 'all'
   }
 
-  function onCategoryChange(series: 'a' | 'b', value: string): Partial<ChartDraft> {
+  function onCategoryChange(series: 'a' | 'b' | 'c', value: string): Partial<ChartDraft> {
     const categoryId = value === 'all' ? '' : value
     if (series === 'a') {
       return { series_a_category_id: categoryId, series_a_indicator_id: '' }
     }
-    return { series_b_category_id: categoryId, series_b_indicator_id: '' }
+    if (series === 'b') {
+      return { series_b_category_id: categoryId, series_b_indicator_id: '' }
+    }
+    return { series_c_category_id: categoryId, series_c_indicator_id: '' }
   }
 
   function updateDraft(key: string, patch: Partial<ChartDraft>) {
@@ -313,31 +348,19 @@ export function GovernanceDefaultChartsAdminPage() {
         setError(`Chart ${i + 1}: title is required.`)
         return
       }
-      if (d.kind === 'comparison' && !d.series_b_label.trim()) {
+      if (isMultiIndicatorKind(d.kind) && !d.series_b_label.trim()) {
         setError(`Chart ${i + 1}: comparison charts need a second series label.`)
+        return
+      }
+      if (d.kind === 'triple' && !d.series_c_label.trim()) {
+        setError(`Chart ${i + 1}: three-indicator charts need a third series label.`)
         return
       }
     }
     setBusy(true)
     try {
       const saved = await adminSyncGovernanceDefaultCharts(toPayload(drafts))
-      setDrafts(
-        saved.map((c) => ({
-          clientKey: `cfg-${c.id}`,
-          kind: c.kind,
-          title: c.title,
-          shape: c.shape,
-          series_a_label: c.series_a_label,
-          series_a_category_id: '',
-          series_a_indicator_id:
-            c.series_a_indicator_id != null ? String(c.series_a_indicator_id) : '',
-          series_b_label: c.series_b_label ?? '',
-          series_b_category_id: '',
-          series_b_indicator_id:
-            c.series_b_indicator_id != null ? String(c.series_b_indicator_id) : '',
-          is_active: c.is_active,
-        })),
-      )
+      setDrafts(saved.map((c) => draftFromSaved(c)))
       setSuccess(
         `Saved ${saved.length} default graph${saved.length === 1 ? '' : 's'} for the Governance Dashboard.`,
       )
@@ -364,7 +387,7 @@ export function GovernanceDefaultChartsAdminPage() {
           {renderGraphActionsBar({ style: { marginBottom: '1rem' } })}
           {drafts.map((draft, index) => {
             const shapes =
-              draft.kind === 'comparison'
+              isMultiIndicatorKind(draft.kind)
                 ? COMPARISON_SHAPES
                 : draft.kind === 'dimension_totals'
                   ? DIMENSION_TOTALS_SHAPES
@@ -443,6 +466,7 @@ export function GovernanceDefaultChartsAdminPage() {
                             draft.shape === 'line' ||
                             draft.shape === 'bar' ||
                             draft.shape === 'composed'
+                          const multi = isMultiIndicatorKind(kind)
                           updateDraft(draft.clientKey, {
                             kind,
                             shape:
@@ -450,7 +474,7 @@ export function GovernanceDefaultChartsAdminPage() {
                                 ? multiSeriesShape
                                   ? draft.shape
                                   : 'bar'
-                                : kind === 'comparison'
+                                : multi
                                   ? multiSeriesShape
                                     ? draft.shape
                                     : 'line'
@@ -461,20 +485,23 @@ export function GovernanceDefaultChartsAdminPage() {
                                   draft.series_a_label === 'Series A'
                                   ? 'Dimension totals'
                                   : draft.series_a_label
-                                : kind === 'comparison' &&
+                                : multi &&
                                     (draft.series_a_label === 'Total' ||
                                       draft.series_a_label === 'Dimension totals')
                                   ? 'Series A'
                                   : draft.series_a_label,
                             series_b_label:
-                              kind === 'comparison' && !draft.series_b_label
-                                ? 'Series B'
-                                : draft.series_b_label,
+                              multi && !draft.series_b_label ? 'Series B' : draft.series_b_label,
+                            series_c_label:
+                              kind === 'triple' && !draft.series_c_label
+                                ? 'Series C'
+                                : draft.series_c_label,
                           })
                         }}
                       >
                         <option value="trend">Single indicator (year total)</option>
                         <option value="comparison">Two indicators (comparison)</option>
+                        <option value="triple">Three indicators (comparison)</option>
                         <option value="dimension_totals">
                           Multi-dimension totals (years × dimensions)
                         </option>
@@ -520,7 +547,7 @@ export function GovernanceDefaultChartsAdminPage() {
                   <FormRow twoCol>
                     <FormControl
                       label={
-                        draft.kind === 'comparison'
+                        isMultiIndicatorKind(draft.kind)
                           ? 'Series A label'
                           : draft.kind === 'dimension_totals'
                             ? 'Legend title'
@@ -537,7 +564,9 @@ export function GovernanceDefaultChartsAdminPage() {
                       />
                     </FormControl>
                     <FormControl
-                      label={draft.kind === 'comparison' ? 'Series A category' : 'Category'}
+                      label={
+                        isMultiIndicatorKind(draft.kind) ? 'Series A category' : 'Category'
+                      }
                       htmlFor={`gdc-a-cat-${draft.clientKey}`}
                     >
                       <SearchableSelect
@@ -554,9 +583,7 @@ export function GovernanceDefaultChartsAdminPage() {
                   <FormRow>
                     <FormControl
                       label={
-                        draft.kind === 'comparison'
-                          ? 'Series A indicator'
-                          : 'Indicator'
+                        isMultiIndicatorKind(draft.kind) ? 'Series A indicator' : 'Indicator'
                       }
                       htmlFor={`gdc-a-ind-${draft.clientKey}`}
                     >
@@ -585,7 +612,7 @@ export function GovernanceDefaultChartsAdminPage() {
                       />
                     </FormControl>
                   </FormRow>
-                  {draft.kind === 'comparison' ? (
+                  {isMultiIndicatorKind(draft.kind) ? (
                     <>
                       <FormRow twoCol>
                         <FormControl
@@ -639,6 +666,68 @@ export function GovernanceDefaultChartsAdminPage() {
                             }
                             emptyFilterMessage={
                               draft.series_b_category_id
+                                ? 'No indicators in this category'
+                                : 'No indicators'
+                            }
+                          />
+                        </FormControl>
+                      </FormRow>
+                    </>
+                  ) : null}
+                  {draft.kind === 'triple' ? (
+                    <>
+                      <FormRow twoCol>
+                        <FormControl
+                          label="Series C label"
+                          htmlFor={`gdc-c-label-${draft.clientKey}`}
+                        >
+                          <input
+                            id={`gdc-c-label-${draft.clientKey}`}
+                            value={draft.series_c_label}
+                            onChange={(e) =>
+                              updateDraft(draft.clientKey, { series_c_label: e.target.value })
+                            }
+                          />
+                        </FormControl>
+                        <FormControl
+                          label="Series C category"
+                          htmlFor={`gdc-c-cat-${draft.clientKey}`}
+                        >
+                          <SearchableSelect
+                            id={`gdc-c-cat-${draft.clientKey}`}
+                            value={categorySelectValue(draft.series_c_category_id)}
+                            onChange={(value) =>
+                              updateDraft(draft.clientKey, onCategoryChange('c', value))
+                            }
+                            options={categoryOptions}
+                            placeholder="All categories"
+                          />
+                        </FormControl>
+                      </FormRow>
+                      <FormRow>
+                        <FormControl
+                          label="Series C indicator"
+                          htmlFor={`gdc-c-ind-${draft.clientKey}`}
+                        >
+                          <SearchableSelect
+                            id={`gdc-c-ind-${draft.clientKey}`}
+                            value={draft.series_c_indicator_id}
+                            onChange={(value) =>
+                              updateDraft(draft.clientKey, { series_c_indicator_id: value })
+                            }
+                            options={buildIndicatorOptions(
+                              indicatorPoolForCategory(draft.series_c_category_id),
+                              draft.series_c_indicator_id,
+                              indicators,
+                            )}
+                            placeholder={
+                              draft.series_c_category_id &&
+                              !indicatorsByCategory[draft.series_c_category_id]
+                                ? 'Loading indicators…'
+                                : 'Select indicator…'
+                            }
+                            emptyFilterMessage={
+                              draft.series_c_category_id
                                 ? 'No indicators in this category'
                                 : 'No indicators'
                             }

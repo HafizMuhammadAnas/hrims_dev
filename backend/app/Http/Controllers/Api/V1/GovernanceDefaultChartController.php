@@ -12,7 +12,11 @@ class GovernanceDefaultChartController extends Controller
     public function index(): JsonResponse
     {
         $rows = GovernanceDefaultChart::query()
-            ->with(['seriesAIndicator:id,indicator_text', 'seriesBIndicator:id,indicator_text'])
+            ->with([
+                'seriesAIndicator:id,indicator_text',
+                'seriesBIndicator:id,indicator_text',
+                'seriesCIndicator:id,indicator_text',
+            ])
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -42,6 +46,10 @@ class GovernanceDefaultChartController extends Controller
             'series_b_label' => $row->series_b_label,
             'series_b_indicator_id' => $row->series_b_indicator_id,
             'series_b_indicator_text' => $row->seriesBIndicator?->indicator_text,
+            'series_c_key' => $row->series_c_key,
+            'series_c_label' => $row->series_c_label,
+            'series_c_indicator_id' => $row->series_c_indicator_id,
+            'series_c_indicator_text' => $row->seriesCIndicator?->indicator_text,
             'is_active' => (bool) $row->is_active,
         ];
     }

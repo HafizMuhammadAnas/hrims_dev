@@ -188,7 +188,7 @@ export function GovernanceDashboardPage() {
         const genderOnlyIds = ids.filter((id) =>
           resolved.some(
             (c) =>
-              (c.kind === 'trend' || c.kind === 'comparison') &&
+              (c.kind === 'trend' || c.kind === 'comparison' || c.kind === 'triple') &&
               c.series.some((s) => s.indicator && String(s.indicator.id) === id),
           ),
         )
