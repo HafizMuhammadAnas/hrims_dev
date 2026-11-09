@@ -169,6 +169,15 @@ function ComparisonChart({
     points.length === 0 ||
     points.every((p) => slots.every((slot) => Number(p[slot.key] ?? 0) === 0))
 
+  // Recharts Legend often reverses series; pin A → B → C (Registered → Investigated → Convictions).
+  const legendPayload = slots.map((slot, i) => ({
+    value: slot.label,
+    type: 'square' as const,
+    id: slot.key,
+    color: reportDashboardChartColor(colorIndex + i),
+    dataKey: slot.key,
+  }))
+
   return (
     <div className="report-generator__chart-panel reporting-dashboard__panel governance-dashboard__chart-panel">
       <h4 className="chart-caption" title={chart.title}>
@@ -190,7 +199,7 @@ function ComparisonChart({
                 <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
-                <Legend />
+                <Legend payload={legendPayload} />
                 {slots.map((slot, i) => (
                   <Bar
                     key={slot.key}
@@ -207,7 +216,7 @@ function ComparisonChart({
                 <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
-                <Legend />
+                <Legend payload={legendPayload} />
                 {slots.map((slot, i) =>
                   i === 0 ? (
                     <Bar
@@ -237,7 +246,7 @@ function ComparisonChart({
                 <XAxis dataKey="year" type="category" allowDuplicatedCategory={false} />
                 <YAxis allowDecimals={false} width={40} />
                 <Tooltip />
-                <Legend />
+                <Legend payload={legendPayload} />
                 {slots.map((slot, i) => (
                   <Line
                     key={slot.key}
