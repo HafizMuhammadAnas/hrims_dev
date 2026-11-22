@@ -51,7 +51,7 @@ class LoginOtpService
             ->update(['consumed_at' => now()]);
 
         $plain = $this->generateCode();
-        $ttl = (int) config('login_otp.ttl_minutes', 10);
+        $ttl = (int) config('login_otp.ttl_minutes', 30);
 
         $otp = LoginOtp::query()->create([
             'user_id' => $user->id,

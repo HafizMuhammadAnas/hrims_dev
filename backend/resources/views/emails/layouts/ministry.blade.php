@@ -27,7 +27,6 @@
                     <tr>
                         <td style="padding:28px 0 8px 0;font-family:Arial,Helvetica,sans-serif;color:#000000;font-size:14px;line-height:1.55;">
                             Regards,<br><br>
-                            <strong>Data Collection &amp; Coordination Unit</strong><br>
                             Ministry of Human Rights<br>
                             Government of Pakistan
                         </td>

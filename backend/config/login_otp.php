@@ -13,7 +13,7 @@ return [
 
     'length' => 6,
 
-    'ttl_minutes' => 10,
+    'ttl_minutes' => 30,
 
     'max_attempts' => 5,
 
