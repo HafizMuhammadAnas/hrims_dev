@@ -8,6 +8,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\RegionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class ApiV1AuthSessionTest extends TestCase
@@ -25,6 +26,7 @@ class ApiV1AuthSessionTest extends TestCase
         parent::setUp();
         $this->seed(RegionSeeder::class);
         $this->seed(RbacSeeder::class);
+        Mail::fake();
     }
 
     public function test_login_session_survives_subsequent_get_with_referer(): void
@@ -33,6 +35,7 @@ class ApiV1AuthSessionTest extends TestCase
         $user = User::factory()->create([
             'username' => 'federal_session_test',
             'password' => 'password',
+            'email' => 'federal_session_test@example.test',
             'region_id' => $federal->id,
         ]);
         $role = RbacRole::query()->where('slug', 'federal_admin')->firstOrFail();
@@ -46,6 +49,13 @@ class ApiV1AuthSessionTest extends TestCase
                 'password' => 'password',
             ])
             ->assertOk()
+            ->assertJsonPath('requires_2fa', true);
+
+        $this->withHeader('Origin', 'http://localhost:5173')
+            ->postJson('/api/v1/auth/verify-2fa', [
+                'code' => '123456',
+            ])
+            ->assertOk()
             ->assertJsonPath('data.username', 'federal_session_test');
 
         $this->withHeader('Referer', 'http://localhost:5173/requests')
@@ -56,5 +66,36 @@ class ApiV1AuthSessionTest extends TestCase
         $this->withHeader('Referer', 'http://localhost:5173/requests')
             ->getJson('/api/v1/hr-requests')
             ->assertOk();
+    }
+
+    public function test_login_requires_2fa_and_rejects_wrong_code(): void
+    {
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
+        User::factory()->create([
+            'username' => 'otp_user',
+            'password' => 'password',
+            'email' => 'otp_user@example.test',
+            'region_id' => $federal->id,
+        ]);
+
+        $this->getJson('/api/v1/auth/csrf-cookie')->assertNoContent();
+
+        $this->withHeader('Origin', 'http://localhost:5173')
+            ->postJson('/api/v1/auth/login', [
+                'username' => 'otp_user',
+                'password' => 'password',
+            ])
+            ->assertOk()
+            ->assertJsonPath('requires_2fa', true);
+
+        $this->withHeader('Origin', 'http://localhost:5173')
+            ->getJson('/api/v1/auth/me')
+            ->assertUnauthorized();
+
+        $this->withHeader('Origin', 'http://localhost:5173')
+            ->postJson('/api/v1/auth/verify-2fa', [
+                'code' => '000000',
+            ])
+            ->assertStatus(422);
     }
 }

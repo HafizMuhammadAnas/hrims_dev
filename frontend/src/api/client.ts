@@ -42,6 +42,32 @@ export async function apiLogin(username: string, password: string): Promise<Resp
   })
 }
 
+export type LoginRequires2faResponse = {
+  requires_2fa: true
+  message?: string
+  masked_email: string
+  resend_available_in: number
+}
+
+export async function apiVerify2fa(code: string): Promise<Response> {
+  await ensureCsrfCookie()
+  return fetch('/api/v1/auth/verify-2fa', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify({ code }),
+  })
+}
+
+export async function apiResend2fa(): Promise<Response> {
+  await ensureCsrfCookie()
+  return fetch('/api/v1/auth/resend-2fa', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+  })
+}
+
 export async function apiLogout(): Promise<Response> {
   await ensureCsrfCookie()
   return fetch('/api/v1/auth/logout', {

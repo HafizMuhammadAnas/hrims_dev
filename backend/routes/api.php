@@ -50,6 +50,8 @@ Route::prefix('v1')->group(function (): void {
     // Throttle uses the default cache store; database cache without a `cache` table causes 500 here.
     // Re-add e.g. ->middleware('throttle:5,1') after CACHE_STORE=file (or migrate cache table).
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
+    Route::post('/auth/verify-2fa', [AuthController::class, 'verifyTwoFactor'])->name('api.v1.auth.verify-2fa');
+    Route::post('/auth/resend-2fa', [AuthController::class, 'resendTwoFactor'])->name('api.v1.auth.resend-2fa');
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.v1.auth.reset-password');
 
     Route::middleware('auth:sanctum')->group(function (): void {

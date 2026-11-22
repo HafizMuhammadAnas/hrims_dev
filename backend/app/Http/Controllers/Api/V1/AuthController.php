@@ -5,13 +5,24 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use App\Services\LoginOtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AuthController extends Controller
 {
+    private const PENDING_USER_KEY = 'pending_2fa_user_id';
+
+    private const PENDING_REMEMBER_KEY = 'pending_2fa_remember';
+
+    public function __construct(
+        private readonly LoginOtpService $loginOtp,
+    ) {}
+
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
@@ -20,31 +31,125 @@ class AuthController extends Controller
             'remember' => ['sometimes', 'boolean'],
         ]);
 
-        if (! Auth::attempt([
-            'username' => $credentials['username'],
-            'password' => $credentials['password'],
-        ], $credentials['remember'] ?? false)) {
+        /** @var User|null $user */
+        $user = User::query()->where('username', $credentials['username'])->first();
+        if ($user === null || ! Hash::check($credentials['password'], (string) $user->password)) {
             throw ValidationException::withMessages([
                 'username' => [__('auth.failed')],
             ]);
         }
 
-        /** @var User $user */
-        $user = Auth::user();
         if (! $user->is_active) {
-            Auth::logout();
-
             throw ValidationException::withMessages([
                 'username' => [__('Your account is inactive.')],
             ]);
         }
 
+        $this->loginOtp->assertUserCanReceiveOtp($user);
+
+        // Ensure no authenticated session until OTP succeeds.
+        Auth::guard('web')->logout();
+
+        try {
+            $issued = $this->loginOtp->issue($user);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            report($e);
+
+            throw ValidationException::withMessages([
+                'username' => [__('Could not send the verification email. Please try again or contact an administrator.')],
+            ]);
+        }
+
+        $request->session()->regenerate();
+        $request->session()->put(self::PENDING_USER_KEY, (int) $user->id);
+        $request->session()->put(self::PENDING_REMEMBER_KEY, (bool) ($credentials['remember'] ?? false));
+
+        return response()->json([
+            'requires_2fa' => true,
+            'message' => __('Enter the verification code sent to your email.'),
+            'masked_email' => $issued['masked_email'],
+            'resend_available_in' => $issued['resend_available_in'],
+        ]);
+    }
+
+    public function verifyTwoFactor(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:32'],
+        ]);
+
+        $user = $this->pendingUser($request);
+        if ($user === null) {
+            throw ValidationException::withMessages([
+                'code' => [__('Your sign-in session expired. Please sign in again.')],
+            ]);
+        }
+
+        if (! $user->is_active) {
+            $this->clearPending($request);
+            throw ValidationException::withMessages([
+                'code' => [__('Your account is inactive.')],
+            ]);
+        }
+
+        try {
+            $this->loginOtp->verify($user, $data['code']);
+        } catch (ValidationException $e) {
+            $messages = $e->errors();
+            $codeMsg = $messages['code'][0] ?? '';
+            if (str_contains($codeMsg, 'sign in again') || str_contains($codeMsg, 'expired') || str_contains($codeMsg, 'Too many')) {
+                $this->clearPending($request);
+            }
+            throw $e;
+        }
+
+        $remember = (bool) $request->session()->get(self::PENDING_REMEMBER_KEY, false);
+        $this->clearPending($request);
+
+        Auth::login($user, $remember);
         $request->session()->regenerate();
         $this->storeSessionPasswordHash($request, $user);
         ActivityLogService::record('login', $user, $request);
 
         return response()->json([
             'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
+        ]);
+    }
+
+    public function resendTwoFactor(Request $request): JsonResponse
+    {
+        $user = $this->pendingUser($request);
+        if ($user === null) {
+            throw ValidationException::withMessages([
+                'code' => [__('Your sign-in session expired. Please sign in again.')],
+            ]);
+        }
+
+        if (! $user->is_active) {
+            $this->clearPending($request);
+            throw ValidationException::withMessages([
+                'code' => [__('Your account is inactive.')],
+            ]);
+        }
+
+        try {
+            $issued = $this->loginOtp->resend($user);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            report($e);
+
+            throw ValidationException::withMessages([
+                'code' => [__('Could not send the verification email. Please try again or contact an administrator.')],
+            ]);
+        }
+
+        return response()->json([
+            'message' => __('A new verification code was sent.'),
+            'masked_email' => $issued['masked_email'],
+            'resend_available_in' => $issued['resend_available_in'],
         ]);
     }
 
@@ -57,6 +162,7 @@ class AuthController extends Controller
         }
 
         Auth::guard('web')->logout();
+        $this->clearPending($request);
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -110,6 +216,21 @@ class AuthController extends Controller
         return response()->json([
             'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
         ]);
+    }
+
+    private function pendingUser(Request $request): ?User
+    {
+        $id = $request->session()->get(self::PENDING_USER_KEY);
+        if (! is_numeric($id)) {
+            return null;
+        }
+
+        return User::query()->find((int) $id);
+    }
+
+    private function clearPending(Request $request): void
+    {
+        $request->session()->forget([self::PENDING_USER_KEY, self::PENDING_REMEMBER_KEY]);
     }
 
     private function storeSessionPasswordHash(Request $request, User $user): void

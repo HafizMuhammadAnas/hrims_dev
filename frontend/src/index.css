@@ -167,7 +167,13 @@ body:has(.modal-overlay) {
 .login-form-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
   margin: -0.35rem 0 0.85rem;
+}
+
+.login-form-actions--split {
+  justify-content: space-between;
 }
 
 .login-forgot-link {
@@ -177,8 +183,23 @@ body:has(.modal-overlay) {
   text-decoration: none;
 }
 
-.login-forgot-link:hover {
+button.login-forgot-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.login-forgot-link:hover:not(:disabled) {
   text-decoration: underline;
+}
+
+.login-forgot-link:disabled {
+  color: var(--txt-lt);
+  cursor: default;
+  text-decoration: none;
+  opacity: 0.75;
 }
 
 .login-submit-btn {
@@ -186,6 +207,16 @@ body:has(.modal-overlay) {
   justify-content: center;
   min-height: 44px;
   font-weight: 600;
+}
+
+.login-otp-input {
+  letter-spacing: 0.28em;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.login-form .app-alert {
+  margin: 0 0 0.85rem;
 }
 
 .login-form label {
