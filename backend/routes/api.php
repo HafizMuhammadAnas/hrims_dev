@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\Admin\UprTypeController as AdminUprTypeControlle
 use App\Http\Controllers\Api\V1\Admin\KnowledgeUprEntryController as AdminKnowledgeUprEntryController;
 use App\Http\Controllers\Api\V1\ActivityLogController;
 use App\Http\Controllers\Api\V1\Admin\ActivityLogController as AdminActivityLogController;
+use App\Http\Controllers\Api\V1\Admin\SystemSettingController as AdminSystemSettingController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompiledRecordController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -52,6 +53,7 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
     Route::post('/auth/verify-2fa', [AuthController::class, 'verifyTwoFactor'])->name('api.v1.auth.verify-2fa');
     Route::post('/auth/resend-2fa', [AuthController::class, 'resendTwoFactor'])->name('api.v1.auth.resend-2fa');
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('api.v1.auth.forgot-password');
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.v1.auth.reset-password');
 
     Route::middleware('auth:sanctum')->group(function (): void {
@@ -324,6 +326,11 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/governance/default-charts', [\App\Http\Controllers\Api\V1\Admin\GovernanceDefaultChartController::class, 'sync'])->name('api.v1.admin.governance.default-charts.sync.put');
 
             Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])->name('api.v1.admin.activity-logs.index');
+
+            Route::get('/settings', [AdminSystemSettingController::class, 'show'])->name('api.v1.admin.settings.show');
+            // POST alias: FortiGate blocks HTTP PATCH on some paths.
+            Route::post('/settings/update', [AdminSystemSettingController::class, 'update'])->name('api.v1.admin.settings.update');
+            Route::patch('/settings', [AdminSystemSettingController::class, 'update'])->name('api.v1.admin.settings.update.patch');
         });
     });
 });

@@ -3,13 +3,19 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PasswordResetMail;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\LoginOtpService;
+use App\Services\SystemSettingService;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -21,6 +27,7 @@ class AuthController extends Controller
 
     public function __construct(
         private readonly LoginOtpService $loginOtp,
+        private readonly SystemSettingService $settings,
     ) {}
 
     public function login(Request $request): JsonResponse
@@ -45,6 +52,13 @@ class AuthController extends Controller
             ]);
         }
 
+        $remember = (bool) ($credentials['remember'] ?? false);
+
+        // Super Admin never requires email OTP. Global toggle can also disable OTP for everyone.
+        if ($user->hasRole('super_admin') || ! $this->settings->isLoginOtpEnabled()) {
+            return $this->completeLogin($request, $user, $remember);
+        }
+
         $this->loginOtp->assertUserCanReceiveOtp($user);
 
         // Ensure no authenticated session until OTP succeeds.
@@ -64,7 +78,7 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
         $request->session()->put(self::PENDING_USER_KEY, (int) $user->id);
-        $request->session()->put(self::PENDING_REMEMBER_KEY, (bool) ($credentials['remember'] ?? false));
+        $request->session()->put(self::PENDING_REMEMBER_KEY, $remember);
 
         return response()->json([
             'requires_2fa' => true,
@@ -108,14 +122,7 @@ class AuthController extends Controller
         $remember = (bool) $request->session()->get(self::PENDING_REMEMBER_KEY, false);
         $this->clearPending($request);
 
-        Auth::login($user, $remember);
-        $request->session()->regenerate();
-        $this->storeSessionPasswordHash($request, $user);
-        ActivityLogService::record('login', $user, $request);
-
-        return response()->json([
-            'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
-        ]);
+        return $this->completeLogin($request, $user, $remember);
     }
 
     public function resendTwoFactor(Request $request): JsonResponse
@@ -171,23 +178,31 @@ class AuthController extends Controller
     }
 
     /**
-     * Guest password reset without email: user sets a new password on this screen.
+     * Send a password-reset link only when username + email both match the same account.
+     * The link is always mailed to that account's registered email (never to a mismatched address).
      */
-    public function resetPassword(Request $request): JsonResponse
+    public function forgotPassword(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'username' => ['required', 'string', 'exists:users,username'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'username' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
         ], [
             'username.required' => __('Username is required.'),
-            'username.exists' => __('No account was found for that username.'),
-            'password.required' => __('Choose a new password.'),
-            'password.min' => __('Password must be at least 8 characters.'),
-            'password.confirmed' => __('Password confirmation does not match.'),
+            'email.required' => __('Email is required.'),
+            'email.email' => __('Enter a valid email address.'),
         ]);
 
-        /** @var User $user */
-        $user = User::query()->where('username', $data['username'])->firstOrFail();
+        $username = trim($data['username']);
+        $email = Str::lower(trim($data['email']));
+
+        /** @var User|null $user */
+        $user = User::query()->where('username', $username)->first();
+
+        if ($user === null) {
+            throw ValidationException::withMessages([
+                'username' => [__('No account was found for that username.')],
+            ]);
+        }
 
         if (! $user->is_active) {
             throw ValidationException::withMessages([
@@ -195,9 +210,92 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->forceFill([
-            'password' => $data['password'],
-        ])->save();
+        $accountEmail = Str::lower(trim((string) $user->email));
+        if ($accountEmail === '' || ! filter_var((string) $user->email, FILTER_VALIDATE_EMAIL)) {
+            throw ValidationException::withMessages([
+                'email' => [__('This account has no valid email address. Contact an administrator.')],
+            ]);
+        }
+
+        if ($accountEmail !== $email) {
+            throw ValidationException::withMessages([
+                'email' => [__('This email does not match the account for that username.')],
+            ]);
+        }
+
+        try {
+            Password::broker()->sendResetLink(
+                ['email' => $user->email],
+                function (User $user, string $token): void {
+                    $frontend = rtrim((string) (config('app.frontend_url') ?: config('app.url')), '/');
+                    $expire = (int) config('auth.passwords.users.expire', 60);
+                    $url = $frontend.'/reset-password?'.http_build_query([
+                        'token' => $token,
+                        'email' => $user->email,
+                    ]);
+
+                    Mail::to($user->email)->send(new PasswordResetMail($user, $url, $expire));
+                }
+            );
+        } catch (Throwable $e) {
+            report($e);
+
+            throw ValidationException::withMessages([
+                'email' => [__('Could not send the reset email. Please try again or contact an administrator.')],
+            ]);
+        }
+
+        return response()->json([
+            'message' => __('A password reset link has been sent to the email registered for this account.'),
+        ]);
+    }
+
+    /**
+     * Complete password reset using the emailed token.
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email', 'max:255'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'token.required' => __('Reset link is invalid or incomplete.'),
+            'email.required' => __('Email is required.'),
+            'email.email' => __('Enter a valid email address.'),
+            'password.required' => __('Choose a new password.'),
+            'password.min' => __('Password must be at least 8 characters.'),
+            'password.confirmed' => __('Password confirmation does not match.'),
+        ]);
+
+        $status = Password::broker()->reset(
+            [
+                'email' => $data['email'],
+                'password' => $data['password'],
+                'password_confirmation' => $data['password_confirmation'] ?? $request->input('password_confirmation'),
+                'token' => $data['token'],
+            ],
+            function (User $user, string $password): void {
+                if (! $user->is_active) {
+                    throw ValidationException::withMessages([
+                        'email' => [__('Your account is inactive.')],
+                    ]);
+                }
+
+                $user->forceFill([
+                    'password' => $password,
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => [__($status)],
+            ]);
+        }
 
         return response()->json([
             'message' => __('Your password has been updated. You can sign in.'),
@@ -212,6 +310,20 @@ class AuthController extends Controller
         if ($user === null) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
+
+        return response()->json([
+            'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),
+        ]);
+    }
+
+    private function completeLogin(Request $request, User $user, bool $remember): JsonResponse
+    {
+        $this->clearPending($request);
+
+        Auth::login($user, $remember);
+        $request->session()->regenerate();
+        $this->storeSessionPasswordHash($request, $user);
+        ActivityLogService::record('login', $user, $request);
 
         return response()->json([
             'data' => $this->userPayload($user->load(['roles.permissions', 'region', 'department'])),

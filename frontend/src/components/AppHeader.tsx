@@ -4,6 +4,10 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useNotify } from '../context/NotificationsContext'
 import { resolveNotificationRoute } from '../lib/notificationRoutes'
+import {
+  PROFILE_PHOTO_CHANGED_EVENT,
+  readProfilePhoto,
+} from '../lib/profilePhoto'
 import { accountPortalSubtitle, formatAccountDisplayName } from '../lib/userDisplayLabels'
 import { LABEL_VIEW_ALL } from '../lib/uiLabels'
 
@@ -18,15 +22,34 @@ export function AppHeader({ onToggleSidebar }: Props) {
   const { inbox, unreadCount, inboxLoading, markRead } = useNotify()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
 
-  if (!user) return null
-
-  const subtitle = accountPortalSubtitle(user)
   const visibleItems = useMemo(
     () => inbox.slice(0, HEADER_NOTIFICATION_LIMIT),
     [inbox],
   )
+
+  useEffect(() => {
+    if (!user) {
+      setPhotoDataUrl(null)
+      return
+    }
+    setPhotoDataUrl(readProfilePhoto(user.id))
+
+    function onPhotoChanged(event: Event) {
+      const detail = (event as CustomEvent<{ userId?: string }>).detail
+      if (!user || (detail?.userId && detail.userId !== String(user.id))) return
+      setPhotoDataUrl(readProfilePhoto(user.id))
+    }
+
+    window.addEventListener(PROFILE_PHOTO_CHANGED_EVENT, onPhotoChanged)
+    window.addEventListener('storage', onPhotoChanged)
+    return () => {
+      window.removeEventListener(PROFILE_PHOTO_CHANGED_EVENT, onPhotoChanged)
+      window.removeEventListener('storage', onPhotoChanged)
+    }
+  }, [user])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -41,6 +64,10 @@ export function AppHeader({ onToggleSidebar }: Props) {
 
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
+
+  if (!user) return null
+
+  const subtitle = accountPortalSubtitle(user)
 
   async function handleOpenNotification(id: number) {
     const item = inbox.find((entry) => entry.id === id)
@@ -80,6 +107,10 @@ export function AppHeader({ onToggleSidebar }: Props) {
           </div>
         </div>
         <div className="user-info">
+          <div className="header-account-meta" onClick={() => navigate('/profile')}>
+            <div className="header-account-name">{formatAccountDisplayName(user.name)}</div>
+            <div className="header-account-subtitle">{subtitle}</div>
+          </div>
           <div className="notification-shell" ref={panelRef}>
             <button
               type="button"
@@ -117,18 +148,18 @@ export function AppHeader({ onToggleSidebar }: Props) {
               </div>
             )}
           </div>
-          <div className="header-account-meta" onClick={() => navigate('/profile')}>
-            <div className="header-account-name">{formatAccountDisplayName(user.name)}</div>
-            <div className="header-account-subtitle">{subtitle}</div>
-          </div>
           <button
             type="button"
             className="back-btn app-header-profile-btn"
             title="Profile"
+            aria-label="Profile"
             onClick={() => navigate('/profile')}
           >
-            <UserCircle size={18} />
-            <span>Profile</span>
+            {photoDataUrl ? (
+              <img src={photoDataUrl} alt="" className="app-header-profile-avatar" />
+            ) : (
+              <UserCircle size={18} aria-hidden />
+            )}
           </button>
           <button
             type="button"

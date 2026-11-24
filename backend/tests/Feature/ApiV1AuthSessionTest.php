@@ -98,4 +98,55 @@ class ApiV1AuthSessionTest extends TestCase
             ])
             ->assertStatus(422);
     }
+
+    public function test_super_admin_login_skips_2fa(): void
+    {
+        $user = User::factory()->create([
+            'username' => 'super_otp_skip',
+            'password' => 'password',
+            'email' => 'super_otp_skip@example.test',
+        ]);
+        $role = RbacRole::query()->where('slug', 'super_admin')->firstOrFail();
+        $user->roles()->attach($role);
+
+        $this->getJson('/api/v1/auth/csrf-cookie')->assertNoContent();
+
+        $this->withHeader('Origin', 'http://localhost:5173')
+            ->postJson('/api/v1/auth/login', [
+                'username' => 'super_otp_skip',
+                'password' => 'password',
+            ])
+            ->assertOk()
+            ->assertJsonMissing(['requires_2fa' => true])
+            ->assertJsonPath('data.username', 'super_otp_skip');
+
+        $this->withHeader('Origin', 'http://localhost:5173')
+            ->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('data.username', 'super_otp_skip');
+    }
+
+    public function test_login_skips_2fa_when_globally_disabled(): void
+    {
+        app(\App\Services\SystemSettingService::class)->setLoginOtpEnabled(false);
+
+        $federal = Region::query()->where('slug', 'ict')->firstOrFail();
+        User::factory()->create([
+            'username' => 'otp_off_user',
+            'password' => 'password',
+            'email' => 'otp_off_user@example.test',
+            'region_id' => $federal->id,
+        ]);
+
+        $this->getJson('/api/v1/auth/csrf-cookie')->assertNoContent();
+
+        $this->withHeader('Origin', 'http://localhost:5173')
+            ->postJson('/api/v1/auth/login', [
+                'username' => 'otp_off_user',
+                'password' => 'password',
+            ])
+            ->assertOk()
+            ->assertJsonMissing(['requires_2fa' => true])
+            ->assertJsonPath('data.username', 'otp_off_user');
+    }
 }

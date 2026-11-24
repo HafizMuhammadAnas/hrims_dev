@@ -84,8 +84,19 @@ export async function apiMe(): Promise<Response> {
   })
 }
 
+export async function apiForgotPassword(username: string, email: string): Promise<Response> {
+  await ensureCsrfCookie()
+  return fetch('/api/v1/auth/forgot-password', {
+    method: 'POST',
+    credentials: 'include',
+    headers: apiJsonHeaders(),
+    body: JSON.stringify({ username, email }),
+  })
+}
+
 export async function apiResetPassword(
-  username: string,
+  email: string,
+  token: string,
   password: string,
   passwordConfirmation: string,
 ): Promise<Response> {
@@ -95,7 +106,8 @@ export async function apiResetPassword(
     credentials: 'include',
     headers: apiJsonHeaders(),
     body: JSON.stringify({
-      username,
+      email,
+      token,
       password,
       password_confirmation: passwordConfirmation,
     }),

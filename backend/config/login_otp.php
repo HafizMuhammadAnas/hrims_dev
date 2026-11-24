@@ -7,7 +7,8 @@ return [
     | Login email OTP
     |--------------------------------------------------------------------------
     |
-    | Mandatory second factor after username/password for all users.
+    | Second factor after username/password. Super Admin always skips OTP.
+    | All other users follow system_settings key login_otp.enabled (default on).
     |
     */
 

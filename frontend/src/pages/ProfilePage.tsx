@@ -3,43 +3,54 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { PageSection } from '../components/ui/PageSection'
 import { TableCard } from '../components/ui/TableCard'
+import {
+  clearProfilePhoto,
+  notifyProfilePhotoChanged,
+  readProfilePhoto,
+  writeProfilePhoto,
+} from '../lib/profilePhoto'
 import { formatAccountDisplayName, formatPrimaryRoleLabel } from '../lib/userDisplayLabels'
-
-const PROFILE_PHOTO_KEY = 'hrims_profile_photo'
 
 export function ProfilePage() {
   const { user } = useAuth()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user) {
+      setPhotoDataUrl(null)
+      return
+    }
+    setPhotoDataUrl(readProfilePhoto(user.id))
+  }, [user])
+
   if (!user) return null
 
   const primaryRole = formatPrimaryRoleLabel(user)
   const displayName = formatAccountDisplayName(user.name)
 
-  useEffect(() => {
-    const savedPhoto = window.localStorage.getItem(PROFILE_PHOTO_KEY)
-    if (savedPhoto) {
-      setPhotoDataUrl(savedPhoto)
-    }
-  }, [])
-
   function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file || !user) return
+    const userId = user.id
 
     const reader = new FileReader()
     reader.onload = () => {
       const result = typeof reader.result === 'string' ? reader.result : null
       if (!result) return
       setPhotoDataUrl(result)
-      window.localStorage.setItem(PROFILE_PHOTO_KEY, result)
+      writeProfilePhoto(userId, result)
+      notifyProfilePhotoChanged(userId)
     }
     reader.readAsDataURL(file)
   }
 
   function clearPhoto() {
+    if (!user) return
+    const userId = user.id
     setPhotoDataUrl(null)
-    window.localStorage.removeItem(PROFILE_PHOTO_KEY)
+    clearProfilePhoto(userId)
+    notifyProfilePhotoChanged(userId)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
